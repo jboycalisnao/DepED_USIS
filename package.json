@@ -1,0 +1,20 @@
+{
+  "name": "deped-usis",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "election",
+    "registrar",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:election": "npm run dev --workspace ./election",
+    "dev:registrar": "npm run dev --workspace ./registrar",
+    "build:election": "npm run build --workspace ./election",
+    "build:registrar": "npm run build --workspace ./registrar",
+    "build": "npm run build:election && npm run build:registrar"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
