@@ -1,6 +1,5 @@
-
 import React from 'react';
-import { Section, GradeLevel } from '../../../types';
+import { GradeLevel, Section } from '../../../types';
 
 interface SectionListExporterProps {
   sections: Section[];
@@ -17,12 +16,12 @@ const SectionListExporter: React.FC<SectionListExporterProps> = ({ sections, sch
 
     const gradeLevels = Object.values(GradeLevel);
 
-    gradeLevels.forEach(grade => {
-      const gradeSections = sections.filter(s => s.gradeLevel === grade);
+    gradeLevels.forEach((grade) => {
+      const gradeSections = sections.filter((section) => section.gradeLevel === grade);
       if (gradeSections.length > 0) {
         content += `${grade.toUpperCase()}\n`;
-        gradeSections.forEach(sec => {
-          content += `  - ${sec.name.padEnd(25)} | Adviser: ${sec.adviserName || 'N/A'}\n`;
+        gradeSections.forEach((section) => {
+          content += `  - ${section.name.padEnd(25)} | Adviser: ${section.adviserName || 'N/A'}\n`;
         });
         content += `\n`;
       }
@@ -43,21 +42,25 @@ const SectionListExporter: React.FC<SectionListExporterProps> = ({ sections, sch
   };
 
   return (
-    <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100 no-print">
-      <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+    <div className="rounded-[12px] border border-[rgba(18,35,61,0.08)] bg-white p-6 shadow-sm no-print">
+      <div className="flex flex-col items-center justify-between gap-6 md:flex-row">
         <div className="flex items-center space-x-4">
-          <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-[#034F8B]">
-            <i className="fa-solid fa-file-lines text-xl"></i>
+          <div className="flex h-12 w-12 items-center justify-center rounded-[12px] bg-blue-50 text-[#034F8B]">
+            <i className="fa-solid fa-file-lines text-[16px]"></i>
           </div>
           <div>
-            <h3 className="text-xl font-black text-gray-900 uppercase tracking-tight">Sections List Exporter</h3>
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Generate raw text directory of active sections</p>
+            <h3 className="text-[16px] font-bold uppercase tracking-tight text-gray-900">
+              Sections List Exporter
+            </h3>
+            <p className="text-[13px] font-bold uppercase tracking-[0.12em] text-slate-500">
+              Generate raw text directory of active sections
+            </p>
           </div>
         </div>
 
-        <button 
+        <button
           onClick={handleExportText}
-          className="bg-gray-50 text-[#034F8B] px-8 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-[#034F8B] hover:text-white transition-all border border-blue-100 flex items-center shadow-sm"
+          className="flex items-center rounded-[12px] border border-blue-100 bg-blue-50 px-6 py-3 text-[13px] font-bold uppercase tracking-[0.08em] text-[#034F8B] transition-colors hover:bg-[#034F8B] hover:text-white"
         >
           <i className="fa-solid fa-download mr-3"></i>
           Export to .TXT File

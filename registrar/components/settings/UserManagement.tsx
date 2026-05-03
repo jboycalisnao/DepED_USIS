@@ -84,23 +84,25 @@ const UserManagement: React.FC = () => {
       </div>
 
       {editingUser && (
-        <div className="fixed inset-0 z-[450] flex items-center justify-center p-6">
-          <div className="fixed inset-0 bg-[#004E8C]/30 backdrop-blur-xl" onClick={() => setEditingUser(null)}></div>
-          <div className="relative w-full max-w-lg bg-white rounded-[48px] shadow-2xl overflow-hidden border border-surfaceVariant/30">
-            <div className="p-8 pb-4 flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-primary rounded-2xl flex items-center justify-center text-white shadow-lg"><span className="material-symbols-outlined text-2xl font-bold">manage_accounts</span></div>
-                <h3 className="text-xl font-black text-primary uppercase tracking-tighter">Edit Account</h3>
+        <div className="modal-overlay modal-overlay--high">
+          <div className="modal-backdrop" onClick={() => setEditingUser(null)}></div>
+          <div className="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="edit-account-title">
+            <div className="modal-dialog__header">
+              <div className="modal-dialog__title-group">
+                <h3 id="edit-account-title">Edit Account</h3>
+                <p className="modal-dialog__eyebrow">Registrar user access</p>
               </div>
-              <button onClick={() => setEditingUser(null)} className="w-10 h-10 rounded-full hover:bg-surface flex items-center justify-center text-outline"><span className="material-symbols-outlined">close</span></button>
+              <button type="button" onClick={() => setEditingUser(null)} className="modal-dialog__close" aria-label="Close edit account"><span className="material-symbols-outlined">close</span></button>
             </div>
-            <form onSubmit={handleUpdateUser} className="p-8 space-y-4">
-              <input type="text" value={editUserForm.displayName} onChange={(e) => setEditUserForm(prev => ({ ...prev, displayName: e.target.value }))} className="w-full px-5 py-4 rounded-2xl bg-surface border-none focus:ring-4 focus:ring-primary/10 font-bold text-sm" />
-              <input type="text" value={editUserForm.username} onChange={(e) => setEditUserForm(prev => ({ ...prev, username: e.target.value }))} className="w-full px-5 py-4 rounded-2xl bg-surface border-none focus:ring-4 focus:ring-primary/10 font-bold text-sm" />
-              <input type="text" value={editUserForm.password} onChange={(e) => setEditUserForm(prev => ({ ...prev, password: e.target.value }))} className="w-full px-5 py-4 rounded-2xl bg-surface border-none focus:ring-4 focus:ring-primary/10 font-bold text-sm" />
-              <div className="flex gap-3 pt-6">
-                <button type="button" onClick={() => generateCredentials(true)} className="flex-1 py-4 bg-white text-primary border border-primary/20 rounded-2xl font-black text-[10px] uppercase tracking-widest">Regenerate</button>
-                <button type="submit" disabled={loading} className="flex-1 py-4 bg-primary text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-primary/20 flex items-center justify-center gap-2">{loading ? <span className="material-symbols-outlined animate-spin">sync</span> : 'Update'}</button>
+            <form onSubmit={handleUpdateUser}>
+              <div className="modal-dialog__body form-grid">
+                <label className="floating-field__control"><input type="text" value={editUserForm.displayName} onChange={(e) => setEditUserForm(prev => ({ ...prev, displayName: e.target.value }))} placeholder=" " /><span>Display Name</span></label>
+                <label className="floating-field__control"><input type="text" value={editUserForm.username} onChange={(e) => setEditUserForm(prev => ({ ...prev, username: e.target.value }))} placeholder=" " /><span>User ID</span></label>
+                <label className="floating-field__control"><input type="text" value={editUserForm.password} onChange={(e) => setEditUserForm(prev => ({ ...prev, password: e.target.value }))} placeholder=" " /><span>Access Key</span></label>
+              </div>
+              <div className="modal-dialog__actions">
+                <button type="button" onClick={() => generateCredentials(true)}>Regenerate</button>
+                <button type="submit" disabled={loading} className="modal-dialog__blue">{loading ? <span className="material-symbols-outlined animate-spin">sync</span> : 'Update'}</button>
               </div>
             </form>
           </div>

@@ -29,28 +29,28 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ sections, learnerData
         const gradePercentage = totalGradeLearners > 0 ? Math.round((votedInGrade / totalGradeLearners) * 100) : 0;
         
         return (
-          <div key={grade} className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="bg-[#034F8B] px-8 py-5 flex justify-between items-center border-b-4 border-[#fcd116]/20">
-              <h3 className="text-lg font-black text-white uppercase tracking-widest flex items-center">
-                <i className="fa-solid fa-graduation-cap mr-3 text-[#fcd116]"></i>
+          <div key={grade} className="bg-white rounded-[12px] shadow-sm border border-[rgba(18,35,61,0.08)] overflow-hidden">
+            <div className="bg-white px-6 py-5 flex justify-between items-center border-b border-[rgba(18,35,61,0.08)]">
+              <h3 className="text-[24px] font-bold text-[#0038a8] uppercase tracking-tight flex items-center">
+                <i className="fa-solid fa-graduation-cap mr-3 text-[#0038a8]"></i>
                 {grade}
               </h3>
               
               <div className="flex items-center space-x-6">
                 <div className="text-right hidden sm:block">
-                  <p className="text-[9px] font-black text-white/40 uppercase tracking-widest leading-none">Grade Turnout</p>
-                  <p className="text-sm font-black text-white mt-1 uppercase">
-                    {votedInGrade.toLocaleString()} / {totalGradeLearners.toLocaleString()} <span className="text-white/40 font-bold ml-1">Voters</span>
+                  <p className="text-[13px] font-bold text-[#68758d] uppercase tracking-[0.06em] leading-none">Grade Turnout</p>
+                  <p className="text-[16px] font-bold text-[#12233d] mt-1 uppercase">
+                    {votedInGrade.toLocaleString()} / {totalGradeLearners.toLocaleString()} <span className="text-[#68758d] font-bold ml-1">Voters</span>
                   </p>
                 </div>
-                <div className="bg-white/10 px-4 py-2 rounded-2xl border border-white/10 shadow-inner flex items-center space-x-2">
-                  <i className="fa-solid fa-chart-line text-[#fcd116] text-xs"></i>
-                  <span className="text-xl font-black text-[#fcd116]">{gradePercentage}%</span>
+                <div className="bg-[#f4f8ff] px-4 py-2 rounded-[12px] border border-[rgba(0,56,168,0.12)] flex items-center space-x-2">
+                  <i className="fa-solid fa-chart-line text-[#0038a8] text-[13px]"></i>
+                  <span className="text-[24px] font-bold text-[#0038a8]">{gradePercentage}%</span>
                 </div>
               </div>
             </div>
 
-            <div className="p-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 bg-gray-50/30">
+            <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 bg-[#f8fafc]">
               {gradeSections.map(sec => {
                 const secStudents = learnerDatabase.filter(l => l.sectionId === sec.id);
                 const studentCount = secStudents.length;
@@ -60,17 +60,17 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ sections, learnerData
                 const sectionTurnout = studentCount > 0 ? Math.round((votedCount / studentCount) * 100) : 0;
                 
                 return (
-                  <div key={sec.id} className="group p-6 bg-white rounded-2xl border border-gray-100 hover:border-[#034F8B] transition-all hover:shadow-xl hover:shadow-[#034F8B]/5">
+                  <div key={sec.id} className="group p-5 bg-white rounded-[12px] border border-[rgba(18,35,61,0.08)] transition-colors hover:border-[#0038a8]/20">
                     <div className="flex justify-between items-start mb-4">
                       <div>
-                        <h4 className="font-black text-gray-900 uppercase group-hover:text-[#034F8B] transition-colors">{sec.name}</h4>
-                        <p className="text-[10px] font-bold text-gray-400 mt-1 uppercase tracking-tighter">
+                        <h4 className="font-bold text-[16px] text-[#12233d] uppercase">{sec.name}</h4>
+                        <p className="text-[13px] font-bold text-[#68758d] mt-1 uppercase tracking-[0.06em]">
                           <i className="fa-solid fa-user-tie mr-1.5"></i>
                           {sec.adviserName}
                         </p>
                       </div>
                       <div className="text-right">
-                        <span className="text-2xl font-black text-[#034F8B]">{sectionTurnout}%</span>
+                        <span className="text-[24px] font-bold text-[#0038a8]">{sectionTurnout}%</span>
                       </div>
                     </div>
 

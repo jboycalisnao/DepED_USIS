@@ -119,7 +119,7 @@ const CandidatesTab: React.FC<CandidatesTabProps> = ({
   };
 
   return (
-    <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden no-print">
+    <div className="bg-white rounded-[12px] shadow-sm border border-[rgba(18,35,61,0.08)] overflow-hidden no-print">
       <ManagePartylistsModal 
         isOpen={isPartyModalOpen} 
         onClose={() => setIsPartyModalOpen(false)} 
@@ -139,19 +139,19 @@ const CandidatesTab: React.FC<CandidatesTabProps> = ({
       />
 
       {/* Admin Header */}
-      <div className="p-8 border-b-4 border-[#fcd116]/20 flex flex-col md:flex-row justify-between items-center bg-[#034F8B] gap-4">
+      <div className="p-6 border-b border-[rgba(18,35,61,0.08)] flex flex-col md:flex-row justify-between items-center bg-white gap-4">
         <div className="flex flex-col">
-          <h3 className="text-xl font-black text-white uppercase tracking-tight flex items-center">
-            <i className="fa-solid fa-id-card-clip mr-3 text-[#fcd116]"></i>
+          <h3 className="text-[24px] font-bold text-[#0038a8] uppercase tracking-tight flex items-center">
+            <i className="fa-solid fa-id-card-clip mr-3 text-[#0038a8]"></i>
             Official Candidate Registry
           </h3>
           <div className="flex items-center mt-1 space-x-3">
-             <span className="text-[10px] text-blue-200 font-bold uppercase tracking-widest bg-white/10 px-2 py-0.5 rounded">
+             <span className="text-[13px] text-[#68758d] font-bold uppercase tracking-[0.08em]">
                {(candidates || []).length} Registered Candidates
              </span>
              {duplicates.size > 0 && (
-               <span className="text-[10px] text-red-400 font-black uppercase flex items-center bg-red-950/20 px-2 py-0.5 rounded border border-red-500/30">
-                 <i className="fa-solid fa-triangle-exclamation mr-1.5 animate-pulse"></i>
+               <span className="text-[13px] text-[#ce1126] font-bold uppercase flex items-center">
+                 <i className="fa-solid fa-triangle-exclamation mr-1.5"></i>
                  {duplicates.size} Registry Duplicates Found
                </span>
              )}
@@ -162,7 +162,7 @@ const CandidatesTab: React.FC<CandidatesTabProps> = ({
           <button 
             onClick={handlePrintList}
             disabled={candidates.length === 0}
-            className="bg-white/10 text-white px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-white/20 transition-all border border-white/20 flex items-center justify-center disabled:opacity-50"
+            className="bg-white text-[#0038a8] px-5 py-3 rounded-[4px] font-bold text-[13px] uppercase tracking-[0.06em] hover:bg-[#f4f8ff] transition-colors border border-[rgba(18,35,61,0.12)] flex items-center justify-center disabled:opacity-50"
           >
             <i className="fa-solid fa-print mr-2"></i>
             Candidates List
@@ -171,7 +171,7 @@ const CandidatesTab: React.FC<CandidatesTabProps> = ({
           <button 
             onClick={() => setIsPartyModalOpen(true)}
             disabled={isProcessing}
-            className="bg-white/10 text-white px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-white/20 transition-all border border-white/20 flex items-center justify-center disabled:opacity-50"
+            className="bg-white text-[#0038a8] px-5 py-3 rounded-[4px] font-bold text-[13px] uppercase tracking-[0.06em] hover:bg-[#f4f8ff] transition-colors border border-[rgba(18,35,61,0.12)] flex items-center justify-center disabled:opacity-50"
           >
             <i className="fa-solid fa-flag mr-2"></i>
             Partylists
@@ -183,7 +183,7 @@ const CandidatesTab: React.FC<CandidatesTabProps> = ({
               setIsCandidateModalOpen(true);
             }}
             disabled={isProcessing}
-            className="bg-[#E11C38] text-white px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-red-700 transition-all shadow-xl shadow-red-900/20 flex items-center justify-center border-2 border-white/20 disabled:opacity-50"
+            className="bg-[#0038a8] text-white px-5 py-3 rounded-[4px] font-bold text-[13px] uppercase tracking-[0.06em] hover:bg-[#002f8a] transition-colors flex items-center justify-center disabled:opacity-50"
           >
             <i className="fa-solid fa-user-plus mr-2"></i>
             New Candidate
@@ -192,15 +192,15 @@ const CandidatesTab: React.FC<CandidatesTabProps> = ({
       </div>
 
       {/* Search Bar Section */}
-      <div className="px-8 py-6 bg-gray-50 border-b border-gray-100">
+      <div className="px-6 py-5 bg-[#f8fafc] border-b border-[rgba(18,35,61,0.08)]">
         <div className="relative group max-w-xl">
-          <i className="fa-solid fa-magnifying-glass absolute left-5 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-[#034F8B] transition-colors"></i>
+          <i className="fa-solid fa-magnifying-glass absolute left-5 top-1/2 -translate-y-1/2 text-[#98a2b3] group-focus-within:text-[#0038a8] transition-colors"></i>
           <input 
             type="text"
-            placeholder="SEARCH CANDIDATE BY NAME OR PARTY..."
+            placeholder="Search candidate by name, party, or position"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-14 pr-10 py-4 bg-white border-2 border-gray-200 rounded-2xl focus:border-[#034F8B] outline-none font-black text-[10px] uppercase tracking-[0.2em] transition-all shadow-sm"
+            className="w-full pl-14 pr-10 py-4 bg-white border border-[rgba(18,35,61,0.12)] rounded-[12px] focus:border-[#0038a8] outline-none font-medium text-[16px] text-[#12233d] transition-colors shadow-sm"
           />
           {searchTerm && (
             <button 
@@ -214,7 +214,7 @@ const CandidatesTab: React.FC<CandidatesTabProps> = ({
       </div>
 
       {/* Candidate List grouped by Position */}
-      <div className="p-8 space-y-12 bg-gray-50/30">
+      <div className="p-6 space-y-10 bg-[#f8fafc]">
         {(POSITIONS || []).map(pos => {
           const positionCandidates = (filteredCandidates || []).filter(c => c.position === pos);
           if (positionCandidates.length === 0) return null;
@@ -226,10 +226,10 @@ const CandidatesTab: React.FC<CandidatesTabProps> = ({
               <div className="flex items-center space-x-4">
                 <div className="h-px flex-grow bg-gray-200"></div>
                 <div className="flex flex-col items-center">
-                  <h4 className="text-[11px] font-black text-[#034F8B] uppercase tracking-[0.3em] bg-blue-50 px-4 py-1.5 rounded-full border border-blue-100">
+                  <h4 className="text-[13px] font-bold text-[#0038a8] uppercase tracking-[0.08em] bg-white px-4 py-2 rounded-[12px] border border-[rgba(18,35,61,0.08)]">
                     {pos}
                   </h4>
-                  <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest mt-1">
+                  <span className="text-[13px] font-bold text-[#68758d] uppercase tracking-[0.06em] mt-1">
                     Audit Tally: {posTotalBallots} Ballots Verified
                   </span>
                 </div>
@@ -242,11 +242,11 @@ const CandidatesTab: React.FC<CandidatesTabProps> = ({
                   const votePercentage = posTotalBallots > 0 ? ((c.votes || 0) / posTotalBallots) * 100 : 0;
 
                   return (
-                    <div key={c.id} className={`bg-white rounded-[2.5rem] p-6 shadow-sm border transition-all hover:shadow-lg group relative flex flex-col ${isDupe ? 'border-red-200 bg-red-50/10 shadow-red-900/5' : 'border-gray-100 hover:border-blue-100'}`}>
+                    <div key={c.id} className={`bg-white rounded-[12px] p-5 shadow-sm border transition-colors group relative flex flex-col ${isDupe ? 'border-[#ce1126]/20 bg-[#fff7f7]' : 'border-[rgba(18,35,61,0.08)] hover:border-[#0038a8]/20'}`}>
                       {isDupe && (
-                        <div className="absolute -top-3 -right-3 z-10 flex items-center bg-red-600 text-white px-3 py-1.5 rounded-xl shadow-xl border-2 border-white animate-bounce">
+                        <div className="absolute top-4 right-4 z-10 flex items-center bg-[#fff1f2] text-[#ce1126] px-3 py-1.5 rounded-[12px] border border-[#ce1126]/20">
                           <i className="fa-solid fa-copy mr-2"></i>
-                          <span className="text-[9px] font-black uppercase tracking-tighter">Duplicate Record</span>
+                          <span className="text-[13px] font-bold uppercase tracking-[0.06em]">Duplicate</span>
                         </div>
                       )}
 

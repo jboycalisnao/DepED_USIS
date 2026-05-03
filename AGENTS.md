@@ -8,10 +8,37 @@ DepED USIS is planned as a **monorepo-style school systems repository** that con
 
 ## Current Module Inventory
 
+- `deped-web-kit/` - DepEd web branding and interface reference app
 - `election/` - election management system
 - `registrar/` - registrar and learner information system
 
 These are currently the active modules already present in the repository.
+
+Additional guidance for `deped-web-kit/`:
+
+- use it as the branding and UI reference point for future USIS-facing web modules
+- align color and interface decisions with the official DepEd visual guide and current DepEd portal patterns
+- prefer extracting reusable visual primitives from this app into shared UI only when they are stable enough for cross-module reuse
+- keep the app structured as a documentation-style portal, not a marketing landing page
+- preserve the 4-pillar model: `Overview`, `Foundations`, `Forms`, and `Patterns`
+- keep flat color surfaces only; do not introduce gradients or ombre styling
+- keep similar box-style surfaces on a `12px` corner radius unless a narrower utility control requires otherwise
+- for system migration and rebranding, all box-style surfaces in USIS modules must be restyled to match the `DepED-Web-Kit` box component treatment instead of keeping or inventing separate module-specific box styles
+- a rebranding pass is not complete if only the shell is updated; internal cards, panels, summaries, and other box-style content surfaces must also be migrated to the `DepED-Web-Kit` box treatment in the same change set whenever they are part of the affected screen
+- modal, alert, confirmation, and admin-access overlays are part of the same rule set; they must follow the `DepED-Web-Kit` modal and box treatment during rebranding rather than keeping a separate legacy overlay style
+- use Helvetica for web interface text inside the kit while keeping official DepEd logo typography guidance distinct
+- keep the DepEd logo and favicon proportional and unstretched
+- maintain visible padding around masthead, navigation, page intros, and major content blocks
+- for DepEd USIS forms, define keyboard flow deliberately; when speed matters, use explicit tab-index logic instead of leaving critical form order ambiguous
+- use Tailwind CSS with PostCSS for shared DepED-Web-Kit layout and documentation components, while keeping focused custom CSS only where interactive widget behavior still needs tighter control
+- keep interface typography within the shared USIS cap unless explicitly overridden: `24px` maximum for titles, `16px` maximum for regular body text, and `13px` maximum for subtitles, helper text, labels, and similar supporting text
+- whenever DepED-Web-Kit rules, components, behaviors, or standards change, update `deped-web-kit/public/usis-ai-reference.txt` so the deployed public AI reference remains aligned with the current system
+
+Favicon rule for USIS subsystems:
+
+- all USIS subsystem apps other than `deped-web-kit/` must use `common/assets/USIS_Icon.png` as the favicon
+- this applies to current modules such as `election/`, `registrar/`, and `coordinator/`, and to future subsystem apps unless a maintainer explicitly approves an exception
+- keep the favicon proportional and unstretched, and prefer cache-busted favicon tags when updating existing subsystem shells
 
 ## Core Architecture Direction
 
@@ -44,6 +71,44 @@ Current shared package:
 
 - `packages/shared-supabase/` is the initialized shared Supabase package for the monorepo foundation.
 
+## Database Naming Rule
+
+All Supabase tables for DepED USIS should be named according to the module or app that owns them.
+
+Required convention:
+
+- every table must start with the module name
+- example for registrar-owned tables: `registrar_<table_name>`
+- the same rule applies to all future USIS modules such as `election_<table_name>`, `guidance_<table_name>`, `library_<table_name>`, and so on
+
+Important note:
+
+- the requested concept is `module-{table_name}`, but for PostgreSQL and Supabase, underscores are the preferred implementation format
+- use `registrar_learners` instead of `registrar-learners`
+- use `election_ballot_entries` instead of `election-ballot-entries`
+- this avoids quoted identifiers and reduces migration/query errors
+
+Migration direction:
+
+- existing generic table names should gradually be renamed to module-prefixed names
+- shared cross-module tables should still be documented clearly if they remain global
+- foreign keys, views, policies, functions, and queries must be updated together whenever a table is renamed
+
+## Current Shared Schema Context
+
+The current Supabase schema is shared across multiple functional domains and includes many generic table names.
+
+Examples from the current schema context:
+
+- registrar-related records such as `learners`, `sections`, `document_requests`, `grade_levels`, `school_years`, `special_programs`, and `strands`
+- election-related records such as `candidates`, `ballot_entries`, `voter_participation`, `partylists`, and `election_config`
+- other USIS domain records such as `activities`, `app_settings`, `audit_logs`, `organizations`, `officers`, `sessions`, `inventory_items`, `borrow_records`, `financial_transactions`, `guidance_referrals`, `incidents`, `hazards`, `disaster_logs`, `evacuation_centers`, and related tables
+
+Schema warning carried forward from the provided context:
+
+- the current schema reference is for context only and is not assumed to be execution-ready as pasted
+- table order and constraints may need adjustment before direct execution
+
 ## Monorepo Guidance
 
 - Keep modules in separate subfolders.
@@ -62,6 +127,31 @@ To maintain a clean and scalable React architecture, always refactor component f
 - If a component exceeds 200 lines or manages multiple unrelated states, break it into smaller focused sub-components.
 - Ensure the folder structure reflects the application's domain, such as `features/auth` or `features/dashboard`, rather than generic technical types.
 
+## Component Folder Rule
+
+All component files must be refactored into their own relevant subfolders based on purpose, work, and logic.
+
+Required structure guidance:
+
+- group files by domain relevance first
+- then group by responsibility within that domain
+- keep view components, logic hooks, utilities, exports, and modal/dialog components separated when they grow
+- avoid large flat `components/` folders when the feature is already substantial
+
+Preferred examples:
+
+- `features/election/ballot/`
+- `features/election/results/`
+- `features/election/admin/candidates/`
+- `features/registrar/enrollment/`
+- `features/registrar/learners/`
+- `features/registrar/settings/`
+
+Refactor expectation:
+
+- if a component file becomes large, split it into sub-components, hooks, and helpers under a focused folder
+- if multiple files work together for one business feature, keep them together in a dedicated subfolder instead of scattering them by technical type only
+
 ## Documentation Expectations
 
 When updating this repository:
@@ -71,6 +161,20 @@ When updating this repository:
 - document shared services and credentials strategy
 - note architectural decisions that affect more than one module
 - treat this file as the persistent background/context guide for contributors and coding agents
+
+## Documentation & Text Standards
+
+- Tone must remain professional, direct, and institutional.
+- Avoid AI-style phrasing such as over-explaining simple UI behavior or using padded, balanced adjective triplets.
+- Prioritize React, Vite, and Supabase implementation patterns that support local-network deployment and offline-first operation for Philippine school environments.
+- Adhere strictly to the `deped-web-kit/` design language when writing or generating UI-related code or documentation.
+- Use web-ready tokens for color, spacing, and interface decisions instead of improvised visual language.
+- Respect the shared USIS type scale by default: titles must not exceed `24px`, regular text must not exceed `16px`, and subtitles, labels, and helper text must not exceed `13px` unless a maintainer explicitly requests an exception.
+- Treat header, main content, and footer as one continuous document flow on standard application pages. Do not create page-level nested scroll containers that trap dashboards or content panes beneath fixed shell regions unless a contained widget explicitly requires its own internal scroll area.
+- Do not apply page-level scale transforms, zoom-like wrappers, or fixed viewport-height containers to primary content regions. They break natural document height and can cause content to overlap the shared footer.
+- Preserve the `DepED-Web-Kit` 4-pillar structure in branding and technical references: `Overview`, `Foundations`, `Forms`, and `Patterns`.
+- Before generating text or code, verify that the output does not conflict with DepED-Web-Kit minimalism and institutional clarity.
+- If a request conflicts with that minimalism or introduces unnecessary visual or textual excess, flag it for review instead of executing it blindly.
 
 ## Working Assumptions for Future Changes
 

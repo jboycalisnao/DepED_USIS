@@ -275,36 +275,35 @@ const SectionManagement: React.FC = () => {
       </div>
 
       {editingSection && (
-        <div className="fixed inset-0 z-[150] flex items-center justify-center p-6">
-          <div className="fixed inset-0 bg-[#004E8C]/30 backdrop-blur-xl animate-in fade-in duration-300" onClick={closeEditModal}></div>
-          <div className="relative w-full max-w-2xl bg-white rounded-[64px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-500">
-             <div className="p-10 pb-4 flex items-center justify-between">
-                <div className="flex items-center gap-5">
-                  <div className="w-14 h-14 rounded-2xl bg-primary flex items-center justify-center text-white shadow-xl">
-                    <span className="material-symbols-outlined text-2xl font-bold">edit_square</span>
-                  </div>
+        <div className="modal-overlay">
+          <div className="modal-backdrop" onClick={closeEditModal}></div>
+          <div className="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="edit-section-title">
+             <div className="modal-dialog__header">
+                <div className="modal-dialog__title-group">
                   <div>
-                    <h3 className="text-2xl font-black text-primary uppercase tracking-tighter leading-none">Edit Section</h3>
+                    <h3 id="edit-section-title">Edit Section</h3>
                     <p className="text-[11px] font-bold text-outline uppercase mt-2 tracking-widest">{editingSection.gradeLevel} • {editingSection.name}</p>
                   </div>
                 </div>
-                <button onClick={closeEditModal} className="w-10 h-10 rounded-full hover:bg-surface transition-all flex items-center justify-center"><span className="material-symbols-outlined text-xl">close</span></button>
+                <button type="button" onClick={closeEditModal} className="modal-dialog__close" aria-label="Close edit section"><span className="material-symbols-outlined">close</span></button>
              </div>
              
-             <form onSubmit={handleUpdateSubmit} className="p-10 pt-6 space-y-6">
-                <div className="space-y-4">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black text-outline uppercase ml-4">Section Name</label>
-                    <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} className="w-full px-6 py-5 rounded-[24px] bg-[#f4f6fa] border border-transparent focus:border-primary/20 outline-none font-bold text-sm text-primary transition-all" />
+             <form onSubmit={handleUpdateSubmit}>
+                <div className="modal-dialog__body form-grid">
+                  <div className="floating-field">
+                    <label className="floating-field__control">
+                      <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} placeholder=" " />
+                      <span>Section Name</span>
+                    </label>
                   </div>
                   
                   {(isSHS(editingSection.gradeLevel) || isJHS(editingSection.gradeLevel)) && (
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-black text-outline uppercase ml-4">Classification</label>
+                    <div className="floating-field">
+                      <label className="floating-field__control">
                       <select 
                         value={editClassification} 
                         onChange={(e) => setEditClassification(e.target.value)} 
-                        className="w-full px-6 py-5 rounded-[24px] bg-[#f4f6fa] border border-transparent focus:border-primary/20 outline-none font-bold text-sm text-primary transition-all appearance-none"
+                        data-has-value={editClassification ? 'true' : 'false'}
                       >
                         <option value="">General</option>
                         {/* Simplified ternary with explicit typing to resolve "Property 'map' does not exist on type 'unknown'" */}
@@ -312,18 +311,22 @@ const SectionManagement: React.FC = () => {
                           <option key={item.id} value={item.acronym}>{item.acronym} - {item.fullName}</option>
                         ))}
                       </select>
+                      <span>Classification</span>
+                      </label>
                     </div>
                   )}
 
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black text-outline uppercase ml-4">Adviser Name</label>
-                    <input type="text" value={editAdviser} onChange={(e) => setEditAdviser(e.target.value)} className="w-full px-6 py-5 rounded-[24px] bg-[#f4f6fa] border border-transparent focus:border-primary/20 outline-none font-bold text-sm text-primary transition-all" />
+                  <div className="floating-field">
+                    <label className="floating-field__control">
+                      <input type="text" value={editAdviser} onChange={(e) => setEditAdviser(e.target.value)} placeholder=" " />
+                      <span>Adviser Name</span>
+                    </label>
                   </div>
                 </div>
 
-                <div className="flex justify-end gap-4 pt-6">
-                  <button type="button" onClick={closeEditModal} className="px-8 py-4 font-black text-xs uppercase text-outline hover:text-primary transition-all">Cancel</button>
-                  <button type="submit" className="px-10 py-5 bg-accent text-white rounded-[24px] font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-accent/20 hover:scale-105 active:scale-95 transition-all">Update Record</button>
+                <div className="modal-dialog__actions">
+                  <button type="button" onClick={closeEditModal}>Cancel</button>
+                  <button type="submit" className="modal-dialog__blue">Update Record</button>
                 </div>
              </form>
           </div>

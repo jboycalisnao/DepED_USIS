@@ -1,6 +1,6 @@
 import React from 'react';
 import { User } from '../types';
-import { LEON_NHS_LOGO_URL, DEPED_SEAL_URL } from '../constants';
+import { DEPED_LOGO_URL } from '../constants';
 
 interface IdentityConfirmationProps {
   user: User;
@@ -20,106 +20,98 @@ const IdentityConfirmation: React.FC<IdentityConfirmationProps> = ({ user, onCon
                         'Regular Program';
 
   return (
-    <div className="flex-grow flex items-center justify-center px-4 py-4 md:py-8 overflow-hidden bg-[#f8fafc]">
-      <div className="bg-white rounded-[2.5rem] shadow-[0_35px_60px_-15px_rgba(0,0,0,0.15)] max-w-4xl w-full overflow-hidden border border-gray-100 flex flex-col md:flex-row min-h-[400px] animate-in fade-in zoom-in-95 duration-500">
-        
-        {/* Left Side: Verification Status */}
-        <div className="w-full md:w-2/5 bg-[#034F8B] p-10 text-center text-white relative flex flex-col justify-center overflow-hidden">
-          <div className="absolute inset-0 opacity-[0.03] pointer-events-none flex items-center justify-center">
-             <img src={LEON_NHS_LOGO_URL} className="w-4/5 h-auto grayscale brightness-200 rotate-12" alt="" />
-          </div>
-          
-          <img 
-            src={LEON_NHS_LOGO_URL} 
-            className="h-24 w-auto mx-auto mb-6 drop-shadow-[0_10px_10px_rgba(0,0,0,0.3)] relative z-10" 
-            alt="Leon NHS Seal" 
-          />
-          <h2 className="text-xl font-black text-white uppercase tracking-[0.2em] relative z-10 leading-tight">Verification Profile</h2>
-          <div className="flex justify-center mt-4 relative z-10">
-            <span className="bg-[#E11C38] text-white px-5 py-1.5 rounded-full text-[9px] font-black uppercase tracking-[0.2em] shadow-lg border border-white/10">
-              Syncing Record...
-            </span>
-          </div>
-          <div className="mt-8 relative z-10 flex justify-center items-center space-x-2">
-            <img src={DEPED_SEAL_URL} className="h-8 w-auto opacity-50" alt="DepEd" />
+    <div className="flex-grow bg-[#f8fafc] px-4 py-6 md:px-6 md:py-8">
+      <div className="mx-auto w-full max-w-[1180px] rounded-[12px] border border-[#d7deea] bg-white shadow-[0_16px_40px_-24px_rgba(15,23,42,0.2)] animate-in fade-in zoom-in-95 duration-300">
+        <div className="border-b border-[#d7deea] px-6 py-5 md:px-8">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-center gap-4">
+              <div className="flex h-[64px] w-[64px] items-center justify-center rounded-[12px] border border-[#d7deea] bg-white">
+                <img src={DEPED_LOGO_URL} className="h-[40px] w-auto object-contain" alt="DepEd logo" />
+              </div>
+              <div>
+                <p className="text-[13px] font-bold uppercase tracking-[0.24em] text-[#6b7a90]">Verification Profile</p>
+                <h2 className="mt-1 text-[24px] font-bold uppercase leading-none text-[#1f2f4a]">Identity Confirmation</h2>
+              </div>
+            </div>
+            <div className="inline-flex items-center rounded-[12px] border border-[#d7deea] bg-white px-4 py-2 text-[13px] font-bold uppercase tracking-[0.18em] text-[#6b7a90]">
+              Syncing Record
+            </div>
           </div>
         </div>
 
-        {/* Right Side: Identity Details & Actions */}
-        <div className="w-full md:w-3/5 p-8 md:p-10 flex flex-col justify-between">
-          <div className="space-y-6">
-            <div className="bg-gray-50 rounded-[1.5rem] p-6 border border-gray-100 shadow-inner relative group overflow-hidden">
-              <div className="absolute top-4 right-4 text-blue-100 group-hover:text-[#034F8B]/5 transition-colors">
-                <i className="fa-solid fa-fingerprint text-5xl"></i>
-              </div>
-              
-              <div className="space-y-4 relative z-10">
+        <div className="space-y-6 px-6 py-6 md:px-8 md:py-8">
+          <div className="rounded-[12px] border border-[#d7deea] bg-white p-5 md:p-6">
+            <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
+              <div className="space-y-3">
                 <div>
-                  <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Authenticated Learner</p>
-                  <h3 className="text-2xl font-black text-gray-900 leading-tight uppercase">{displayName}</h3>
+                  <p className="text-[13px] font-bold uppercase tracking-[0.24em] text-[#6b7a90]">Authenticated Learner</p>
+                  <h3 className="mt-2 text-[24px] font-bold uppercase leading-tight text-[#1f2f4a]">{displayName}</h3>
                 </div>
-                
                 <div>
-                  <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Official LRN</p>
-                  <p className="text-base font-mono font-black text-[#034F8B] tracking-[0.2em] bg-white inline-block px-3 py-1 rounded-lg border border-blue-50 shadow-sm">
+                  <p className="text-[13px] font-bold uppercase tracking-[0.24em] text-[#6b7a90]">Official LRN</p>
+                  <p className="mt-2 inline-flex rounded-[12px] border border-[#d7deea] bg-white px-4 py-2 font-mono text-[16px] font-bold tracking-[0.18em] text-[#034f8b]">
                     {user.studentId}
                   </p>
                 </div>
               </div>
+              <div className="flex h-[56px] w-[56px] items-center justify-center rounded-[12px] bg-[#edf4ff] text-[#034f8b]">
+                <i className="fa-solid fa-fingerprint text-[24px]"></i>
+              </div>
             </div>
+          </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="bg-blue-50/30 p-4 rounded-xl border border-blue-100 flex items-center space-x-4">
-                <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center text-[#034F8B] shadow-sm">
-                  <i className="fa-solid fa-graduation-cap text-xs"></i>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="rounded-[12px] border border-[#d7deea] bg-white p-4">
+              <div className="flex items-center gap-4">
+                <div className="flex h-[44px] w-[44px] items-center justify-center rounded-[12px] border border-[#d7deea] bg-white text-[#034f8b]">
+                  <i className="fa-solid fa-graduation-cap text-[16px]"></i>
                 </div>
                 <div>
-                  <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Grade & Section</p>
-                  <p className="text-xs font-black text-[#034F8B] uppercase">{user.gradeLevel} - {user.sectionName || 'N/A'}</p>
+                  <p className="text-[13px] font-bold uppercase tracking-[0.18em] text-[#6b7a90]">Grade & Section</p>
+                  <p className="mt-1 text-[16px] font-bold uppercase text-[#034f8b]">{user.gradeLevel} - {user.sectionName || 'N/A'}</p>
                 </div>
               </div>
-              
-              <div className={`p-4 rounded-xl border flex items-center space-x-4 ${isSpecialized ? 'bg-[#fcd116]/10 border-[#fcd116]/30' : 'bg-blue-50/30 border-blue-100'}`}>
-                <div className={`w-8 h-8 bg-white rounded-lg flex items-center justify-center shadow-sm ${isSpecialized ? 'text-amber-600' : 'text-[#034F8B]'}`}>
-                  <i className={`fa-solid ${isSpecialized ? 'fa-star' : 'fa-id-card-clip'} text-xs`}></i>
+            </div>
+
+            <div className="rounded-[12px] border border-[#d7deea] bg-white p-4">
+              <div className="flex items-center gap-4">
+                <div className="flex h-[44px] w-[44px] items-center justify-center rounded-[12px] border border-[#d7deea] bg-white text-[#034f8b]">
+                  <i className={`fa-solid ${isSpecialized ? 'fa-star' : 'fa-id-card-clip'} text-[16px]`}></i>
                 </div>
                 <div>
-                  <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Voter Category</p>
-                  <p className={`text-xs font-black uppercase ${isSpecialized ? 'text-amber-700' : 'text-[#034F8B]'}`}>
-                    {categoryLabel}
-                  </p>
+                  <p className="text-[13px] font-bold uppercase tracking-[0.18em] text-[#6b7a90]">Voter Category</p>
+                  <p className="mt-1 text-[16px] font-bold uppercase text-[#034f8b]">{categoryLabel}</p>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="pt-6 space-y-4">
-             <div className="bg-red-50/50 rounded-xl p-4 border border-red-100 flex items-start space-x-3">
-              <i className="fa-solid fa-shield-halved text-[#E11C38] mt-1 text-xs"></i>
-              <p className="text-[9px] font-bold text-red-800 leading-relaxed uppercase tracking-tight">
+          <div className="rounded-[12px] border border-[#f1c5cb] bg-[#fff8f8] p-4">
+            <div className="flex items-start gap-3">
+              <i className="fa-solid fa-shield-halved mt-[2px] text-[16px] text-[#E11C38]"></i>
+              <p className="text-[13px] font-bold leading-6 text-[#a62b37]">
                 By clicking proceed, you declare that the profile above is your own. Intentional misidentification is subject to school disciplinary action.
               </p>
-            </div>
-
-            <div className="flex flex-col gap-3">
-              <button
-                onClick={onConfirm}
-                className="w-full bg-[#E11C38] text-white py-4 rounded-2xl font-black text-base hover:bg-red-700 transform transition-all active:scale-95 shadow-xl shadow-red-900/20 flex items-center justify-center group uppercase tracking-widest border-b-4 border-red-900"
-              >
-                <span>Access Digital Ballot</span>
-                <i className="fa-solid fa-arrow-right-long ml-4 group-hover:translate-x-1 transition-transform"></i>
-              </button>
-              <button
-                onClick={onCancel}
-                className="w-full py-1 font-black text-[9px] text-gray-400 hover:text-red-500 transition-colors uppercase tracking-[0.3em] flex items-center justify-center"
-              >
-                <i className="fa-solid fa-arrow-left mr-2"></i>
-                Not me? Logout
-              </button>
             </div>
           </div>
         </div>
 
+        <div className="flex flex-col gap-3 border-t border-[#d7deea] px-6 py-5 md:flex-row md:justify-end md:px-8">
+          <button
+            onClick={onCancel}
+            className="inline-flex items-center justify-center rounded-[12px] border border-[#d7deea] bg-white px-5 py-3 text-[13px] font-bold uppercase tracking-[0.18em] text-[#5d6f8a] transition-colors hover:border-[#c6d2e2] hover:text-[#1f2f4a]"
+          >
+            <i className="fa-solid fa-arrow-left mr-2"></i>
+            Not Me? Logout
+          </button>
+          <button
+            onClick={onConfirm}
+            className="inline-flex items-center justify-center rounded-[12px] bg-[#E11C38] px-5 py-3 text-[13px] font-bold uppercase tracking-[0.18em] text-white transition-colors hover:bg-[#c91833]"
+          >
+            <span>Access Digital Ballot</span>
+            <i className="fa-solid fa-arrow-right-long ml-3"></i>
+          </button>
+        </div>
       </div>
     </div>
   );

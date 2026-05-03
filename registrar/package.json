@@ -9,16 +9,16 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@deped-usis/shared-supabase": "^0.1.0",
-    "react": "19.0.0",
-    "react-dom": "19.0.0",
-    "react-router-dom": "7.1.1",
-    "antd": "5.23.2",
     "@ant-design/icons": "5.5.2",
+    "@deped-usis/shared-supabase": "^0.1.0",
+    "@supabase/supabase-js": "2.45.4",
+    "antd": "5.23.2",
     "dayjs": "1.11.13",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
+    "react-router-dom": "^7.14.2",
     "recharts": "3.6.0",
-    "xlsx": "0.18.5",
-    "@supabase/supabase-js": "2.45.4"
+    "xlsx": "0.18.5"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

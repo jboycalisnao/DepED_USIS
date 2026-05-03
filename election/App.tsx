@@ -8,6 +8,8 @@ import Confirmation from './components/Confirmation';
 import Results from './components/Results';
 import PublicResults from './components/PublicResults';
 import PublicTurnout from './components/PublicTurnout';
+import FeaturePlaceholder from './components/FeaturePlaceholder';
+import ElectionRegistrationPage from './components/ElectionRegistrationPage';
 import Footer from './components/Footer';
 import AdminPanel from './components/admin/AdminPanel';
 import NotificationModal, { ModalConfig } from './components/NotificationModal';
@@ -19,6 +21,17 @@ import { Candidate, AppView, User, ElectionConfig, ElectionStatus, Position, Gra
 import { DEPED_SEAL_URL, DEPED_LOGO_URL, LEON_NHS_LOGO_URL, LG_COMEA_LOGO_URL } from './constants';
 import { useStore } from './supabaseStore';
 import { cacheBrandingImages } from './utils/imagePersistence';
+import {
+  getCurrentElectionPath,
+  getElectionNavigationEvent,
+  navigateToElectionPath,
+  normalizeElectionPath,
+} from './utils/navigation';
+import {
+  getStoredElectionRegistrationAccess,
+  getStoredElectionRegistration,
+  normalizeElectionCode,
+} from './utils/electionRegistration';
 import { DEMO_LRN, DEMO_USER, DEMO_CANDIDATES, DemoBanner } from './components/DemoMode';
 
 const App: React.FC = () => {
@@ -27,6 +40,7 @@ const App: React.FC = () => {
   const [view, setView] = useState<AppView | 'audit' | 'monitoring'>('login');
   const [auditCandidateId, setAuditCandidateId] = useState<string | null>(null);
   const [studentId, setStudentId] = useState('');
+  const [electionCode, setElectionCode] = useState('');
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [turnoutByPosition, setTurnoutByPosition] = useState<Record<string, number>>({});
@@ -35,6 +49,12 @@ const App: React.FC = () => {
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
   const [isDemoMode, setIsDemoMode] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [activeElectionRegistration, setActiveElectionRegistration] = useState(() =>
+    getStoredElectionRegistration(),
+  );
+  const [registrationStep, setRegistrationStep] = useState<'access' | 'setup'>(() =>
+    getStoredElectionRegistrationAccess() ? 'setup' : 'access',
+  );
   
   const [electionConfig, setElectionConfig] = useState<ElectionConfig>({
     status: ElectionStatus.MANUAL_OPEN,
@@ -80,6 +100,18 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
+    const legacyHash = window.location.hash.replace(/^#\/?/, '/');
+    if (legacyHash) {
+      navigateToElectionPath(legacyHash, true);
+      return;
+    }
+
+    if (normalizeElectionPath(window.location.pathname) === '/login') {
+      navigateToElectionPath('/', true);
+    }
+  }, []);
+
+  useEffect(() => {
     cacheBrandingImages({
       'deped_seal': DEPED_SEAL_URL,
       'deped_logo': DEPED_LOGO_URL,
@@ -90,12 +122,54 @@ const App: React.FC = () => {
   }, [store.activeSchoolYear?.id]);
 
   useEffect(() => {
-    const handleHashChange = () => {
-      const hash = window.location.hash.replace('#/', '');
-      const parts = hash.split('/');
-      const mainView = parts[0] as AppView | 'audit' | 'monitoring';
-      const validViews: string[] = ['login', 'identity-confirmation', 'ballot', 'confirmation', 'results', 'admin', 'audit', 'monitoring', 'public-results', 'public-turnout'];
-      
+    const learnerExists = !!(store.learners || []).find((learner) => learner.lrn === studentId);
+    if (!learnerExists) {
+      setElectionCode('');
+    }
+  }, [studentId, store.learners]);
+
+  useEffect(() => {
+    const handleRouteChange = () => {
+      const pathname = getCurrentElectionPath();
+      const parts = pathname.split('/').filter(Boolean);
+      const normalizedParts = parts.filter(Boolean);
+      const hasAdminAccessSegment = normalizedParts.includes('admin-access');
+      const mainView = (parts[0] || 'login') as AppView | 'audit' | 'monitoring';
+      const validViews: string[] = [
+        'login',
+        'identity-confirmation',
+        'ballot',
+        'confirmation',
+        'results',
+        'election-registration',
+        'tally-results',
+        'admin',
+        'admin-access',
+        'audit',
+        'monitoring',
+        'public-results',
+        'public-turnout',
+      ];
+
+      if (pathname === '/') {
+        setView('login');
+        return;
+      }
+
+      if (hasAdminAccessSegment) {
+        if (currentUser?.isAdmin) {
+          updateView('admin/dashboard');
+          return;
+        }
+
+        setIsAdminModalOpen(true);
+        setView('login');
+        if (pathname !== '/admin-access') {
+          navigateToElectionPath('/admin-access', true);
+        }
+        return;
+      }
+
       if (validViews.includes(mainView)) {
         if (mainView === 'audit') {
           setAuditCandidateId(parts[1] || null);
@@ -118,30 +192,64 @@ const App: React.FC = () => {
           return;
         }
 
-        if (mainView === 'results' && !currentUser?.isAdmin) {
-            window.location.hash = '#/login';
-            setView('login');
+        if (mainView === 'results') {
+          setView('results-page');
+          return;
+        }
+
+        if (mainView === 'election-registration') {
+          const hasAccess = !!getStoredElectionRegistrationAccess();
+          const nextStep = parts[1] === 'setup' ? 'setup' : 'access';
+
+          if (nextStep === 'setup' && !hasAccess) {
+            navigateToElectionPath('/election-registration', true);
+            setRegistrationStep('access');
+            setView('election-registration');
             return;
+          }
+
+          setRegistrationStep(nextStep);
+          setView('election-registration');
+          return;
+        }
+
+        if (mainView === 'tally-results' && !currentUser?.isAdmin) {
+          navigateToElectionPath('/', true);
+          setView('login');
+          return;
         }
         
         if (['identity-confirmation', 'ballot', 'confirmation', 'admin'].includes(mainView) && !currentUser) {
-          window.location.hash = '#/login';
+          navigateToElectionPath('/', true);
           setView('login');
         } else {
           setView(mainView as any);
         }
       } else {
-        window.location.hash = '#/login';
+        navigateToElectionPath('/', true);
         setView('login');
       }
     };
-    window.addEventListener('hashchange', handleHashChange);
-    handleHashChange();
-    return () => window.removeEventListener('hashchange', handleHashChange);
+    const navigationEvent = getElectionNavigationEvent();
+    window.addEventListener('popstate', handleRouteChange);
+    window.addEventListener(navigationEvent, handleRouteChange);
+    handleRouteChange();
+    return () => {
+      window.removeEventListener('popstate', handleRouteChange);
+      window.removeEventListener(navigationEvent, handleRouteChange);
+    };
   }, [currentUser]);
 
   const updateView = (newView: string) => {
-    window.location.hash = `#/${newView}`;
+    const nextPath = newView === 'login' ? '/' : `/${newView.replace(/^\/+/, '')}`;
+    navigateToElectionPath(nextPath);
+  };
+
+  const closeAdminAccessModal = () => {
+    setIsAdminModalOpen(false);
+    if (!currentUser && getCurrentElectionPath() === '/admin-access') {
+      updateView('login');
+    }
   };
 
   const showAlert = (title: string, message: string, type: ModalConfig['type'] = 'info', onConfirm?: () => void) => {
@@ -171,6 +279,38 @@ const App: React.FC = () => {
     } catch (err) {
       refreshElectionData();
       throw err;
+    }
+  };
+
+  const handleDeleteBallot = async (lrn: string) => {
+    await store.deleteVoterBallot(lrn, store.activeSchoolYear?.id || '');
+    await refreshElectionData();
+  };
+
+  const handleReset = () => {
+    showAlert(
+      "Confirm System Reset",
+      "Permanently wipe records?",
+      "confirm",
+      () => store.resetAllElectionData(store.activeSchoolYear?.id || '').then(refreshElectionData),
+    );
+  };
+
+  const handleMigrateLegacyData = async () => {
+    try {
+      const result = await store.migrateLegacyElectionData(electionConfig);
+      await refreshElectionData();
+      showAlert(
+        'Legacy Migration Completed',
+        `Schools created: ${result.schoolCreated ? 1 : 0}, election events created: ${result.electionCreated ? 1 : 0}, candidates migrated: ${result.candidatesMigrated}, ballots migrated: ${result.ballotsMigrated}, participation migrated: ${result.participationMigrated}, partylists migrated: ${result.partylistsMigrated}.`,
+        'success',
+      );
+    } catch (error: any) {
+      showAlert(
+        'Legacy Migration Failed',
+        error?.message || 'The legacy migration could not be completed. Review the new schema objects first.',
+        'error',
+      );
     }
   };
 
@@ -214,6 +354,27 @@ const App: React.FC = () => {
     if (alreadyVoted) {
       showAlert("Duplicate Record", "Our records show that this student has already successfully cast a ballot.", "warning");
       setStudentId('');
+      return;
+    }
+
+    if (!activeElectionRegistration) {
+      showAlert(
+        'Election Code Required',
+        'No active election code has been generated yet. Complete the Election Registration page first.',
+        'warning',
+      );
+      return;
+    }
+
+    if (
+      normalizeElectionCode(electionCode) !==
+      normalizeElectionCode(activeElectionRegistration.electionCode)
+    ) {
+      showAlert(
+        'Invalid Election Code',
+        'The election code does not match the active code generated in Election Registration.',
+        'error',
+      );
       return;
     }
     
@@ -278,6 +439,7 @@ const App: React.FC = () => {
   const handleLogout = () => {
     setCurrentUser(null);
     setStudentId('');
+    setElectionCode('');
     setSelections({});
     setIsDemoMode(false);
     updateView('login');
@@ -302,34 +464,11 @@ const App: React.FC = () => {
     );
   }
 
-  if (view === 'public-results') {
-    return (
-      <PublicResults 
-        candidates={candidates} 
-        turnoutByPosition={turnoutByPosition} 
-        config={electionConfig}
-        schoolYearLabel={store.activeSchoolYear?.label || '----'}
-      />
-    );
-  }
-
-  if (view === 'public-turnout') {
-    return (
-      <PublicTurnout 
-        voters={voters} 
-        learnerDatabase={store.learners || []} 
-        sections={store.sections || []} 
-        config={electionConfig}
-        schoolYearLabel={store.activeSchoolYear?.label || '----'}
-      />
-    );
-  }
-
   return (
-    <div className="flex flex-col h-screen bg-[#f8fafc] overflow-hidden">
+    <div className="flex min-h-screen flex-col bg-[#f8fafc]">
       <SystemAlerts isOnline={store.online} isSyncing={store.loading || isSubmitting} hasError={store.connError} />
       <NotificationModal config={modalConfig} onClose={() => setModalConfig({ ...modalConfig, isOpen: false })} />
-      <AdminAccessModal isOpen={isAdminModalOpen} onClose={() => setIsAdminModalOpen(false)} onConfirm={(code) => {
+      <AdminAccessModal isOpen={isAdminModalOpen} onClose={closeAdminAccessModal} onConfirm={(code) => {
         if (code === '456456') {
           setCurrentUser({ studentId: 'admin', name: 'System Administrator', hasVoted: false, isAdmin: true });
           setIsAdminModalOpen(false);
@@ -342,53 +481,120 @@ const App: React.FC = () => {
       <Header 
         onLogout={currentUser ? handleLogout : undefined} 
         currentUser={currentUser?.name} 
-        onAdminClick={!currentUser ? () => setIsAdminModalOpen(true) : undefined} 
+        onAdminClick={!currentUser ? () => updateView('admin-access') : undefined} 
         schoolName={electionConfig.schoolName} 
         electionYear={electionYearLabel}
+        currentView={view}
       />
 
       {isDemoMode && <DemoBanner />}
       
-      <main className="flex-grow flex flex-col page-fade-in relative overflow-hidden bg-[#f8fafc]">
-        {view === 'login' && <Login studentId={studentId} setStudentId={setStudentId} onLogin={handleLogin} isLoadingLearners={store.loading} fetchProgress={100} config={electionConfig} />}
+      <main className="flex-grow flex flex-col page-fade-in relative bg-[#f8fafc]">
+        {view === 'login' && (
+          <Login
+            studentId={studentId}
+            setStudentId={setStudentId}
+            electionCode={electionCode}
+            setElectionCode={setElectionCode}
+            showElectionCodeField={
+              /^\d{12}$/.test(studentId) &&
+              !!(store.learners || []).find((learner) => learner.lrn === studentId)
+            }
+            activeElectionCode={activeElectionRegistration?.electionCode || ''}
+            onLogin={handleLogin}
+            isLoadingLearners={store.loading}
+            fetchProgress={100}
+            config={electionConfig}
+          />
+        )}
         {view === 'identity-confirmation' && currentUser && <IdentityConfirmation user={currentUser} onConfirm={() => updateView('ballot')} onCancel={handleLogout} />}
         {view === 'ballot' && (
-          <div className="overflow-y-auto h-full no-scrollbar">
-            <Ballot 
-              candidates={isDemoMode ? DEMO_CANDIDATES : candidates} 
-              selections={selections} 
-              onSelect={(pos, ids) => setSelections({...selections, [pos]: ids})} 
-              onSubmit={handleVoteSubmission} 
-              currentUser={currentUser} 
-            />
-          </div>
+          <Ballot 
+            candidates={isDemoMode ? DEMO_CANDIDATES : candidates} 
+            selections={selections} 
+            onSelect={(pos, ids) => setSelections({...selections, [pos]: ids})} 
+            onSubmit={handleVoteSubmission} 
+            currentUser={currentUser} 
+          />
         )}
         {view === 'confirmation' && <Confirmation candidates={isDemoMode ? DEMO_CANDIDATES : candidates} selections={selections} onLogout={handleLogout} user={currentUser} />}
-        {view === 'results' && <div className="overflow-y-auto h-full"><Results candidates={candidates} turnoutByPosition={turnoutByPosition} /></div>}
+        {view === 'results-page' && (
+          <FeaturePlaceholder
+            label="Results"
+            title="Election Results"
+            message="The new election results page will be added here using the DepED-Web-Kit template and the updated election portal standards."
+          />
+        )}
+        {view === 'election-registration' && (
+          <ElectionRegistrationPage
+            schoolName={electionConfig.schoolName || 'Leon National High School'}
+            schoolYearLabel={store.activeSchoolYear?.label || '----'}
+            onRegistrationGenerated={setActiveElectionRegistration}
+            onStepChange={setRegistrationStep}
+            step={registrationStep}
+            adminWorkspace={
+              registrationStep === 'setup' ? (
+                <AdminPanel 
+                  candidates={candidates || []} 
+                  turnoutByPosition={turnoutByPosition}
+                  onAddCandidate={handleAddCandidate}
+                  onUpdateCandidate={handleUpdateCandidate}
+                  onDeleteCandidate={handleDeleteCandidate}
+                  onDeleteBallot={handleDeleteBallot}
+                  voters={voters}
+                  learnerDatabase={store.learners}
+                  sections={store.sections}
+                  electionConfig={electionConfig}
+                  setElectionConfig={handleUpdateElectionConfig}
+                  onMigrateLegacyData={handleMigrateLegacyData}
+                  onReset={handleReset}
+                  onLogout={handleLogout}
+                  showAlert={showAlert}
+                  schoolYears={store.schoolYears}
+                  variant="embedded"
+                />
+              ) : null
+            }
+          />
+        )}
+        {view === 'tally-results' && <Results candidates={candidates} turnoutByPosition={turnoutByPosition} />}
+        {view === 'public-results' && (
+          <PublicResults 
+            candidates={candidates} 
+            turnoutByPosition={turnoutByPosition} 
+            config={electionConfig}
+            schoolYearLabel={store.activeSchoolYear?.label || '----'}
+          />
+        )}
+        {view === 'public-turnout' && (
+          <PublicTurnout 
+            voters={voters} 
+            learnerDatabase={store.learners || []} 
+            sections={store.sections || []} 
+            config={electionConfig}
+            schoolYearLabel={store.activeSchoolYear?.label || '----'}
+          />
+        )}
         {view === 'audit' && <CandidateAuditView candidate={candidates.find(c => c.id === auditCandidateId) || null} onBack={handleLogout} />}
         {view === 'admin' && (
-          <div className="overflow-y-auto h-full">
-            <AdminPanel 
-              candidates={candidates || []} 
-              turnoutByPosition={turnoutByPosition}
-              onAddCandidate={handleAddCandidate}
-              onUpdateCandidate={handleUpdateCandidate}
-              onDeleteCandidate={handleDeleteCandidate}
-              onDeleteBallot={async (lrn) => {
-                await store.deleteVoterBallot(lrn, store.activeSchoolYear?.id || '');
-                await refreshElectionData();
-              }}
-              voters={voters || []} 
-              learnerDatabase={store.learners || []} 
-              sections={store.sections || []} 
-              onReset={() => showAlert("Confirm System Reset", "Permanently wipe records?", "confirm", () => store.resetAllElectionData(store.activeSchoolYear?.id || '').then(refreshElectionData))} 
-              onLogout={handleLogout} 
-              showAlert={showAlert} 
-              electionConfig={electionConfig} 
-              setElectionConfig={handleUpdateElectionConfig}
-              schoolYears={store.schoolYears || []}
-            />
-          </div>
+          <AdminPanel 
+            candidates={candidates || []} 
+            turnoutByPosition={turnoutByPosition}
+            onAddCandidate={handleAddCandidate}
+            onUpdateCandidate={handleUpdateCandidate}
+            onDeleteCandidate={handleDeleteCandidate}
+            onDeleteBallot={handleDeleteBallot}
+            voters={voters || []} 
+            learnerDatabase={store.learners || []} 
+            sections={store.sections || []} 
+            onReset={handleReset}
+            onLogout={handleLogout} 
+            showAlert={showAlert} 
+            electionConfig={electionConfig} 
+            setElectionConfig={handleUpdateElectionConfig}
+            onMigrateLegacyData={handleMigrateLegacyData}
+            schoolYears={store.schoolYears || []}
+          />
         )}
       </main>
 

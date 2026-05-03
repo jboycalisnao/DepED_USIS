@@ -171,31 +171,34 @@ const AcademicClassifications: React.FC = () => {
       </section>
 
       {editingProgram && (
-        <div className="fixed inset-0 z-[450] flex items-center justify-center p-6">
-          <div className="fixed inset-0 bg-[#004E8C]/30 backdrop-blur-xl" onClick={() => setEditingProgram(null)}></div>
-          <div className="relative w-full max-w-lg bg-white rounded-[48px] shadow-2xl overflow-hidden border border-surfaceVariant/30 animate-in zoom-in-95 duration-300">
-            <div className="p-8 pb-4 flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-primary rounded-2xl flex items-center justify-center text-white shadow-lg"><span className="material-symbols-outlined text-2xl font-bold">edit_note</span></div>
-                <div>
-                  <h3 className="text-xl font-black text-primary uppercase tracking-tighter">Edit {editingProgram.type === 'strand' ? 'Strand' : 'Program'}</h3>
-                  <p className="text-[10px] font-bold text-outline uppercase tracking-widest">Update institutional classification</p>
-                </div>
+        <div className="modal-overlay modal-overlay--high">
+          <div className="modal-backdrop" onClick={() => setEditingProgram(null)}></div>
+          <div className="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="edit-classification-title">
+            <div className="modal-dialog__header">
+              <div className="modal-dialog__title-group">
+                <h3 id="edit-classification-title">Edit {editingProgram.type === 'strand' ? 'Strand' : 'Program'}</h3>
+                <p className="modal-dialog__eyebrow">Update institutional classification</p>
               </div>
-              <button onClick={() => setEditingProgram(null)} className="w-10 h-10 rounded-full hover:bg-surface flex items-center justify-center text-outline"><span className="material-symbols-outlined">close</span></button>
+              <button type="button" onClick={() => setEditingProgram(null)} className="modal-dialog__close" aria-label="Close edit classification"><span className="material-symbols-outlined">close</span></button>
             </div>
-            <form onSubmit={handleUpdate} className="p-8 space-y-4">
-              <div className="space-y-1">
-                <label className="text-[9px] font-black text-outline uppercase tracking-widest ml-4">Acronym</label>
-                <input type="text" value={editAcronym} onChange={(e) => setEditAcronym(e.target.value)} disabled={loading} className="w-full px-5 py-4 rounded-2xl bg-surface border-none focus:ring-4 focus:ring-primary/10 font-bold text-sm uppercase" />
+            <form onSubmit={handleUpdate}>
+              <div className="modal-dialog__body form-grid">
+              <div className="floating-field">
+                <label className="floating-field__control">
+                  <input type="text" value={editAcronym} onChange={(e) => setEditAcronym(e.target.value)} disabled={loading} placeholder=" " />
+                  <span>Acronym</span>
+                </label>
               </div>
-              <div className="space-y-1">
-                <label className="text-[9px] font-black text-outline uppercase tracking-widest ml-4">Full Name</label>
-                <input type="text" value={editFullName} onChange={(e) => setEditFullName(e.target.value)} disabled={loading} className="w-full px-5 py-4 rounded-2xl bg-surface border-none focus:ring-4 focus:ring-primary/10 font-bold text-sm" />
+              <div className="floating-field">
+                <label className="floating-field__control">
+                  <input type="text" value={editFullName} onChange={(e) => setEditFullName(e.target.value)} disabled={loading} placeholder=" " />
+                  <span>Full Name</span>
+                </label>
               </div>
-              <div className="flex gap-3 pt-6">
-                <button type="button" onClick={() => setEditingProgram(null)} className="flex-1 py-4 text-outline font-black text-[10px] uppercase tracking-widest">Cancel</button>
-                <button type="submit" disabled={loading} className="flex-1 py-4 bg-primary text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-primary/20 flex items-center justify-center gap-2">
+              </div>
+              <div className="modal-dialog__actions">
+                <button type="button" onClick={() => setEditingProgram(null)}>Cancel</button>
+                <button type="submit" disabled={loading} className="modal-dialog__blue">
                   {loading ? <span className="material-symbols-outlined animate-spin">sync</span> : 'Update Record'}
                 </button>
               </div>

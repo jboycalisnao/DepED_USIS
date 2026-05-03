@@ -1,9 +1,12 @@
 
 import { useState, useEffect } from 'react';
-import { Student, SchoolYear, EnrollmentStatus, GradeLevel, Section, Candidate, ElectionConfig, ElectionStatus, Position } from './types';
+import { Student, SchoolYear, EnrollmentStatus, GradeLevel, Section, Candidate, ElectionConfig, ElectionStatus, Position, ElectionContext, LegacyMigrationResult } from './types';
 import { SCHOOL_YEARS as FALLBACK_SY, MOCK_STUDENTS } from './constants';
 import { supabase } from './lib/supabase';
 import { getBase64Size } from './utils/imageUtils';
+import { getMaxSelectionsForPosition, sanitizeBallotSelections } from './utils/electionRules';
+import { getStoredElectionRegistrationContext, resolveElectionContext } from './utils/electionSchemaContext';
+import { migrateLegacyElectionData as runLegacyElectionMigration } from './utils/legacyElectionMigration';
 
 let learners: Student[] = []; 
 let sections: Section[] = [];
@@ -106,6 +109,27 @@ const mapCandidateToDb = (c: Partial<Candidate>) => {
   return dbObj;
 };
 
+const DEFAULT_ELECTION_CONFIG: ElectionConfig = {
+  status: ElectionStatus.MANUAL_OPEN,
+  startTime: null,
+  endTime: null,
+  schoolName: 'Leon National High School',
+  publicResultsEnabled: false,
+  publicTurnoutEnabled: false,
+};
+
+const getElectionContext = async (schoolYearId: string): Promise<ElectionContext | null> => {
+  if (!schoolYearId) {
+    return null;
+  }
+
+  try {
+    return await resolveElectionContext(schoolYearId);
+  } catch {
+    return null;
+  }
+};
+
 const fetchLearners = async (schoolYearId: string) => {
   setLoading(true);
   const cacheKey = `${CACHE_KEYS.LEARNERS}${schoolYearId}`;
@@ -121,7 +145,7 @@ const fetchLearners = async (schoolYearId: string) => {
   }
 
   const { data: sySections, error: secError } = await supabase
-    .from('sections')
+    .from('registrar_sections')
     .select('id')
     .eq('school_year_id', schoolYearId);
   
@@ -140,7 +164,7 @@ const fetchLearners = async (schoolYearId: string) => {
   }
 
   const { data, error } = await supabase
-    .from('learners')
+    .from('registrar_learners')
     .select('*')
     .in('section_id', sectionIds);
 
@@ -181,7 +205,7 @@ const fetchSections = async (schoolYearId: string) => {
   }
 
   const { data, error } = await supabase
-    .from('sections')
+    .from('registrar_sections')
     .select('*')
     .eq('school_year_id', schoolYearId);
 
@@ -206,7 +230,7 @@ const fetchSections = async (schoolYearId: string) => {
 };
 
 const fetchSchoolYears = async () => {
-  const { data, error } = await supabase.from('school_years').select('*').order('label', { ascending: false });
+  const { data, error } = await supabase.from('registrar_school_years').select('*').order('label', { ascending: false });
   if (error) {
     setConnectionError(true);
   } else if (data) {
@@ -272,11 +296,18 @@ export const useStore = () => {
 
   const fetchCandidates = async (syId?: string): Promise<{ candidates: Candidate[], turnoutByPosition: Record<string, number> }> => {
     const targetSyId = syId || currentSY.id;
-    
-    const { data: candidatesData, error: candError } = await supabase
-      .from('candidates')
+    const context = await getElectionContext(targetSyId);
+
+    const candidateQuery = supabase
+      .from('election_candidates')
       .select('*')
       .eq('school_year_id', targetSyId);
+
+    if (context) {
+      candidateQuery.eq('school_id', context.schoolId).eq('election_code', context.electionCode);
+    }
+
+    const { data: candidatesData, error: candError } = await candidateQuery;
 
     let allBallotEntries: any[] = [];
     let from = 0;
@@ -284,11 +315,16 @@ export const useStore = () => {
     let finished = false;
 
     while (!finished) {
-      const { data: votesBatch, error: voteError } = await supabase
-        .from('ballot_entries')
-        .select('candidate_id, position, voter_lrn')
-        .eq('school_year_id', targetSyId)
-        .range(from, to);
+      const votesQuery = supabase
+        .from('election_ballot_entries')
+        .select('id, candidate_id, position, voter_lrn, created_at')
+        .eq('school_year_id', targetSyId);
+
+      if (context) {
+        votesQuery.eq('school_id', context.schoolId).eq('election_code', context.electionCode);
+      }
+
+      const { data: votesBatch, error: voteError } = await votesQuery.range(from, to);
 
       if (voteError) {
         setConnectionError(true);
@@ -314,7 +350,20 @@ export const useStore = () => {
     // IDEMPOTENT MULTI-SEAT TALLYING
     const voterPositionSelections = new Map<string, Map<string, string[]>>();
 
-    allBallotEntries.forEach(entry => {
+    allBallotEntries
+      .sort((a, b) => {
+        const voterSort = String(a.voter_lrn).localeCompare(String(b.voter_lrn));
+        if (voterSort !== 0) return voterSort;
+
+        const positionSort = String(a.position).localeCompare(String(b.position));
+        if (positionSort !== 0) return positionSort;
+
+        const createdAtSort = String(a.created_at || '').localeCompare(String(b.created_at || ''));
+        if (createdAtSort !== 0) return createdAtSort;
+
+        return String(a.id || '').localeCompare(String(b.id || ''));
+      })
+      .forEach(entry => {
       if (!voterPositionSelections.has(entry.voter_lrn)) {
         voterPositionSelections.set(entry.voter_lrn, new Map());
       }
@@ -325,13 +374,7 @@ export const useStore = () => {
       }
 
       const selected = posMap.get(entry.position)!;
-      const posLower = entry.position.toLowerCase();
-      
-      // REFINED RULE: Multi-seat (2) for regular Reps, but SINGLE (1) for STE and SPA.
-      const isMultiSeatRep = posLower.includes('representative') && 
-                             !posLower.includes('ste') && 
-                             !posLower.includes('spa');
-      const limit = isMultiSeatRep ? 2 : 1;
+      const limit = getMaxSelectionsForPosition(entry.position);
 
       if (selected.length < limit && !selected.includes(entry.candidate_id)) {
         selected.push(entry.candidate_id);
@@ -352,16 +395,49 @@ export const useStore = () => {
   };
 
   const fetchElectionConfig = async (): Promise<ElectionConfig> => {
+    const context = await getElectionContext(currentSY.id);
+
+    if (context) {
+      const { data, error } = await supabase
+        .from('election_events')
+        .select('*')
+        .eq('id', context.electionId)
+        .single();
+
+      if (error) {
+        console.error("Config fetch error:", error);
+        setConnectionError(true);
+        return { ...DEFAULT_ELECTION_CONFIG, schoolId: context.schoolId, schoolCode: context.schoolCode, electionId: context.electionId, electionCode: context.electionCode };
+      }
+
+      return {
+        status: data?.status as ElectionStatus || ElectionStatus.MANUAL_OPEN,
+        startTime: data?.start_time || null,
+        endTime: data?.end_time || null,
+        schoolName: data?.school_display_name || context.schoolName,
+        schoolId: context.schoolId,
+        schoolCode: context.schoolCode,
+        electionId: context.electionId,
+        electionCode: context.electionCode,
+        publicResultsEnabled: data?.public_results_enabled ?? false,
+        publicTurnoutEnabled: data?.public_turnout_enabled ?? false
+      };
+    }
+
     const { data, error } = await supabase.from('election_config').select('*').eq('id', 1).single();
     if (error) {
        console.error("Config fetch error:", error);
        setConnectionError(true);
+       return DEFAULT_ELECTION_CONFIG;
     }
     return {
       status: data?.status as ElectionStatus || ElectionStatus.MANUAL_OPEN,
       startTime: data?.start_time || null,
       endTime: data?.end_time || null,
       schoolName: data?.school_name || 'Leon National High School',
+      schoolId: getStoredElectionRegistrationContext()?.schoolId,
+      schoolCode: getStoredElectionRegistrationContext()?.schoolId,
+      electionCode: getStoredElectionRegistrationContext()?.electionCode,
       publicResultsEnabled: data?.public_results_enabled ?? false,
       publicTurnoutEnabled: data?.public_turnout_enabled ?? false
     };
@@ -369,14 +445,32 @@ export const useStore = () => {
 
   const saveElectionConfig = async (config: ElectionConfig) => {
     setLoading(true);
-    const { error } = await supabase.from('election_config').update({
-      status: config.status,
-      start_time: config.startTime,
-      end_time: config.endTime,
-      school_name: config.schoolName,
-      public_results_enabled: config.publicResultsEnabled,
-      public_turnout_enabled: config.publicTurnoutEnabled
-    }).eq('id', 1);
+    const context = await getElectionContext(currentSY.id);
+    const mutation = context
+      ? supabase
+          .from('election_events')
+          .update({
+            status: config.status,
+            start_time: config.startTime,
+            end_time: config.endTime,
+            school_display_name: config.schoolName,
+            public_results_enabled: config.publicResultsEnabled,
+            public_turnout_enabled: config.publicTurnoutEnabled
+          })
+          .eq('id', context.electionId)
+      : supabase
+          .from('election_config')
+          .update({
+            status: config.status,
+            start_time: config.startTime,
+            end_time: config.endTime,
+            school_name: config.schoolName,
+            public_results_enabled: config.publicResultsEnabled,
+            public_turnout_enabled: config.publicTurnoutEnabled
+          })
+          .eq('id', 1);
+
+    const { error } = await mutation;
 
     if (error) {
       console.error("Config persistence failed:", error);
@@ -388,13 +482,24 @@ export const useStore = () => {
   };
 
   const submitBallot = async (lrn: string, selections: Record<string, string[]>, schoolYearId: string) => {
+    const sanitizedSelections = sanitizeBallotSelections(selections);
     const ballotLines: any[] = [];
+    const context = await getElectionContext(schoolYearId);
     
-    Object.entries(selections).forEach(([pos, ids]) => {
+    Object.entries(sanitizedSelections).forEach(([pos, ids]) => {
       if (Array.isArray(ids)) {
+        if (ids.length > getMaxSelectionsForPosition(pos)) {
+          throw new Error(`Selection limit exceeded for ${pos}.`);
+        }
+
         ids.forEach(cid => {
           if (cid) {
             ballotLines.push({
+              ...(context ? {
+                school_id: context.schoolId,
+                election_id: context.electionId,
+                election_code: context.electionCode
+              } : {}),
               voter_lrn: lrn,
               candidate_id: cid,
               position: pos,
@@ -411,8 +516,16 @@ export const useStore = () => {
     }
 
     const [res1, res2] = await Promise.all([
-      supabase.from('voter_participation').insert([{ lrn, school_year_id: schoolYearId }]),
-      ballotLines.length > 0 ? supabase.from('ballot_entries').insert(ballotLines) : Promise.resolve({ error: null })
+      supabase.from('election_voter_participation').insert([{
+        ...(context ? {
+          school_id: context.schoolId,
+          election_id: context.electionId,
+          election_code: context.electionCode
+        } : {}),
+        lrn,
+        school_year_id: schoolYearId
+      }]),
+      ballotLines.length > 0 ? supabase.from('election_ballot_entries').insert(ballotLines) : Promise.resolve({ error: null })
     ]);
 
     if (res1.error || res2.error) {
@@ -422,83 +535,153 @@ export const useStore = () => {
   };
 
   const addCandidateToDb = async (candidate: Partial<Candidate>, schoolYearId: string) => {
+    const context = await getElectionContext(schoolYearId);
     const dbPayload = {
       ...mapCandidateToDb(candidate),
-      school_year_id: schoolYearId
+      school_year_id: schoolYearId,
+      ...(context ? {
+        school_id: context.schoolId,
+        election_id: context.electionId,
+        election_code: context.electionCode
+      } : {})
     };
-    const { error } = await supabase.from('candidates').insert([dbPayload]);
+    const { error } = await supabase.from('election_candidates').insert([dbPayload]);
     if (error) setConnectionError(true);
   };
 
   const updateCandidateInDb = async (id: string, candidate: Partial<Candidate>) => {
     const dbPayload = mapCandidateToDb(candidate);
-    const { error } = await supabase.from('candidates').update(dbPayload).eq('id', id);
+    const { error } = await supabase.from('election_candidates').update(dbPayload).eq('id', id);
     if (error) setConnectionError(true);
   };
 
   const deleteCandidateFromDb = async (id: string) => {
-    const { error } = await supabase.from('candidates').delete().eq('id', id);
+    const { error } = await supabase.from('election_candidates').delete().eq('id', id);
     if (error) setConnectionError(true);
   };
 
   const fetchVoterBallot = async (lrn: string, syId: string) => {
-    const { data, error } = await supabase.from('ballot_entries').select('position, candidate_id, candidates(name)').eq('voter_lrn', lrn).eq('school_year_id', syId);
+    const context = await getElectionContext(syId);
+    const query = supabase
+      .from('election_ballot_entries')
+      .select('position, candidate_id, election_candidates(name)')
+      .eq('voter_lrn', lrn)
+      .eq('school_year_id', syId);
+
+    if (context) {
+      query.eq('school_id', context.schoolId).eq('election_code', context.electionCode);
+    }
+
+    const { data, error } = await query;
     if (error) setConnectionError(true);
     return data || [];
   };
 
   const deleteVoterBallot = async (lrn: string, syId: string) => {
+    const context = await getElectionContext(syId);
+    const ballotDelete = supabase
+      .from('election_ballot_entries')
+      .delete()
+      .eq('voter_lrn', lrn)
+      .eq('school_year_id', syId);
+    const participationDelete = supabase
+      .from('election_voter_participation')
+      .delete()
+      .eq('lrn', lrn)
+      .eq('school_year_id', syId);
+
+    if (context) {
+      ballotDelete.eq('school_id', context.schoolId).eq('election_code', context.electionCode);
+      participationDelete.eq('school_id', context.schoolId).eq('election_code', context.electionCode);
+    }
+
     const [res1, res2] = await Promise.all([
-      supabase.from('ballot_entries').delete().eq('voter_lrn', lrn).eq('school_year_id', syId),
-      supabase.from('voter_participation').delete().eq('lrn', lrn).eq('school_year_id', syId)
+      ballotDelete,
+      participationDelete
     ]);
     if (res1.error || res2.error) setConnectionError(true);
   };
 
   const fetchParticipation = async (syId: string) => {
-    const { data, error } = await supabase.from('voter_participation').select('lrn').eq('school_year_id', syId);
+    const context = await getElectionContext(syId);
+    const query = supabase.from('election_voter_participation').select('lrn').eq('school_year_id', syId);
+    if (context) {
+      query.eq('school_id', context.schoolId).eq('election_code', context.electionCode);
+    }
+    const { data, error } = await query;
     if (error) setConnectionError(true);
     return (data || []).map(d => d.lrn);
   };
 
   const fetchPartylists = async (syId: string) => {
-    const { data, error } = await supabase.from('partylists').select('*').eq('school_year_id', syId);
+    const context = await getElectionContext(syId);
+    const query = supabase.from('election_partylists').select('*').eq('school_year_id', syId);
+    if (context) {
+      query.eq('school_id', context.schoolId).eq('election_code', context.electionCode);
+    }
+    const { data, error } = await query;
     if (error) setConnectionError(true);
     return data || [];
   };
 
   const addPartylist = async (name: string, slogan: string, syId: string) => {
-    const { error } = await supabase.from('partylists').insert([{ name, slogan, school_year_id: syId }]);
+    const context = await getElectionContext(syId);
+    const { error } = await supabase.from('election_partylists').insert([{
+      ...(context ? {
+        school_id: context.schoolId,
+        election_id: context.electionId,
+        election_code: context.electionCode
+      } : {}),
+      name,
+      slogan,
+      school_year_id: syId
+    }]);
     if (error) setConnectionError(true);
   };
 
   const updatePartylist = async (id: string, name: string, slogan: string) => {
-    const { error } = await supabase.from('partylists').update({ name, slogan }).eq('id', id);
+    const { error } = await supabase.from('election_partylists').update({ name, slogan }).eq('id', id);
     if (error) setConnectionError(true);
   };
 
   const deletePartylist = async (id: string) => {
-    const { error } = await supabase.from('partylists').delete().eq('id', id);
+    const { error } = await supabase.from('election_partylists').delete().eq('id', id);
     if (error) setConnectionError(true);
   };
 
   const checkIfVoted = async (lrn: string, syId: string) => {
-    const { data, error } = await supabase
-      .from('voter_participation')
+    const context = await getElectionContext(syId);
+    const query = supabase
+      .from('election_voter_participation')
       .select('lrn')
       .eq('lrn', lrn)
-      .eq('school_year_id', syId)
-      .maybeSingle();
+      .eq('school_year_id', syId);
+    if (context) {
+      query.eq('school_id', context.schoolId).eq('election_code', context.electionCode);
+    }
+    const { data, error } = await query.maybeSingle();
     if (error) setConnectionError(true);
     return !!data;
   };
 
   const resetAllElectionData = async (syId: string) => {
+    const context = await getElectionContext(syId);
+    const ballotDelete = supabase.from('election_ballot_entries').delete().eq('school_year_id', syId);
+    const participationDelete = supabase.from('election_voter_participation').delete().eq('school_year_id', syId);
+    if (context) {
+      ballotDelete.eq('school_id', context.schoolId).eq('election_code', context.electionCode);
+      participationDelete.eq('school_id', context.schoolId).eq('election_code', context.electionCode);
+    }
     const [res1, res2] = await Promise.all([
-      supabase.from('ballot_entries').delete().eq('school_year_id', syId),
-      supabase.from('voter_participation').delete().eq('school_year_id', syId)
+      ballotDelete,
+      participationDelete
     ]);
     if (res1.error || res2.error) setConnectionError(true);
+  };
+
+  const migrateLegacyElectionData = async (config: ElectionConfig): Promise<LegacyMigrationResult> => {
+    const schoolYearId = currentSY.id;
+    return runLegacyElectionMigration({ config, schoolYearId });
   };
 
   const setActiveSchoolYear = async (syId: string) => {
@@ -538,6 +721,7 @@ export const useStore = () => {
     deletePartylist,
     checkIfVoted,
     resetAllElectionData,
-    setActiveSchoolYear
+    setActiveSchoolYear,
+    migrateLegacyElectionData
   };
 };

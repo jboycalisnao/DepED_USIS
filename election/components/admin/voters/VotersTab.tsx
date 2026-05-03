@@ -92,70 +92,91 @@ const VotersTab: React.FC<VotersTabProps> = ({ learnerDatabase = [], voters = []
     if (!auditedUser) return null;
 
     return createPortal(
-      <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xl animate-in fade-in duration-300">
-        <div className="bg-white rounded-[2.5rem] shadow-2xl max-w-lg w-full overflow-hidden border border-white/10 flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
-          <div className="bg-[#034F8B] p-8 text-white text-center relative">
-            <img src={DEPED_SEAL_URL} className="h-16 mx-auto mb-4" alt="DepEd" />
-            <h3 className="text-xl font-black uppercase tracking-tight">Voter Audit Report</h3>
-            <p className="text-[10px] font-bold text-blue-200 uppercase tracking-widest mt-1">Official Ballot Record</p>
-            
-            <button 
+      <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-[rgba(18,35,61,0.24)] p-4 backdrop-blur-sm animate-in fade-in duration-300">
+        <div className="flex max-h-[90vh] w-full max-w-[860px] flex-col overflow-hidden rounded-[12px] border border-[rgba(18,35,61,0.14)] bg-white shadow-[0_18px_36px_rgba(18,35,61,0.18)] animate-in zoom-in-95 duration-200">
+          <div className="flex items-start justify-between gap-4 border-b border-[rgba(18,35,61,0.12)] px-6 py-5">
+            <div className="flex items-start gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[12px] border border-[rgba(18,35,61,0.08)] bg-[#eef4ff]">
+                <img src={DEPED_SEAL_URL} className="h-8 w-8 object-contain" alt="DepEd" />
+              </div>
+              <div>
+                <h3 className="text-[24px] font-black uppercase tracking-tight text-[#12233d]">
+                  Voter Audit Report
+                </h3>
+                <p className="mt-1 text-[13px] font-bold uppercase tracking-[0.12em] text-slate-500">
+                  Official ballot record
+                </p>
+              </div>
+            </div>
+
+            <button
               onClick={() => { setAuditedUser(null); setAuditBallot(null); }}
-              className="absolute top-6 right-6 text-white/50 hover:text-white transition-colors"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-[12px] border border-[rgba(18,35,61,0.14)] bg-white text-[16px] font-bold text-[#12233d] transition-colors hover:bg-slate-50"
+              aria-label="Close audit modal"
             >
-              <i className="fa-solid fa-xmark text-xl"></i>
+              <i className="fa-solid fa-xmark"></i>
             </button>
           </div>
-          
-          <div className="p-8 overflow-y-auto no-scrollbar">
-            <div className="bg-gray-50 rounded-2xl p-6 mb-6 border border-gray-100">
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Voter Profile</p>
-              <h4 className="text-xl font-black text-gray-900 uppercase">{getLearnerName(auditedUser)}</h4>
-              <p className="text-sm font-mono font-bold text-[#034F8B] mt-1">{getLearnerLRN(auditedUser)}</p>
+
+          <div className="overflow-y-auto p-6 no-scrollbar">
+            <div className="mb-6 rounded-[12px] border border-[rgba(18,35,61,0.08)] bg-white p-5 shadow-sm">
+              <p className="mb-2 text-[13px] font-bold uppercase tracking-[0.12em] text-slate-500">Voter Profile</p>
+              <h4 className="text-[24px] font-black uppercase text-[#12233d]">{getLearnerName(auditedUser)}</h4>
+              <p className="mt-2 text-[16px] font-bold text-[#0038a8]">{getLearnerLRN(auditedUser)}</p>
             </div>
 
             <div className="space-y-4">
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100 pb-2">Identified Choices</p>
+              <p className="border-b border-[rgba(18,35,61,0.08)] pb-3 text-[13px] font-bold uppercase tracking-[0.12em] text-slate-500">
+                Identified Choices
+              </p>
               {isAuditing ? (
                 <div className="py-12 text-center">
                   <i className="fa-solid fa-circle-notch animate-spin text-3xl text-blue-500"></i>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase mt-4">Retrieving Ballot Data...</p>
+                  <p className="mt-4 text-[13px] font-bold uppercase tracking-[0.12em] text-slate-500">Retrieving ballot data</p>
                 </div>
               ) : auditBallot && auditBallot.length > 0 ? (
                 <div className="space-y-3">
-                  {auditBallot.map((item, idx) => (
-                    <div key={idx} className="flex justify-between items-center p-4 bg-white border border-gray-100 rounded-xl">
-                      <span className="text-[10px] font-black text-gray-400 uppercase">{item.position}</span>
-                      <span className="text-xs font-black text-[#034F8B] uppercase">{item.candidates?.name}</span>
-                    </div>
-                  ))}
+                  {auditBallot.map((item, idx) => {
+                    const candidateRecord = Array.isArray(item.election_candidates)
+                      ? item.election_candidates[0]
+                      : item.election_candidates;
+
+                    return (
+                      <div key={idx} className="flex items-center justify-between rounded-[12px] border border-[rgba(18,35,61,0.08)] bg-white px-4 py-4 shadow-sm">
+                        <span className="text-[13px] font-bold uppercase tracking-[0.08em] text-slate-500">{item.position}</span>
+                        <span className="text-[16px] font-bold uppercase text-[#0038a8]">
+                          {candidateRecord?.name || 'Candidate record unavailable'}
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
-                <div className="py-10 text-center bg-red-50 rounded-xl border border-red-100">
-                  <i className="fa-solid fa-box-open text-3xl text-red-200 mb-2"></i>
-                  <p className="text-[10px] font-black text-red-400 uppercase">No ballot lines recorded for this LRN</p>
+                <div className="rounded-[12px] border border-red-100 bg-red-50 py-10 text-center">
+                  <i className="fa-solid fa-box-open mb-2 text-3xl text-red-200"></i>
+                  <p className="text-[13px] font-bold uppercase tracking-[0.12em] text-red-400">No ballot lines recorded for this LRN</p>
                 </div>
               )}
             </div>
           </div>
 
-          <div className="p-6 bg-gray-50 flex flex-col gap-3">
-            <button 
-              onClick={() => handleDeleteVote(auditedUser)}
-              disabled={isProcessingDelete}
-              className="w-full bg-[#E11C38] text-white py-4 rounded-xl font-black text-xs uppercase shadow-lg shadow-red-900/20 active:scale-95 transition-all flex items-center justify-center disabled:opacity-50"
-            >
-              <i className={`fa-solid ${isProcessingDelete ? 'fa-circle-notch animate-spin' : 'fa-trash-can'} mr-2`}></i>
-              Permanently Void This Ballot
-            </button>
-            <button 
+          <div className="flex flex-wrap justify-end gap-3 border-t border-[rgba(18,35,61,0.12)] bg-slate-50 px-6 py-5">
+            <button
               onClick={() => {
                 setAuditedUser(null);
                 setAuditBallot(null);
               }}
-              className="w-full bg-white text-gray-500 border border-gray-200 py-3 rounded-xl font-black text-[10px] uppercase active:scale-95 transition-all"
+              className="rounded-[12px] border border-[rgba(18,35,61,0.14)] bg-white px-5 py-3 text-[13px] font-bold uppercase tracking-[0.08em] text-[#12233d] transition-colors hover:bg-slate-50"
             >
               Dismiss Audit View
+            </button>
+            <button 
+              onClick={() => handleDeleteVote(auditedUser)}
+              disabled={isProcessingDelete}
+              className="inline-flex items-center justify-center rounded-[12px] bg-[#ce1126] px-5 py-3 text-[13px] font-bold uppercase tracking-[0.08em] text-white transition-colors hover:bg-[#b10f21] disabled:opacity-50"
+            >
+              <i className={`fa-solid ${isProcessingDelete ? 'fa-circle-notch animate-spin' : 'fa-trash-can'} mr-2`}></i>
+              Permanently Void This Ballot
             </button>
           </div>
         </div>
@@ -248,21 +269,21 @@ const VotersTab: React.FC<VotersTabProps> = ({ learnerDatabase = [], voters = []
     <div className="space-y-6 pb-20 relative">
       {renderAuditModal()}
 
-      <div className="bg-[#034F8B] p-8 rounded-3xl shadow-2xl border-b-4 border-[#E11C38]">
+      <div className="bg-white p-6 rounded-[12px] shadow-sm border border-[rgba(18,35,61,0.08)]">
         <div className="relative">
-          <i className="fa-solid fa-magnifying-glass absolute left-5 top-1/2 -translate-y-1/2 text-blue-200 text-xl"></i>
+          <i className="fa-solid fa-magnifying-glass absolute left-5 top-1/2 -translate-y-1/2 text-[#98a2b3] text-[16px]"></i>
           <input 
             type="text"
-            placeholder="SEARCH BY LRN OR NAME..."
+            placeholder="Search by LRN or learner name"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-14 pr-6 py-5 bg-[#011a2e] border-2 border-blue-400/50 rounded-2xl outline-none focus:ring-4 focus:ring-red-500/60 focus:border-red-500 transition-all font-black text-white placeholder:text-blue-300/30 uppercase tracking-[0.2em] text-lg shadow-inner"
+            className="w-full pl-14 pr-6 py-4 bg-[#f8fafc] border border-[rgba(18,35,61,0.12)] rounded-[12px] outline-none focus:border-[#0038a8] transition-colors font-medium text-[16px] text-[#12233d] placeholder:text-[#98a2b3]"
           />
         </div>
-        <div className="mt-4 flex items-center justify-between text-[11px] font-black text-blue-100 uppercase tracking-widest px-2">
+        <div className="mt-4 flex items-center justify-between text-[13px] font-bold text-[#68758d] uppercase tracking-[0.06em] px-1">
           <span className="flex items-center">
-            <i className="fa-solid fa-user-lock mr-2 text-red-400"></i>
-            Demographic Audit Active: Gender Grouping Enabled
+            <i className="fa-solid fa-user-lock mr-2 text-[#0038a8]"></i>
+            Demographic audit with gender grouping
           </span>
           <span>{(learnerDatabase || []).length} Total Database Records</span>
         </div>
@@ -288,17 +309,17 @@ const VotersTab: React.FC<VotersTabProps> = ({ learnerDatabase = [], voters = []
           const gradeVotedCount = filteredGradeLearners.filter(l => (voters || []).find(v => v.studentId === getLearnerLRN(l))?.hasVoted).length;
 
           return (
-            <div key={grade} className={`bg-white rounded-3xl shadow-lg border overflow-hidden ${isG12 ? 'border-gray-100 opacity-60' : 'border-gray-200'}`}>
+            <div key={grade} className={`bg-white rounded-[12px] shadow-sm border overflow-hidden ${isG12 ? 'border-[rgba(18,35,61,0.08)] opacity-70' : 'border-[rgba(18,35,61,0.08)]'}`}>
               <button 
                 onClick={() => toggleGrade(grade)}
-                className={`w-full px-8 py-6 flex items-center justify-between transition-all duration-300 ${isGradeExpanded ? 'bg-[#034F8B] text-white shadow-inner' : 'bg-gray-50 hover:bg-gray-100 text-gray-800'}`}
+                className={`w-full px-6 py-5 flex items-center justify-between transition-colors ${isGradeExpanded ? 'bg-[#f4f8ff] text-[#12233d]' : 'bg-white hover:bg-[#f8fafc] text-[#12233d]'}`}
               >
                 <div className="flex items-center space-x-5">
-                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl ${isGradeExpanded ? 'bg-white/10' : 'bg-[#034F8B]/5 text-[#034F8B]'}`}>
+                  <div className={`w-11 h-11 rounded-[12px] flex items-center justify-center text-[16px] ${isGradeExpanded ? 'bg-white text-[#0038a8] border border-[rgba(18,35,61,0.08)]' : 'bg-[#f4f8ff] text-[#0038a8]'}`}>
                     <i className={`fa-solid ${isGradeExpanded ? (isG12 ? 'fa-folder-closed' : 'fa-folder-open') : 'fa-folder'}`}></i>
                   </div>
                   <div className="text-left">
-                    <h3 className="text-xl font-black uppercase tracking-widest">{grade} {isG12 && '(Non-Voting)'}</h3>
+                    <h3 className="text-[24px] font-bold uppercase tracking-tight">{grade} {isG12 && '(Non-Voting)'}</h3>
                     {!isG12 && (
                       <div className="flex items-center mt-1">
                         <div className={`h-1.5 w-24 rounded-full mr-3 ${isGradeExpanded ? 'bg-white/20' : 'bg-gray-200'}`}>
@@ -307,7 +328,7 @@ const VotersTab: React.FC<VotersTabProps> = ({ learnerDatabase = [], voters = []
                             style={{ width: `${filteredGradeLearners.length > 0 ? (gradeVotedCount/filteredGradeLearners.length)*100 : 0}%` }}
                           ></div>
                         </div>
-                        <p className={`text-[10px] font-black uppercase tracking-tighter ${isGradeExpanded ? 'text-blue-200' : 'text-gray-400'}`}>
+                        <p className="text-[13px] font-bold uppercase tracking-[0.06em] text-[#68758d]">
                           {gradeVotedCount} / {filteredGradeLearners.length} VOTES CAST
                         </p>
                       </div>

@@ -1,0 +1,300 @@
+.form-grid,
+.floating-field-grid {
+  display: grid;
+  gap: 18px;
+}
+
+.form-grid {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.floating-field-grid {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.floating-field {
+  display: grid;
+  gap: 8px;
+}
+
+.floating-field small {
+  color: var(--deped-muted);
+  font-size: var(--usis-helper-size);
+}
+
+.floating-field__control {
+  position: relative;
+}
+
+.floating-field__control input,
+.floating-field__control select,
+.floating-field__control textarea {
+  width: 100%;
+  padding: 24px 16px 10px;
+  border: 1px solid rgba(18, 35, 61, 0.14);
+  border-radius: 12px;
+  background: #fbfcff;
+  color: var(--deped-ink);
+  outline: none;
+  transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+
+.floating-field__control .floating-field__input--password {
+  padding-right: 84px;
+}
+
+.floating-field__control textarea {
+  min-height: 132px;
+  resize: vertical;
+}
+
+.floating-field__control span {
+  position: absolute;
+  top: 50%;
+  left: 16px;
+  color: var(--deped-muted);
+  pointer-events: none;
+  transform: translateY(-50%);
+  transform-origin: left top;
+  transition: transform 180ms ease, top 180ms ease, color 180ms ease, font-size 180ms ease;
+}
+
+.floating-field__password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 36px;
+  block-size: 36px;
+  border: 1px solid rgba(18, 35, 61, 0.1);
+  border-radius: 10px;
+  background: var(--deped-white);
+  color: var(--deped-blue);
+  cursor: pointer;
+  transform: translateY(-50%);
+}
+
+.floating-field__password-toggle:hover {
+  background: #eef4ff;
+}
+
+.floating-field__password-icon {
+  inline-size: 18px;
+  block-size: 18px;
+}
+
+.floating-field__control input:focus,
+.floating-field__control select:focus,
+.floating-field__control textarea:focus {
+  border-color: rgba(0, 56, 168, 0.44);
+  box-shadow: 0 0 0 4px rgba(0, 56, 168, 0.08);
+  transform: translateY(-1px);
+}
+
+.floating-field__control input:focus + span,
+.floating-field__control select:focus + span,
+.floating-field__control textarea:focus + span,
+.floating-field__control input:not(:placeholder-shown) + span,
+.floating-field__control textarea:not(:placeholder-shown) + span,
+.floating-field__control select[data-has-value="true"] + span {
+  top: 11px;
+  color: var(--deped-blue);
+  font-size: 0.74rem;
+  transform: translateY(0);
+}
+
+.searchable-select {
+  position: relative;
+  display: grid;
+  gap: 8px;
+}
+
+.searchable-select__label {
+  color: var(--deped-blue);
+  font-size: var(--usis-helper-size);
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.searchable-select__field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
+.searchable-select__field input,
+.searchable-select__field button {
+  border: 1px solid rgba(18, 35, 61, 0.14);
+  background: #fbfcff;
+  color: var(--deped-ink);
+}
+
+.searchable-select__field input {
+  width: 100%;
+  padding: 14px 16px;
+  border-right: 0;
+  border-radius: 12px 0 0 12px;
+  font-size: var(--usis-body-size);
+  line-height: 1.35;
+  outline: none;
+}
+
+.searchable-select__field input:focus {
+  border-color: rgba(0, 56, 168, 0.44);
+  box-shadow: 0 0 0 4px rgba(0, 56, 168, 0.08);
+  position: relative;
+  z-index: 2;
+}
+
+.searchable-select__field button {
+  min-width: 44px;
+  padding: 0 16px;
+  font-size: var(--usis-helper-size);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.searchable-select__clear {
+  border-right: 0;
+  border-radius: 0;
+  color: var(--deped-blue);
+}
+
+.searchable-select__clear:hover,
+.searchable-select__toggle:hover,
+.searchable-select__option:hover,
+.searchable-select__option[aria-selected="true"] {
+  background: #eef4ff;
+}
+
+.searchable-select__toggle {
+  border-radius: 0 12px 12px 0;
+  color: var(--deped-blue);
+}
+
+.searchable-select__menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  overflow: hidden;
+  border: 1px solid rgba(18, 35, 61, 0.14);
+  border-radius: 12px;
+  background: var(--deped-white);
+  box-shadow: 0 18px 32px rgba(18, 35, 61, 0.12);
+}
+
+.searchable-select__option,
+.searchable-select__empty {
+  width: 100%;
+  padding: 12px 14px;
+  font-size: var(--usis-body-size);
+  line-height: 1.35;
+  text-align: left;
+}
+
+.searchable-select__option {
+  border: 0;
+  border-bottom: 1px solid rgba(18, 35, 61, 0.08);
+  background: var(--deped-white);
+  color: var(--deped-ink);
+  cursor: pointer;
+}
+
+.searchable-select__option:last-child {
+  border-bottom: 0;
+}
+
+.searchable-select__empty {
+  color: var(--deped-muted);
+  background: var(--deped-white);
+}
+
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: flex-end;
+  padding-top: 18px;
+  border-top: 1px solid var(--deped-line);
+}
+
+.button,
+.primary-button,
+.secondary-button,
+.portal-button,
+.portal-side-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 4px;
+  font-size: var(--usis-helper-size);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.primary-button,
+.portal-button,
+.portal-side-button--blue {
+  border: 0;
+  background: var(--deped-blue);
+  color: var(--deped-white);
+}
+
+.secondary-button {
+  border: 1px solid rgba(0, 56, 168, 0.18);
+  background: var(--deped-white);
+  color: var(--deped-blue);
+}
+
+.portal-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--deped-blue);
+  font-size: var(--usis-helper-size);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.portal-side-button {
+  min-height: 42px;
+  padding: 10px 14px;
+  line-height: 1.25;
+  text-align: center;
+  letter-spacing: 0;
+}
+
+.portal-side-button--red {
+  border: 0;
+  background: var(--deped-red);
+  color: var(--deped-white);
+}
+
+.portal-side-button--yellow {
+  border: 0;
+  background: var(--deped-yellow);
+  color: var(--deped-ink);
+}
+
+.button:disabled,
+.primary-button:disabled,
+.secondary-button:disabled,
+.portal-button:disabled,
+.portal-side-button:disabled,
+.portal-button[aria-disabled="true"],
+.portal-side-button[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.7;
+  pointer-events: none;
+}

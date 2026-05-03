@@ -28,16 +28,10 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
 }) => {
   if (!isOpen) return null;
 
-  const colorClasses = {
-    primary: 'bg-primary shadow-primary/20 hover:bg-primary/90',
-    danger: 'bg-accent shadow-accent/20 hover:bg-accent/90',
-    accent: 'bg-accent shadow-accent/20 hover:bg-accent/90',
-  };
-
-  const iconClasses = {
-    primary: 'text-primary bg-primary/10',
-    danger: 'text-accent bg-accent/10',
-    accent: 'text-accent bg-accent/10',
+  const alertTypeClasses = {
+    primary: 'alert-modal--success',
+    danger: 'alert-modal--danger',
+    accent: 'alert-modal--warning',
   };
 
   const icons = {
@@ -47,28 +41,29 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[400] flex items-center justify-center p-6 sm:p-8">
-      {/* Universal Backdrop Blur - Robust Fullscreen Coverage */}
-      <div 
-        className="fixed top-0 left-0 w-full h-full bg-[#004E8C]/30 backdrop-blur-xl animate-in fade-in duration-300" 
-        onClick={onCancel}
-      ></div>
-      
-      {/* Modal Card */}
-      <div className="relative w-full max-w-md bg-white rounded-[48px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-500 border border-surfaceVariant/30">
-        <div className="p-8 pb-0 flex flex-col items-center text-center">
-          <div className={`w-16 h-16 rounded-3xl flex items-center justify-center mb-6 ${iconClasses[type]}`}>
-            <span className="material-symbols-outlined text-3xl font-bold">{icons[type]}</span>
-          </div>
-          <h3 className="text-2xl font-black text-primary uppercase tracking-tighter mb-2">{title}</h3>
-          <p className="text-sm font-medium text-outline leading-relaxed">{message}</p>
+    <div className="modal-overlay" role="presentation">
+      <div className="modal-backdrop" onClick={onCancel} />
+
+      <div className={`alert-modal ${alertTypeClasses[type]}`} role="alertdialog" aria-modal="true" aria-labelledby="registrar-alert-title">
+        <div className="alert-modal__icon" aria-hidden="true">
+          <span className="material-symbols-outlined">{icons[type]}</span>
+        </div>
+        <div className="alert-modal__content">
+          <h3 id="registrar-alert-title">{title}</h3>
+          <p>{message}</p>
         </div>
 
-        <div className="p-8 pt-10 flex flex-col gap-3">
+        <div className="alert-modal__actions">
+          {!hideCancel && (
+            <button type="button" onClick={onCancel} disabled={isLoading}>
+              {cancelLabel}
+            </button>
+          )}
           <button
+            type="button"
             onClick={onConfirm}
             disabled={isLoading}
-            className={`w-full py-5 rounded-2xl text-white font-black text-xs uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2 ${colorClasses[type]}`}
+            className={type === 'primary' ? 'alert-modal__blue' : 'alert-modal__primary'}
           >
             {isLoading ? (
               <span className="material-symbols-outlined animate-spin">sync</span>
@@ -76,15 +71,6 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
               confirmLabel
             )}
           </button>
-          {!hideCancel && (
-            <button
-              onClick={onCancel}
-              disabled={isLoading}
-              className="w-full py-4 rounded-2xl text-outline font-black text-xs uppercase tracking-[0.2em] hover:bg-surface transition-all"
-            >
-              {cancelLabel}
-            </button>
-          )}
         </div>
       </div>
     </div>

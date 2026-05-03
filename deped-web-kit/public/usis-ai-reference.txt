@@ -1,0 +1,92 @@
+DepED USIS AI Reference
+
+Purpose
+- This file is the single AI-readable reference for DepED-Web-Kit.
+- Use it when generating or reviewing new USIS web applications.
+- Treat this file as the authoritative public summary of the deployed design system.
+
+Project context
+- Product: DepED USIS - Unified School Information System
+- Reference app: DepED-Web-Kit
+- Role of reference app: visual, interaction, and form standard for future USIS-facing web modules
+- Target context: Philippine school environments, including local-network and low-spec deployment scenarios
+
+Required information architecture
+- Overview
+- Foundations
+- Forms
+- Patterns
+
+Do not invent additional primary pillars outside these four.
+
+Brand and visual rules
+- Use flat color surfaces only.
+- Do not use gradients, ombre, glossy effects, or decorative visual styling.
+- Use the DepEd visual baseline and current institutional portal direction.
+- Keep similar box-style surfaces on 10px corner radius.
+- Use 10px corner radius for buttons, form controls, and compact utility controls.
+- During system migration and rebranding, reuse the DepED-Web-Kit box component treatment for cards, panels, summaries, and similar content surfaces across other USIS modules.
+- Do not treat a rebranding pass as complete if only the outer shell changes. When a screen is reworked, its internal box-style surfaces should be migrated in the same pass.
+- Keep visible padding around header, navigation, page intro, and major content blocks.
+- Keep the site shell documentation-style, not marketing-style.
+- For the web-kit header template, use the approved combined header logo asset at a 50px display height, a contextual top-right system label, an institutional search field, and route-based navigation.
+- For the global footer template, use the approved USIS footer structure with `common/assets/USIS_Footer.png` at a 50px display height: blue top band, white centered logo band, yellow stripe, red stripe, and blue footer body with the shared USIS identity block plus service columns.
+
+Typography rules
+- Use Helvetica for web interface text in DepED-Web-Kit-derived interfaces.
+- Do not describe Helvetica as the official DepEd logo typeface.
+- Official DepEd identity typography remains separate from interface typography guidance.
+- Keep to the shared USIS type scale unless a human maintainer explicitly overrides it: titles up to 24px, regular text up to 16px, and subtitles, labels, and helper text up to 13px.
+
+Color direction
+- Use DepEd Blue as the primary navigation and trusted action color.
+- Use DepEd Red for important action emphasis only.
+- Use DepEd Yellow as a controlled accent or highlight.
+- Use neutral white and restrained ink tones for readable form and content surfaces.
+
+Implementation stack rules
+- Prefer React + Vite patterns aligned with this monorepo.
+- Use Tailwind CSS with PostCSS for shared layout and documentation-style component structure.
+- Reuse the shared CSS formatting library in common/css/ for stable USIS tokens, shell, footer, box, form, and utility styling when creating or aligning subsystem apps.
+- Keep focused custom CSS only where interactive form behavior needs tighter control.
+- Do not rewrite stable components aggressively when an incremental conversion is safer.
+- Keep standard application shells in normal document flow: header, content, and footer should belong to the same page scroll. Avoid nested page-level scroll containers unless a specific internal widget requires local scrolling.
+- Do not use page-level scale transforms, zoom wrappers, or fixed viewport-height containers for primary content regions. They break document height and can make content overlap the footer.
+
+Form behavior rules
+- Forms must support fast keyboard-first operation.
+- Define deliberate tab order when workflows are high-volume or clerical.
+- Floating labels may stay floated when fields contain values, but strong active highlight boxes should appear only when the field is focused or selected.
+- Password fields should use an icon-based show/hide control, not text buttons.
+- Searchable dropdowns should use a custom searchable field and custom dropdown menu aligned to the system style.
+- File upload fields should use custom styled upload surfaces.
+- Radio and checkbox rows should be compact, hoverable, and clearly clickable.
+
+Documentation rules
+- Show copyable code samples for documented components.
+- For mixed component families, separate code samples by navigation tabs so each field type or control can be reviewed independently.
+- Use professional, direct, institutional wording.
+- Avoid AI-style wording, jargon-heavy labels, and over-explaining obvious UI behavior.
+
+Architecture rules
+- Keep folders organized by business/domain relevance.
+- Extract reusable UI into shared components when stable.
+- Extract utilities and logic out of oversized component files.
+- If a React component becomes too large or handles unrelated concerns, split it into focused parts.
+
+Database and system context
+- DepED USIS is a unified multi-module platform.
+- Modules share the same Supabase backend where appropriate.
+- Supabase table names should use module-prefixed naming, such as:
+  - registrar_learners
+  - election_candidates
+  - core_users
+
+AI contribution warning
+- Any AI-generated logic for RFID, GSM, or Offline Exam modules must undergo manual logic verification before acceptance or deployment.
+- If a requested output conflicts with DepED-Web-Kit minimalism or institutional clarity, stop and flag it for review instead of improvising.
+
+Usage instruction for AI agents
+- Read this file first.
+- Then apply it as the baseline for layout, tokens, form behavior, component structure, and documentation tone.
+- Do not invent a separate design language unless explicitly instructed by a human maintainer.

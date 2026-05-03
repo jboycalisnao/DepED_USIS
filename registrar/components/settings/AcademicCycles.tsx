@@ -22,6 +22,7 @@ const AcademicCycles: React.FC = () => {
   const [pendingSYDelete, setPendingSYDelete] = useState<SchoolYear | null>(null);
   const [pendingSYActive, setPendingSYActive] = useState<SchoolYear | null>(null);
   const [pendingSYLock, setPendingSYLock] = useState<SchoolYear | null>(null);
+  const [deleteBlockedMessage, setDeleteBlockedMessage] = useState<string | null>(null);
 
   // Update default when schoolYears change (e.g., after a refresh or add)
   useEffect(() => {
@@ -143,7 +144,8 @@ const AcademicCycles: React.FC = () => {
 
       <ConfirmationModal isOpen={!!pendingSYActive} title="Switch Cycle" message={`Set ${pendingSYActive?.label} as active?`} confirmLabel="Switch" onConfirm={async () => { if(pendingSYActive) await setActiveSchoolYear(pendingSYActive.id); setPendingSYActive(null); }} onCancel={() => setPendingSYActive(null)} isLoading={loading} />
       <ConfirmationModal isOpen={!!pendingSYLock} title={pendingSYLock?.isLocked ? "Unlock" : "Archive"} message={`Update SY ${pendingSYLock?.label} lock status?`} type={pendingSYLock?.isLocked ? "primary" : "accent"} confirmLabel="Update" onConfirm={async () => { if(pendingSYLock) await lockSchoolYear(pendingSYLock.id, !pendingSYLock.isLocked); setPendingSYLock(null); }} onCancel={() => setPendingSYLock(null)} isLoading={loading} />
-      <ConfirmationModal isOpen={!!pendingSYDelete} title="Deregister Year" message={`Remove ${pendingSYDelete?.label}?`} type="danger" confirmLabel="Delete" onConfirm={async () => { if(pendingSYDelete) { if(getSectionsInSY(pendingSYDelete.id) > 0) alert("Remove sections first."); else await removeSchoolYear(pendingSYDelete.id); } setPendingSYDelete(null); }} onCancel={() => setPendingSYDelete(null)} isLoading={loading} />
+      <ConfirmationModal isOpen={!!pendingSYDelete} title="Deregister Year" message={`Remove ${pendingSYDelete?.label}?`} type="danger" confirmLabel="Delete" onConfirm={async () => { if(pendingSYDelete) { const linkedSections = getSectionsInSY(pendingSYDelete.id); if(linkedSections > 0) setDeleteBlockedMessage(`Remove ${linkedSections} linked section${linkedSections === 1 ? '' : 's'} before deregistering this school year.`); else await removeSchoolYear(pendingSYDelete.id); } setPendingSYDelete(null); }} onCancel={() => setPendingSYDelete(null)} isLoading={loading} />
+      <ConfirmationModal isOpen={!!deleteBlockedMessage} title="Cycle In Use" message={deleteBlockedMessage || ''} type="accent" confirmLabel="Understood" hideCancel onConfirm={() => setDeleteBlockedMessage(null)} />
     </section>
   );
 };

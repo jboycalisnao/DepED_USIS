@@ -101,7 +101,7 @@ export const handleGradeResultsPrint = async (
 
   // 2. Fetch scoped votes from the cloud
   const { data: entries, error } = await supabase
-    .from('ballot_entries')
+    .from('election_ballot_entries')
     .select('candidate_id, position, voter_lrn')
     .in('voter_lrn', targetLrns);
 

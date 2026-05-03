@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Candidate } from '../types';
-import { DEPED_SEAL_URL, LEON_NHS_LOGO_URL } from '../constants';
+import { LEON_NHS_LOGO_URL } from '../constants';
 
 interface CandidateAuditViewProps {
   candidate: Candidate | null;
@@ -11,14 +11,21 @@ interface CandidateAuditViewProps {
 const CandidateAuditView: React.FC<CandidateAuditViewProps> = ({ candidate, onBack }) => {
   if (!candidate) {
     return (
-      <div className="flex-grow flex items-center justify-center p-8 bg-gray-50">
-        <div className="text-center max-w-sm">
-          <i className="fa-solid fa-user-slash text-6xl text-gray-200 mb-6"></i>
-          <h2 className="text-2xl font-black text-gray-900 uppercase">Invalid Reference</h2>
-          <p className="text-gray-500 text-sm mt-2">This candidate profile could not be found in our current database.</p>
-          <button onClick={onBack} className="mt-8 text-[#034F8B] font-black uppercase text-xs tracking-widest">Return to Portal</button>
+      <section className="mx-auto w-[min(1180px,calc(100%-32px))] px-[28px] py-10">
+        <div className="rounded-[12px] border border-slate-200 bg-white px-6 py-10 text-center shadow-sm">
+          <i className="fa-solid fa-user-slash mb-5 text-[24px] text-slate-300"></i>
+          <h2 className="text-[24px] font-black uppercase text-slate-900">Invalid Reference</h2>
+          <p className="mt-3 text-[16px] leading-[1.5] text-slate-600">
+            This candidate profile could not be found in the current database.
+          </p>
+          <button
+            onClick={onBack}
+            className="mt-6 text-[13px] font-bold uppercase tracking-[0.12em] text-[#034F8B]"
+          >
+            Return to Portal
+          </button>
         </div>
-      </div>
+      </section>
     );
   }
 
@@ -44,50 +51,52 @@ const CandidateAuditView: React.FC<CandidateAuditViewProps> = ({ candidate, onBa
   const incompleteCount = auditFields.filter(f => f.required && !checkField(f.value)).length;
 
   return (
-    <div className="flex-grow overflow-y-auto bg-gray-50 py-10 px-4">
-      <div className="max-w-2xl mx-auto bg-white rounded-[2.5rem] shadow-xl overflow-hidden border border-gray-100 animate-in fade-in zoom-in-95 duration-500">
-        <div className="bg-[#034F8B] p-8 text-center text-white relative">
-          <div className="flex justify-center items-center space-x-4 mb-4">
-            <img src={DEPED_SEAL_URL} className="h-12" alt="DepEd" />
-            <img src={LEON_NHS_LOGO_URL} className="h-12" alt="LNHS" />
-          </div>
-          <h2 className="text-xl font-black uppercase tracking-tight">Public Candidate Audit</h2>
-          <p className="text-[10px] font-bold text-blue-200 uppercase tracking-widest mt-1">Biographical Data Integrity Check</p>
+    <section className="mx-auto w-[min(1180px,calc(100%-32px))] px-[28px] py-10">
+      <div className="rounded-[12px] border border-slate-200 bg-white shadow-sm">
+        <div className="border-b border-slate-200 px-6 py-5">
+          <p className="text-[13px] font-bold uppercase tracking-[0.18em] text-slate-500">
+            Candidate Audit
+          </p>
+          <h2 className="mt-2 text-[24px] font-black uppercase text-[#034F8B]">
+            Public Candidate Audit
+          </h2>
+          <p className="mt-2 text-[16px] leading-[1.5] text-slate-600">
+            Biographical data integrity check for the current election cycle.
+          </p>
         </div>
 
-        <div className="p-8">
-          <div className="flex items-center space-x-6 mb-10 pb-8 border-b border-gray-100">
+        <div className="px-6 py-6">
+          <div className="mb-8 flex items-center space-x-6 border-b border-slate-200 pb-6">
             <img 
               src={candidate.imageUrl || LEON_NHS_LOGO_URL} 
-              className="w-24 h-24 rounded-2xl object-cover shadow-lg bg-gray-50 p-1" 
+              className="h-24 w-24 rounded-[12px] border border-slate-200 bg-slate-50 object-cover p-1" 
               alt={candidate.name} 
               onError={(e) => { (e.target as HTMLImageElement).src = LEON_NHS_LOGO_URL; }}
             />
             <div>
-              <h3 className="text-2xl font-black text-gray-900 uppercase leading-none">{candidate.name}</h3>
-              <p className="text-[#034F8B] font-bold uppercase text-xs mt-1">{candidate.position}</p>
+              <h3 className="text-[24px] font-black uppercase leading-none text-slate-900">{candidate.name}</h3>
+              <p className="mt-1 text-[13px] font-bold uppercase tracking-[0.12em] text-[#034F8B]">{candidate.position}</p>
               {incompleteCount > 0 ? (
-                <div className="mt-3 flex items-center text-red-600">
+                <div className="mt-3 flex items-center text-[#E11C38]">
                   <i className="fa-solid fa-circle-exclamation mr-2"></i>
-                  <span className="text-[10px] font-black uppercase tracking-widest">{incompleteCount} Required Fields Missing</span>
+                  <span className="text-[13px] font-bold uppercase tracking-[0.12em]">{incompleteCount} Required Fields Missing</span>
                 </div>
               ) : (
                 <div className="mt-3 flex items-center text-green-600">
                   <i className="fa-solid fa-circle-check mr-2"></i>
-                  <span className="text-[10px] font-black uppercase tracking-widest">All Data Verified Complete</span>
+                  <span className="text-[13px] font-bold uppercase tracking-[0.12em]">All Data Verified Complete</span>
                 </div>
               )}
             </div>
           </div>
 
-          {/* New Encoder Remarks Section */}
           {candidate.remarks && (
-            <div className="mb-8 p-6 bg-amber-50 rounded-2xl border-l-4 border-amber-400">
-              <h4 className="text-[10px] font-black text-amber-600 uppercase tracking-widest mb-2 flex items-center">
+            <div className="mb-8 rounded-[12px] border border-amber-200 bg-amber-50 px-5 py-5">
+              <h4 className="mb-2 flex items-center text-[13px] font-bold uppercase tracking-[0.12em] text-amber-700">
                 <i className="fa-solid fa-comment-dots mr-2"></i>
                 Official Encoder Remarks
               </h4>
-              <p className="text-xs font-bold text-amber-900 leading-relaxed uppercase">
+              <p className="text-[16px] leading-[1.5] text-amber-900">
                 {candidate.remarks}
               </p>
             </div>
@@ -97,18 +106,18 @@ const CandidateAuditView: React.FC<CandidateAuditViewProps> = ({ candidate, onBa
             {auditFields.map((f, i) => {
               const hasData = checkField(f.value);
               return (
-                <div key={i} className={`flex items-center justify-between p-4 rounded-xl border transition-all ${!hasData && f.required ? 'bg-red-50 border-red-100' : 'bg-white border-gray-100'}`}>
+                <div key={i} className={`flex items-center justify-between rounded-[12px] border px-4 py-4 ${!hasData && f.required ? 'border-red-100 bg-red-50' : 'border-slate-200 bg-white'}`}>
                   <div>
-                    <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">{f.label}</p>
-                    <p className={`text-xs font-bold ${!hasData ? 'italic text-gray-300' : 'text-gray-900'}`}>
+                    <p className="mb-1 text-[13px] font-bold uppercase tracking-[0.12em] text-slate-500">{f.label}</p>
+                    <p className={`text-[16px] leading-[1.5] ${!hasData ? 'italic text-slate-400' : 'text-slate-900'}`}>
                       {hasData ? f.value : 'No information provided'}
                     </p>
                   </div>
                   <div>
                     {!hasData && f.required ? (
-                      <span className="text-[8px] font-black text-red-600 bg-red-100 px-3 py-1 rounded-full uppercase">REQUIRED</span>
+                      <span className="rounded-[12px] bg-red-100 px-3 py-2 text-[13px] font-bold uppercase text-[#E11C38]">Required</span>
                     ) : !hasData ? (
-                      <span className="text-[8px] font-black text-gray-400 bg-gray-100 px-3 py-1 rounded-full uppercase">OPTIONAL</span>
+                      <span className="rounded-[12px] bg-slate-100 px-3 py-2 text-[13px] font-bold uppercase text-slate-500">Optional</span>
                     ) : (
                       <i className="fa-solid fa-check text-green-500"></i>
                     )}
@@ -118,21 +127,21 @@ const CandidateAuditView: React.FC<CandidateAuditViewProps> = ({ candidate, onBa
             })}
           </div>
 
-          <div className="mt-10 p-6 bg-blue-50 rounded-2xl border border-blue-100">
-            <p className="text-[10px] font-bold text-blue-700 leading-relaxed uppercase italic">
+          <div className="mt-8 rounded-[12px] border border-blue-100 bg-blue-50 px-5 py-5">
+            <p className="text-[13px] leading-[1.5] text-[#034F8B]">
               Candidates with incomplete "Required" fields must contact the LG COMEA to update their digital profile before the election period begins.
             </p>
           </div>
           
           <button 
             onClick={onBack}
-            className="w-full mt-8 py-4 font-black text-gray-400 uppercase text-[10px] tracking-widest hover:text-gray-900 transition-colors"
+            className="mt-6 text-[13px] font-bold uppercase tracking-[0.12em] text-[#034F8B]"
           >
             Close Audit View
           </button>
         </div>
       </div>
-    </div>
+    </section>
   );
 };
 

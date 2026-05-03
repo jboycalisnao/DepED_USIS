@@ -1,31 +1,26 @@
-
 import React, { useState } from 'react';
-import { 
-  Form, 
-  Input, 
-  Button, 
-  Checkbox, 
-  Card, 
-  Typography, 
-  ConfigProvider, 
+import {
+  ConfigProvider,
   App as AntApp,
-  theme 
 } from 'antd';
-import { UserOutlined, LockOutlined, SafetyCertificateOutlined } from '@ant-design/icons';
+import { SafetyCertificateOutlined } from '@ant-design/icons';
 import { useStore } from '../store';
-
-const { Title, Text } = Typography;
+import { RegistrarHeader } from '../components/shell/RegistrarHeader';
+import { RegistrarFooter } from '../components/shell/RegistrarFooter';
 
 const LandingContent: React.FC = () => {
   const { login } = useStore();
   const { message } = AntApp.useApp();
   const [loading, setLoading] = useState(false);
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
 
-  const onFinish = (values: any) => {
+  const onSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
     setLoading(true);
-    // Add artificial delay for high-end feel
     setTimeout(() => {
-      const success = login(values.username, values.password);
+      const success = login(username, password);
       if (success) {
         message.success('Access granted. Synchronizing systems...');
       } else {
@@ -35,116 +30,113 @@ const LandingContent: React.FC = () => {
     }, 800);
   };
 
-  const schoolSeal = "https://ik.imagekit.io/astrasolutions/Leon%20NHS/leon%20nhs%20marks%20-%20upscaled/Leon%20NHS%20-%20Seal(Blue).png?updatedAt=1769134600365";
-  const depedLogo = "https://ik.imagekit.io/astrasolutions/Leon%20NHS/leon%20nhs%20marks%20-%20upscaled/Leon%20NHS%20-%20Seal(Blue).png?updatedAt=1769134600365";
-
   return (
-    <div className="min-h-screen bg-[#f0f2f5] flex items-center justify-center p-6 relative overflow-hidden font-sans selection:bg-primary/20">
-      {/* Subtle Institutional Background */}
-      <div className="absolute top-0 left-0 w-full h-full opacity-[0.03] pointer-events-none" 
-           style={{ backgroundImage: `url(${schoolSeal})`, backgroundSize: '400px', backgroundRepeat: 'repeat' }}>
-      </div>
-      <div className="absolute -top-24 -left-24 w-96 h-96 bg-primary/5 rounded-full blur-[100px] pointer-events-none"></div>
-      <div className="absolute -bottom-24 -right-24 w-96 h-96 bg-accent/5 rounded-full blur-[100px] pointer-events-none"></div>
-
-      <div className="relative w-full max-w-[420px] animate-in fade-in zoom-in-95 duration-700">
-        {/* Top Header */}
-        <div className="flex flex-col items-center mb-8 text-center">
-          <img src={depedLogo} alt="DepEd Logo" className="h-10 w-auto mb-3 grayscale opacity-70" />
-          <Text strong className="text-[10px] uppercase tracking-[0.2em] text-outline opacity-60">
-            Republic of the Philippines
-          </Text>
-        </div>
-
-        <Card 
-          className="shadow-ant-shadow border-none rounded-[16px] overflow-hidden"
-          styles={{ body: { padding: '48px 40px' } }}
-        >
-          <div className="flex flex-col items-center mb-10">
-            <div className="w-20 h-20 bg-white rounded-full shadow-lg flex items-center justify-center p-2 mb-6 border border-gray-100">
-              <img src={schoolSeal} alt="Leon NHS Seal" className="w-full h-full object-contain" />
-            </div>
-            
-            <Title level={3} className="!m-0 !text-primary !font-black !uppercase !tracking-tight">
-              Leon NHS
-            </Title>
-            <Text strong className="text-[11px] text-accent uppercase tracking-[0.2em] mt-1">
-              Registrar's Portal
-            </Text>
+    <>
+      <RegistrarHeader showSearch>
+        <nav className="kit-nav" aria-label="Registrar landing sections">
+          <div className="kit-nav__grid">
+            <a className="kit-nav__link kit-nav__link--active" href="#registrar-login-title">
+              Access
+            </a>
           </div>
+        </nav>
+      </RegistrarHeader>
 
-          <Form
-            name="login_form"
-            initialValues={{ remember: true }}
-            onFinish={onFinish}
-            layout="vertical"
-            size="large"
-            autoComplete="off"
-          >
-            <Form.Item
-              name="username"
-              rules={[{ required: true, message: 'Identification is required' }]}
-            >
-              <Input 
-                prefix={<UserOutlined className="text-gray-400" />} 
-                placeholder="User Identification" 
-                className="rounded-lg py-3"
-              />
-            </Form.Item>
+      <main className="page-frame registrar-login-page">
+        <div className="content-width">
+          <section className="registrar-login section-shell">
+            <div className="registrar-login__panel">
+              <section className="portal-panel registrar-login-panel" aria-labelledby="registrar-login-title">
+                <header className="portal-panel__header registrar-login-panel__header">
+                  <h2 id="registrar-login-title">Registrar's Portal</h2>
+                  <p>Use assigned school credentials to access learner records.</p>
+                </header>
 
-            <Form.Item
-              name="password"
-              rules={[{ required: true, message: 'Access key is required' }]}
-            >
-              <Input.Password
-                prefix={<LockOutlined className="text-gray-400" />}
-                placeholder="Access Key"
-                className="rounded-lg py-3"
-              />
-            </Form.Item>
+                <form className="registrar-login-form" onSubmit={onSubmit}>
+                  <label className="floating-field">
+                    <div className="floating-field__control">
+                      <input
+                        value={username}
+                        onChange={(event) => setUsername(event.target.value)}
+                        type="text"
+                        name="username"
+                        autoComplete="username"
+                        required
+                        tabIndex={1}
+                        placeholder=" "
+                      />
+                      <span>User Identification</span>
+                    </div>
+                  </label>
 
-            <div className="flex items-center justify-between mb-8 px-1">
-              <Form.Item name="remember" valuePropName="checked" noStyle>
-                <Checkbox className="text-[11px] font-bold uppercase tracking-tight text-gray-500">
-                  Stay Active
-                </Checkbox>
-              </Form.Item>
-              <Button type="link" className="!p-0 !h-auto text-[11px] font-black uppercase tracking-tight text-outline">
-                Recovery
-              </Button>
+                  <label className="floating-field">
+                    <div className="floating-field__control">
+                      <input
+                        value={password}
+                        onChange={(event) => setPassword(event.target.value)}
+                        type={isPasswordVisible ? 'text' : 'password'}
+                        name="password"
+                        autoComplete="current-password"
+                        required
+                        tabIndex={2}
+                        placeholder=" "
+                        className="floating-field__input--password"
+                      />
+                      <span>Access Key</span>
+                      <button
+                        type="button"
+                        className="floating-field__password-toggle"
+                        aria-label={isPasswordVisible ? 'Hide access key' : 'Show access key'}
+                        tabIndex={3}
+                        onClick={() => setIsPasswordVisible((visible) => !visible)}
+                      >
+                        <svg viewBox="0 0 24 24" aria-hidden="true" className="floating-field__password-icon">
+                          {isPasswordVisible ? (
+                            <>
+                              <path d="M3 5l16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                              <path d="M10.6 6.5A10.7 10.7 0 0 1 12 6.4c5.2 0 9 5.6 9 5.6a17.2 17.2 0 0 1-3.4 3.9" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                              <path d="M14.1 14.2A3 3 0 0 1 9.8 9.9" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                              <path d="M6.2 9A17.1 17.1 0 0 0 3 12s3.8 5.6 9 5.6c1.1 0 2.1-.2 3.1-.6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                            </>
+                          ) : (
+                            <>
+                              <path d="M1.8 12s4-5.8 10.2-5.8S22.2 12 22.2 12 18.2 17.8 12 17.8 1.8 12 1.8 12Z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                              <circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" strokeWidth="1.8" />
+                            </>
+                          )}
+                        </svg>
+                      </button>
+                    </div>
+                  </label>
+
+                  <div className="registrar-login-form__options">
+                    <label className="choice-row registrar-login__remember">
+                      <input type="checkbox" name="remember" tabIndex={4} defaultChecked />
+                      <span>Stay Active</span>
+                    </label>
+                    <button type="button" className="portal-link registrar-login__recovery" tabIndex={5}>
+                      Recovery
+                    </button>
+                  </div>
+
+                  <button type="submit" className="primary-button registrar-login__submit" disabled={loading} tabIndex={6}>
+                    {!loading && <SafetyCertificateOutlined className="text-lg" />}
+                    {loading ? 'Checking Access' : 'Secure Access'}
+                  </button>
+                </form>
+
+                <div className="registrar-login-card__meta">
+                  <span>System Cycle 2025.0</span>
+                  <span>Institutional Master Registry</span>
+                </div>
+              </section>
             </div>
-
-            <Form.Item className="mb-0">
-              <Button 
-                type="primary" 
-                htmlType="submit" 
-                block 
-                loading={loading}
-                className="h-14 rounded-lg bg-primary hover:!bg-primary/90 flex items-center justify-center gap-2"
-              >
-                {!loading && <SafetyCertificateOutlined className="text-lg" />}
-                SECURE ACCESS
-              </Button>
-            </Form.Item>
-          </Form>
-
-          <div className="mt-12 text-center opacity-40">
-            <Text className="text-[9px] font-black uppercase tracking-widest block">
-              System Cycle 2025.0
-            </Text>
-            <Text className="text-[8px] font-bold uppercase tracking-[0.2em] block mt-1">
-              Institutional Master Registry
-            </Text>
-          </div>
-        </Card>
-
-        <div className="mt-8 text-center">
-          <Text className="text-[10px] font-bold text-outline opacity-40 uppercase tracking-[0.4em]">
-            Leon National High School
-          </Text>
+          </section>
         </div>
-      </div>
-    </div>
+      </main>
+
+      <RegistrarFooter />
+    </>
   );
 };
 
@@ -153,22 +145,10 @@ const Landing: React.FC = () => {
     <ConfigProvider
       theme={{
         token: {
-          colorPrimary: '#004E8C',
-          borderRadius: 8,
-          fontFamily: 'Roboto, sans-serif',
-          colorBgContainer: '#ffffff',
-          colorTextHeading: '#004E8C',
-          colorLink: '#004E8C',
+          colorPrimary: '#0038a8',
+          fontFamily: '"Helvetica Neue", Helvetica, sans-serif',
+          colorLink: '#0038a8',
         },
-        components: {
-          Input: {
-            activeShadow: '0 0 0 2px rgba(0, 78, 140, 0.1)',
-          },
-          Button: {
-            controlHeightLG: 56,
-            fontWeight: 700,
-          }
-        }
       }}
     >
       <AntApp>

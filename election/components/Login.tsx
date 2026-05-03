@@ -1,173 +1,201 @@
-import React, { useRef, useEffect } from 'react';
-import { DEPED_LOGO_URL, DEPED_SEAL_URL, LEON_NHS_LOGO_URL } from '../constants';
+import React, { useRef } from 'react';
+import userIcon from '../../common/assets/User_Icon.png';
 import { ElectionConfig, ElectionStatus } from '../types';
 
 interface LoginProps {
   studentId: string;
   setStudentId: (id: string) => void;
+  electionCode: string;
+  setElectionCode: (value: string) => void;
+  showElectionCodeField: boolean;
+  activeElectionCode: string;
   onLogin: (e?: React.FormEvent) => void;
   isLoadingLearners: boolean;
   fetchProgress: number;
   config: ElectionConfig;
 }
 
-const Login: React.FC<LoginProps> = ({ 
-  studentId, 
-  setStudentId, 
-  onLogin, 
-  isLoadingLearners, 
+const Login: React.FC<LoginProps> = ({
+  studentId,
+  setStudentId,
+  electionCode,
+  setElectionCode,
+  showElectionCodeField,
+  activeElectionCode,
+  onLogin,
+  isLoadingLearners,
   fetchProgress,
-  config
+  config,
 }) => {
   const formRef = useRef<HTMLFormElement>(null);
 
   const isCurrentlyOpen = () => {
     if (config.status === ElectionStatus.MANUAL_OPEN) return true;
     if (config.status === ElectionStatus.MANUAL_CLOSED) return false;
-    
+
     if (config.status === ElectionStatus.SCHEDULED) {
       const now = new Date().getTime();
       const start = config.startTime ? new Date(config.startTime).getTime() : 0;
       const end = config.endTime ? new Date(config.endTime).getTime() : Infinity;
       return now >= start && now <= end;
     }
+
     return false;
   };
 
   const isOpen = isCurrentlyOpen();
 
-  // Automatic Redirection Logic: Trigger login immediately once 12 digits are reached
-  useEffect(() => {
-    const isNumericLRN = /^\d{12}$/.test(studentId);
-    if (isNumericLRN && !isLoadingLearners && isOpen) {
-      // Small timeout to ensure the state is fully applied before we redirect
-      const timer = setTimeout(() => {
-        onLogin(); // Call handler directly for faster, zero-click response
-      }, 50);
-      return () => clearTimeout(timer);
-    }
-  }, [studentId, isLoadingLearners, isOpen, onLogin]);
-
   const handleClearCache = () => {
-    if (confirm("Reset local system memory? This will clear cached voter lists and force a fresh sync with the cloud.")) {
+    if (confirm('Reset local system memory? This will clear cached voter lists and force a fresh sync with the cloud.')) {
       localStorage.clear();
       window.location.reload();
     }
   };
 
   const getStatusMessage = () => {
-    if (config.status === ElectionStatus.MANUAL_CLOSED) return "The election portal is currently closed by the administrator.";
+    if (config.status === ElectionStatus.MANUAL_CLOSED) {
+      return 'The election portal is currently closed by the administrator.';
+    }
+
     if (config.status === ElectionStatus.SCHEDULED) {
       const now = new Date().getTime();
       const start = config.startTime ? new Date(config.startTime).getTime() : 0;
       if (now < start) {
         return `Voting scheduled to begin on ${new Date(config.startTime!).toLocaleString()}.`;
       }
-      return "The scheduled voting period has ended.";
+      return 'The scheduled voting period has ended.';
     }
-    return "Elections are not yet active.";
+
+    return 'Elections are not yet active.';
   };
 
   return (
-    <div className="flex-grow flex items-center justify-center px-4 py-4 overflow-hidden bg-[#f8fafc]">
-      <div className="bg-white rounded-[2rem] shadow-[0_15px_40px_rgba(0,0,0,0.08)] max-w-sm w-full overflow-hidden border border-gray-100 flex flex-col transform transition-all duration-300">
-        <div className="bg-gradient-to-b from-blue-50 to-white p-5 sm:p-6 text-center border-b border-gray-50">
-          <div className="flex justify-center items-center space-x-5 mb-3 sm:mb-4">
-            <img src={DEPED_SEAL_URL} className="h-10 sm:h-12 w-auto drop-shadow-sm" alt="DepEd Seal" />
-            <div className="h-8 sm:h-10 w-px bg-blue-100"></div>
-            <img src={LEON_NHS_LOGO_URL} className="h-14 sm:h-16 w-auto drop-shadow-md" alt="Institution Seal" />
-          </div>
-          <div className="mb-1.5">
-            <img src={DEPED_LOGO_URL} className="h-4 sm:h-5 w-auto mx-auto mb-1.5 opacity-80" alt="DepEd Logo" />
-          </div>
-          <h2 className="text-base sm:text-lg font-black text-gray-900 uppercase tracking-tight leading-none mb-1">
-            {config.schoolName || 'Leon National High School'}
-          </h2>
-          <p className="text-[8px] sm:text-[9px] font-bold text-[#034F8B] uppercase tracking-[0.2em]">Digital Election Portal</p>
-        </div>
-        
-        <div className="p-5 sm:p-6 flex-grow">
-          {isOpen ? (
-            <form ref={formRef} onSubmit={onLogin} className="space-y-3 sm:space-y-4">
-              <div>
-                <label className="block text-[8px] sm:text-[9px] font-black text-[#034F8B] uppercase tracking-[0.2em] mb-1.5 sm:mb-2 text-left">Learner Reference Number (LRN)</label>
-                <div className="relative">
-                  <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-blue-200">
-                    <i className="fa-solid fa-user-graduate text-base"></i>
-                  </span>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    required
-                    autoFocus
-                    value={studentId}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      if (val.toLowerCase() === 'admin' || /^\d*$/.test(val)) {
-                        setStudentId(val.slice(0, 12));
-                      }
-                    }}
-                    placeholder={isLoadingLearners ? `Syncing... ${fetchProgress}%` : "12-DIGIT LRN"}
-                    disabled={isLoadingLearners}
-                    className="w-full pl-10 pr-4 py-2.5 sm:py-3 bg-[#011a2e] border-2 border-[#034F8B] rounded-xl focus:ring-4 focus:ring-red-500/20 focus:border-[#E11C38] outline-none transition-all font-black text-sm sm:text-base text-white placeholder:text-blue-300/30 uppercase tracking-[0.1em] disabled:opacity-50 shadow-inner"
-                  />
-                </div>
-                {isLoadingLearners && (
-                  <div className="mt-2 w-full bg-gray-100 rounded-full h-1 overflow-hidden border border-gray-200">
-                    <div 
-                      className="bg-[#E11C38] h-full transition-all duration-300 shadow-[0_0_8px_rgba(225,28,56,0.4)]" 
-                      style={{ width: `${fetchProgress}%` }}
-                    ></div>
-                  </div>
-                )}
-              </div>
-              
-              <button
-                type="submit"
-                disabled={isLoadingLearners}
-                className="w-full bg-[#E11C38] text-white py-2.5 sm:py-3 px-4 rounded-xl font-black text-sm sm:text-base hover:bg-red-700 transform transition-all active:scale-95 shadow-lg shadow-red-900/10 flex items-center justify-center space-x-2.5 group disabled:bg-gray-400 uppercase tracking-widest"
-              >
-                {isLoadingLearners ? (
-                  <>
-                    <i className="fa-solid fa-circle-notch animate-spin text-xs"></i>
-                    <span className="text-xs">Syncing...</span>
-                  </>
-                ) : (
-                  <>
-                    <span>Login to Ballot</span>
-                    <i className="fa-solid fa-arrow-right text-xs group-hover:translate-x-1 transition-transform"></i>
-                  </>
-                )}
-              </button>
-            </form>
-          ) : (
-            <div className="text-center py-2 sm:py-4">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-3">
-                <i className="fa-solid fa-lock text-lg text-red-500"></i>
-              </div>
-              <h3 className="text-xs sm:text-sm font-black text-gray-900 uppercase tracking-tight mb-1">Portal Access Suspended</h3>
-              <p className="text-[9px] text-gray-500 font-medium leading-relaxed px-2">
-                {getStatusMessage()}
-              </p>
-            </div>
-          )}
-          
-          <div className="mt-5 flex items-center justify-between border-t border-gray-50 pt-4 px-1">
-            <p className="text-[7px] text-gray-400 font-bold uppercase tracking-[0.2em] flex items-center">
-              <i className="fa-solid fa-shield-halved mr-1.5 text-green-500"></i>
-              Verified Session
+    <section className="flex-grow bg-[#f8fafc]">
+      <div className="mx-auto w-[min(1180px,calc(100%-32px))] px-[28px] py-10 md:py-14">
+        <div className="mx-auto flex max-w-[980px] flex-col items-center text-center">
+          <div className="w-full">
+            <p className="m-0 text-[16px] font-normal leading-[1.25] text-black">
+              Welcome to the DepED - Unified School Information System!
             </p>
-            <button 
-              type="button"
-              onClick={handleClearCache}
-              className="text-[7px] text-gray-300 hover:text-red-400 font-black uppercase tracking-[0.1em] transition-colors"
-            >
-              Reset Cache <i className="fa-solid fa-trash-can ml-1"></i>
-            </button>
+            <h1 className="mt-2 mb-0 text-[24px] font-black uppercase leading-[1.05] tracking-[-0.03em] text-[#0038a8]">
+              Learner Government Election Portal
+            </h1>
+            <p className="mt-1 mb-0 text-[24px] font-black uppercase leading-none text-[#ce1126]">
+              Module
+            </p>
+          </div>
+
+          <div className="mt-12 flex w-full flex-col items-center">
+            <img
+              src={userIcon}
+              alt="User sign-in icon"
+              className="h-[50px] w-[50px] object-contain"
+            />
+
+            {isOpen ? (
+              <>
+                <p className="mt-6 mb-0 text-[24px] font-black leading-[1.15] tracking-[-0.03em] text-black">
+                  Please sign in to continue with voting:
+                </p>
+
+                <form
+                  ref={formRef}
+                  onSubmit={onLogin}
+                  className="mt-7 flex w-full flex-col items-center"
+                >
+                  <label className="relative block w-full max-w-[720px] text-left">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      required
+                      autoFocus
+                      value={studentId}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val.toLowerCase() === 'admin' || /^\d*$/.test(val)) {
+                          setStudentId(val.slice(0, 12));
+                        }
+                      }}
+                      placeholder=" "
+                      disabled={isLoadingLearners}
+                      className="peer w-full rounded-[12px] border border-[rgba(18,35,61,0.14)] bg-white px-6 pt-8 pb-4 text-[16px] text-[#12233d] outline-none transition-all duration-200 placeholder:text-transparent focus:border-[rgba(0,56,168,0.44)] focus:shadow-[0_0_0_4px_rgba(0,56,168,0.08)] disabled:opacity-60"
+                    />
+                    <span className="pointer-events-none absolute top-1/2 left-6 -translate-y-1/2 text-[13px] font-bold uppercase tracking-[0.08em] text-[#8a8a8a] transition-all duration-200 peer-focus:top-4 peer-focus:translate-y-0 peer-focus:text-[13px] peer-focus:text-[#0038a8] peer-[:not(:placeholder-shown)]:top-4 peer-[:not(:placeholder-shown)]:translate-y-0 peer-[:not(:placeholder-shown)]:text-[13px] peer-[:not(:placeholder-shown)]:text-[#68758d]">
+                      {isLoadingLearners ? `Syncing... ${fetchProgress}%` : 'Learner Reference Number (LRN)'}
+                    </span>
+                  </label>
+
+                  {showElectionCodeField && (
+                    <label className="relative mt-4 block w-full max-w-[720px] text-left">
+                      <input
+                        type="text"
+                        required
+                        value={electionCode}
+                        onChange={(e) => setElectionCode(e.target.value.toUpperCase())}
+                        placeholder=" "
+                        disabled={isLoadingLearners}
+                        className="peer w-full rounded-[12px] border border-[rgba(18,35,61,0.14)] bg-white px-6 pt-8 pb-4 text-[16px] uppercase text-[#12233d] outline-none transition-all duration-200 placeholder:text-transparent focus:border-[rgba(0,56,168,0.44)] focus:shadow-[0_0_0_4px_rgba(0,56,168,0.08)] disabled:opacity-60"
+                      />
+                      <span className="pointer-events-none absolute top-1/2 left-6 -translate-y-1/2 text-[13px] font-bold uppercase tracking-[0.08em] text-[#8a8a8a] transition-all duration-200 peer-focus:top-4 peer-focus:translate-y-0 peer-focus:text-[13px] peer-focus:text-[#0038a8] peer-[:not(:placeholder-shown)]:top-4 peer-[:not(:placeholder-shown)]:translate-y-0 peer-[:not(:placeholder-shown)]:text-[13px] peer-[:not(:placeholder-shown)]:text-[#68758d]">
+                        Election Code
+                      </span>
+                    </label>
+                  )}
+
+                  {isLoadingLearners && (
+                    <div className="mt-4 w-full max-w-[720px] rounded-full border border-[rgba(18,35,61,0.12)] bg-white p-1">
+                      <div
+                        className="h-2 rounded-full bg-[#0038a8] transition-all duration-300"
+                        style={{ width: `${fetchProgress}%` }}
+                      />
+                    </div>
+                  )}
+
+                  <div className="mt-5 w-full max-w-[720px] text-right">
+                    <button
+                      type="submit"
+                      disabled={!studentId || (showElectionCodeField && !electionCode)}
+                      className="rounded-[4px] bg-[#0038a8] px-6 py-3 text-[13px] font-bold uppercase tracking-[0.08em] text-white transition-colors hover:bg-[#002f8a] disabled:cursor-not-allowed disabled:bg-slate-300"
+                    >
+                      Continue
+                    </button>
+                  </div>
+                </form>
+
+                <p className="mt-8 mb-0 max-w-[1100px] text-[13px] leading-[1.4] text-[#68758d]">
+                  {showElectionCodeField
+                    ? `Enter the active election code to continue. Current active code: ${activeElectionCode || 'Not yet generated'}.`
+                    : 'Enter the 12-digit LRN. Once the learner is found in the registry, the election code field will appear before you proceed.'}
+                </p>
+              </>
+            ) : (
+              <div className="mt-8 w-full max-w-[720px] rounded-[12px] border border-[rgba(18,35,61,0.12)] bg-white px-8 py-10 text-center shadow-[0_18px_36px_rgba(18,35,61,0.08)]">
+                <p className="m-0 text-[13px] font-bold uppercase tracking-[0.14em] text-[#8a8a8a]">
+                  Portal Status
+                </p>
+                <h2 className="mt-3 mb-0 text-[24px] font-black uppercase tracking-[-0.03em] text-[#12233d]">
+                  Portal Access Suspended
+                </h2>
+                <p className="mt-4 mb-0 text-[16px] leading-[1.5] text-[#68758d]">
+                  {getStatusMessage()}
+                </p>
+              </div>
+            )}
+
+            <div className="mt-10 flex w-full max-w-[720px] items-center justify-between gap-4 border-t border-[rgba(18,35,61,0.12)] pt-5">
+              <div />
+              <button
+                type="button"
+                onClick={handleClearCache}
+                className="rounded-[4px] border border-[rgba(18,35,61,0.12)] bg-white px-4 py-2 text-[13px] font-bold uppercase tracking-[0.08em] text-[#68758d] transition-colors hover:border-[#ce1126] hover:text-[#ce1126]"
+              >
+                Reset Cache
+              </button>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </section>
   );
 };
 

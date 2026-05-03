@@ -6,6 +6,7 @@ DepED USIS currently uses a monorepo-style repository with module applications a
 
 - `election/`
 - `registrar/`
+- `sp-portal/`
 
 The repository also contains shared packages under `packages/` for code that should be reused across modules.
 
@@ -18,6 +19,29 @@ The system is intended to behave as one unified school platform with separate do
 - shared utilities
 - shared UI primitives
 - common auth and access-control patterns
+
+## Database Architecture
+
+The shared database now follows a module-prefixed naming convention to make ownership clearer across the unified system.
+
+Examples:
+
+- `registrar_*` for registrar-owned records
+- `election_*` for election-owned records
+- `sp_portal_*` for Special Program portal admissions records
+- `core_*` for shared or system-wide records
+
+This convention is now part of the active architecture, not just a future direction.
+
+## Current Recorded Schema
+
+The repository stores the current shared schema reference in:
+
+- `database.schema.sql`
+
+Module-specific schema references may still exist when useful, such as:
+
+- `election/schema.sql`
 
 ## Near-Term Plan
 

@@ -2,6 +2,7 @@
 import { Candidate } from '../../../types';
 import { getEncodingSlipTemplate } from './EncodingSlipTemplate';
 import { DEPED_SEAL_URL, LEON_NHS_LOGO_URL } from '../../../constants';
+import { getElectionAbsoluteUrl } from '../../../utils/navigation';
 
 export const handlePrintEncodingSlip = (
   candidate: Candidate, 
@@ -22,7 +23,7 @@ export const handlePrintEncodingSlip = (
   const cocNumber = `${sy}-${uniqueId}`;
 
   // Public Audit URL
-  const qrUrl = `${window.location.origin}${window.location.pathname}#/audit/${candidate.id}`;
+  const qrUrl = getElectionAbsoluteUrl(`/audit/${candidate.id}`);
 
   const html = getEncodingSlipTemplate(
     candidate, 

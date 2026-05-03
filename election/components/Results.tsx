@@ -1,9 +1,15 @@
-
 import React from 'react';
-import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
 } from 'recharts';
-import { Candidate, Position } from '../types';
+import { Candidate } from '../types';
 import { POSITIONS, DEPED_COLORS, LEON_NHS_LOGO_URL, CURRENT_SY_LABEL } from '../constants';
 
 interface ResultsProps {
@@ -13,82 +19,89 @@ interface ResultsProps {
 
 const Results: React.FC<ResultsProps> = ({ candidates, turnoutByPosition = {} }) => {
   return (
-    <div className="max-w-7xl mx-auto py-12 px-4">
-      <div className="flex flex-col md:flex-row justify-between items-center mb-12 gap-6 bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
-        <div className="flex items-center space-x-6">
-          <img src={LEON_NHS_LOGO_URL} className="h-24 w-auto" alt="Leon NHS Seal" />
-          <div>
-            <h2 className="text-4xl font-black text-gray-900 uppercase tracking-tighter leading-none">Official Election Tally</h2>
-            <p className="text-[#034F8B] font-bold uppercase text-xs tracking-[0.2em] mt-2">Leon National High School • SY {CURRENT_SY_LABEL}</p>
+    <section className="mx-auto w-[min(1180px,calc(100%-32px))] px-[28px] py-10">
+      <div className="mb-6 rounded-[12px] border border-slate-200 bg-white px-6 py-6 shadow-sm">
+        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div className="flex items-center gap-4">
+            <img src={LEON_NHS_LOGO_URL} className="h-[50px] w-auto" alt="Leon NHS Seal" />
+            <div>
+              <p className="text-[13px] font-bold uppercase tracking-[0.18em] text-slate-500">
+                Election Results
+              </p>
+              <h2 className="mt-0 text-[24px] font-black uppercase text-[#034F8B]">
+                Official Election Tally
+              </h2>
+              <p className="mt-2 text-[16px] leading-[1.5] text-slate-600">
+                Leon National High School • SY {CURRENT_SY_LABEL}
+              </p>
+            </div>
           </div>
-        </div>
-        <div className="flex items-center space-x-4">
-          <div className="bg-[#E11C38] text-white px-6 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest flex items-center shadow-lg shadow-red-900/20">
-            <i className="fa-solid fa-circle-dot mr-3 animate-pulse"></i>
-            Final Recording
+          <div className="rounded-[12px] border border-slate-200 bg-slate-50 px-4 py-3 text-[13px] font-bold uppercase tracking-[0.12em] text-slate-600">
+            Final recording
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-        {POSITIONS.map(pos => {
-          const positionCandidates = candidates.filter(c => c.position === pos);
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        {POSITIONS.map((pos) => {
+          const positionCandidates = candidates.filter((candidate) => candidate.position === pos);
           const uniqueVotersCount = turnoutByPosition[pos] || 0;
 
           if (positionCandidates.length === 0) return null;
 
           return (
-            <div key={pos} className="bg-white p-8 rounded-3xl shadow-lg border border-gray-100 transform transition-all hover:scale-[1.01]">
-              <div className="flex justify-between items-start mb-8 pb-4 border-b border-gray-100">
-                <div>
-                  <h3 className="text-xl font-black text-[#034F8B] uppercase tracking-tight flex items-center">
-                    <i className="fa-solid fa-chart-simple mr-3 text-[#E11C38]"></i>
-                    {pos}
-                  </h3>
-                </div>
-                <div className="text-right">
-                  <span className="text-[10px] font-black bg-blue-50 text-[#034F8B] px-3 py-1 rounded-full uppercase tracking-tighter">
-                    {uniqueVotersCount} Total Votes
-                  </span>
-                </div>
+            <article
+              key={pos}
+              className="rounded-[12px] border border-slate-200 bg-white px-6 py-6 shadow-sm"
+            >
+              <div className="mb-6 flex items-start justify-between border-b border-slate-200 pb-4">
+                <h3 className="text-[24px] font-black uppercase text-[#034F8B]">{pos}</h3>
+                <span className="rounded-[12px] border border-slate-200 bg-slate-50 px-3 py-2 text-[13px] font-bold text-slate-600">
+                  {uniqueVotersCount} voters
+                </span>
               </div>
+
               <div className="h-72">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={positionCandidates}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                    <XAxis 
-                      dataKey="name" 
-                      axisLine={false} 
-                      tickLine={false} 
-                      tick={{ fontSize: 11, fontWeight: 700, fill: '#64748b' }} 
+                    <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" vertical={false} />
+                    <XAxis
+                      axisLine={false}
+                      dataKey="name"
+                      tick={{ fill: '#64748b', fontSize: 11, fontWeight: 700 }}
+                      tickLine={false}
                     />
-                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} />
-                    <Tooltip 
+                    <YAxis
+                      axisLine={false}
+                      tick={{ fill: '#94a3b8', fontSize: 10 }}
+                      tickLine={false}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '12px',
+                        boxShadow: '0 10px 30px rgba(15, 23, 42, 0.08)',
+                        padding: '12px',
+                      }}
                       cursor={{ fill: '#f8fafc' }}
-                      contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', padding: '16px' }}
-                      itemStyle={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '10px' }}
+                      itemStyle={{ fontSize: '13px', fontWeight: 700 }}
                     />
-                    <Bar dataKey="votes" radius={[8, 8, 0, 0]} barSize={45}>
+                    <Bar barSize={45} dataKey="votes" radius={[8, 8, 0, 0]}>
                       {positionCandidates.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={index % 2 === 0 ? DEPED_COLORS.blue : DEPED_COLORS.red} />
+                        <Cell
+                          key={`${entry.id}-${index}`}
+                          fill={index % 2 === 0 ? DEPED_COLORS.blue : DEPED_COLORS.red}
+                        />
                       ))}
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               </div>
-            </div>
+            </article>
           );
         })}
       </div>
-      
-      <div className="mt-20 text-center py-12 px-8 bg-[#034F8B] rounded-3xl border-t-4 border-[#fcd116]">
-        <div className="max-w-2xl mx-auto space-y-4">
-          <p className="text-white text-[11px] font-black uppercase tracking-[0.4em]">
-            Automated Tallying System • Leon National High School • Secure Election Cloud SY {CURRENT_SY_LABEL}
-          </p>
-        </div>
-      </div>
-    </div>
+    </section>
   );
 };
 

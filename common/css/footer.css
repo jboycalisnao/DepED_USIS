@@ -1,0 +1,130 @@
+.site-footer {
+  width: 100%;
+  margin-top: 32px;
+  background: var(--deped-blue);
+  color: var(--deped-white);
+}
+
+.usis-footer {
+  width: 100%;
+  border: 1px solid rgba(0, 56, 168, 0.12);
+  background: var(--deped-blue);
+  color: var(--deped-white);
+}
+
+.usis-footer__top-band {
+  height: 16px;
+  background: var(--deped-blue);
+}
+
+.usis-footer__logo-band {
+  display: flex;
+  justify-content: center;
+  padding: 10px 24px;
+  background: var(--deped-white);
+}
+
+.usis-footer__logo {
+  width: auto;
+  height: 50px;
+  max-width: 100%;
+  object-fit: contain;
+}
+
+.usis-footer__yellow-band {
+  height: 12px;
+  background: var(--deped-yellow);
+}
+
+.usis-footer__red-band {
+  height: 12px;
+  background: var(--deped-red);
+}
+
+.usis-footer__body {
+  display: grid;
+  gap: 16px;
+  align-items: start;
+  padding: 12px 28px 4px;
+  background: var(--deped-blue);
+  color: var(--deped-white);
+}
+
+.usis-footer__body h3 {
+  margin: 0;
+  color: var(--deped-white);
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  text-transform: uppercase;
+}
+
+.usis-footer__body p,
+.usis-footer__body li {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 13px;
+  line-height: 1.22;
+}
+
+.usis-footer__identity {
+  margin-top: 12px;
+  color: var(--deped-white);
+  font-size: 16px;
+  line-height: 1.2;
+}
+
+.usis-footer__powered {
+  margin-top: 20px;
+  font-style: italic;
+  line-height: 1.4;
+}
+
+.usis-footer__powered + p {
+  margin-top: 4px;
+  line-height: 1.4;
+}
+
+.usis-footer__divider {
+  display: none;
+}
+
+.usis-footer__services {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.usis-footer__services ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (min-width: 640px) {
+  .usis-footer__services {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 768px) {
+  .usis-footer__body {
+    grid-template-columns: 1.05fr auto 1.55fr;
+  }
+
+  .usis-footer__divider {
+    display: block;
+    width: 1px;
+    min-height: 120px;
+    background: rgba(255, 255, 255, 0.9);
+  }
+}
+
+@media (min-width: 1024px) {
+  .usis-footer__services {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}

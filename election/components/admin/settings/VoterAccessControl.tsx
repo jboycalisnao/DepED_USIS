@@ -32,39 +32,31 @@ const VoterAccessControl: React.FC<VoterAccessControlProps> = ({ config, onUpdat
   const actualStatus = isPortalActuallyOpen();
 
   return (
-    <div className="bg-white p-10 rounded-[2.5rem] shadow-sm border border-gray-100 no-print">
-      <div className="flex items-center justify-between mb-8">
+    <div className="rounded-[12px] border border-[rgba(18,35,61,0.08)] bg-white p-6 shadow-sm no-print">
+      <div className="mb-6 flex items-center">
         <div className="flex items-center space-x-4">
-          <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-[#034F8B]">
-            <i className="fa-solid fa-clock-rotate-left text-xl"></i>
+          <div className="flex h-12 w-12 items-center justify-center rounded-[12px] bg-blue-50 text-[#034F8B]">
+            <i className="fa-solid fa-clock-rotate-left text-[16px]"></i>
           </div>
           <div>
-            <h3 className="text-xl font-black text-gray-900 uppercase tracking-tight">Voter Access Control</h3>
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Manage login availability & scheduling</p>
+            <h3 className="text-[24px] font-black uppercase tracking-tight text-gray-900">Voter Access Control</h3>
+            <p className="text-[13px] font-bold uppercase tracking-[0.12em] text-slate-500">Manage login availability and scheduling</p>
           </div>
-        </div>
-        
-        <div className={`flex items-center px-4 py-2 rounded-xl border ${actualStatus ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-          <div className={`w-2 h-2 rounded-full mr-3 ${actualStatus ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
-          <span className={`text-[10px] font-black uppercase ${actualStatus ? 'text-green-700' : 'text-red-700'}`}>
-            Live Status: {actualStatus ? 'Portal Open' : 'Portal Closed'}
-          </span>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Manual Toggles */}
         <div className="lg:col-span-1 space-y-4">
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Manual Override</p>
+          <p className="mb-4 text-[13px] font-bold uppercase tracking-[0.12em] text-slate-500">Manual Override</p>
           <div className="flex flex-col gap-3">
             <button 
               type="button"
               onClick={() => handleStatusChange(ElectionStatus.MANUAL_OPEN)}
-              className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all active:scale-95 cursor-pointer ${config.status === ElectionStatus.MANUAL_OPEN ? 'bg-[#034F8B] border-[#034F8B] text-white shadow-lg' : 'bg-white border-gray-100 text-gray-500 hover:border-gray-200'}`}
+              className={`flex cursor-pointer items-center justify-between rounded-[12px] border px-4 py-4 text-left transition-colors ${config.status === ElectionStatus.MANUAL_OPEN ? 'border-[rgba(0,56,168,0.24)] bg-[#eef4ff] text-[#0038a8]' : 'border-[rgba(18,35,61,0.14)] bg-white text-slate-600 hover:bg-slate-50'}`}
             >
               <div className="flex items-center pointer-events-none">
                 <i className="fa-solid fa-lock-open mr-3"></i>
-                <span className="font-black text-[10px] uppercase">Always Open</span>
+                <span className="text-[13px] font-bold uppercase tracking-[0.08em]">Always Open</span>
               </div>
               {config.status === ElectionStatus.MANUAL_OPEN && <i className="fa-solid fa-check"></i>}
             </button>
@@ -72,11 +64,11 @@ const VoterAccessControl: React.FC<VoterAccessControlProps> = ({ config, onUpdat
             <button 
               type="button"
               onClick={() => handleStatusChange(ElectionStatus.MANUAL_CLOSED)}
-              className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all active:scale-95 cursor-pointer ${config.status === ElectionStatus.MANUAL_CLOSED ? 'bg-[#E11C38] border-[#E11C38] text-white shadow-lg' : 'bg-white border-gray-100 text-gray-500 hover:border-gray-200'}`}
+              className={`flex cursor-pointer items-center justify-between rounded-[12px] border px-4 py-4 text-left transition-colors ${config.status === ElectionStatus.MANUAL_CLOSED ? 'border-[rgba(206,17,38,0.24)] bg-[#fff5f6] text-[#ce1126]' : 'border-[rgba(18,35,61,0.14)] bg-white text-slate-600 hover:bg-slate-50'}`}
             >
               <div className="flex items-center pointer-events-none">
                 <i className="fa-solid fa-lock mr-3"></i>
-                <span className="font-black text-[10px] uppercase">Force Closed</span>
+                <span className="text-[13px] font-bold uppercase tracking-[0.08em]">Force Closed</span>
               </div>
               {config.status === ElectionStatus.MANUAL_CLOSED && <i className="fa-solid fa-check"></i>}
             </button>
@@ -84,47 +76,46 @@ const VoterAccessControl: React.FC<VoterAccessControlProps> = ({ config, onUpdat
             <button 
               type="button"
               onClick={() => handleStatusChange(ElectionStatus.SCHEDULED)}
-              className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all active:scale-95 cursor-pointer ${config.status === ElectionStatus.SCHEDULED ? 'bg-[#034F8B] border-[#034F8B] text-white shadow-lg' : 'bg-white border-gray-100 text-gray-500 hover:border-gray-200'}`}
+              className={`flex cursor-pointer items-center justify-between rounded-[12px] border px-4 py-4 text-left transition-colors ${config.status === ElectionStatus.SCHEDULED ? 'border-[rgba(0,56,168,0.24)] bg-[#eef4ff] text-[#0038a8]' : 'border-[rgba(18,35,61,0.14)] bg-white text-slate-600 hover:bg-slate-50'}`}
             >
               <div className="flex items-center pointer-events-none">
                 <i className="fa-solid fa-calendar-check mr-3"></i>
-                <span className="font-black text-[10px] uppercase">Use Schedule</span>
+                <span className="text-[13px] font-bold uppercase tracking-[0.08em]">Use Schedule</span>
               </div>
               {config.status === ElectionStatus.SCHEDULED && <i className="fa-solid fa-check"></i>}
             </button>
           </div>
         </div>
 
-        {/* Scheduling Inputs */}
-        <div className={`lg:col-span-2 space-y-6 p-8 bg-gray-50 rounded-3xl border border-gray-100 transition-opacity ${config.status !== ElectionStatus.SCHEDULED ? 'opacity-40 grayscale pointer-events-none' : ''}`}>
-          <div className="flex items-center space-x-2 mb-4">
+        <div className={`lg:col-span-2 space-y-6 rounded-[12px] border border-[rgba(18,35,61,0.08)] bg-slate-50 p-6 transition-opacity ${config.status !== ElectionStatus.SCHEDULED ? 'pointer-events-none opacity-40 grayscale' : ''}`}>
+          <div className="mb-4 flex items-center space-x-2">
              <i className="fa-solid fa-timeline text-blue-500"></i>
-             <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest">Automation Settings</p>
+             <p className="text-[13px] font-bold uppercase tracking-[0.12em] text-slate-600">Automation Settings</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">Portal Open Time</label>
+              <label className="mb-2 block text-[13px] font-bold uppercase tracking-[0.12em] text-slate-500">Portal Open Time</label>
               <input 
                 type="datetime-local"
                 value={config.startTime || ''}
                 onChange={(e) => handleTimeChange('startTime', e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border-2 border-white bg-white focus:border-blue-500 outline-none font-bold text-xs"
+                className="w-full rounded-[12px] border border-[rgba(18,35,61,0.14)] bg-white px-4 py-[14px] text-[16px] text-[#12233d] outline-none transition-all duration-200 focus:border-[rgba(0,56,168,0.44)] focus:shadow-[0_0_0_4px_rgba(0,56,168,0.08)]"
               />
             </div>
             <div>
-              <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">Portal Close Time</label>
+              <label className="mb-2 block text-[13px] font-bold uppercase tracking-[0.12em] text-slate-500">Portal Close Time</label>
               <input 
                 type="datetime-local"
                 value={config.endTime || ''}
                 onChange={(e) => handleTimeChange('endTime', e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border-2 border-white bg-white focus:border-blue-500 outline-none font-bold text-xs"
+                className="w-full rounded-[12px] border border-[rgba(18,35,61,0.14)] bg-white px-4 py-[14px] text-[16px] text-[#12233d] outline-none transition-all duration-200 focus:border-[rgba(0,56,168,0.44)] focus:shadow-[0_0_0_4px_rgba(0,56,168,0.08)]"
               />
             </div>
           </div>
 
-          <div className="bg-white p-4 rounded-2xl border border-gray-200">
-            <p className="text-[10px] font-bold text-gray-500 leading-relaxed italic">
+          <div className="rounded-[12px] border border-gray-200 bg-white p-4">
+            <p className="text-[13px] leading-relaxed text-slate-600">
               <i className="fa-solid fa-circle-info mr-2 text-blue-400"></i>
               When "Use Schedule" is active, voters can only access the login form between these two dates. Outside of this window, they will see a "Portal Closed" message.
             </p>

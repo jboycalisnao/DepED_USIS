@@ -10,15 +10,18 @@
   },
   "dependencies": {
     "@deped-usis/shared-supabase": "^0.1.0",
+    "@google/genai": "^1.39.0",
+    "@supabase/supabase-js": "^2.45.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.4",
-    "recharts": "^3.6.0",
-    "@supabase/supabase-js": "^2.45.0",
-    "@google/genai": "^1.39.0"
+    "recharts": "^3.6.0"
   },
   "devDependencies": {
+    "@tailwindcss/postcss": "^4.2.4",
     "@types/node": "^22.14.0",
     "@vitejs/plugin-react": "^5.0.0",
+    "postcss": "^8.5.10",
+    "tailwindcss": "^4.2.4",
     "typescript": "~5.8.2",
     "vite": "^6.2.0"
   }

@@ -14,10 +14,12 @@ import { handleResultsPrint } from './resultsExportHandler';
 import { handleParticipationPrint } from './participationExportHandler';
 import { handleNonVotersPrint } from './nonVotersExportHandler';
 import { DEPED_SEAL_URL, LEON_NHS_LOGO_URL } from '../../../constants';
+import { getElectionAbsoluteUrl } from '../../../utils/navigation';
 
 interface SettingsTabProps {
   candidates: Candidate[];
   onReset: () => void;
+  onMigrateLegacyData: () => Promise<void>;
   onLogout: () => void;
   learnerDatabase: Student[];
   voters: User[];
@@ -31,6 +33,7 @@ interface SettingsTabProps {
 const SettingsTab: React.FC<SettingsTabProps> = ({ 
   candidates,
   onReset, 
+  onMigrateLegacyData,
   onLogout, 
   learnerDatabase, 
   voters, 
@@ -45,6 +48,7 @@ const SettingsTab: React.FC<SettingsTabProps> = ({
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
   const [isTarpModalOpen, setIsTarpModalOpen] = useState(false);
   const [isGradeResultsOpen, setIsGradeResultsOpen] = useState(false);
+  const [isMigratingLegacy, setIsMigratingLegacy] = useState(false);
 
   const handleTogglePublicResults = () => {
     const nextState = !electionConfig.publicResultsEnabled;
@@ -58,7 +62,7 @@ const SettingsTab: React.FC<SettingsTabProps> = ({
 
   const handleCopyLink = (type: 'results' | 'turnout') => {
     const route = type === 'results' ? 'public-results' : 'public-turnout';
-    const publicUrl = `${window.location.origin}${window.location.pathname}#/${route}`;
+    const publicUrl = getElectionAbsoluteUrl(`/${route}`);
     navigator.clipboard.writeText(publicUrl).then(() => {
       showAlert("Link Copied", `The ${type} URL has been copied to your clipboard.`, "success");
     });
@@ -75,6 +79,15 @@ const SettingsTab: React.FC<SettingsTabProps> = ({
 
   const handleExportNonVoters = () => {
     handleNonVotersPrint(learnerDatabase, voters, sections, electionConfig, activeSyLabel);
+  };
+
+  const handleMigrateLegacy = async () => {
+    try {
+      setIsMigratingLegacy(true);
+      await onMigrateLegacyData();
+    } finally {
+      setIsMigratingLegacy(false);
+    }
   };
 
   return (
@@ -108,76 +121,71 @@ const SettingsTab: React.FC<SettingsTabProps> = ({
       />
 
       {/* Branding Header within Tab */}
-      <div className="bg-[#034F8B] p-10 rounded-[2.5rem] shadow-xl border-b-4 border-[#fcd116]/20 flex flex-col md:flex-row items-center justify-between gap-6 no-print">
+      <div className="bg-white p-6 rounded-[12px] shadow-sm border border-[rgba(18,35,61,0.08)] flex flex-col md:flex-row items-center justify-between gap-6 no-print">
         <div className="flex items-center space-x-6">
-          <img src={DEPED_SEAL_URL} className="h-16 w-auto" alt="DepEd Seal" />
-          <div className="w-px h-12 bg-white/20"></div>
-          <img src={LEON_NHS_LOGO_URL} className="h-16 w-auto" alt="School Logo" />
           <div className="text-left">
-            <h2 className="text-white font-black text-2xl uppercase tracking-tight">System Settings</h2>
-            <p className="text-blue-200 text-[10px] font-bold uppercase tracking-[0.3em] mt-1">Election Configuration Module</p>
+            <h2 className="text-[#0038a8] font-bold text-[24px] uppercase tracking-tight">System Settings</h2>
+            <p className="text-[#68758d] text-[13px] font-bold uppercase tracking-[0.08em] mt-1">Election Configuration Module</p>
           </div>
         </div>
       </div>
 
       {/* Public Accessibility Controls */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 no-print">
-        {/* Results Visibility */}
-        <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100">
+        <div className="rounded-[12px] border border-[rgba(18,35,61,0.08)] bg-white p-6 shadow-sm">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center space-x-4">
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${electionConfig.publicResultsEnabled ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
-                <i className={`fa-solid ${electionConfig.publicResultsEnabled ? 'fa-square-poll-vertical' : 'fa-eye-slash'} text-lg`}></i>
+              <div className={`flex h-10 w-10 items-center justify-center rounded-[12px] transition-colors ${electionConfig.publicResultsEnabled ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
+                <i className={`fa-solid ${electionConfig.publicResultsEnabled ? 'fa-square-poll-vertical' : 'fa-eye-slash'} text-[16px]`}></i>
               </div>
               <div>
-                <h3 className="text-lg font-black text-gray-900 uppercase">Live Tally Access</h3>
-                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Broadcast candidate performance</p>
+                <h3 className="text-[16px] font-bold uppercase text-gray-900">Live Tally Access</h3>
+                <p className="text-[13px] font-bold uppercase tracking-[0.12em] text-slate-500">Broadcast candidate performance</p>
               </div>
             </div>
             <button 
               onClick={handleTogglePublicResults}
-              className={`px-4 py-2 rounded-xl font-black text-[9px] uppercase tracking-widest transition-all ${electionConfig.publicResultsEnabled ? 'bg-green-500 text-white shadow-lg' : 'bg-gray-200 text-gray-500'}`}
+              className={`rounded-[12px] border px-4 py-3 text-[13px] font-bold uppercase tracking-[0.08em] transition-colors ${electionConfig.publicResultsEnabled ? 'border-green-200 bg-green-50 text-green-700' : 'border-slate-200 bg-slate-50 text-slate-600'}`}
             >
               {electionConfig.publicResultsEnabled ? 'PUBLISHED' : 'HIDDEN'}
             </button>
           </div>
-          <div className="flex items-center space-x-2 bg-gray-50 p-3 rounded-2xl border border-gray-100">
-            <input 
+          <div className="grid grid-cols-[minmax(0,1fr)_auto]">
+              <input 
               type="text" 
               readOnly 
-              value={`${window.location.origin}${window.location.pathname}#/public-results`}
-              className="flex-grow bg-transparent text-[8px] font-mono font-bold text-gray-400 outline-none"
+              value={getElectionAbsoluteUrl('/public-results')}
+              className="w-full rounded-l-[12px] border border-r-0 border-[rgba(18,35,61,0.14)] bg-[#fbfcff] px-4 py-[14px] text-[13px] text-slate-500 outline-none"
             />
-            <button onClick={() => handleCopyLink('results')} className="text-blue-500 hover:text-blue-700 p-2"><i className="fa-solid fa-copy"></i></button>
+            <button onClick={() => handleCopyLink('results')} className="cursor-pointer rounded-r-[12px] border border-[rgba(18,35,61,0.14)] bg-[#fbfcff] px-4 text-[#0038a8] transition-colors hover:bg-[#eef4ff]"><i className="fa-solid fa-copy"></i></button>
           </div>
         </div>
 
-        {/* Turnout Visibility - ALWAYS ONLINE */}
-        <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100">
+        <div className="rounded-[12px] border border-[rgba(18,35,61,0.08)] bg-white p-6 shadow-sm">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center space-x-4">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-blue-50 text-blue-600">
-                <i className="fa-solid fa-chart-area text-lg"></i>
+              <div className="flex h-10 w-10 items-center justify-center rounded-[12px] bg-blue-50 text-blue-600">
+                <i className="fa-solid fa-chart-area text-[16px]"></i>
               </div>
               <div>
-                <h3 className="text-lg font-black text-gray-900 uppercase">Participation Dashboard</h3>
-                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Public engagement statistics</p>
+                <h3 className="text-[16px] font-bold uppercase text-gray-900">Participation Dashboard</h3>
+                <p className="text-[13px] font-bold uppercase tracking-[0.12em] text-slate-500">Public engagement statistics</p>
               </div>
             </div>
-            <span className="px-4 py-2 rounded-xl font-black text-[9px] uppercase tracking-widest bg-blue-600 text-white shadow-lg">
+            <span className="rounded-[12px] border border-blue-200 bg-blue-50 px-4 py-3 text-[13px] font-bold uppercase tracking-[0.08em] text-blue-700">
               ALWAYS ONLINE
             </span>
           </div>
-          <div className="flex items-center space-x-2 bg-gray-50 p-3 rounded-2xl border border-gray-100">
-            <input 
+          <div className="grid grid-cols-[minmax(0,1fr)_auto]">
+              <input 
               type="text" 
               readOnly 
-              value={`${window.location.origin}${window.location.pathname}#/public-turnout`}
-              className="flex-grow bg-transparent text-[8px] font-mono font-bold text-gray-400 outline-none"
+              value={getElectionAbsoluteUrl('/public-turnout')}
+              className="w-full rounded-l-[12px] border border-r-0 border-[rgba(18,35,61,0.14)] bg-[#fbfcff] px-4 py-[14px] text-[13px] text-slate-500 outline-none"
             />
-            <button onClick={() => handleCopyLink('turnout')} className="text-blue-500 hover:text-blue-700 p-2"><i className="fa-solid fa-copy"></i></button>
+            <button onClick={() => handleCopyLink('turnout')} className="cursor-pointer rounded-r-[12px] border border-[rgba(18,35,61,0.14)] bg-[#fbfcff] px-4 text-[#0038a8] transition-colors hover:bg-[#eef4ff]"><i className="fa-solid fa-copy"></i></button>
           </div>
-          <p className="text-[8px] font-bold text-gray-400 mt-3 uppercase italic">
+          <p className="mt-3 text-[13px] italic text-slate-500">
             <i className="fa-solid fa-circle-info mr-1 text-blue-400"></i>
             Aggregated stats are shared automatically to promote transparency.
           </p>
@@ -218,7 +226,7 @@ const SettingsTab: React.FC<SettingsTabProps> = ({
       />
 
       {/* Advance Election Controls */}
-      <div className="bg-white p-10 rounded-[2.5rem] shadow-sm border border-gray-100 no-print">
+      <div className="bg-white p-6 rounded-[12px] shadow-sm border border-[rgba(18,35,61,0.08)] no-print">
         <div className="flex items-center justify-between mb-8">
            <h3 className="text-xl font-black text-gray-900 uppercase flex items-center">
             <i className="fa-solid fa-sliders mr-3 text-[#034F8B]"></i>
@@ -293,11 +301,25 @@ const SettingsTab: React.FC<SettingsTabProps> = ({
             <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-1">Report Image</span>
             <span className="text-xs font-bold text-gray-900 text-center">High-Res PNG Infographic Exporter</span>
           </button>
+
+          <button 
+            onClick={handleMigrateLegacy}
+            disabled={isMigratingLegacy}
+            className="flex flex-col items-center p-8 bg-gray-50 rounded-2xl border border-gray-100 hover:bg-white hover:border-[#034F8B] transition-all group shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <div className="w-12 h-12 bg-white rounded-xl shadow-sm flex items-center justify-center mb-4 group-hover:bg-[#034F8B] group-hover:text-white transition-colors">
+              <i className={`fa-solid ${isMigratingLegacy ? 'fa-circle-notch animate-spin' : 'fa-database'}`}></i>
+            </div>
+            <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-1">Legacy Migration</span>
+            <span className="text-xs font-bold text-gray-900 text-center">
+              {isMigratingLegacy ? 'Migrating Legacy Records...' : 'Enforce Legacy Ballots & Candidates'}
+            </span>
+          </button>
         </div>
       </div>
 
       {/* Security Protocol */}
-      <div className="bg-red-50 p-10 rounded-[2.5rem] border border-red-100 no-print">
+      <div className="bg-[#fff7f7] p-6 rounded-[12px] border border-[#ce1126]/12 no-print">
         <div className="flex items-start space-x-4 mb-8">
           <div className="bg-red-600 text-white w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg shadow-red-900/20">
             <i className="fa-solid fa-triangle-exclamation text-xl"></i>

@@ -242,29 +242,24 @@ const BulkImport: React.FC = () => {
       </div>
 
       {showPreview && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 sm:p-12 animate-in fade-in duration-300">
+        <div className="modal-overlay">
           <div 
-            className="fixed top-0 left-0 w-full h-full bg-[#010e5b]/40 backdrop-blur-xl" 
+            className="modal-backdrop" 
             onClick={() => setShowPreview(false)}
           ></div>
           
-          <div className="relative w-full max-w-5xl bg-white rounded-[64px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-500">
-            <div className="p-10 border-b border-surfaceVariant flex flex-col md:flex-row md:items-center justify-between gap-6 bg-surface/30">
-              <div className="flex items-center gap-5">
-                <div className="w-16 h-16 bg-primary rounded-[24px] flex items-center justify-center text-white shadow-xl">
-                  <span className="material-symbols-outlined text-3xl">sync_alt</span>
-                </div>
-                <div>
-                  <h3 className="text-3xl font-black text-primary uppercase tracking-tighter">Resolution Preview</h3>
+          <div className="modal-dialog modal-dialog--wide" role="dialog" aria-modal="true" aria-labelledby="resolution-preview-title">
+            <div className="modal-dialog__header">
+                <div className="modal-dialog__title-group">
+                  <h3 id="resolution-preview-title">Resolution Preview</h3>
                   <div className="flex gap-4 mt-1">
                     <span className="text-[10px] font-black text-green-700 bg-green-50 px-2 py-0.5 rounded-full uppercase tracking-widest">{totals.newCount} New Profiles</span>
                     <span className="text-[10px] font-black text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full uppercase tracking-widest">{totals.existingCount} Profile Updates</span>
                   </div>
                 </div>
-              </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto custom-scrollbar">
+            <div className="modal-dialog__body custom-scrollbar">
               <table className="w-full text-left">
                 <thead className="bg-white sticky top-0 z-10">
                   <tr>
@@ -295,16 +290,15 @@ const BulkImport: React.FC = () => {
               </table>
             </div>
 
-            <div className="p-10 bg-surface/30 border-t border-surfaceVariant flex justify-between items-center">
+            <div className="modal-dialog__actions">
               <button 
                 onClick={() => { setShowPreview(false); resetForNewImport(); }}
-                className="px-10 py-5 rounded-2xl text-outline font-black text-xs uppercase tracking-widest hover:bg-white transition-all"
               >
                 Abort & Return
               </button>
               <button 
                 onClick={() => setShowFinalConfirm(true)}
-                className="px-12 py-5 rounded-[24px] bg-primary text-white font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-primary/30 hover:scale-105 active:scale-95 transition-all flex items-center gap-3"
+                className="modal-dialog__blue"
               >
                 <span className="material-symbols-outlined">save</span>
                 Commit Batch Changes

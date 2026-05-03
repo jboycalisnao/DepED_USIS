@@ -1,0 +1,26 @@
+:root {
+  --deped-blue: #0038a8;
+  --deped-red: #ce1126;
+  --deped-yellow: #fcd116;
+  --deped-white: #ffffff;
+  --deped-ink: #12233d;
+  --deped-canvas: #f4f7fb;
+  --deped-muted: #68758d;
+  --deped-line: rgba(18, 35, 61, 0.12);
+  --deped-line-strong: rgba(0, 56, 168, 0.24);
+  --deped-shadow: 0 24px 56px rgba(13, 30, 68, 0.12);
+  --deped-font: "Helvetica Neue", Helvetica, sans-serif;
+  --page-inset: 28px;
+  --heading-stack-gap: 8px;
+  --usis-radius-surface: 12px;
+  --usis-radius-control: 4px;
+  --usis-title-size: 24px;
+  --usis-body-size: 16px;
+  --usis-helper-size: 13px;
+}
+
+@media (max-width: 640px) {
+  :root {
+    --page-inset: 16px;
+  }
+}

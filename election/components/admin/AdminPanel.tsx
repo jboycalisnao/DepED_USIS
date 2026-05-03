@@ -1,12 +1,17 @@
-
-import React, { useState, useEffect } from 'react';
-import { Candidate, User, Student, Section, ElectionConfig, SchoolYear } from '../../types';
-import DashboardTab from './dashboard/DashboardTab';
+import React, { useEffect, useState } from 'react';
+import { Candidate, ElectionConfig, SchoolYear, Section, Student, User } from '../../types';
+import { ELECTION_TITLE } from '../../constants';
 import CandidatesTab from './candidates/CandidatesTab';
-import VotersTab from './voters/VotersTab';
+import DashboardTab from './dashboard/DashboardTab';
 import OrganizationTab from './organization/OrganizationTab';
 import SettingsTab from './settings/SettingsTab';
-import { ELECTION_TITLE, DEPED_SEAL_URL, LEON_NHS_LOGO_URL } from '../../constants';
+import VotersTab from './voters/VotersTab';
+import {
+  getCurrentElectionPath,
+  getElectionNavigationEvent,
+  navigateToElectionPath,
+  openElectionPathInNewTab,
+} from '../../utils/navigation';
 
 interface AdminPanelProps {
   candidates: Candidate[];
@@ -20,49 +25,80 @@ interface AdminPanelProps {
   sections: Section[];
   electionConfig: ElectionConfig;
   setElectionConfig: (config: ElectionConfig) => void;
+  onMigrateLegacyData: () => Promise<void>;
   onReset: () => void;
   onLogout: () => void;
-  showAlert: (title: string, message: string, type?: 'info' | 'warning' | 'error' | 'success' | 'confirm', onConfirm?: () => void) => void;
+  showAlert: (
+    title: string,
+    message: string,
+    type?: 'info' | 'warning' | 'error' | 'success' | 'confirm',
+    onConfirm?: () => void,
+  ) => void;
   schoolYears: SchoolYear[];
+  variant?: 'embedded' | 'standalone';
 }
 
 type AdminTab = 'dashboard' | 'candidates' | 'voters' | 'organization' | 'settings';
 
+const validTabs: AdminTab[] = ['dashboard', 'candidates', 'voters', 'organization', 'settings'];
+
+const tabs: { id: AdminTab; label: string; icon: string }[] = [
+  { id: 'dashboard', label: 'Dashboard', icon: 'fa-gauge-high' },
+  { id: 'candidates', label: 'Candidates', icon: 'fa-user-tie' },
+  { id: 'voters', label: 'Voters', icon: 'fa-users-viewfinder' },
+  { id: 'organization', label: 'Organization', icon: 'fa-sitemap' },
+  { id: 'settings', label: 'Settings', icon: 'fa-gear' },
+];
+
 const AdminPanel: React.FC<AdminPanelProps> = (props) => {
   const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
+  const isEmbedded = props.variant === 'embedded';
 
-  // Handle Hash Sync for Sub-routing
   useEffect(() => {
-    const syncTabFromHash = () => {
-      const hash = window.location.hash.replace('#/', '');
-      const parts = hash.split('/');
-      
-      // We expect paths like admin/voters
-      if (parts[0] === 'admin') {
-        const tab = parts[1] as AdminTab;
-        const validTabs: AdminTab[] = ['dashboard', 'candidates', 'voters', 'organization', 'settings'];
-        
-        if (tab && validTabs.includes(tab)) {
-          setActiveTab(tab);
-        } else if (!tab) {
-          // If just #/admin, redirect to default tab
-          window.location.hash = '#/admin/dashboard';
-        }
+    if (isEmbedded) {
+      return;
+    }
+
+    const syncTabFromPath = () => {
+      const pathname = getCurrentElectionPath();
+      const parts = pathname.split('/').filter(Boolean);
+
+      if (parts[0] !== 'admin') return;
+
+      const tab = parts[1] as AdminTab | undefined;
+
+      if (tab && validTabs.includes(tab)) {
+        setActiveTab(tab);
+        return;
+      }
+
+      if (!tab) {
+        navigateToElectionPath('/admin/dashboard', true);
       }
     };
 
-    window.addEventListener('hashchange', syncTabFromHash);
-    syncTabFromHash(); // Initial check
+    const navigationEvent = getElectionNavigationEvent();
+    window.addEventListener('popstate', syncTabFromPath);
+    window.addEventListener(navigationEvent, syncTabFromPath);
+    syncTabFromPath();
 
-    return () => window.removeEventListener('hashchange', syncTabFromHash);
-  }, []);
+    return () => {
+      window.removeEventListener('popstate', syncTabFromPath);
+      window.removeEventListener(navigationEvent, syncTabFromPath);
+    };
+  }, [isEmbedded]);
 
   const handleTabClick = (tabId: AdminTab) => {
-    window.location.hash = `#/admin/${tabId}`;
+    if (isEmbedded) {
+      setActiveTab(tabId);
+      return;
+    }
+
+    navigateToElectionPath(`/admin/${tabId}`);
   };
 
   const handleOpenMonitor = () => {
-    window.open('#/monitoring', '_blank');
+    openElectionPathInNewTab('/monitoring');
   };
 
   const renderContent = () => {
@@ -71,41 +107,48 @@ const AdminPanel: React.FC<AdminPanelProps> = (props) => {
         return <DashboardTab {...props} />;
       case 'candidates':
         return (
-          <CandidatesTab 
-            candidates={props.candidates} 
+          <CandidatesTab
+            candidates={props.candidates}
             turnoutByPosition={props.turnoutByPosition}
-            onAddCandidate={props.onAddCandidate} 
+            onAddCandidate={props.onAddCandidate}
             onUpdateCandidate={props.onUpdateCandidate}
             onDeleteCandidate={props.onDeleteCandidate}
-            showAlert={props.showAlert} 
+            showAlert={props.showAlert}
             schoolYears={props.schoolYears}
             electionConfig={props.electionConfig}
           />
         );
       case 'voters':
         return (
-          <VotersTab 
-            learnerDatabase={props.learnerDatabase} 
-            voters={props.voters} 
-            sections={props.sections} 
+          <VotersTab
+            learnerDatabase={props.learnerDatabase}
+            voters={props.voters}
+            sections={props.sections}
             onDeleteBallot={props.onDeleteBallot}
             showAlert={props.showAlert}
           />
         );
       case 'organization':
-        return <OrganizationTab sections={props.sections} learnerDatabase={props.learnerDatabase} voters={props.voters} />;
+        return (
+          <OrganizationTab
+            sections={props.sections}
+            learnerDatabase={props.learnerDatabase}
+            voters={props.voters}
+          />
+        );
       case 'settings':
         return (
-          <SettingsTab 
+          <SettingsTab
             candidates={props.candidates}
-            onReset={props.onReset} 
-            onLogout={props.onLogout} 
+            onReset={props.onReset}
+            onLogout={props.onLogout}
             learnerDatabase={props.learnerDatabase}
             voters={props.voters}
             sections={props.sections}
             showAlert={props.showAlert}
             electionConfig={props.electionConfig}
             setElectionConfig={props.setElectionConfig}
+            onMigrateLegacyData={props.onMigrateLegacyData}
             schoolYears={props.schoolYears}
           />
         );
@@ -114,78 +157,69 @@ const AdminPanel: React.FC<AdminPanelProps> = (props) => {
     }
   };
 
-  const tabs: { id: AdminTab; label: string; icon: string }[] = [
-    { id: 'dashboard', label: 'Dashboard', icon: 'fa-gauge-high' },
-    { id: 'candidates', label: 'Candidates', icon: 'fa-user-tie' },
-    { id: 'voters', label: 'Voters', icon: 'fa-users-viewfinder' },
-    { id: 'organization', label: 'Organization', icon: 'fa-sitemap' },
-    { id: 'settings', label: 'Settings', icon: 'fa-gear' },
-  ];
-
   return (
-    <div className="max-w-7xl mx-auto py-6 md:py-10 px-4">
-      {/* Branding Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-6">
-        <div className="flex items-center space-x-6">
-          <div className="flex items-center space-x-3">
-             <img src={DEPED_SEAL_URL} className="h-14 w-auto drop-shadow-md" alt="DepEd Seal" />
-             <div className="w-px h-10 bg-gray-200"></div>
-             <img src={LEON_NHS_LOGO_URL} className="h-16 w-auto drop-shadow-md" alt="LNHS Logo" />
-          </div>
-          <div>
-            <h2 className="text-3xl md:text-4xl font-black text-[#034F8B] uppercase tracking-tighter leading-none">
-              Admin Console
-            </h2>
-            <p className="text-gray-400 font-bold uppercase text-[10px] tracking-[0.3em] mt-1">
-              {ELECTION_TITLE} • Live Data Access
-            </p>
-          </div>
-        </div>
-        
-        <div className="hidden md:flex flex-col items-end">
-          <button 
-            onClick={handleOpenMonitor}
-            className="flex items-center space-x-3 bg-slate-900 text-white px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-800 transition-all shadow-xl shadow-slate-900/20 border border-slate-700 active:scale-95"
-          >
-            <i className="fa-solid fa-tower-observation text-[#fcd116] animate-pulse"></i>
-            <span>Launch Live Monitor</span>
-            <i className="fa-solid fa-arrow-up-right-from-square text-[8px] opacity-50 ml-2"></i>
-          </button>
-        </div>
-      </div>
+    <div className={isEmbedded ? 'w-full py-0' : 'mx-auto w-[min(1180px,calc(100%-32px))] py-6 md:py-8'}>
+      <div className={isEmbedded ? '' : 'px-[28px]'}>
+        {!isEmbedded && (
+          <section className="mb-6 flex flex-col gap-5 border-b border-[rgba(18,35,61,0.12)] pb-6 lg:flex-row lg:items-end lg:justify-between">
+            <div className="flex flex-col gap-4">
+              <div>
+                <p className="text-[13px] font-bold uppercase tracking-[0.12em] text-[#68758d]">
+                  Admin Console
+                </p>
+                <h2 className="mt-1 text-[24px] font-bold uppercase leading-tight text-[#0038a8]">
+                  Election Administration
+                </h2>
+                <p className="mt-2 max-w-[720px] text-[16px] text-[#4a5568]">
+                  Manage candidates, voters, organization records, settings, and reporting for {ELECTION_TITLE}.
+                </p>
+              </div>
+            </div>
 
-      {/* Navigation Redesign */}
-      <div className="mb-10">
-        <nav className="bg-[#034F8B] p-2 rounded-[1.5rem] shadow-2xl border-b-4 border-[#E11C38] grid grid-cols-2 sm:grid-cols-3 lg:flex lg:flex-nowrap gap-2">
-          {tabs.map(tab => (
             <button
-              key={tab.id}
-              onClick={() => handleTabClick(tab.id)}
-              className={`flex flex-col lg:flex-row items-center justify-center lg:space-x-3 px-4 py-4 lg:px-6 lg:py-3 rounded-2xl font-black text-[10px] uppercase transition-all tracking-widest flex-1 ${
-                activeTab === tab.id 
-                  ? 'bg-white text-[#034F8B] shadow-lg scale-[1.03] z-10' 
-                  : 'text-blue-200/60 hover:text-white hover:bg-white/10'
-              }`}
+              onClick={handleOpenMonitor}
+              className="inline-flex items-center justify-center gap-3 self-start rounded-[4px] bg-[#0038a8] px-6 py-3 text-[13px] font-bold uppercase tracking-[0.08em] text-white transition-colors hover:bg-[#002f8a]"
             >
-              <i className={`fa-solid ${tab.icon} text-lg lg:text-sm mb-2 lg:mb-0`}></i>
-              <span className="text-center">{tab.label}</span>
+              <i className="fa-solid fa-tower-observation text-[13px]"></i>
+              <span>Open Live Monitor</span>
             </button>
-          ))}
-          {/* Mobile Launch Monitor button */}
-          <button
-            onClick={handleOpenMonitor}
-            className="flex flex-col lg:hidden items-center justify-center px-4 py-4 rounded-2xl font-black text-[10px] uppercase transition-all tracking-widest flex-1 text-yellow-400 bg-white/5 hover:bg-white/10"
-          >
-             <i className="fa-solid fa-tower-observation text-lg mb-2"></i>
-             <span>Monitor</span>
-          </button>
-        </nav>
+          </section>
+        )}
+
+        <div className={`${isEmbedded ? 'mb-5' : 'mb-6'} border-b border-[rgba(18,35,61,0.12)]`}>
+          <nav aria-label="Admin console sections">
+            <div className={`flex flex-wrap items-center ${isEmbedded ? 'justify-between gap-4 py-4' : 'gap-5 py-5 md:gap-8 lg:gap-12'}`}>
+              {tabs.map((tab) => {
+                const isActive = activeTab === tab.id;
+
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => handleTabClick(tab.id)}
+                    className={[
+                      'inline-flex items-center gap-3 text-[16px] font-bold uppercase tracking-[0.02em] transition-colors',
+                      isActive ? 'text-[#0038a8]' : 'text-[#8a8a8a] hover:text-[#0038a8]',
+                    ].join(' ')}
+                  >
+                    <i className={`fa-solid ${tab.icon} text-[13px]`}></i>
+                    <span>{tab.label}</span>
+                  </button>
+                );
+              })}
+
+              <button
+                onClick={handleOpenMonitor}
+                className={`inline-flex items-center gap-3 text-[16px] font-bold uppercase tracking-[0.02em] text-[#8a8a8a] transition-colors hover:text-[#0038a8] ${isEmbedded ? '' : 'lg:hidden'}`}
+              >
+                <i className="fa-solid fa-tower-observation text-[13px]"></i>
+                <span>Monitor</span>
+              </button>
+            </div>
+          </nav>
+        </div>
       </div>
 
-      {/* Main Content Area - Applied 80% zoom scale globally */}
-      <div className="min-h-[60vh] h-[calc(100vh-350px)] page-fade-in bg-white/40 rounded-[2rem] p-1 border border-transparent scale-[0.8] origin-top">
-        {renderContent()}
-      </div>
+      <div className={isEmbedded ? 'page-fade-in' : 'page-fade-in px-[28px]'}>{renderContent()}</div>
     </div>
   );
 };

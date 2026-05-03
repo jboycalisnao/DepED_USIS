@@ -2,6 +2,7 @@
 import React from 'react';
 import CandidateCard from './CandidateCard';
 import { Position, Candidate } from '../types';
+import { getMaxSelectionsForPosition } from '../utils/electionRules';
 
 interface BallotPositionGroupProps {
   position: Position;
@@ -18,14 +19,7 @@ const BallotPositionGroup: React.FC<BallotPositionGroupProps> = ({
   onSelectionChange,
   index
 }) => {
-  // LOGIC: Regular Representatives (Grade 7-12) allow 2 seats. 
-  // Specialized ones (STE, SPA) allow only 1.
-  const posLower = position.toLowerCase();
-  const isMultiSeatRep = posLower.includes('representative') && 
-                         !posLower.includes('ste') && 
-                         !posLower.includes('spa');
-  
-  const limit = isMultiSeatRep ? 2 : 1;
+  const limit = getMaxSelectionsForPosition(position);
   const currentCount = selectedIds.length;
 
   const handleToggleCandidate = (candidateId: string) => {
@@ -48,30 +42,30 @@ const BallotPositionGroup: React.FC<BallotPositionGroupProps> = ({
   };
 
   return (
-    <section className={`bg-white rounded-[2.5rem] p-8 shadow-sm border transition-all duration-500 ${
-      currentCount > 0 ? 'border-green-100 bg-green-50/10' : 'border-gray-100'
+    <section className={`bg-white rounded-[12px] p-6 shadow-sm border transition-colors ${
+      currentCount > 0 ? 'border-[#22c55e]/20 bg-[#f7fff9]' : 'border-[rgba(18,35,61,0.08)]'
     }`}>
-      <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 pb-4 border-b border-gray-100 gap-4">
-        <h3 className="text-xl font-extrabold text-[#034F8B] flex items-center">
-          <span className={`rounded-xl w-10 h-10 flex items-center justify-center mr-4 text-sm font-black transition-colors ${
-            currentCount > 0 ? (currentCount === limit ? 'bg-green-500 text-white' : 'bg-blue-500 text-white') : 'bg-[#034F8B] text-white'
+      <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 pb-4 border-b border-[rgba(18,35,61,0.08)] gap-4">
+        <h3 className="text-[24px] font-bold text-[#0038a8] flex items-center">
+          <span className={`rounded-[12px] w-10 h-10 flex items-center justify-center mr-4 text-[13px] font-bold transition-colors ${
+            currentCount > 0 ? (currentCount === limit ? 'bg-[#22c55e] text-white' : 'bg-[#0038a8] text-white') : 'bg-[#0038a8] text-white'
           }`}>
             {index}
           </span>
           {position}
         </h3>
         <div className="flex items-center space-x-3">
-          <div className={`px-4 py-2 rounded-xl border text-[10px] font-black uppercase tracking-widest transition-all ${
+          <div className={`px-4 py-2 rounded-[12px] border text-[13px] font-bold uppercase tracking-[0.06em] transition-colors ${
             currentCount === limit 
-              ? 'bg-green-500 text-white border-green-600 shadow-md' 
-              : 'bg-blue-50 text-blue-400 border-blue-100'
+              ? 'bg-[#22c55e] text-white border-[#22c55e]' 
+              : 'bg-[#f4f8ff] text-[#0038a8] border-[rgba(0,56,168,0.12)]'
           }`}>
             {currentCount === 0 ? `SELECT UP TO ${limit} (OPTIONAL)` : (currentCount === limit ? 'SELECTION COMPLETE' : `${currentCount}/${limit} SELECTED`)}
           </div>
           {currentCount > 0 && (
             <button 
               onClick={() => onSelectionChange([])}
-              className="text-[10px] font-black text-gray-400 hover:text-red-500 uppercase tracking-widest transition-colors p-2"
+              className="text-[13px] font-bold text-[#68758d] hover:text-[#ce1126] uppercase tracking-[0.06em] transition-colors p-2"
             >
               Clear
             </button>
@@ -91,8 +85,8 @@ const BallotPositionGroup: React.FC<BallotPositionGroupProps> = ({
       </div>
 
       {candidates.length === 0 && (
-        <div className="py-12 text-center bg-gray-50/50 rounded-3xl border-2 border-dashed border-gray-100">
-          <p className="text-[10px] font-black text-gray-300 uppercase tracking-[0.2em]">No official candidates filed for this position</p>
+        <div className="py-10 text-center bg-[#f8fafc] rounded-[12px] border border-dashed border-[rgba(18,35,61,0.12)]">
+          <p className="text-[13px] font-bold text-[#68758d] uppercase tracking-[0.08em]">No official candidates filed for this position</p>
         </div>
       )}
     </section>

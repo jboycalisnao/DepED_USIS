@@ -1,5 +1,6 @@
 
 import { Position, Candidate, SchoolYear, GradeLevel, EnrollmentStatus, Student } from './types';
+import depedSharedLogo from '../common/assets/Department_of_Education_(DepEd).svg.png';
 
 export const POSITIONS = [
   Position.PRESIDENT,
@@ -96,8 +97,7 @@ export const DEPED_COLORS = {
   inputBg: '#012a4a'
 };
 
-// Optimization applied via tr parameter for ImageKit
-export const DEPED_LOGO_URL = "https://ik.imagekit.io/astrasolutions/DepEd/DepEd%20Emblem%20&%20Seals/Department_of_Education_(DepEd).svg.png?tr=w-200,q-80";
-export const DEPED_SEAL_URL = "https://ik.imagekit.io/astrasolutions/DepEd/DepEd%20Emblem%20&%20Seals/Seal_of_the_Department_of_Education_of_the_Philippines.png?tr=w-200,q-80";
+export const DEPED_LOGO_URL = depedSharedLogo;
+export const DEPED_SEAL_URL = depedSharedLogo;
 export const LEON_NHS_LOGO_URL = "https://ik.imagekit.io/astrasolutions/Leon%20NHS/leon%20nhs%20marks%20-%20upscaled/Leon%20NHS%20-%20Seal(Blue).png?tr=w-300,q-80";
 export const LG_COMEA_LOGO_URL = "https://ik.imagekit.io/astrasolutions/Leon%20NHS/LG%20COMEA%20Logo.png?tr=w-400,q-80";

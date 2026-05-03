@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { ElectionConfig, SchoolYear } from '../../../types';
 import { useStore } from '../../../supabaseStore';
+import SearchableSelect from '../../ui/SearchableSelect';
 
 interface SchoolProfileConfigProps {
   config: ElectionConfig;
@@ -31,46 +32,56 @@ const SchoolProfileConfig: React.FC<SchoolProfileConfigProps> = ({ config, onUpd
   };
 
   return (
-    <div className="bg-white p-10 rounded-[2.5rem] shadow-sm border border-gray-100 no-print">
-      <div className="flex items-center space-x-4 mb-8">
-        <div className="w-12 h-12 bg-red-50 rounded-2xl flex items-center justify-center text-[#E11C38]">
-          <i className="fa-solid fa-school text-xl"></i>
+    <div className="rounded-[12px] border border-[rgba(18,35,61,0.08)] bg-white p-6 shadow-sm no-print">
+      <div className="mb-6 flex items-center space-x-4">
+        <div className="flex h-12 w-12 items-center justify-center rounded-[12px] bg-red-50 text-[#E11C38]">
+          <i className="fa-solid fa-school text-[16px]"></i>
         </div>
         <div>
-          <h3 className="text-xl font-black text-gray-900 uppercase tracking-tight">School Profile</h3>
-          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Global system branding & current term</p>
+          <h3 className="text-[24px] font-black uppercase tracking-tight text-gray-900">School Profile</h3>
+          <p className="text-[13px] font-bold uppercase tracking-[0.12em] text-slate-500">Global system branding and current term</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        {/* School Name Input */}
         <div>
-          <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Official Institution Name</label>
+          <label className="mb-3 block text-[13px] font-bold uppercase tracking-[0.12em] text-slate-500">Official Institution Name</label>
           <div className="flex gap-2">
             <div className="relative flex-grow">
-              <i className="fa-solid fa-building-columns absolute left-5 top-1/2 -translate-y-1/2 text-gray-300"></i>
+              <i className="fa-solid fa-building-columns pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
               <input 
                 type="text"
                 value={localSchoolName}
                 onChange={(e) => setLocalSchoolName(e.target.value)}
-                placeholder="Enter School Name..."
-                className="w-full pl-14 pr-4 py-4 bg-gray-50 border-2 border-gray-100 rounded-2xl focus:border-[#034F8B] outline-none font-bold text-sm uppercase tracking-widest transition-all"
+                placeholder="Enter school name"
+                className="w-full rounded-[12px] border border-[rgba(18,35,61,0.14)] bg-[#fbfcff] py-[14px] pr-4 pl-12 text-[16px] text-[#12233d] outline-none transition-all duration-200 focus:border-[rgba(0,56,168,0.44)] focus:shadow-[0_0_0_4px_rgba(0,56,168,0.08)]"
               />
             </div>
             <button 
               onClick={handleSaveName}
-              className="bg-[#034F8B] text-white px-6 rounded-2xl font-black text-[10px] uppercase hover:bg-blue-800 transition-all shadow-lg shadow-blue-900/10"
+              className="rounded-[12px] bg-[#ce1126] px-6 py-3 text-[13px] font-bold uppercase tracking-[0.08em] text-white transition-colors hover:bg-[#b10f21]"
             >
               Update
             </button>
           </div>
         </div>
 
-        {/* School Year Select */}
         <div>
-          <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Active School Year</label>
-          <div className="relative">
-            <i className="fa-solid fa-calendar-check absolute left-5 top-1/2 -translate-y-1/2 text-gray-300"></i>
+          <SearchableSelect
+            id="active-school-year"
+            label="Active School Year"
+            placeholder="Search school year"
+            value={selectedSyId}
+            onChange={(syId) => {
+              setSelectedSyId(syId);
+              handleSyChange(syId);
+            }}
+            options={schoolYears.map((sy) => ({
+              value: sy.id,
+              label: `SY ${sy.label}${sy.id === store.activeSchoolYear.id ? ' (ACTIVE)' : ''}`,
+            }))}
+          />
+          {false && (
             <select 
               value={selectedSyId}
               onChange={(e) => handleSyChange(e.target.value)}
@@ -82,14 +93,13 @@ const SchoolProfileConfig: React.FC<SchoolProfileConfigProps> = ({ config, onUpd
                 </option>
               ))}
             </select>
-            <i className="fa-solid fa-chevron-down absolute right-5 top-1/2 -translate-y-1/2 text-gray-300 pointer-events-none"></i>
-          </div>
+          )}
         </div>
       </div>
 
-      <div className="mt-8 bg-blue-50/50 p-4 rounded-xl border border-blue-100 flex items-start space-x-3">
-        <i className="fa-solid fa-circle-info text-blue-500 mt-0.5 text-xs"></i>
-        <p className="text-[9px] font-bold text-blue-700 leading-relaxed uppercase tracking-tight">
+      <div className="mt-6 flex items-start space-x-3 rounded-[12px] border border-blue-100 bg-blue-50/50 p-4">
+        <i className="fa-solid fa-circle-info mt-0.5 text-[13px] text-blue-500"></i>
+        <p className="text-[13px] leading-relaxed text-blue-700">
           Changing the Active School Year will switch all election data, candidate lists, and voter registries to the selected term. Existing ballots will remain saved in their respective terms.
         </p>
       </div>

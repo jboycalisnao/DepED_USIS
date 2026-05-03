@@ -15,7 +15,10 @@ The project is intended to function as a **monorepo-style repository**:
 
 The repository currently contains these active modules:
 
+- `coordinator/` - coordinator-facing USIS operations portal
+- `deped-web-kit/` - DepEd web branding and UI reference kit
 - `election/` - DepED school election system
+- `sp-portal/` - Special Program admissions portal for school-specific application bulletins
 - `registrar/` - Registrar and learner records system
 
 Both modules are currently standalone Vite + React applications.
@@ -28,6 +31,7 @@ The repository now has a root npm workspace setup with:
 - root `.gitignore`
 - `docs/` for project-level documentation
 - `packages/shared-supabase/` for the shared Supabase client
+- `database.schema.sql` for the current module-prefixed shared schema reference
 
 This keeps the current module folders intact while establishing the shared-platform foundation for future modules.
 
@@ -36,7 +40,11 @@ This keeps the current module folders intact while establishing the shared-platf
 ### What already exists
 
 - `election/` has a larger feature set with admin tools, public results, tally monitoring, candidate management, and Supabase-backed state.
+- `election/` now also includes an election registration flow scaffold where coordinators can generate the active election code required by voter sign-in after LRN recognition.
+- `coordinator/` now provides a DepED-Web-Kit-aligned subsystem shell for coordinator-facing operations, access guidance, and future school-level administration workflows.
+- `sp-portal/` provides the initial school-based Special Program admissions landing page at `/admissions/{region_slug}/{division_slug}/{school_id}`.
 - `registrar/` has dashboard, learner list, enrollment, bulk import, section management, settings, and Supabase-backed services.
+- `deped-web-kit/` provides a DepEd-aligned visual baseline for future module UI work using the official branding guide and current portal styling cues.
 - Both modules already use the **same Supabase URL and anon key** in their local `lib/supabase.ts` files.
 
 ### Current gaps before full USIS standardization
@@ -52,7 +60,10 @@ This keeps the current module folders intact while establishing the shared-platf
 The intended end state is a unified school platform with multiple modules under one repository, such as:
 
 - `election/`
+- `coordinator/`
 - `registrar/`
+- `sp-portal/`
+- `deped-web-kit/`
 - future modules like `guidance/`, `library/`, `clinic/`, `finance/`, `hr/`, or `student-portal/`
 
 All modules should follow these platform rules:
@@ -97,6 +108,24 @@ DepED USIS is intended to be a **true unified system**, so all modules should us
 - the same authentication and access-control direction
 - the same core school reference data when applicable
 
+## Database Status
+
+The shared Supabase database has now been aligned to the USIS module-prefix naming convention.
+
+Examples:
+
+- registrar tables use names like `registrar_learners`, `registrar_sections`, and `registrar_school_years`
+- election tables use names like `election_candidates`, `election_ballot_entries`, `election_partylists`, and `election_voter_participation`
+- shared/core tables use names like `core_users`
+
+The codebase has also been updated so the current `election/` and `registrar/` apps point to these renamed tables.
+
+Reference files:
+
+- root schema snapshot: `database.schema.sql`
+- election-focused local schema reference: `election/schema.sql`
+- contributor rules and naming guidance: `AGENTS.md`
+
 ### Important implementation note
 
 Right now, both apps hardcode the same Supabase credentials in:
@@ -113,6 +142,13 @@ This proved both modules already targeted the same backend. The repo is now init
 - Shared code should move into common packages/utilities instead of being copy-pasted between modules.
 - React files should follow single-responsibility principles and be refactored when they become too large or handle unrelated concerns.
 - Folder structure should reflect business domains, not only technical categories.
+- Design-reference modules like `deped-web-kit/` should document official branding tokens and reusable UI direction for other apps.
+- `deped-web-kit/` should preserve its documented consistency rules, including the 4-pillar structure, flat surfaces, Helvetica interface text, documented official typography distinction, proportional logo/favicon handling, and `12px` rounding for similar box-style surfaces.
+- during system migration and rebranding, box-style surfaces in other USIS modules should be updated to follow the `DepED-Web-Kit` box component treatment rather than keeping separate legacy card styles
+- a screen rebranding pass should be treated as incomplete if the shell is updated but the internal box-style surfaces on that same screen remain in the legacy style
+- all modules should default to the shared USIS type scale unless explicitly overridden: titles up to `24px`, regular text up to `16px`, and subtitles, labels, and helper text up to `13px`
+- standard application pages should scroll as one whole document; avoid page-level nested scroll containers that separate content from the shared header and footer
+- avoid page-level scale transforms, zoom-like wrappers, or fixed viewport-height containers on primary content areas because they can break document height and cause footer overlap
 
 ## Branching and Upload Workflow
 
@@ -124,6 +160,13 @@ Recommended practice:
 - create feature branches per module or feature
 - document which module a branch affects
 - avoid changing shared credentials/config without checking impact on all modules
+
+## AI Contribution Policy
+
+- AI-assisted contributions are allowed, but they must follow the repository standards documented in `AGENTS.md`.
+- Any AI-generated logic for RFID, GSM, or Offline Exam modules must undergo manual logic verification before acceptance or deployment.
+- That manual review is required to prevent cascading failures across connected school workflows, devices, and offline data paths.
+- If an AI-generated change introduces behavior that conflicts with DepED-Web-Kit minimalism or institutional documentation standards, it must be flagged for review before implementation.
 
 ## Immediate Next Steps
 

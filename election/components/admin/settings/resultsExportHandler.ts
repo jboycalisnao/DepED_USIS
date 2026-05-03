@@ -2,6 +2,7 @@
 import { Candidate, ElectionConfig } from '../../../types';
 import { POSITIONS } from '../../../constants';
 import { getStandardReportStyles, getStandardReportHeaderHTML, getStandardSignatoriesHTML } from './reportLayoutUtils';
+import { getWinnerSlotsForPosition, isRegularGradeRepresentativePosition } from '../../../utils/electionRules';
 
 export const handleResultsPrint = (
   candidates: Candidate[], 
@@ -28,21 +29,17 @@ export const handleResultsPrint = (
 
     if (posCandidates.length === 0) return '';
 
-    const posLower = pos.toLowerCase();
-    // Multi-seat (2) for regular Reps, but SINGLE (1) for STE and SPA.
-    const isMultiSeatRep = posLower.includes('representative') && 
-                           !posLower.includes('ste') && 
-                           !posLower.includes('spa');
+    const isMultiSeatRep = isRegularGradeRepresentativePosition(pos);
+    const winnerSlots = getWinnerSlotsForPosition(pos);
 
     return `
       <tr style="background-color: #f8fafc;">
         <td colspan="3" style="font-weight: 900; font-size: 10px; text-transform: uppercase; background-color: #e2e8f0; padding: 10px;">
-          ${pos} ${isMultiSeatRep ? '(TOP 2 WINNERS)' : ''}
+          ${pos} ${isMultiSeatRep ? `(TOP ${winnerSlots} WINNERS)` : ''}
         </td>
       </tr>
       ${posCandidates.map((c, idx) => {
-        // Multi-seat positions allow 2 winners
-        const isWinner = isMultiSeatRep ? idx < 2 : idx < 1;
+        const isWinner = idx < winnerSlots;
         const hasVotes = (c.votes || 0) > 0;
         const highlightStyle = (isWinner && hasVotes) ? 'background-color: #fffbeb;' : '';
         
@@ -90,7 +87,7 @@ export const handleResultsPrint = (
       </div>
 
       <p style="font-size: 8pt; margin-bottom: 10px; color: #475569; font-style: italic;">
-        * Note: Multi-seat positions (Regular Grade Representatives) recognize the top 2 candidates as confirmed winners. Specialized positions (STE/SPA) follow the plurality-single-winner rule.
+        * Note: Regular Grade Representative positions recognize the top 2 candidates as confirmed winners. Specialized positions (STE/SPA) follow the plurality-single-winner rule.
       </p>
 
       <table>

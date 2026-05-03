@@ -49,7 +49,7 @@ const Dashboard: React.FC = () => {
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
       {connectionError && (
-        <div className="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-2xl flex items-center gap-4 animate-bounce-short">
+        <div className="notice-box border-l-4 border-amber-500 bg-amber-50 flex items-center gap-4 animate-bounce-short">
           <span className="material-symbols-outlined text-amber-600">cloud_off</span>
           <div>
             <p className="text-amber-800 text-xs font-black uppercase">Cloud Sync Unavailable</p>
@@ -66,7 +66,7 @@ const Dashboard: React.FC = () => {
         </div>
         <div className="flex gap-2">
           {loading && (
-            <div className="flex items-center gap-2 px-4 py-2 bg-primary/10 text-primary rounded-full text-[9px] font-black uppercase">
+            <div className="status-badge status-badge--open flex items-center gap-2">
               <span className="material-symbols-outlined text-[16px] animate-spin">sync</span>
               Syncing...
             </div>
@@ -74,7 +74,7 @@ const Dashboard: React.FC = () => {
           <button 
             onClick={() => { refreshData(true); }}
             disabled={loading}
-            className="flex items-center gap-2 bg-white px-4 py-2 rounded-full border border-surfaceVariant shadow-sm hover:bg-primary hover:text-white transition-all text-[10px] font-black uppercase disabled:opacity-50"
+            className="secondary-button gap-2 disabled:opacity-50"
           >
             <span className={`material-symbols-outlined text-[18px] ${loading ? 'animate-spin' : ''}`}>refresh</span>
             Refresh Year Data
@@ -84,25 +84,28 @@ const Dashboard: React.FC = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {displayStats.map((stat) => (
-          <div key={stat.label} className="bg-white p-6 rounded-3xl shadow-m3-2 border border-surfaceVariant hover:translate-y-[-4px] transition-all duration-300 relative overflow-hidden">
-            <div className="flex justify-between items-start mb-4">
-              <div className={`${stat.color} p-3 rounded-2xl flex items-center justify-center shadow-lg shadow-black/10`}>
-                <span className="material-symbols-outlined text-white">{stat.icon}</span>
+          <div key={stat.label} className="info-card">
+            <div className="info-card__content">
+              <div className="flex justify-between items-start mb-4">
+                <div className={`registrar-dashboard__stat-icon ${stat.color}`}>
+                  <span className="material-symbols-outlined text-white">{stat.icon}</span>
+                </div>
               </div>
+              <h3>{stat.label}</h3>
+              <p className="registrar-dashboard__stat-value">
+                {stat.value.toLocaleString()}
+              </p>
             </div>
-            <h3 className="text-sm font-bold text-outline mb-1 uppercase tracking-tight">{stat.label}</h3>
-            <p className={`text-4xl font-black text-onSurface`}>
-              {stat.value.toLocaleString()}
-            </p>
           </div>
         ))}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 bg-white p-8 rounded-[40px] shadow-m3-2 border border-surfaceVariant">
+        <div className="section-card lg:col-span-2">
+          <div className="section-card__content">
           <div className="flex items-center justify-between mb-8">
-            <h3 className="text-xl font-black text-primary uppercase tracking-tighter">Enrollment Composition</h3>
-            <span className="text-xs bg-surface px-4 py-2 rounded-full font-bold text-outline border border-surfaceVariant">SY {activeSchoolYear.label}</span>
+            <h3>Enrollment Composition</h3>
+            <span className="status-badge status-badge--inactive">SY {activeSchoolYear.label}</span>
           </div>
           <div className="h-80">
             {activeLearnersList.length > 0 ? (
@@ -113,7 +116,7 @@ const Dashboard: React.FC = () => {
                   <YAxis axisLine={false} tickLine={false} tick={{fontSize: 12, fontWeight: 600}} />
                   <Tooltip 
                     cursor={{fill: '#f8fafc'}}
-                    contentStyle={{ borderRadius: '24px', border: 'none', boxShadow: '0 10px 30px rgba(0,78,140,0.1)', padding: '16px' }}
+                    contentStyle={{ borderRadius: '12px', border: '1px solid rgba(18,35,61,0.12)', boxShadow: 'none', padding: '16px' }}
                   />
                   <Bar dataKey="count" radius={[12, 12, 4, 4]} barSize={60}>
                     {enrollmentData.map((entry, index) => (
@@ -129,10 +132,12 @@ const Dashboard: React.FC = () => {
               </div>
             )}
           </div>
+          </div>
         </div>
 
-        <div className="bg-white p-8 rounded-[40px] shadow-m3-2 border border-surfaceVariant">
-          <h3 className="text-xl font-black text-primary mb-8 uppercase tracking-tighter">Demographics</h3>
+        <div className="section-card">
+          <div className="section-card__content">
+          <h3>Demographics</h3>
           <div className="h-80 flex flex-col items-center justify-center">
             {activeLearnersList.length > 0 ? (
               <>
@@ -170,6 +175,7 @@ const Dashboard: React.FC = () => {
                 <p className="text-outline font-medium uppercase tracking-widest text-[10px] font-black">Waiting for Profiling...</p>
               </div>
             )}
+          </div>
           </div>
         </div>
       </div>

@@ -19,6 +19,15 @@ export interface SystemUser {
 const STORAGE_KEY_GL = 'leon_nhs_active_gls';
 const STORAGE_KEY_STRANDS = 'leon_nhs_strands';
 const STORAGE_KEY_PROGRAMS = 'leon_nhs_special_programs';
+const REGISTRAR_TABLES = {
+  users: 'core_users',
+  learners: 'registrar_learners',
+  sections: 'registrar_sections',
+  strands: 'registrar_strands',
+  specialPrograms: 'registrar_special_programs',
+  schoolYears: 'registrar_school_years',
+  gradeLevels: 'registrar_grade_levels',
+} as const;
 
 // Shared State
 let learners: Student[] = []; 
@@ -144,7 +153,15 @@ const updateConnectionStatus = (err: boolean) => {
   connectionListeners.forEach(l => l(hasConnectionError));
 };
 
-const fetchAllFromTable = async (tableName: string, updateFn: (data: any[]) => void) => {
+const fetchAllFromTable = async (
+  tableName: string,
+  updateFn: (data: any[]) => void,
+  retryWhenOffline = false
+) => {
+  if (hasConnectionError && !retryWhenOffline) {
+    return;
+  }
+
   try {
     const { data, error } = await supabase.from(tableName).select('*');
     if (error) {
@@ -158,7 +175,7 @@ const fetchAllFromTable = async (tableName: string, updateFn: (data: any[]) => v
   }
 };
 
-const fetchUsers = () => fetchAllFromTable('users', (data) => {
+const fetchUsers = () => fetchAllFromTable(REGISTRAR_TABLES.users, (data) => {
   const fetchedUsers = data.map(mapDbToUser);
   if (fetchedUsers.length > 0) {
     users = fetchedUsers;
@@ -166,18 +183,18 @@ const fetchUsers = () => fetchAllFromTable('users', (data) => {
   }
 });
 
-const fetchLearners = () => fetchAllFromTable('learners', (data) => {
+const fetchLearners = () => fetchAllFromTable(REGISTRAR_TABLES.learners, (data) => {
   learners = data.map(mapDbToLearner);
   isFirstLoad = false;
   learnersListeners.forEach(l => l(learners));
 });
 
-const fetchSections = () => fetchAllFromTable('sections', (data) => {
+const fetchSections = () => fetchAllFromTable(REGISTRAR_TABLES.sections, (data) => {
   sections = data.map(mapDbToSection);
   sectionsListeners.forEach(l => l(sections));
 });
 
-const fetchSchoolYears = () => fetchAllFromTable('school_years', (data) => {
+const fetchSchoolYears = (retryWhenOffline = false) => fetchAllFromTable(REGISTRAR_TABLES.schoolYears, (data) => {
   const mapped = data.map(sy => ({
     id: String(sy.id).trim(),
     label: sy.label,
@@ -194,9 +211,9 @@ const fetchSchoolYears = () => fetchAllFromTable('school_years', (data) => {
     }
   }
   syListListeners.forEach(l => l(schoolYears));
-});
+}, retryWhenOffline);
 
-const fetchGradeLevels = () => fetchAllFromTable('grade_levels', (data) => {
+const fetchGradeLevels = () => fetchAllFromTable(REGISTRAR_TABLES.gradeLevels, (data) => {
   if (data && data.length > 0) {
     activeGradeLevels = data
       .filter(gl => !!(gl.is_active ?? gl.isActive))
@@ -206,12 +223,12 @@ const fetchGradeLevels = () => fetchAllFromTable('grade_levels', (data) => {
   notifyGradeLevels();
 });
 
-const fetchStrands = () => fetchAllFromTable('strands', (data) => {
+const fetchStrands = () => fetchAllFromTable(REGISTRAR_TABLES.strands, (data) => {
   availableStrands = data.map(mapDbToProgram).sort((a, b) => a.acronym.localeCompare(b.acronym));
   notifyStrands();
 });
 
-const fetchPrograms = () => fetchAllFromTable('special_programs', (data) => {
+const fetchPrograms = () => fetchAllFromTable(REGISTRAR_TABLES.specialPrograms, (data) => {
   availableSpecialPrograms = data.map(mapDbToProgram).sort((a, b) => a.acronym.localeCompare(b.acronym));
   notifyPrograms();
 });
@@ -220,7 +237,10 @@ const fetchPrograms = () => fetchAllFromTable('special_programs', (data) => {
 const initializeStore = async () => {
   setGlobalLoading(true);
   try {
-    await fetchSchoolYears(); // Fetch years first to set context
+    await fetchSchoolYears(true); // Probe backend first to avoid repeated DNS failures.
+    if (hasConnectionError) {
+      return;
+    }
     await Promise.allSettled([
       fetchUsers(),
       fetchLearners(),
@@ -296,11 +316,14 @@ export const useStore = () => {
     
     setGlobalLoading(true);
     try {
+      await fetchSchoolYears(true);
+      if (hasConnectionError) {
+        return;
+      }
       await Promise.allSettled([
         fetchUsers(), 
         fetchLearners(), 
         fetchSections(), 
-        fetchSchoolYears(), 
         fetchStrands(), 
         fetchPrograms(), 
         fetchGradeLevels()
@@ -338,7 +361,7 @@ export const useStore = () => {
       setGlobalLoading(true);
       const id = Math.random().toString(36).substr(2, 9);
       try {
-        const { error } = await supabase.from('users').insert([{ id, username, password, display_name: displayName }]);
+        const { error } = await supabase.from(REGISTRAR_TABLES.users).insert([{ id, username, password, display_name: displayName }]);
         if (!error) await fetchUsers();
       } finally {
         setGlobalLoading(false);
@@ -351,7 +374,7 @@ export const useStore = () => {
         if (updates.username) dbPayload.username = updates.username;
         if (updates.password) dbPayload.password = updates.password;
         if (updates.displayName) dbPayload.display_name = updates.displayName;
-        const { error } = await supabase.from('users').update(dbPayload).eq('id', id);
+        const { error } = await supabase.from(REGISTRAR_TABLES.users).update(dbPayload).eq('id', id);
         if (!error) await fetchUsers();
       } finally {
         setGlobalLoading(false);
@@ -361,7 +384,7 @@ export const useStore = () => {
       if (users.length <= 1) return; 
       setGlobalLoading(true);
       try {
-        const { error } = await supabase.from('users').delete().eq('id', id);
+        const { error } = await supabase.from(REGISTRAR_TABLES.users).delete().eq('id', id);
         if (!error) await fetchUsers();
       } finally {
         setGlobalLoading(false);
@@ -371,7 +394,7 @@ export const useStore = () => {
       if (activeSchoolYear.isLocked) return { error: "Locked" };
       setGlobalLoading(true);
       try {
-        const { error } = await supabase.from('learners').insert([mapLearnerToDb(learner)]);
+        const { error } = await supabase.from(REGISTRAR_TABLES.learners).insert([mapLearnerToDb(learner)]);
         if (!error) await fetchLearners();
         return { error: error?.message };
       } finally {
@@ -386,7 +409,7 @@ export const useStore = () => {
         if (!existing) return { error: "Not Found" };
 
         const payload = mapLearnerToDb({ ...existing, ...updates });
-        const { error } = await supabase.from('learners').update(payload).eq('id', id);
+        const { error } = await supabase.from(REGISTRAR_TABLES.learners).update(payload).eq('id', id);
         if (!error) await fetchLearners();
         return { error: error?.message };
       } finally {
@@ -397,7 +420,7 @@ export const useStore = () => {
       if (activeSchoolYear.isLocked) return { error: "Locked" };
       setGlobalLoading(true);
       try {
-        const { error } = await supabase.from('learners').delete().eq('id', id);
+        const { error } = await supabase.from(REGISTRAR_TABLES.learners).delete().eq('id', id);
         if (!error) await fetchLearners();
         return { error: error?.message };
       } finally {
@@ -410,7 +433,7 @@ export const useStore = () => {
       try {
         const payload = newLearners.map(l => mapLearnerToDb(l));
         // Use upsert on LRN to handle duplicates at DB level too
-        const { error } = await supabase.from('learners').upsert(payload, { onConflict: 'lrn' });
+        const { error } = await supabase.from(REGISTRAR_TABLES.learners).upsert(payload, { onConflict: 'lrn' });
         if (!error) await fetchLearners();
         return { error: error?.message };
       } finally {
@@ -422,7 +445,7 @@ export const useStore = () => {
       setGlobalLoading(true);
       const id = Math.random().toString(36).substr(2, 9);
       try {
-        const { error } = await supabase.from('sections').insert([{ id, name, grade_level: gradeLevel, adviser_name: adviserName, strand, school_year_id: activeSchoolYear.id }]);
+        const { error } = await supabase.from(REGISTRAR_TABLES.sections).insert([{ id, name, grade_level: gradeLevel, adviser_name: adviserName, strand, school_year_id: activeSchoolYear.id }]);
         if (!error) await fetchSections();
         return { error: error?.message };
       } finally {
@@ -438,7 +461,7 @@ export const useStore = () => {
         if (updates.gradeLevel) dbPayload.grade_level = updates.gradeLevel;
         if (updates.adviserName !== undefined) dbPayload.adviser_name = updates.adviserName;
         if (updates.strand !== undefined) dbPayload.strand = updates.strand;
-        const { error } = await supabase.from('sections').update(dbPayload).eq('id', id);
+        const { error } = await supabase.from(REGISTRAR_TABLES.sections).update(dbPayload).eq('id', id);
         if (!error) await fetchSections();
         return { error: error?.message };
       } finally {
@@ -449,9 +472,9 @@ export const useStore = () => {
       if (activeSchoolYear.isLocked) return { error: "Locked" };
       setGlobalLoading(true);
       try {
-        const { error } = await supabase.from('sections').delete().eq('id', id);
+        const { error } = await supabase.from(REGISTRAR_TABLES.sections).delete().eq('id', id);
         if (!error) { 
-          await supabase.from('learners').delete().eq('section_id', id); 
+          await supabase.from(REGISTRAR_TABLES.learners).delete().eq('section_id', id); 
           await Promise.all([fetchLearners(), fetchSections()]); 
         }
         return { error: error?.message };
@@ -463,7 +486,7 @@ export const useStore = () => {
       if (activeSchoolYear.isLocked) return { error: "Locked" };
       setGlobalLoading(true);
       try {
-        const { error } = await supabase.from('learners').delete().eq('section_id', sectionId);
+        const { error } = await supabase.from(REGISTRAR_TABLES.learners).delete().eq('section_id', sectionId);
         if (!error) await fetchLearners();
         return { error: error?.message };
       } finally {
@@ -474,7 +497,7 @@ export const useStore = () => {
       setGlobalLoading(true);
       try {
         const id = Math.random().toString(36).substr(2, 9);
-        await supabase.from('strands').insert([{ id, acronym, full_name: fullName }]);
+        await supabase.from(REGISTRAR_TABLES.strands).insert([{ id, acronym, full_name: fullName }]);
         await fetchStrands();
       } finally {
         setGlobalLoading(false);
@@ -486,7 +509,7 @@ export const useStore = () => {
         const dbPayload: any = {};
         if (updates.acronym) dbPayload.acronym = updates.acronym;
         if (updates.fullName) dbPayload.full_name = updates.fullName;
-        await supabase.from('strands').update(dbPayload).eq('id', id);
+        await supabase.from(REGISTRAR_TABLES.strands).update(dbPayload).eq('id', id);
         await fetchStrands();
       } finally {
         setGlobalLoading(false);
@@ -495,7 +518,7 @@ export const useStore = () => {
     removeStrand: async (id: string) => {
       setGlobalLoading(true);
       try {
-        await supabase.from('strands').delete().eq('id', id);
+        await supabase.from(REGISTRAR_TABLES.strands).delete().eq('id', id);
         await fetchStrands();
       } finally {
         setGlobalLoading(false);
@@ -505,7 +528,7 @@ export const useStore = () => {
       setGlobalLoading(true);
       try {
         const id = Math.random().toString(36).substr(2, 9);
-        await supabase.from('special_programs').insert([{ id, acronym, full_name: fullName }]);
+        await supabase.from(REGISTRAR_TABLES.specialPrograms).insert([{ id, acronym, full_name: fullName }]);
         await fetchPrograms();
       } finally {
         setGlobalLoading(false);
@@ -517,7 +540,7 @@ export const useStore = () => {
         const dbPayload: any = {};
         if (updates.acronym) dbPayload.acronym = updates.acronym;
         if (updates.fullName) dbPayload.full_name = updates.fullName;
-        await supabase.from('special_programs').update(dbPayload).eq('id', id);
+        await supabase.from(REGISTRAR_TABLES.specialPrograms).update(dbPayload).eq('id', id);
         await fetchPrograms();
       } finally {
         setGlobalLoading(false);
@@ -526,7 +549,7 @@ export const useStore = () => {
     removeSpecialProgram: async (id: string) => {
       setGlobalLoading(true);
       try {
-        await supabase.from('special_programs').delete().eq('id', id);
+        await supabase.from(REGISTRAR_TABLES.specialPrograms).delete().eq('id', id);
         await fetchPrograms();
       } finally {
         setGlobalLoading(false);
@@ -536,7 +559,7 @@ export const useStore = () => {
       setGlobalLoading(true);
       try {
         const id = 'sy' + label.replace(/[^0-9]/g, '');
-        const { error } = await supabase.from('school_years').insert([{ id, label, is_active: false, is_locked: false }]);
+        const { error } = await supabase.from(REGISTRAR_TABLES.schoolYears).insert([{ id, label, is_active: false, is_locked: false }]);
         if (!error) await fetchSchoolYears();
         return { error: error?.message };
       } finally {
@@ -546,7 +569,7 @@ export const useStore = () => {
     removeSchoolYear: async (id: string) => {
       setGlobalLoading(true);
       try {
-        const { error } = await supabase.from('school_years').delete().eq('id', id);
+        const { error } = await supabase.from(REGISTRAR_TABLES.schoolYears).delete().eq('id', id);
         if (!error) await fetchSchoolYears();
       } finally {
         setGlobalLoading(false);
@@ -556,8 +579,8 @@ export const useStore = () => {
     setActiveSchoolYear: async (id: string) => {
       setGlobalLoading(true);
       try {
-        await supabase.from('school_years').update({ is_active: false }).neq('id', id);
-        const { error } = await supabase.from('school_years').update({ is_active: true }).eq('id', id);
+        await supabase.from(REGISTRAR_TABLES.schoolYears).update({ is_active: false }).neq('id', id);
+        const { error } = await supabase.from(REGISTRAR_TABLES.schoolYears).update({ is_active: true }).eq('id', id);
         if (!error) await fetchSchoolYears();
       } finally {
         setGlobalLoading(false);
@@ -567,7 +590,7 @@ export const useStore = () => {
     lockSchoolYear: async (id: string, lock: boolean) => {
       setGlobalLoading(true);
       try {
-        const { error } = await supabase.from('school_years').update({ is_locked: lock }).eq('id', id);
+        const { error } = await supabase.from(REGISTRAR_TABLES.schoolYears).update({ is_locked: lock }).eq('id', id);
         if (!error) await fetchSchoolYears();
       } finally {
         setGlobalLoading(false);
@@ -582,7 +605,7 @@ export const useStore = () => {
         notifyGradeLevels(); 
         const allLevels = Object.values(GradeLevel);
         const payload = allLevels.map(level => ({ id: level, is_active: gls.includes(level) }));
-        await supabase.from('grade_levels').upsert(payload, { onConflict: 'id' });
+        await supabase.from(REGISTRAR_TABLES.gradeLevels).upsert(payload, { onConflict: 'id' });
       } finally {
         setGlobalLoading(false);
       }

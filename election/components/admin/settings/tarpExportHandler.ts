@@ -196,7 +196,7 @@ export const handleReportImageExport = async (
 
     if (gradeLearnersLrns.length > 0) {
       const { data: entries, error } = await supabase
-        .from('ballot_entries')
+        .from('election_ballot_entries')
         .select('candidate_id')
         .in('voter_lrn', gradeLearnersLrns);
       

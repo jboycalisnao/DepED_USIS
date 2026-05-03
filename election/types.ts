@@ -43,8 +43,32 @@ export interface ElectionConfig {
   startTime: string | null;
   endTime: string | null;
   schoolName?: string;
+  schoolId?: string;
+  schoolCode?: string;
+  electionId?: string;
+  electionCode?: string;
   publicResultsEnabled?: boolean;
   publicTurnoutEnabled?: boolean;
+}
+
+export interface ElectionContext {
+  schoolId: string;
+  schoolCode: string;
+  schoolName: string;
+  electionId: string;
+  electionCode: string;
+  schoolYearId: string;
+}
+
+export interface LegacyMigrationResult {
+  schoolCreated: boolean;
+  electionCreated: boolean;
+  coreCoordinatorCreated: boolean;
+  electionCoordinatorCreated: boolean;
+  candidatesMigrated: number;
+  ballotsMigrated: number;
+  participationMigrated: number;
+  partylistsMigrated: number;
 }
 
 export interface Section {
@@ -129,4 +153,36 @@ export interface User {
   strand?: string;
 }
 
-export type AppView = 'login' | 'identity-confirmation' | 'ballot' | 'confirmation' | 'results' | 'admin' | 'public-results' | 'public-turnout';
+export interface ElectionRegistrationRecord {
+  id: string;
+  electionCode: string;
+  schoolId: string;
+  schoolName: string;
+  schoolAddress: string;
+  schoolDivision: string;
+  schoolRegion: string;
+  coordinatorName: string;
+  coordinatorRole: string;
+  coordinatorSchoolAffiliation: string;
+  electionName: string;
+  electionType: string;
+  electionScope: string;
+  schoolYearLabel: string;
+  votingDate: string;
+  filingStartDate: string;
+  filingEndDate: string;
+  generatedAt: string;
+  notes?: string;
+}
+
+export type AppView =
+  | 'login'
+  | 'identity-confirmation'
+  | 'ballot'
+  | 'confirmation'
+  | 'results-page'
+  | 'election-registration'
+  | 'tally-results'
+  | 'admin'
+  | 'public-results'
+  | 'public-turnout';

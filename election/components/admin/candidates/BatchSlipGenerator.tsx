@@ -3,6 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { Candidate, SchoolYear } from '../../../types';
 import { LEON_NHS_LOGO_URL, DEPED_SEAL_URL } from '../../../constants';
 import { getEncodingSlipTemplate } from './EncodingSlipTemplate';
+import { getElectionAbsoluteUrl } from '../../../utils/navigation';
 
 interface BatchSlipGeneratorProps {
   candidates: Candidate[];
@@ -71,7 +72,7 @@ const BatchSlipGenerator: React.FC<BatchSlipGeneratorProps> = ({ candidates, sch
     const slipsHtml = selectedCandidates.map(candidate => {
       const uniqueId = Math.random().toString(36).substring(2, 10).toUpperCase();
       const cocNumber = `${activeSyLabel}-${uniqueId}`;
-      const qrUrl = `${window.location.origin}${window.location.pathname}#/audit/${candidate.id}`;
+      const qrUrl = getElectionAbsoluteUrl(`/audit/${candidate.id}`);
       
       const template = getEncodingSlipTemplate(
         candidate, 
