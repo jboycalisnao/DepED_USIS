@@ -1,0 +1,61 @@
+export type PublicEnrollmentResponse = {
+  id: string;
+  submittedAt: string;
+  schoolYear: string;
+  enrollmentType: string;
+  learnerClassification: string;
+  schoolSource: string;
+  previousSchool: string;
+  lastSchoolYearAttended: string;
+  lastGradeLevelAttended: string;
+  gradeLevelToEnroll: string;
+  track: string;
+  strand: string;
+  semester: string;
+  psaBirthCertificateNo: string;
+  lrn: string;
+  lastName: string;
+  firstName: string;
+  middleName: string;
+  extensionName: string;
+  birthDate: string;
+  gender: string;
+  placeOfBirth: string;
+  isIpCommunity: string;
+  ipCommunityName: string;
+  motherTongue: string;
+  religion: string;
+  is4psBeneficiary: string;
+  household4psId: string;
+  currentAddress: AddressFields;
+  permanentAddress: AddressFields;
+  samePermanentAddress: string;
+  father: GuardianFields;
+  mother: GuardianFields;
+  guardian: GuardianFields;
+  hasSpecialNeeds: string;
+  specialNeedsDiagnosis: string;
+  specialNeedsManifestation: string;
+  hasPwdId: string;
+  preferredLearningModality: string;
+  preferredDevice: string;
+  isDeviceShared: string;
+  hasInternetConnection: string;
+  consentAccepted: boolean;
+};
+
+export type AddressFields = {
+  province: string;
+  city: string;
+  barangay: string;
+  houseNo: string;
+  street: string;
+  zipCode: string;
+};
+
+export type GuardianFields = {
+  lastName: string;
+  firstName: string;
+  middleName: string;
+  contactNumber: string;
+};

@@ -5,6 +5,7 @@ import { parseSF1 } from '../services/sf1Service';
 import { useStore } from '../store';
 import { GradeLevel, Student } from '../types';
 import ConfirmationModal from '../components/ConfirmationModal';
+import { SearchableDropdown } from '../components/ui/SearchableDropdown';
 
 const BulkImport: React.FC = () => {
   const navigate = useNavigate();
@@ -34,6 +35,20 @@ const BulkImport: React.FC = () => {
   const selectedSectionName = useMemo(() => {
     return sections.find(s => s.id === sectionId)?.name || '';
   }, [sectionId, sections]);
+
+  const gradeLevelOptions = useMemo(
+    () => gradeLevels.map(g => ({ value: g, label: g })),
+    [gradeLevels]
+  );
+
+  const sectionOptions = useMemo(
+    () => availableSections.map(sec => ({
+      value: sec.id,
+      label: sec.name,
+      meta: `${sec.learnerCount} learners`,
+    })),
+    [availableSections]
+  );
 
   /**
    * Automatic Extraction Trigger
@@ -134,34 +149,26 @@ const BulkImport: React.FC = () => {
           <div className="bg-white p-8 rounded-[40px] shadow-m3-2 border border-surfaceVariant">
             <h3 className="text-xl font-black text-primary uppercase tracking-tighter mb-6">Batch Configuration</h3>
             <div className="space-y-6">
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-outline uppercase tracking-widest ml-2">Grade Level</label>
-                <select 
-                  value={gradeLevel}
-                  onChange={(e) => {
-                    setGradeLevel(e.target.value as GradeLevel);
-                    setSectionId(''); 
-                  }}
-                  className="w-full px-4 py-4 rounded-2xl bg-surface focus:ring-4 focus:ring-primary/10 outline-none border-none font-bold text-sm"
-                >
-                  {gradeLevels.map(g => <option key={g} value={g}>{g}</option>)}
-                </select>
-              </div>
+              <SearchableDropdown
+                label="Grade Level"
+                options={gradeLevelOptions}
+                value={gradeLevel}
+                placeholder="Search grade level"
+                allowClear={false}
+                onChange={(value) => {
+                  setGradeLevel(value as GradeLevel);
+                  setSectionId('');
+                }}
+              />
 
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-outline uppercase tracking-widest ml-2">Class Section</label>
-                <select 
+                <SearchableDropdown
+                  label="Class Section"
+                  options={sectionOptions}
                   value={sectionId}
-                  onChange={(e) => setSectionId(e.target.value)}
-                  className="w-full px-4 py-4 rounded-2xl bg-surface focus:ring-4 focus:ring-primary/10 outline-none border-none font-bold text-sm"
-                >
-                  <option value="">Select Target Destination</option>
-                  {availableSections.map(sec => (
-                    <option key={sec.id} value={sec.id}>
-                      {sec.name} ({sec.learnerCount} Learners)
-                    </option>
-                  ))}
-                </select>
+                  placeholder="Select Target Destination"
+                  onChange={setSectionId}
+                />
                 {availableSections.length === 0 && (
                   <p className="text-[9px] text-accent font-black mt-1 ml-2 uppercase">No active section found for this level.</p>
                 )}

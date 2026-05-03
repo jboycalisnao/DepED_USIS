@@ -10,6 +10,7 @@ import SectionManagement from './views/SectionManagement';
 import Settings from './views/Settings';
 import Landing from './views/Landing';
 import { useStore } from './store';
+import PublicEnrollmentPage from './features/public-enrollment/PublicEnrollmentPage';
 
 const App: React.FC = () => {
   const { isAuthenticated } = useStore();
@@ -18,6 +19,7 @@ const App: React.FC = () => {
     return (
       <BrowserRouter>
         <Routes>
+          <Route path="/public/enrollment" element={<PublicEnrollmentPage />} />
           <Route path="/" element={<Landing />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
@@ -27,8 +29,11 @@ const App: React.FC = () => {
 
   return (
     <BrowserRouter>
-      <Layout>
-        <Routes>
+      <Routes>
+        <Route path="/public/enrollment" element={<PublicEnrollmentPage />} />
+        <Route path="*" element={(
+          <Layout>
+            <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/learners" element={<LearnerList />} />
           <Route path="/enroll" element={<EnrollmentForm />} />
@@ -36,8 +41,10 @@ const App: React.FC = () => {
           <Route path="/import" element={<BulkImport />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </Layout>
+            </Routes>
+          </Layout>
+        )} />
+      </Routes>
     </BrowserRouter>
   );
 };

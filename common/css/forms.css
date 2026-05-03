@@ -30,13 +30,25 @@
 .floating-field__control select,
 .floating-field__control textarea {
   width: 100%;
-  padding: 24px 16px 10px;
+  min-height: 58px;
+  padding: 18px 16px;
   border: 1px solid rgba(18, 35, 61, 0.14);
   border-radius: 12px;
   background: #fbfcff;
   color: var(--deped-ink);
+  line-height: 1.25;
   outline: none;
   transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+
+.floating-field__control input:not(:placeholder-shown),
+.floating-field__control textarea:not(:placeholder-shown),
+.floating-field__control select[data-has-value="true"] {
+  padding: 28px 16px 8px;
+}
+
+.floating-field__control textarea {
+  padding-top: 24px;
 }
 
 .floating-field__control .floating-field__input--password {
@@ -48,10 +60,16 @@
   resize: vertical;
 }
 
+.floating-field__control input,
+.floating-field__control select {
+  min-height: 58px;
+}
+
 .floating-field__control span {
   position: absolute;
   top: 50%;
   left: 16px;
+  line-height: 1;
   color: var(--deped-muted);
   pointer-events: none;
   transform: translateY(-50%);
@@ -93,9 +111,6 @@
   transform: translateY(-1px);
 }
 
-.floating-field__control input:focus + span,
-.floating-field__control select:focus + span,
-.floating-field__control textarea:focus + span,
 .floating-field__control input:not(:placeholder-shown) + span,
 .floating-field__control textarea:not(:placeholder-shown) + span,
 .floating-field__control select[data-has-value="true"] + span {
@@ -128,16 +143,18 @@
 .searchable-select__field input,
 .searchable-select__field button {
   border: 1px solid rgba(18, 35, 61, 0.14);
-  background: #fbfcff;
+  background: #f3f6fb;
   color: var(--deped-ink);
 }
 
 .searchable-select__field input {
   width: 100%;
-  padding: 14px 16px;
+  min-height: 58px;
+  padding: 16px;
   border-right: 0;
   border-radius: 12px 0 0 12px;
   font-size: var(--usis-body-size);
+  font-weight: 700;
   line-height: 1.35;
   outline: none;
 }
@@ -155,6 +172,10 @@
   font-size: var(--usis-helper-size);
   font-weight: 700;
   cursor: pointer;
+}
+
+.searchable-select__field button .material-symbols-outlined {
+  font-size: 20px;
 }
 
 .searchable-select__clear {
@@ -198,10 +219,15 @@
 }
 
 .searchable-select__option {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
   border: 0;
   border-bottom: 1px solid rgba(18, 35, 61, 0.08);
   background: var(--deped-white);
   color: var(--deped-ink);
+  font-weight: 700;
   cursor: pointer;
 }
 
@@ -212,6 +238,127 @@
 .searchable-select__empty {
   color: var(--deped-muted);
   background: var(--deped-white);
+}
+
+.searchable-select__option small {
+  color: var(--deped-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.compact-select {
+  position: relative;
+}
+
+.compact-select__button {
+  display: inline-grid;
+  grid-template-columns: auto minmax(90px, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  min-height: 54px;
+  min-width: 340px;
+  padding: 0 14px 0 18px;
+  border: 1px solid rgba(18, 35, 61, 0.14);
+  border-radius: var(--usis-radius-control);
+  background: var(--deped-white);
+  color: var(--deped-ink);
+  cursor: pointer;
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.compact-select__button:hover,
+.compact-select__button[aria-expanded="true"] {
+  border-color: rgba(0, 56, 168, 0.32);
+}
+
+.compact-select__button:focus-visible {
+  border-color: rgba(0, 56, 168, 0.44);
+  box-shadow: 0 0 0 4px rgba(0, 56, 168, 0.08);
+  outline: none;
+}
+
+.compact-select__label {
+  color: var(--deped-muted);
+  font-size: var(--usis-helper-size);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.compact-select__value {
+  color: var(--deped-blue);
+  font-size: var(--usis-body-size);
+  font-weight: 700;
+  line-height: 1;
+  text-align: left;
+}
+
+.compact-select__icon {
+  color: var(--deped-blue);
+  transition: transform 180ms ease;
+}
+
+.compact-select__button[aria-expanded="true"] .compact-select__icon {
+  transform: rotate(180deg);
+}
+
+.compact-select__menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  z-index: 30;
+  overflow: hidden;
+  border: 1px solid rgba(18, 35, 61, 0.14);
+  border-radius: var(--usis-radius-control);
+  background: var(--deped-white);
+  box-shadow: 0 18px 32px rgba(18, 35, 61, 0.12);
+}
+
+.compact-select__option {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 12px 14px;
+  border: 0;
+  border-bottom: 1px solid rgba(18, 35, 61, 0.08);
+  background: var(--deped-white);
+  color: var(--deped-ink);
+  font-size: var(--usis-helper-size);
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+.compact-select__option:last-child {
+  border-bottom: 0;
+}
+
+.compact-select__option:hover,
+.compact-select__option[aria-selected="true"] {
+  background: #eef4ff;
+  color: var(--deped-blue);
+}
+
+.compact-select__option small {
+  color: var(--deped-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+@media (max-width: 640px) {
+  .compact-select,
+  .compact-select__button {
+    min-width: 0;
+    width: 100%;
+  }
 }
 
 .form-actions {

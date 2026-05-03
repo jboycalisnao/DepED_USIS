@@ -9,7 +9,6 @@
 }
 
 .registrar-status,
-.registrar-year,
 .registrar-signout,
 .registrar-icon-button {
   min-height: 42px;
@@ -41,31 +40,12 @@
 }
 
 .registrar-status strong,
-.registrar-year span,
 .registrar-signout {
   color: var(--deped-muted);
   font-size: var(--usis-helper-size);
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-}
-
-.registrar-year {
-  display: inline-grid;
-  grid-template-columns: auto minmax(130px, 1fr);
-  gap: 10px;
-  align-items: center;
-  padding: 0 10px 0 14px;
-}
-
-.registrar-year select {
-  min-height: 34px;
-  border: 0;
-  background: transparent;
-  color: var(--deped-blue);
-  font-size: var(--usis-helper-size);
-  font-weight: 700;
-  outline: none;
 }
 
 .registrar-icon-button,
@@ -89,6 +69,14 @@
   color: var(--deped-red);
 }
 
+.registrar-school-year-select {
+  flex: 0 1 340px;
+}
+
+.registrar-school-year-select .compact-select__button {
+  width: 100%;
+}
+
 .registrar-page-intro {
   display: flex;
   flex-wrap: wrap;
@@ -101,8 +89,47 @@
 }
 
 .registrar-page-intro h1,
-.registrar-page-intro p {
+.registrar-page-intro h2,
+.registrar-page-intro p,
+.registrar-page-intro dl,
+.registrar-page-intro dd {
   margin: 0;
+}
+
+.registrar-school-identity {
+  display: grid;
+  gap: 8px;
+}
+
+.registrar-school-identity h2 {
+  color: var(--deped-blue);
+  font-size: var(--usis-title-size);
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.registrar-school-identity dl {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  align-items: center;
+}
+
+.registrar-school-identity div {
+  display: inline-flex;
+  gap: 5px;
+  align-items: baseline;
+  color: var(--deped-muted);
+  font-size: var(--usis-helper-size);
+  line-height: 1.4;
+}
+
+.registrar-school-identity dt {
+  font-weight: 700;
+}
+
+.registrar-school-identity dd {
+  font-weight: 600;
 }
 
 .registrar-page-intro h1 {
@@ -271,17 +298,180 @@
   text-transform: uppercase;
 }
 
+.public-enrollment-page {
+  min-height: 100vh;
+  padding: 32px var(--page-inset) 48px;
+  background: var(--deped-canvas);
+}
+
+.public-enrollment__header {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 20px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--deped-line);
+}
+
+.public-enrollment__header h1,
+.public-enrollment__header p {
+  margin: 0;
+}
+
+.public-enrollment__header h1 {
+  color: var(--deped-blue);
+  font-size: var(--usis-title-size);
+  font-weight: 700;
+}
+
+.public-enrollment__header > p:last-child {
+  color: var(--deped-muted);
+  font-size: var(--usis-helper-size);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.public-enrollment__notice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 18px;
+  color: var(--deped-blue);
+}
+
+.public-enrollment__form {
+  margin-bottom: 0;
+}
+
+.public-enrollment__section {
+  display: grid;
+  gap: 18px;
+  padding: 22px 0;
+  border-bottom: 1px solid var(--deped-line);
+}
+
+.public-enrollment__section:first-child {
+  padding-top: 0;
+}
+
+.public-enrollment__section h2,
+.public-enrollment__subsection h3 {
+  margin: 0;
+  color: var(--deped-blue);
+  font-size: var(--usis-body-size);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.public-enrollment__subsection {
+  display: grid;
+  gap: 14px;
+}
+
+.public-enrollment__consent {
+  padding-top: 22px;
+}
+
+.public-enrollment__consent label {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  color: var(--deped-ink);
+  font-size: var(--usis-helper-size);
+  line-height: 1.6;
+}
+
+.public-enrollment__consent input {
+  margin-top: 3px;
+}
+
+.public-enrollment-responses {
+  display: grid;
+  gap: 18px;
+}
+
+.public-enrollment-responses__header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.public-enrollment-responses__header h3,
+.public-enrollment-responses__header p {
+  margin: 0;
+}
+
+.public-enrollment-responses__summary {
+  display: inline-flex;
+  gap: 10px;
+  align-items: baseline;
+  color: var(--deped-muted);
+  font-size: var(--usis-helper-size);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.public-enrollment-responses__summary strong {
+  color: var(--deped-blue);
+  font-size: var(--usis-title-size);
+}
+
+.public-enrollment-responses__list {
+  display: grid;
+  gap: 10px;
+}
+
+.public-enrollment-response {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px;
+  border: 1px solid var(--deped-line);
+  border-radius: var(--usis-radius-surface);
+  background: var(--deped-white);
+}
+
+.public-enrollment-response h4,
+.public-enrollment-response p {
+  margin: 0;
+}
+
+.public-enrollment-response h4 {
+  color: var(--deped-ink);
+  font-size: var(--usis-body-size);
+  font-weight: 700;
+}
+
+.public-enrollment-response p,
+.public-enrollment-response time {
+  color: var(--deped-muted);
+  font-size: var(--usis-helper-size);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.public-enrollment-responses__empty {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  color: var(--deped-muted);
+  font-size: var(--usis-helper-size);
+  font-weight: 700;
+}
+
 @media (max-width: 920px) {
   .registrar-header__actions {
     justify-content: flex-start;
   }
 
-  .registrar-year {
-    grid-template-columns: 1fr;
-    gap: 2px;
-    align-items: start;
-    padding-top: 8px;
-    padding-bottom: 8px;
+  .registrar-school-year-select {
+    flex-basis: min(100%, 340px);
   }
 }
 
@@ -296,6 +486,12 @@
     padding-left: 0;
     padding-right: 0;
     min-height: 420px;
+  }
+
+  .registrar-school-year-select,
+  .registrar-school-year-select .compact-select__button {
+    min-width: 0;
+    width: 100%;
   }
 
   .registrar-signout {

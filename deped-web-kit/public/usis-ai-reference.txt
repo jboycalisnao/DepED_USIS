@@ -59,6 +59,7 @@ Form behavior rules
 - Floating labels may stay floated when fields contain values, but strong active highlight boxes should appear only when the field is focused or selected.
 - Password fields should use an icon-based show/hide control, not text buttons.
 - Searchable dropdowns should use a custom searchable field and custom dropdown menu aligned to the system style.
+- Compact context dropdowns such as school-year selectors should use the shared compact select treatment from common/css instead of native browser select styling.
 - File upload fields should use custom styled upload surfaces.
 - Radio and checkbox rows should be compact, hoverable, and clearly clickable.
 

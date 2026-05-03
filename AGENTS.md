@@ -56,6 +56,15 @@ All DepED USIS modules should connect to the same shared backend configuration w
 - common environment variables
 - shared school reference data
 
+## Multi-School Identity Rule
+
+DepED USIS is intended for deployment across multiple schools.
+
+- School-facing module headers and workspace intros must show the active school context when available: school name, School ID, division, and region.
+- Do not treat `Leon National High School` as a permanent hard-coded product identity. It may remain as a local development fallback or seed value only.
+- The preferred source of truth for school identity is the shared `usis_schools` data model or the authenticated user's school context.
+- New registrar, election, special program, and future module screens should be written so the school identity can be replaced per school without editing component markup.
+
 Current state:
 
 - `election/lib/supabase.ts` and `registrar/lib/supabase.ts` both point to the same Supabase project.

@@ -8,6 +8,7 @@ import {
   calculateEnrollmentComposition, 
   calculateGenderDemographics 
 } from '../services/dashboardService';
+import { PublicEnrollmentResponses } from '../features/public-enrollment/PublicEnrollmentResponses';
 
 const Dashboard: React.FC = () => {
   const { learners, sections, activeSchoolYear, loading, refreshData, connectionError } = useStore();
@@ -179,6 +180,8 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
       </div>
+
+      <PublicEnrollmentResponses />
     </div>
   );
 };

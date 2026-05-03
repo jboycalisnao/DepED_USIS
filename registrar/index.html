@@ -58,6 +58,86 @@
         }
       }
     </script>
+    <style>
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        text-align: center !important;
+        width: 1.25rem !important;
+        height: 1.25rem !important;
+        line-height: 1 !important;
+        font-size: 20px;
+        white-space: nowrap;
+        word-wrap: normal;
+        direction: ltr;
+        -webkit-font-smoothing: antialiased;
+        text-rendering: optimizeLegibility;
+        -moz-osx-font-smoothing: grayscale;
+        font-feature-settings: 'liga';
+        overflow: hidden;
+        user-select: none;
+      }
+      
+      ::-webkit-scrollbar {
+        width: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #f1f1f1;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #004E8C;
+      }
+      
+      .custom-scrollbar::-webkit-scrollbar {
+        height: 6px;
+      }
+
+      .ant-btn-primary {
+        box-shadow: 0 2px 0 rgba(0, 78, 140, 0.1);
+        font-weight: 700 !important;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+      }
+
+      .root-select {
+        appearance: none;
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        background-image: none;
+      }
+
+      .root-select::-ms-expand {
+        display: none;
+      }
+
+      .root-select::-webkit-list-button,
+      .root-select::-webkit-calendar-picker-indicator {
+        opacity: 0;
+      }
+    </style>
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@19.0.0",
+    "react-dom": "https://esm.sh/react-dom@19.0.0",
+    "react/": "https://esm.sh/react@19.0.0/",
+    "react-dom/": "https://esm.sh/react-dom@19.0.0/",
+    "react-router-dom": "https://esm.sh/react-router-dom@7.1.1?deps=react@19.0.0,react-dom@19.0.0",
+    "antd": "https://esm.sh/antd@5.23.2?bundle&deps=react@19.0.0,react-dom@19.0.0",
+    "@ant-design/icons": "https://esm.sh/@ant-design/icons@5.5.2?bundle&deps=react@19.0.0,react-dom@19.0.0",
+    "dayjs": "https://esm.sh/dayjs@1.11.13",
+    "recharts": "https://esm.sh/recharts@3.6.0?deps=react@19.0.0,react-dom@19.0.0",
+    "xlsx": "https://esm.sh/xlsx@0.18.5",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.45.4"
+  }
+}
+</script>
 </head>
 <body>
     <div id="root"></div>

@@ -12,7 +12,7 @@ Use `common/css/index.css` when a subsystem should import the full shared format
 - `header.css` - Web-Kit header, search, and navigation treatment
 - `footer.css` - USIS global footer structure
 - `boxes.css` - cards, panels, notices, and modal box treatment
-- `forms.css` - floating fields, form grids, actions, and buttons
+- `forms.css` - floating fields, searchable selects, compact dropdowns, form grids, actions, and buttons
 - `utilities.css` - screen-reader utility, status badges, and table formatting
 
 ## Standards

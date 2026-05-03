@@ -4,13 +4,15 @@ import { Link, useLocation } from 'react-router-dom';
 import { useStore } from '../store';
 import { RegistrarHeader } from './shell/RegistrarHeader';
 import { RegistrarFooter } from './shell/RegistrarFooter';
+import { SchoolYearDropdown } from './ui/SchoolYearDropdown';
+import { registrarSchoolIdentity } from '../config/schoolIdentity';
 
 interface LayoutProps {
   children: React.ReactNode;
 }
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
-  const { activeSchoolYear, setSchoolYear, schoolYears, connectionError, refreshData, logout } = useStore();
+  const { activeSchoolYear, setSchoolYear, schoolYears, refreshData, logout } = useStore();
   const location = useLocation();
 
   const menuItems = [
@@ -29,26 +31,17 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       <RegistrarHeader
         actions={
           <>
-            <div className="registrar-status" data-state={connectionError ? 'offline' : 'online'}>
-              <span aria-hidden="true" />
-              <strong>{connectionError ? 'Local Mode' : 'Online'}</strong>
-            </div>
             {activeSchoolYear.isLocked && (
               <div className="registrar-status registrar-status--locked">
                 <span className="material-symbols-outlined" aria-hidden="true">lock</span>
                 <strong>Read-Only Archive</strong>
               </div>
             )}
-            <label className="registrar-year">
-              <span>School Year</span>
-              <select value={activeSchoolYear.id} onChange={(event) => setSchoolYear(event.target.value)}>
-                {schoolYears.map((schoolYear) => (
-                  <option key={schoolYear.id} value={schoolYear.id}>
-                    {schoolYear.label} {schoolYear.isLocked ? '(Locked)' : ''}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <SchoolYearDropdown
+              activeSchoolYear={activeSchoolYear}
+              schoolYears={schoolYears}
+              onChange={setSchoolYear}
+            />
             <button className="registrar-icon-button" type="button" onClick={() => refreshData(true)} aria-label="Refresh registrar data">
               <span className="material-symbols-outlined" aria-hidden="true">refresh</span>
             </button>
@@ -77,7 +70,24 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       <main className="page-frame registrar-main">
         <div className="content-width">
           <section className="registrar-page-intro" aria-label="Current registrar section">
-            <p className="page-intro__eyebrow">Registrar Workspace</p>
+            <div className="registrar-school-identity">
+              <p className="page-intro__eyebrow">Registrar Workspace</p>
+              <h2>{registrarSchoolIdentity.schoolName}</h2>
+              <dl aria-label="School identity">
+                <div>
+                  <dt>School ID</dt>
+                  <dd>{registrarSchoolIdentity.schoolId}</dd>
+                </div>
+                <div>
+                  <dt>Division</dt>
+                  <dd>{registrarSchoolIdentity.division}</dd>
+                </div>
+                <div>
+                  <dt>Region</dt>
+                  <dd>{registrarSchoolIdentity.region}</dd>
+                </div>
+              </dl>
+            </div>
             <div>
               <h1>{currentSection.label}</h1>
               <p>SY {activeSchoolYear.label}</p>
