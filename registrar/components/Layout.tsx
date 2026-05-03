@@ -132,15 +132,18 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-3 bg-white pl-5 pr-2 py-1.5 rounded-full shadow-m3-1 border border-surfaceVariant group transition-all hover:border-primary/50">
               <span className="text-xs font-bold text-outline group-hover:text-primary transition-colors uppercase">Year</span>
-              <select 
-                value={activeSchoolYear.id}
-                onChange={(e) => setSchoolYear(e.target.value)}
-                className="bg-transparent text-sm font-black text-primary focus:outline-none border-none py-1 cursor-pointer pr-6"
-              >
-                {schoolYears.map(sy => (
-                  <option key={sy.id} value={sy.id}>{sy.label} {sy.isLocked ? '(Locked)' : ''}</option>
-                ))}
-              </select>
+              <div className="relative">
+                <select 
+                  value={activeSchoolYear.id}
+                  onChange={(e) => setSchoolYear(e.target.value)}
+                  className="root-select bg-transparent text-sm font-black text-primary focus:outline-none border-none py-1 cursor-pointer pr-7"
+                >
+                  {schoolYears.map(sy => (
+                    <option key={sy.id} value={sy.id}>{sy.label} {sy.isLocked ? '(Locked)' : ''}</option>
+                  ))}
+                </select>
+                <span className="material-symbols-outlined pointer-events-none absolute right-1 top-1/2 -translate-y-1/2 text-primary/80 text-[18px]">keyboard_arrow_down</span>
+              </div>
             </div>
             
             <div className="h-8 w-[1px] bg-surfaceVariant mx-1"></div>

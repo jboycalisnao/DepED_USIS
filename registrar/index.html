@@ -101,6 +101,22 @@
         text-transform: uppercase;
         letter-spacing: 0.1em;
       }
+
+      .root-select {
+        appearance: none;
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        background-image: none;
+      }
+
+      .root-select::-ms-expand {
+        display: none;
+      }
+
+      .root-select::-webkit-list-button,
+      .root-select::-webkit-calendar-picker-indicator {
+        opacity: 0;
+      }
     </style>
 <script type="importmap">
 {
