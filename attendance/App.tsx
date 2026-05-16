@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useSerial } from './hooks/useSerial';
 import { useLearners } from './hooks/useLearners';
 import { useAttendance } from './hooks/useAttendance';
@@ -48,7 +48,7 @@ const determineAttendanceType = (now: Date, settings: TimeSlotSettings): Attenda
   return 'UNSCHEDULED';
 };
 
-const App: React.FC = () => {
+function App() {
   const [access, setAccess] = useState<AttendanceAccessRecord | null>(() => getStoredAttendanceAccess());
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
@@ -516,6 +516,6 @@ const App: React.FC = () => {
       <UsisGlobalFooter />
     </div>
   );
-};
+}
 
 export default App;
