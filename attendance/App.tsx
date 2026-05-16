@@ -259,7 +259,7 @@ const App: React.FC = () => {
   );
 
   const selectedLearner = learners.find(l => l.id === selectedLearnerId) || null;
-  const profileInitials = String(access.displayName || '')
+  const profileInitials = String(access?.displayName || '')
     .trim()
     .split(/\s+/)
     .slice(0, 2)
