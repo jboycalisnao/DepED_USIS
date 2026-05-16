@@ -1,5 +1,5 @@
 import { supabase } from '../../../lib/supabase';
-import { hasCoordinatorModuleAccess } from '../../../../common/auth/moduleAccess';
+import { getCoordinatorModuleAccessMap, hasCoordinatorModuleAccess } from '../../../../common/auth/moduleAccess';
 
 export interface AttendanceAccessRecord {
   accountSource: 'usis_core_users' | 'usis_core_coordinators';
@@ -18,6 +18,14 @@ const isMissingRelationError = (error: { code?: string; message?: string } | nul
   error?.code === '42P01' || error?.message?.includes('usis_core_users');
 
 const normalizeIdentity = (value: string) => value.trim().toLowerCase();
+
+const hasExplicitAttendanceDeny = (accountId: string) => {
+  const accessMap = getCoordinatorModuleAccessMap();
+  if (!Object.prototype.hasOwnProperty.call(accessMap, accountId)) {
+    return false;
+  }
+  return !hasCoordinatorModuleAccess(accountId, 'attendance');
+};
 
 const matchesPassword = (record: any, password: string) => {
   const normalized = password.trim();
@@ -104,10 +112,7 @@ export const resolveAttendanceAccess = async (
       continue;
     }
 
-    if (
-      candidate.source === 'usis_core_coordinators' &&
-      !hasCoordinatorModuleAccess(candidate.data.id, 'attendance')
-    ) {
+    if (candidate.source === 'usis_core_coordinators' && hasExplicitAttendanceDeny(candidate.data.id)) {
       return {
         error: 'Access denied. This account is not granted Attendance module access in Coordinator Portal.',
         record: null,
