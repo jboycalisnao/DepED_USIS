@@ -1,42 +1,31 @@
-
 import React from 'react';
-import AcademicCycles from '../components/settings/AcademicCycles';
-import UserManagement from '../components/settings/UserManagement';
-import GradeLevelManagement from '../components/settings/GradeLevelManagement';
 import AcademicClassifications from '../components/settings/AcademicClassifications';
+import AcademicCycles from '../components/settings/AcademicCycles';
+import EnrollmentPortalControls from '../components/settings/EnrollmentPortalControls';
+import GradeLevelManagement from '../components/settings/GradeLevelManagement';
 
 const Settings: React.FC = () => {
   return (
-    <div className="max-w-5xl mx-auto space-y-12 animate-in fade-in duration-700 pb-20">
-      <div className="bg-white p-10 rounded-[48px] shadow-m3-2 border border-surfaceVariant">
-        <div className="flex items-center gap-4 mb-10">
-          <div className="w-1.5 h-10 bg-primary rounded-full"></div>
+    <div className="registrar-settings-page">
+      <section className="registrar-settings-page__panel">
+        <header className="registrar-settings-page__header">
+          <div className="registrar-settings-page__bar" aria-hidden="true" />
           <div>
-            <h3 className="text-3xl font-black text-primary uppercase tracking-tighter">Academic Configuration</h3>
-            <p className="text-xs font-bold text-outline uppercase tracking-widest">Define the operational scope of your institution</p>
+            <h3>Academic Configuration</h3>
+            <p>Define the operational scope of your institution.</p>
           </div>
-        </div>
+        </header>
 
-        <div className="space-y-16">
-          {/* School Year Management */}
+        <div className="registrar-settings-page__stack">
           <AcademicCycles />
-
-          <div className="h-px bg-surfaceVariant opacity-40"></div>
-
-          {/* User & Access Management */}
-          <UserManagement />
-
-          <div className="h-px bg-surfaceVariant opacity-40"></div>
-
-          {/* Grade Level Toggles */}
+          <hr />
           <GradeLevelManagement />
-
-          <div className="h-px bg-surfaceVariant opacity-40"></div>
-
-          {/* Strand & Program Registries */}
+          <hr />
           <AcademicClassifications />
+          <hr />
+          <EnrollmentPortalControls />
         </div>
-      </div>
+      </section>
     </div>
   );
 };

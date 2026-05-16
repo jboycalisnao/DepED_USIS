@@ -9,7 +9,7 @@
   --deped-line: rgba(18, 35, 61, 0.12);
   --deped-line-strong: rgba(0, 56, 168, 0.24);
   --deped-shadow: 0 24px 56px rgba(13, 30, 68, 0.12);
-  --deped-font: "Helvetica Neue", Helvetica, sans-serif;
+  --deped-font: "Segoe UI", sans-serif;
   --page-inset: 28px;
   --heading-stack-gap: 8px;
   --usis-radius-surface: 12px;
@@ -17,6 +17,15 @@
   --usis-title-size: 24px;
   --usis-body-size: 16px;
   --usis-helper-size: 13px;
+  --usis-title-line-height: 1.2;
+  --usis-body-line-height: 1.5;
+  --usis-helper-line-height: 1.35;
+  --usis-title-weight: 700;
+  --usis-body-weight: 400;
+  --usis-helper-weight: 400;
+  --usis-title-tracking: 0;
+  --usis-body-tracking: 0;
+  --usis-helper-tracking: 0;
 }
 
 @media (max-width: 640px) {

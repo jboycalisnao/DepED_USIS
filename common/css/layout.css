@@ -1,5 +1,6 @@
 .content-width {
-  width: min(1180px, calc(100% - 32px));
+  width: 100%;
+  max-width: none;
   margin: 0 auto;
 }
 
@@ -30,7 +31,6 @@
   font-size: var(--usis-helper-size);
   font-weight: 700;
   line-height: 1.3;
-  letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
@@ -41,7 +41,6 @@
   font-size: var(--usis-title-size);
   font-weight: 700;
   line-height: 1.08;
-  letter-spacing: 0;
 }
 
 .page-intro p,
@@ -72,10 +71,6 @@
 }
 
 @media (max-width: 640px) {
-  .content-width {
-    width: min(100% - 20px, 1180px);
-  }
-
   .page-frame {
     padding-bottom: 56px;
   }

@@ -1,5 +1,5 @@
 import React from 'react';
-import learnerGovernmentHeaderLogo from '../../common/assets/Learner-Government_Header_Logo.png';
+import { UsisUnifiedHeader } from '../../common/header/UsisUnifiedHeader';
 import { navigateToElectionPath } from '../utils/navigation';
 
 interface HeaderProps {
@@ -102,46 +102,13 @@ const Header: React.FC<HeaderProps> = ({
   return (
     <header className="w-full bg-white shadow-[0_2px_0_rgba(18,35,61,0.04)]">
       <div className="mx-auto w-[min(1180px,calc(100%-32px))]">
-        <div className="px-[28px]">
-          <div className="flex justify-between gap-4 border-b border-[rgba(18,35,61,0.12)] py-3 text-[0.88rem] text-[#8a8a8a]">
-            <span>Department of Education</span>
-            <span>Learner Government Election Portal</span>
-          </div>
-
-          <div className="flex flex-col items-start justify-between gap-6 border-b-4 border-[#0038a8] py-6 lg:flex-row lg:items-center">
-            <div className="flex items-center">
-              <img
-                className="h-[50px] w-auto max-w-full object-contain"
-                src={learnerGovernmentHeaderLogo}
-                alt="Learner Government election portal header logo"
-              />
-            </div>
-
-            <form
-              className="flex w-full min-w-[min(100%,420px)] items-stretch gap-[10px] lg:max-w-[500px]"
-              role="search"
-              onSubmit={handleSearchSubmit}
-            >
-              <label htmlFor="election-search" className="sr-only">
-                Search election portal
-              </label>
-              <input
-                id="election-search"
-                type="search"
-                placeholder="Keywords"
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-                className="min-w-[220px] flex-1 rounded-[4px] border border-[rgba(18,35,61,0.12)] bg-[#f6f6f6] px-[18px] py-3 text-[#12233d] outline-none"
-              />
-              <button
-                type="submit"
-                className="rounded-[4px] bg-[#0038a8] px-7 font-bold text-white transition-colors hover:bg-[#002f8a]"
-              >
-                Search
-              </button>
-            </form>
-          </div>
-        </div>
+        <UsisUnifiedHeader
+          searchId="election-search"
+          searchLabel="Search election portal"
+          onSearchSubmit={handleSearchSubmit}
+          searchValue={searchQuery}
+          onSearchChange={setSearchQuery}
+        />
 
         <nav className="border-b border-[rgba(18,35,61,0.12)] px-[28px]" aria-label="Election portal sections">
           <div className="flex flex-wrap items-center gap-5 py-5 md:gap-10 lg:gap-16">

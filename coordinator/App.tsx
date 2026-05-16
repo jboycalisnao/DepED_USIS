@@ -4,11 +4,11 @@ import { AdminLayout } from './features/admin/components/AdminLayout';
 import { RequireCoordinatorAccess } from './features/auth/components/RequireCoordinatorAccess';
 import { LoginPage } from './features/auth/pages/LoginPage';
 import { CredentialsPage } from './features/access/pages/CredentialsPage';
-import { CodeRegistryPage } from './features/access/pages/CodeRegistryPage';
 import { RegistryPage } from './features/access/pages/RegistryPage';
 import { RequireRegistrationAccess } from './features/registration/components/RequireRegistrationAccess';
 import { RegistrationCredentialsPage } from './features/registration/pages/RegistrationCredentialsPage';
 import { RegistrationPortalPage } from './features/registration/pages/RegistrationPortalPage';
+import { SchoolsDirectoryPage } from './features/schools/pages/SchoolsDirectoryPage';
 
 export default function App() {
   return (
@@ -21,7 +21,7 @@ export default function App() {
             <Route path="/admin" element={<AdminLayout />}>
               <Route index element={<Navigate to="/admin/credentials" replace />} />
               <Route path="credentials" element={<CredentialsPage />} />
-              <Route path="codes" element={<CodeRegistryPage />} />
+              <Route path="schools" element={<SchoolsDirectoryPage />} />
               <Route path="registry" element={<RegistryPage />} />
             </Route>
           </Route>

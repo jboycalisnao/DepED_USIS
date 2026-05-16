@@ -1,9 +1,5 @@
-import { GlobalFooterTemplate } from '@/features/patterns/components/GlobalFooterTemplate';
+import { UsisGlobalFooter } from '../../../common/footer/UsisGlobalFooter';
 
 export function SiteFooter() {
-  return (
-    <div className="mt-8">
-      <GlobalFooterTemplate />
-    </div>
-  );
+  return <UsisGlobalFooter />;
 }

@@ -1,0 +1,7 @@
+{
+  "name": "Web Serial Monitor",
+  "description": "A clean, modern web-based Serial Monitor for Arduino and other microcontrollers using the Web Serial API.",
+  "requestFramePermissions": [
+    "serial"
+  ]
+}

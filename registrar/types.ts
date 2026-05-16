@@ -43,6 +43,17 @@ export interface Section {
 export interface Student {
   id: string;
   lrn: string;
+  loginUsername?: string;
+  loginPassword?: string;
+  loginStatus?: string;
+  lastLoginAt?: string;
+  microsoftUserId?: string;
+  microsoftUpn?: string;
+  microsoftMailNickname?: string;
+  microsoftAccountStatus?: string;
+  microsoftLicenseSkuId?: string;
+  microsoftCreatedAt?: string;
+  microsoftLastSyncedAt?: string;
   firstName: string;
   lastName: string;
   middleName?: string;

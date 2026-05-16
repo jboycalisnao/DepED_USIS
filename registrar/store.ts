@@ -3,6 +3,13 @@ import { useState, useEffect } from 'react';
 import { Student, SchoolYear, EnrollmentStatus, GradeLevel, Section, AcademicProgram } from './types';
 import { SCHOOL_YEARS } from './constants';
 import { supabase } from './lib/supabase';
+import {
+  clearStoredRegistrarAccess,
+  getStoredRegistrarAccess,
+  resolveRegistrarCoordinatorAccess,
+  storeRegistrarAccess,
+  type RegistrarCoordinatorAccess,
+} from './features/auth/coordinatorAccess';
 
 /**
  * DATABASE SCHEMA REQUIREMENT:
@@ -20,7 +27,7 @@ const STORAGE_KEY_GL = 'leon_nhs_active_gls';
 const STORAGE_KEY_STRANDS = 'leon_nhs_strands';
 const STORAGE_KEY_PROGRAMS = 'leon_nhs_special_programs';
 const REGISTRAR_TABLES = {
-  users: 'core_users',
+  users: 'usis_core_coordinators',
   learners: 'registrar_learners',
   sections: 'registrar_sections',
   strands: 'registrar_strands',
@@ -33,9 +40,7 @@ const REGISTRAR_TABLES = {
 let learners: Student[] = []; 
 let sections: Section[] = [];
 let schoolYears: SchoolYear[] = [...SCHOOL_YEARS].sort((a, b) => b.label.localeCompare(a.label));
-let users: SystemUser[] = [
-  { id: '1', username: '456456', password: '456456', displayName: 'Primary Registrar' }
-];
+let users: SystemUser[] = [];
 
 let availableStrands: AcademicProgram[] = JSON.parse(localStorage.getItem(STORAGE_KEY_STRANDS) || '[]');
 let availableSpecialPrograms: AcademicProgram[] = JSON.parse(localStorage.getItem(STORAGE_KEY_PROGRAMS) || '[]');
@@ -44,7 +49,9 @@ let activeGradeLevels: GradeLevel[] = JSON.parse(localStorage.getItem(STORAGE_KE
 
 let hasConnectionError = false;
 let isFirstLoad = true;
-let isAuthenticated = false;
+const existingAccess = getStoredRegistrarAccess();
+let isAuthenticated = Boolean(existingAccess);
+let registrarAccess: RegistrarCoordinatorAccess | null = existingAccess;
 let isGlobalLoading = false;
 let lastSyncTime = 0;
 
@@ -60,6 +67,7 @@ let glListeners: Array<(gl: GradeLevel[]) => void> = [];
 let connectionListeners: Array<(err: boolean) => void> = [];
 let authListeners: Array<(auth: boolean) => void> = [];
 let loadingListeners: Array<(load: boolean) => void> = [];
+let registrarAccessListeners: Array<(access: RegistrarCoordinatorAccess | null) => void> = [];
 
 const notifyGradeLevels = () => glListeners.forEach(l => l([...activeGradeLevels]));
 const notifyStrands = () => {
@@ -72,6 +80,7 @@ const notifyPrograms = () => {
 };
 const notifyLoading = () => loadingListeners.forEach(l => l(isGlobalLoading));
 const setGlobalLoading = (val: boolean) => { isGlobalLoading = val; notifyLoading(); };
+const createId = () => Math.random().toString(36).substr(2, 9);
 
 const mapLearnerToDb = (data: Partial<Student>) => {
   const sId = data.sectionId ? String(data.sectionId).trim() : null;
@@ -96,6 +105,17 @@ const mapLearnerToDb = (data: Partial<Student>) => {
     is_artist: !!data.isArtist,
     is_4ps: !!data.is4Ps,
     is_indigent: !!data.isIndigent,
+    login_username: data.loginUsername || null,
+    login_password_plain: data.loginPassword || null,
+    login_status: data.loginStatus || null,
+    last_login_at: data.lastLoginAt || null,
+    microsoft_user_id: data.microsoftUserId || null,
+    microsoft_upn: data.microsoftUpn || null,
+    microsoft_mail_nickname: data.microsoftMailNickname || null,
+    microsoft_account_status: data.microsoftAccountStatus || null,
+    microsoft_license_sku_id: data.microsoftLicenseSkuId || null,
+    microsoft_created_at: data.microsoftCreatedAt || null,
+    microsoft_last_synced_at: data.microsoftLastSyncedAt || null,
     org_affiliations: Array.isArray(data.orgAffiliations) ? data.orgAffiliations : [],
     enrollment_history: Array.isArray(data.enrollments) ? data.enrollments : []
   };
@@ -104,6 +124,17 @@ const mapLearnerToDb = (data: Partial<Student>) => {
 const mapDbToLearner = (l: any): Student => ({
   id: String(l.id).trim(),
   lrn: l.lrn,
+  loginUsername: l.login_username || l.portal_username || l.username || l.lrn || '',
+  loginPassword: l.login_password_plain || l.portal_password_plain || l.login_password || l.portal_password || '',
+  loginStatus: l.login_status || (l.is_login_active === false ? 'Disabled' : 'Active'),
+  lastLoginAt: l.last_login_at || '',
+  microsoftUserId: l.microsoft_user_id || '',
+  microsoftUpn: l.microsoft_upn || '',
+  microsoftMailNickname: l.microsoft_mail_nickname || '',
+  microsoftAccountStatus: l.microsoft_account_status || '',
+  microsoftLicenseSkuId: l.microsoft_license_sku_id || '',
+  microsoftCreatedAt: l.microsoft_created_at || '',
+  microsoftLastSyncedAt: l.microsoft_last_synced_at || '',
   firstName: l.first_name || l.firstName || '',
   lastName: l.last_name || l.lastName || '',
   middleName: l.middle_name || l.middleName || '',
@@ -138,8 +169,12 @@ const mapDbToSection = (s: any): Section => ({
 const mapDbToUser = (u: any): SystemUser => ({
   id: String(u.id).trim(),
   username: u.username,
-  password: u.password,
-  displayName: u.display_name || u.displayName || 'System User'
+  password: u.password_plain || u.password_hash || '',
+  displayName:
+    [u.first_name, u.middle_name, u.last_name].filter(Boolean).join(' ').trim() ||
+    u.display_name ||
+    u.displayName ||
+    'System User'
 });
 
 const mapDbToProgram = (p: any): AcademicProgram => ({
@@ -175,13 +210,36 @@ const fetchAllFromTable = async (
   }
 };
 
-const fetchUsers = () => fetchAllFromTable(REGISTRAR_TABLES.users, (data) => {
-  const fetchedUsers = data.map(mapDbToUser);
-  if (fetchedUsers.length > 0) {
-    users = fetchedUsers;
-    usersListeners.forEach(l => l(users));
+const fetchUsers = async () => {
+  if (!registrarAccess?.schoolUuid) {
+    users = [];
+    usersListeners.forEach((listener) => listener(users));
+    return;
   }
-});
+
+  if (hasConnectionError) {
+    return;
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from(REGISTRAR_TABLES.users)
+      .select('*')
+      .eq('school_id', registrarAccess.schoolUuid)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      updateConnectionStatus(true);
+      return;
+    }
+
+    updateConnectionStatus(false);
+    users = (data || []).map(mapDbToUser);
+    usersListeners.forEach((listener) => listener(users));
+  } catch {
+    updateConnectionStatus(true);
+  }
+};
 
 const fetchLearners = () => fetchAllFromTable(REGISTRAR_TABLES.learners, (data) => {
   learners = data.map(mapDbToLearner);
@@ -269,6 +327,7 @@ export const useStore = () => {
   const [connectionError, setConnectionError] = useState<boolean>(hasConnectionError);
   const [isAuth, setIsAuth] = useState<boolean>(isAuthenticated);
   const [loading, setLoading] = useState(isGlobalLoading);
+  const [currentRegistrarAccess, setCurrentRegistrarAccess] = useState<RegistrarCoordinatorAccess | null>(registrarAccess);
 
   useEffect(() => {
     const lListener = (newList: Student[]) => setCurrentLearners([...newList]);
@@ -282,6 +341,7 @@ export const useStore = () => {
     const cListener = (err: boolean) => setConnectionError(err);
     const aListener = (auth: boolean) => setIsAuth(auth);
     const loadListener = (load: boolean) => setLoading(load);
+    const registrarAccessListener = (access: RegistrarCoordinatorAccess | null) => setCurrentRegistrarAccess(access);
     
     learnersListeners.push(lListener);
     sectionsListeners.push(sListener);
@@ -294,6 +354,7 @@ export const useStore = () => {
     connectionListeners.push(cListener);
     authListeners.push(aListener);
     loadingListeners.push(loadListener);
+    registrarAccessListeners.push(registrarAccessListener);
     
     return () => {
       learnersListeners = learnersListeners.filter(l => l !== lListener);
@@ -307,6 +368,7 @@ export const useStore = () => {
       connectionListeners = connectionListeners.filter(l => l !== cListener);
       authListeners = authListeners.filter(l => l !== aListener);
       loadingListeners = loadingListeners.filter(l => l !== loadListener);
+      registrarAccessListeners = registrarAccessListeners.filter(l => l !== registrarAccessListener);
     };
   }, []);
 
@@ -346,45 +408,99 @@ export const useStore = () => {
     connectionError,
     isAuthenticated: isAuth,
     loading,
+    registrarAccess: currentRegistrarAccess,
     refreshData,
     setSchoolYear: (syId: string) => {
       const found = currentSYList.find(s => s.id === syId);
       if (found) { activeSchoolYear = found; syListeners.forEach(l => l(activeSchoolYear)); }
     },
-    login: (u: string, p: string) => {
-      const foundUser = users.find(user => user.username === u && user.password === p);
-      if (foundUser) { isAuthenticated = true; authListeners.forEach(l => l(true)); return true; }
-      return false;
+    login: async (username: string, password: string) => {
+      const result = await resolveRegistrarCoordinatorAccess(username, password);
+      if (result.error || !result.record) {
+        return { ok: false, error: result.error || 'Authentication failed.' };
+      }
+      registrarAccess = result.record;
+      storeRegistrarAccess(result.record);
+      registrarAccessListeners.forEach((listener) => listener(registrarAccess));
+      isAuthenticated = true;
+      authListeners.forEach(l => l(true));
+      await fetchUsers();
+      return { ok: true, error: null };
     },
-    logout: () => { isAuthenticated = false; authListeners.forEach(l => l(false)); },
+    logout: () => {
+      clearStoredRegistrarAccess();
+      registrarAccess = null;
+      registrarAccessListeners.forEach((listener) => listener(null));
+      isAuthenticated = false;
+      authListeners.forEach(l => l(false));
+    },
     addUser: async (displayName: string, username: string, password: string) => {
+      if (!registrarAccess?.schoolUuid) return;
       setGlobalLoading(true);
-      const id = Math.random().toString(36).substr(2, 9);
       try {
-        const { error } = await supabase.from(REGISTRAR_TABLES.users).insert([{ id, username, password, display_name: displayName }]);
+        const [firstName, ...rest] = displayName.trim().split(/\s+/);
+        const lastName = rest.join(' ').trim() || 'Coordinator';
+        const { error } = await supabase.from(REGISTRAR_TABLES.users).insert([{
+          school_id: registrarAccess.schoolUuid,
+          region_code: null,
+          division_code: null,
+          employee_id: null,
+          username: username.trim().toLowerCase(),
+          email: `${username.trim().toLowerCase()}@usis.local`,
+          password_hash: password,
+          password_plain: password,
+          first_name: firstName || 'Registrar',
+          last_name: lastName,
+          middle_name: null,
+          mobile_no: null,
+          role: 'school_usis_coordinator',
+          access_level: 'school',
+          is_super_admin: false,
+          is_active: true
+        }]);
         if (!error) await fetchUsers();
       } finally {
         setGlobalLoading(false);
       }
     },
     updateUser: async (id: string, updates: Partial<SystemUser>) => {
+      if (!registrarAccess?.schoolUuid) return;
       setGlobalLoading(true);
       try {
         const dbPayload: any = {};
-        if (updates.username) dbPayload.username = updates.username;
-        if (updates.password) dbPayload.password = updates.password;
-        if (updates.displayName) dbPayload.display_name = updates.displayName;
-        const { error } = await supabase.from(REGISTRAR_TABLES.users).update(dbPayload).eq('id', id);
+        if (updates.username) {
+          dbPayload.username = updates.username.trim().toLowerCase();
+          dbPayload.email = `${updates.username.trim().toLowerCase()}@usis.local`;
+        }
+        if (updates.password) {
+          dbPayload.password_hash = updates.password;
+          dbPayload.password_plain = updates.password;
+        }
+        if (updates.displayName) {
+          const [firstName, ...rest] = updates.displayName.trim().split(/\s+/);
+          dbPayload.first_name = firstName || 'Registrar';
+          dbPayload.last_name = rest.join(' ').trim() || 'Coordinator';
+        }
+        const { error } = await supabase
+          .from(REGISTRAR_TABLES.users)
+          .update(dbPayload)
+          .eq('id', id)
+          .eq('school_id', registrarAccess.schoolUuid);
         if (!error) await fetchUsers();
       } finally {
         setGlobalLoading(false);
       }
     },
     removeUser: async (id: string) => {
+      if (!registrarAccess?.schoolUuid) return;
       if (users.length <= 1) return; 
       setGlobalLoading(true);
       try {
-        const { error } = await supabase.from(REGISTRAR_TABLES.users).delete().eq('id', id);
+        const { error } = await supabase
+          .from(REGISTRAR_TABLES.users)
+          .delete()
+          .eq('id', id)
+          .eq('school_id', registrarAccess.schoolUuid);
         if (!error) await fetchUsers();
       } finally {
         setGlobalLoading(false);
@@ -440,10 +556,35 @@ export const useStore = () => {
         setGlobalLoading(false);
       }
     },
+    updateLearnerCredentials: async (
+      payload: Array<{ id: string; loginUsername?: string | null; loginPassword?: string | null; loginStatus?: string | null }>
+    ) => {
+      if (activeSchoolYear.isLocked) return { error: "Locked" };
+      setGlobalLoading(true);
+      try {
+        const updates = payload.map((row) =>
+          supabase
+            .from(REGISTRAR_TABLES.learners)
+            .update({
+              login_username: row.loginUsername ?? null,
+              login_password_plain: row.loginPassword ?? null,
+              login_status: row.loginStatus ?? 'Active',
+            })
+            .eq('id', row.id)
+        );
+        const results = await Promise.all(updates);
+        const failed = results.find((result) => result.error);
+        if (failed?.error) return { error: failed.error.message };
+        await fetchLearners();
+        return { error: undefined };
+      } finally {
+        setGlobalLoading(false);
+      }
+    },
     addSection: async (name: string, gradeLevel: GradeLevel, adviserName: string, strand?: string) => {
       if (activeSchoolYear.isLocked) return { error: "Locked" };
       setGlobalLoading(true);
-      const id = Math.random().toString(36).substr(2, 9);
+      const id = createId();
       try {
         const { error } = await supabase.from(REGISTRAR_TABLES.sections).insert([{ id, name, grade_level: gradeLevel, adviser_name: adviserName, strand, school_year_id: activeSchoolYear.id }]);
         if (!error) await fetchSections();
@@ -496,7 +637,7 @@ export const useStore = () => {
     addStrand: async (acronym: string, fullName: string) => {
       setGlobalLoading(true);
       try {
-        const id = Math.random().toString(36).substr(2, 9);
+        const id = createId();
         await supabase.from(REGISTRAR_TABLES.strands).insert([{ id, acronym, full_name: fullName }]);
         await fetchStrands();
       } finally {
@@ -527,7 +668,7 @@ export const useStore = () => {
     addSpecialProgram: async (acronym: string, fullName: string) => {
       setGlobalLoading(true);
       try {
-        const id = Math.random().toString(36).substr(2, 9);
+        const id = createId();
         await supabase.from(REGISTRAR_TABLES.specialPrograms).insert([{ id, acronym, full_name: fullName }]);
         await fetchPrograms();
       } finally {
@@ -576,12 +717,80 @@ export const useStore = () => {
       }
       return { error: null };
     },
-    setActiveSchoolYear: async (id: string) => {
+    copySectionsBetweenSchoolYears: async (sourceSchoolYearId: string, targetSchoolYearId: string) => {
       setGlobalLoading(true);
       try {
+        if (!sourceSchoolYearId || !targetSchoolYearId) {
+          return { error: 'Source and target school year are required.' };
+        }
+        if (sourceSchoolYearId === targetSchoolYearId) {
+          return { error: 'Source and target school year must be different.' };
+        }
+        const { data: sourceSections, error: sourceFetchError } = await supabase
+          .from(REGISTRAR_TABLES.sections)
+          .select('id,name,grade_level,adviser_name,strand')
+          .eq('school_year_id', sourceSchoolYearId);
+        if (sourceFetchError) {
+          return { error: sourceFetchError.message };
+        }
+        if (!(sourceSections || []).length) {
+          return { error: null };
+        }
+        const payload = (sourceSections || []).map((section: any) => ({
+          id: createId(),
+          name: section.name || '',
+          grade_level: section.grade_level || GradeLevel.GRADE_7,
+          adviser_name: section.adviser_name || '',
+          strand: section.strand || '',
+          school_year_id: targetSchoolYearId,
+        }));
+        const { error: copyError } = await supabase.from(REGISTRAR_TABLES.sections).insert(payload);
+        if (copyError) {
+          return { error: copyError.message };
+        }
+        await fetchSections();
+      } finally {
+        setGlobalLoading(false);
+      }
+      return { error: null };
+    },
+    setActiveSchoolYear: async (id: string, sectionStrategy: 'none' | 'copy' = 'none') => {
+      setGlobalLoading(true);
+      try {
+        const sourceSchoolYearId = activeSchoolYear.id;
+        if (sectionStrategy === 'copy') {
+          const { data: sourceSections, error: sourceFetchError } = await supabase
+            .from(REGISTRAR_TABLES.sections)
+            .select('id,name,grade_level,adviser_name,strand,school_year_id')
+            .eq('school_year_id', sourceSchoolYearId);
+
+          if (sourceFetchError) {
+            return { error: sourceFetchError.message };
+          }
+          if ((sourceSections || []).length > 0) {
+            const payload = (sourceSections || []).map((section: any) => ({
+              id: createId(),
+              name: section.name || '',
+              grade_level: section.grade_level || GradeLevel.GRADE_7,
+              adviser_name: section.adviser_name || '',
+              strand: section.strand || '',
+              school_year_id: id,
+            }));
+            const { error: copyError } = await supabase.from(REGISTRAR_TABLES.sections).insert(payload);
+            if (copyError) {
+              return { error: copyError.message };
+            }
+          }
+        }
+
         await supabase.from(REGISTRAR_TABLES.schoolYears).update({ is_active: false }).neq('id', id);
         const { error } = await supabase.from(REGISTRAR_TABLES.schoolYears).update({ is_active: true }).eq('id', id);
-        if (!error) await fetchSchoolYears();
+        if (!error) {
+          await Promise.all([fetchSchoolYears(), fetchSections()]);
+        }
+        if (error) {
+          return { error: error.message };
+        }
       } finally {
         setGlobalLoading(false);
       }

@@ -8,17 +8,7 @@ const DEFAULT_SCHOOL_REGION = 'Region VI - Western Visayas';
 
 export const TEMP_ELECTION_REGISTRATION_CREDENTIALS = {
   password: 'Usis2026!',
-  schoolId: '123456',
   username: 'election.coordinator',
-};
-
-const SCHOOL_DIRECTORY: Record<string, { address: string; division: string; name: string; region: string }> = {
-  '123456': {
-    name: 'Leon National High School',
-    address: 'M.H. Del Pilar Street, Leon, Iloilo',
-    division: DEFAULT_SCHOOL_DIVISION,
-    region: DEFAULT_SCHOOL_REGION,
-  },
 };
 
 const toTitleCase = (value: string) =>
@@ -84,18 +74,15 @@ export const clearElectionRegistrationAccess = () => {
 export const normalizeElectionCode = (value: string) => value.trim().toUpperCase();
 
 export const resolveElectionRegistrationAccess = async (
-  schoolId: string,
   username: string,
   password: string,
   fallbackSchoolName: string,
 ) => {
-  const normalizedSchoolId = schoolId.trim();
   const normalizedUsername = username.trim().toLowerCase();
 
-  if (!/^\d{6}$/.test(normalizedSchoolId) || !normalizedUsername || password.trim().length < 6) {
+  if (!normalizedUsername || password.trim().length < 6) {
     return {
-      error:
-        'Provide a valid 6-digit school ID, username, and password with at least 6 characters.',
+      error: 'Provide a valid username and password with at least 6 characters.',
       record: null,
     };
   }
@@ -116,7 +103,7 @@ export const resolveElectionRegistrationAccess = async (
     `)
     .eq('username', normalizedUsername)
     .eq('is_active', true)
-    .eq('usis_schools.school_code', normalizedSchoolId)
+    .limit(1)
     .maybeSingle();
 
   if (error) {
@@ -132,7 +119,7 @@ export const resolveElectionRegistrationAccess = async (
 
   if (!coordinatorRecord) {
     return {
-      error: 'No active election coordinator account matches the supplied school ID and username.',
+      error: 'No active election coordinator account matches the supplied username.',
       record: null,
     };
   }
@@ -167,13 +154,11 @@ export const resolveElectionRegistrationAccess = async (
       schoolAddress: schoolAddress || 'School address not yet configured in the coordinator registry.',
       schoolDivision:
         schoolRecord?.division ||
-        SCHOOL_DIRECTORY[normalizedSchoolId]?.division ||
         DEFAULT_SCHOOL_DIVISION,
-      schoolId: normalizedSchoolId,
+      schoolId: schoolRecord?.school_code || '',
       schoolName: schoolRecord?.school_name || fallbackSchoolName,
       schoolRegion:
         schoolRecord?.region ||
-        SCHOOL_DIRECTORY[normalizedSchoolId]?.region ||
         DEFAULT_SCHOOL_REGION,
     },
   };

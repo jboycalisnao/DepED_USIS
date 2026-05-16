@@ -1,0 +1,92 @@
+.usis-login-modal {
+  width: min(100%, 640px);
+  margin: 0 auto;
+  padding: 8px 0 6px;
+  font-family: var(--deped-font);
+}
+
+.usis-login-modal__card {
+  overflow: hidden;
+  border: 1px solid var(--deped-line);
+  border-radius: 12px;
+  background: var(--deped-white);
+  box-shadow: 0 6px 20px rgba(18, 35, 61, 0.08);
+  padding: 0 24px 24px;
+}
+
+.usis-login-modal__stripe {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  margin: 0 -24px;
+}
+
+.usis-login-modal__stripe span {
+  height: 3px;
+  display: block;
+}
+
+.usis-login-modal__stripe-blue {
+  background: var(--deped-blue);
+}
+
+.usis-login-modal__stripe-red {
+  background: var(--deped-red);
+}
+
+.usis-login-modal__stripe-yellow {
+  background: var(--deped-yellow);
+}
+
+.usis-login-modal__header {
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+  text-align: center;
+  padding: 24px 6px 10px;
+  margin-bottom: 10px;
+}
+
+.usis-login-modal__logo {
+  width: 96px;
+  height: 96px;
+  object-fit: contain;
+}
+
+.usis-login-modal__header h2 {
+  color: var(--deped-blue);
+  font-size: var(--usis-title-size);
+  font-weight: var(--usis-title-weight);
+  line-height: var(--usis-title-line-height);
+}
+
+.usis-login-modal__form {
+  display: grid;
+  gap: 18px;
+  padding: 0;
+  margin-top: 10px;
+}
+
+.usis-login-modal .floating-field__control input {
+  min-height: 64px;
+  background: #fbfcff;
+}
+
+.usis-login-modal .floating-field__control span {
+  text-transform: none;
+  font-weight: 400;
+  font-size: var(--usis-body-size);
+}
+
+.usis-login-modal .floating-field__control input:focus + span,
+.usis-login-modal .floating-field__control input:not(:placeholder-shown) + span,
+.usis-login-modal .floating-field__control input[data-has-value="true"] ~ span {
+  font-size: var(--usis-helper-size);
+  text-transform: none;
+  font-weight: 400;
+}
+
+.usis-login-modal__submit {
+  justify-self: center;
+  min-width: 180px;
+  width: min(100%, 300px);
+}

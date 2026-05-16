@@ -1,30 +1,28 @@
 import type { CoordinatorAccessRecord } from '@/features/auth/utils/coordinatorAccess';
 
 export const coreRoleOptions = [
+  { label: 'System Admin', value: 'system_admin' },
   { label: 'School USIS Coordinator', value: 'school_usis_coordinator' },
-  { label: 'Division USIS Coordinator', value: 'division_usis_coordinator' },
-  { label: 'Regional USIS Coordinator', value: 'regional_usis_coordinator' },
+  { label: 'Attendance Coordinator', value: 'attendance_coordinator' },
 ] as const;
 
 export const coreAccessLevelOptions = [
   { label: 'School', value: 'school' },
-  { label: 'Division', value: 'division' },
-  { label: 'Region', value: 'region' },
 ] as const;
 
 export const coreRoleByAccessLevel: Record<string, string> = {
-  division: 'division_usis_coordinator',
-  region: 'regional_usis_coordinator',
   school: 'school_usis_coordinator',
 };
 
 export const coreAccessLevelByRole: Record<string, string> = {
-  division_usis_coordinator: 'division',
-  regional_usis_coordinator: 'region',
+  attendance_coordinator: 'school',
+  registrar_coordinator: 'school',
   school_usis_coordinator: 'school',
+  system_admin: 'school',
 };
 
 const uniq = <T,>(values: T[]) => Array.from(new Set(values));
+const SCHOOL_ONLY_ROLES = ['school_usis_coordinator', 'registrar_coordinator', 'attendance_coordinator', 'system_admin'];
 
 export const getAssignableCoreAccessLevels = (
   access: CoordinatorAccessRecord | null,
@@ -32,23 +30,9 @@ export const getAssignableCoreAccessLevels = (
 ) => {
   const values = (() => {
     if (!access) return [];
-    if (access.isSuperAdmin || access.coordinatorRole === 'system_admin') {
-      return ['region', 'division', 'school'];
-    }
-
-    if (access.accountSource !== 'usis_core_coordinators') {
-      return [];
-    }
-
-    if (access.accessLevel === 'region') {
-      return ['division', 'school'];
-    }
-
-    if (access.accessLevel === 'division') {
-      return ['school'];
-    }
-
-    return [];
+    if (access.isSuperAdmin || access.coordinatorRole === 'system_admin') return ['school'];
+    if (access.accountSource !== 'usis_core_coordinators') return [];
+    return ['school'];
   })();
 
   return uniq(includeCurrent ? [...values, includeCurrent] : values);
@@ -58,8 +42,20 @@ export const getAssignableCoreRoles = (
   access: CoordinatorAccessRecord | null,
   includeCurrent?: string,
 ) => {
-  const values = getAssignableCoreAccessLevels(access).map((value) => coreRoleByAccessLevel[value]).filter(Boolean);
-  return uniq(includeCurrent ? [...values, includeCurrent] : values);
+  const values = getAssignableCoreAccessLevels(access)
+    .flatMap((value) =>
+      value === 'school'
+        ? ['school_usis_coordinator', 'registrar_coordinator', 'attendance_coordinator']
+        : [coreRoleByAccessLevel[value]],
+    )
+    .filter(Boolean);
+  if (access && (access.isSuperAdmin || access.coordinatorRole === 'system_admin')) {
+    values.push('system_admin');
+  }
+  const nextValues = includeCurrent && SCHOOL_ONLY_ROLES.includes(includeCurrent)
+    ? [...values, includeCurrent]
+    : values;
+  return uniq(nextValues);
 };
 
 export const getAssignableCoreAccessLevelOptions = (
@@ -86,7 +82,15 @@ export const canAssignCoreAccessLevel = (
 export const getDefaultCoreRoleForAccessLevel = (
   accessLevel: string,
   fallbackRole?: string,
-) => coreRoleByAccessLevel[accessLevel] || fallbackRole || 'school_usis_coordinator';
+) => {
+  if (fallbackRole === 'system_admin') {
+    return 'system_admin';
+  }
+  if (accessLevel === 'school' && fallbackRole === 'registrar_coordinator') {
+    return 'registrar_coordinator';
+  }
+  return coreRoleByAccessLevel[accessLevel] || fallbackRole || 'school_usis_coordinator';
+};
 
 export const getDefaultCoreAccessLevelForRole = (
   role: string,

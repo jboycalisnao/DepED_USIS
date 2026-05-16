@@ -1,38 +1,45 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import type { CoordinatorAccessRecord } from '@/features/auth/utils/coordinatorAccess';
 import { FloatingField } from '@/features/shared/components/FloatingField';
-import { SearchableSelect } from '@/features/shared/components/SearchableSelect';
 import type {
   CreateCoreCredentialInput,
-  RegistrySchoolContext,
 } from '../utils/credentialRegistry';
-import {
-  getAssignableCoreRoleOptions,
-  getDefaultCoreAccessLevelForRole,
-} from '../utils/coreAccessRules';
+import { CoordinatorCredentialSuccessModal } from './CoordinatorCredentialSuccessModal';
 
 interface CoreCoordinatorCredentialFormProps {
   access: CoordinatorAccessRecord | null;
+  accessLevel: 'school';
+  credentialType:
+    | 'school_usis_coordinator'
+    | 'registrar_coordinator'
+    | 'attendance_coordinator'
+    | 'system_admin';
   isSubmitting: boolean;
   onSubmit: (payload: CreateCoreCredentialInput) => Promise<void>;
-  schools: RegistrySchoolContext[];
+  role:
+    | 'school_usis_coordinator'
+    | 'registrar_coordinator'
+    | 'attendance_coordinator'
+    | 'system_admin';
   schoolCode: string;
 }
 
 export function CoreCoordinatorCredentialForm({
   access,
+  accessLevel,
+  credentialType,
   isSubmitting,
   onSubmit,
-  schools,
+  role,
   schoolCode,
 }: CoreCoordinatorCredentialFormProps) {
-  const coreRoleOptions = useMemo(() => getAssignableCoreRoleOptions(access), [access]);
-  const defaultSchoolCode = schoolCode || schools[0]?.schoolCode || '';
-  const defaultRole = coreRoleOptions[0]?.value || 'school_usis_coordinator';
-  const [targetSchoolCode, setTargetSchoolCode] = useState(defaultSchoolCode);
+  const defaultSchoolCode = schoolCode === '123456' ? '' : schoolCode;
+  const defaultRole = role;
+  const effectiveSchoolCode = defaultSchoolCode;
   const [form, setForm] = useState<CreateCoreCredentialInput>({
-    accessLevel: getDefaultCoreAccessLevelForRole(defaultRole, 'school'),
+    accessLevel,
     actorAccess: access as CoordinatorAccessRecord,
+    credentialType,
     email: '',
     employeeId: '',
     firstName: '',
@@ -45,18 +52,20 @@ export function CoreCoordinatorCredentialForm({
     username: '',
   });
 
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successData, setSuccessData] = useState<any>(null);
+
   useEffect(() => {
-    const nextSchoolCode = targetSchoolCode || defaultSchoolCode;
+    const nextSchoolCode = effectiveSchoolCode;
     setForm((current) => {
-      const nextRole = coreRoleOptions.some((option) => option.value === current.role)
-        ? current.role
-        : defaultRole;
+      const nextRole = defaultRole;
       const actorAccess = access as CoordinatorAccessRecord;
-      const nextAccessLevel = getDefaultCoreAccessLevelForRole(nextRole, current.accessLevel);
+      const nextAccessLevel = accessLevel;
 
       if (
         current.accessLevel === nextAccessLevel &&
         current.actorAccess === actorAccess &&
+        current.credentialType === credentialType &&
         current.role === nextRole &&
         current.schoolCode === nextSchoolCode
       ) {
@@ -67,82 +76,84 @@ export function CoreCoordinatorCredentialForm({
         ...current,
         accessLevel: nextAccessLevel,
         actorAccess,
+        credentialType,
         role: nextRole,
         schoolCode: nextSchoolCode,
       };
     });
 
-    if (!targetSchoolCode && nextSchoolCode) {
-      setTargetSchoolCode(nextSchoolCode);
-    }
-  }, [access, coreRoleOptions, defaultRole, defaultSchoolCode, targetSchoolCode]);
+  }, [access, accessLevel, credentialType, defaultRole, defaultSchoolCode, effectiveSchoolCode]);
 
-  const updateField = (field: keyof CreateCoreCredentialInput, value: string) => {
-    setForm((current) => {
-      if (field === 'role') {
-        return {
-          ...current,
-          accessLevel: getDefaultCoreAccessLevelForRole(value, current.accessLevel),
-          actorAccess: access as CoordinatorAccessRecord,
-          role: value,
-          schoolCode: targetSchoolCode || defaultSchoolCode,
-        };
-      }
-
-      return {
-        ...current,
-        [field]: value,
-        actorAccess: access as CoordinatorAccessRecord,
-        schoolCode: targetSchoolCode || defaultSchoolCode,
-      };
-    });
-  };
+  const updateField = (field: keyof CreateCoreCredentialInput, value: string) =>
+    setForm((current) => ({
+      ...current,
+      [field]: value,
+      actorAccess: access as CoordinatorAccessRecord,
+      schoolCode: defaultSchoolCode,
+    }));
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
-    await onSubmit({
-      ...form,
-      actorAccess: access as CoordinatorAccessRecord,
-      accessLevel: getDefaultCoreAccessLevelForRole(form.role, form.accessLevel),
-      role: form.role,
-      schoolCode: targetSchoolCode || defaultSchoolCode,
-    });
-    setForm({
-      accessLevel: getDefaultCoreAccessLevelForRole(defaultRole, 'school'),
-      actorAccess: access as CoordinatorAccessRecord,
-      email: '',
-      employeeId: '',
-      firstName: '',
-      lastName: '',
-      middleName: '',
-      mobileNo: '',
-      password: '',
-      role: defaultRole,
-      schoolCode: targetSchoolCode || defaultSchoolCode,
-      username: '',
-    });
+    const finalSchoolCode = effectiveSchoolCode;
+
+    if (!finalSchoolCode) {
+      alert('Please select a target school.');
+      return;
+    }
+
+    if (!form.username || !form.email || !form.password || !form.firstName || !form.lastName) {
+      alert('Please fill in all required fields.');
+      return;
+    }
+
+    try {
+      console.log('Submitting core credential:', { ...form, schoolCode: finalSchoolCode });
+      await onSubmit({
+        ...form,
+        actorAccess: access as CoordinatorAccessRecord,
+        accessLevel,
+        credentialType,
+        role: form.role,
+        schoolCode: finalSchoolCode,
+      });
+
+      setSuccessData({
+        firstName: form.firstName,
+        lastName: form.lastName,
+        email: form.email,
+        username: form.username,
+        password: form.password,
+        accessLevel: form.accessLevel,
+        credentialType: credentialType,
+      });
+      setShowSuccessModal(true);
+
+      setForm({
+        accessLevel,
+        actorAccess: access as CoordinatorAccessRecord,
+        credentialType,
+        email: '',
+        employeeId: '',
+        firstName: '',
+        lastName: '',
+        middleName: '',
+        mobileNo: '',
+        password: '',
+        role: defaultRole,
+        schoolCode: finalSchoolCode,
+        username: '',
+      });
+    } catch (err) {
+      console.error('Form submission failed:', err);
+    }
   };
 
-  if (!access || coreRoleOptions.length === 0) {
+  if (!access) {
     return <p className="registry-copy">This account cannot assign core USIS access.</p>;
   }
 
   return (
     <form className="registry-form" onSubmit={handleSubmit}>
-      {schools.length > 1 ? (
-        <SearchableSelect
-          label="Target School"
-          onChange={(value) => {
-            setTargetSchoolCode(value);
-            setForm((current) => ({ ...current, actorAccess: access, schoolCode: value }));
-          }}
-          options={schools.map((entry) => ({
-            label: `${entry.schoolCode} - ${entry.schoolName}`,
-            value: entry.schoolCode,
-          }))}
-          value={targetSchoolCode || schoolCode}
-        />
-      ) : null}
       <FloatingField
         id="core-first-name"
         label="First Name"
@@ -204,19 +215,16 @@ export function CoreCoordinatorCredentialForm({
           required
         />
       </div>
-      <div className="registry-select-grid registry-select-grid--single">
-        <SearchableSelect
-          label="Role"
-          onChange={(value) => updateField('role', value)}
-          options={coreRoleOptions}
-          value={form.role}
-        />
-      </div>
       <div className="registry-form__actions">
         <button className="login-card__submit" disabled={isSubmitting} type="submit">
           {isSubmitting ? 'Saving...' : 'Create Core Access'}
         </button>
       </div>
+      <CoordinatorCredentialSuccessModal
+        isOpen={showSuccessModal}
+        onClose={() => setShowSuccessModal(false)}
+        data={successData || {}}
+      />
     </form>
   );
 }

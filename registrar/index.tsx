@@ -2,7 +2,12 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import './styles/tailwind.css';
 import './styles/global.css';
+import './styles/adminPanel.css';
+import { applyDocumentBranding } from '../common/config/usisBranding';
+
+applyDocumentBranding({ moduleTitle: "Registrar's Office" });
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {

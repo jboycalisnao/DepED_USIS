@@ -335,6 +335,57 @@ CREATE TABLE public.registrar_learners (
   CONSTRAINT registrar_learners_pkey PRIMARY KEY (id)
 );
 
+CREATE TABLE public.registrar_public_enrollment_submissions (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  school_id text,
+  school_year text,
+  lrn text,
+  last_name text,
+  first_name text,
+  middle_name text,
+  grade_to_enroll text,
+  guardian_contact text,
+  payload jsonb NOT NULL DEFAULT '{}'::jsonb,
+  CONSTRAINT registrar_public_enrollment_submissions_pkey PRIMARY KEY (id)
+);
+
+ALTER TABLE public.registrar_public_enrollment_submissions ENABLE ROW LEVEL SECURITY;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename = 'registrar_public_enrollment_submissions'
+      AND policyname = 'Registrar public enrollment insert policy'
+  ) THEN
+    CREATE POLICY "Registrar public enrollment insert policy"
+      ON public.registrar_public_enrollment_submissions
+      FOR INSERT
+      TO anon, authenticated
+      WITH CHECK (true);
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename = 'registrar_public_enrollment_submissions'
+      AND policyname = 'Registrar public enrollment select policy'
+  ) THEN
+    CREATE POLICY "Registrar public enrollment select policy"
+      ON public.registrar_public_enrollment_submissions
+      FOR SELECT
+      TO authenticated
+      USING (true);
+  END IF;
+END $$;
+
 CREATE TABLE public.sslg_merch_orders (
   id text NOT NULL,
   customerName text,

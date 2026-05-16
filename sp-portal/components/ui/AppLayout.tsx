@@ -1,6 +1,6 @@
 import { Outlet, useLocation } from 'react-router-dom';
 import { SiteFooter } from './SiteFooter';
-import spPortalHeaderLogo from '../../../common/assets/SP-Portal_Header_Logo.png';
+import { UsisUnifiedHeader } from '../../../common/header/UsisUnifiedHeader';
 
 function PortalNav() {
   const location = useLocation();
@@ -41,28 +41,7 @@ export function AppLayout() {
     <>
       <header className="site-chrome">
         <div className="content-width">
-          <div className="brand-header">
-            <div className="brand-header__utility">
-              <span>Department of Education</span>
-              <span>DepED USIS - SP Portal</span>
-            </div>
-            <div className="brand-header__main">
-              <div className="brand-header__identity">
-                <img className="brand-header__logo" src={spPortalHeaderLogo} alt="DepED USIS SP Portal header logo" />
-              </div>
-              <form
-                className="brand-header__search"
-                role="search"
-                onSubmit={(event) => event.preventDefault()}
-              >
-                <label htmlFor="portal-search" className="sr-only">
-                  Search SP Portal
-                </label>
-                <input id="portal-search" type="search" placeholder="Keywords" />
-                <button type="submit">Search</button>
-              </form>
-            </div>
-          </div>
+          <UsisUnifiedHeader searchId="portal-search" searchLabel="Search SP Portal" />
           <PortalNav />
         </div>
       </header>

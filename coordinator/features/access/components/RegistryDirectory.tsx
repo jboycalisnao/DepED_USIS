@@ -36,9 +36,28 @@ export function RegistryDirectory({
   onEdit,
 }: RegistryDirectoryProps) {
   const [query, setQuery] = useState('');
+  const [credentialType, setCredentialType] = useState('all');
+  const credentialTypeOptions = useMemo(() => {
+    const uniqueRoles = Array.from(new Set(records.map((record) => record.role).filter(Boolean))).sort();
+    return [{ label: 'All Credential Types', value: 'all' }].concat(
+      uniqueRoles.map((role) => ({
+        label: role
+          .split('_')
+          .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+          .join(' '),
+        value: role,
+      })),
+    );
+  }, [records]);
+
   const filteredRecords = useMemo(
-    () => records.filter((record) => matchesQuery(record, query)),
-    [query, records],
+    () =>
+      records.filter(
+        (record) =>
+          matchesQuery(record, query) &&
+          (credentialType === 'all' || record.role === credentialType),
+      ),
+    [credentialType, query, records],
   );
 
   return (
@@ -50,10 +69,23 @@ export function RegistryDirectory({
           onChange={(event) => setQuery(event.target.value)}
           value={query}
         />
+        <label className="registry-select">
+          <span>Credential Type</span>
+          <select
+            aria-label="Filter by credential type"
+            value={credentialType}
+            onChange={(event) => setCredentialType(event.target.value)}
+          >
+            {credentialTypeOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
       <div className="registry-list">
         <RegistryTree
-          autoExpand={query.trim().length > 0}
           emptyMessage={query.trim() ? 'No users matched the search.' : emptyMessage}
           onEdit={onEdit}
           records={filteredRecords}

@@ -21,3 +21,8 @@ Use `common/css/index.css` when a subsystem should import the full shared format
 - Buttons, form controls, and narrow utility controls use `10px` radius through `--usis-radius-control`.
 - Titles use `24px`, body text uses `16px`, and labels/helper text use `13px` unless a maintainer approves an exception.
 - Colors are restricted to DepED Blue, DepED Red, DepED Yellow, white, and restrained institutional ink/muted tones.
+- Global font family is strictly `Segoe UI, sans-serif`.
+- Regular text weight is `400`; maximum allowed font weight is `700`.
+- Shared styles avoid forced global letter-spacing and uppercase treatment for normal UI text.
+- Floating-form labels and field text should render with natural tracking and shared `forms.css` behavior.
+- Modal, alert, and login overlays must use shared common styles/components instead of module-local forks.

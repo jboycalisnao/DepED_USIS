@@ -1,5 +1,11 @@
 @import "../../common/css/index.css";
 
+:root {
+  --usis-module-label: "USIS - Registrar and Learner Information System";
+  --usis-module-kicker: "School";
+  --usis-module-title: "REGISTRAR PORTAL";
+}
+
 .registrar-header__actions {
   display: flex;
   flex-wrap: wrap;
@@ -8,6 +14,7 @@
   justify-content: flex-end;
 }
 
+.registrar-user,
 .registrar-status,
 .registrar-year,
 .registrar-signout,
@@ -16,6 +23,36 @@
   border: 1px solid var(--deped-line);
   border-radius: var(--usis-radius-control);
   background: var(--deped-white);
+}
+
+.registrar-user {
+  display: inline-flex;
+  gap: 10px;
+  align-items: center;
+  padding: 0 12px;
+  color: var(--deped-muted);
+}
+
+.registrar-user > span {
+  font-size: 18px;
+  color: var(--deped-blue);
+}
+
+.registrar-user > div {
+  display: grid;
+  line-height: 1.1;
+}
+
+.registrar-user > div > span {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: none;
+}
+
+.registrar-user > div > strong {
+  color: var(--deped-blue);
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .registrar-status {
@@ -46,8 +83,7 @@
   color: var(--deped-muted);
   font-size: var(--usis-helper-size);
   font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  text-transform: none;
 }
 
 .registrar-year {
@@ -91,38 +127,187 @@
 
 .registrar-page-intro {
   display: flex;
-  flex-wrap: wrap;
-  gap: 12px 20px;
-  align-items: flex-end;
-  justify-content: space-between;
+  align-items: center;
   margin-top: 24px;
-  padding: 0 var(--page-inset) 20px;
+  padding: 0 var(--page-inset) 14px;
   border-bottom: 1px solid var(--deped-line);
 }
 
-.registrar-page-intro h1,
+.registrar-shell {
+  min-height: 100dvh;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+}
+
+.registrar-main.page-frame {
+  padding-bottom: 0;
+  min-height: 0;
+}
+
+.registrar-chrome .kit-nav {
+  margin-top: 6px;
+}
+
+.registrar-chrome .kit-nav__grid {
+  gap: 24px 36px;
+  padding: 14px 0;
+}
+
+.registrar-chrome .kit-nav__link {
+  font-size: 15px;
+}
+
 .registrar-page-intro p {
   margin: 0;
 }
 
-.registrar-page-intro h1 {
-  color: var(--deped-blue);
-  font-size: var(--usis-title-size);
-  font-weight: 700;
-  line-height: 1.08;
-}
-
-.registrar-page-intro div p {
-  margin-top: 6px;
-  color: var(--deped-muted);
+.registrar-breadcrumb {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   font-size: var(--usis-helper-size);
   font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  color: var(--deped-muted);
+  text-transform: none;
+}
+
+.registrar-breadcrumb__root {
+  color: var(--deped-muted);
+}
+
+.registrar-breadcrumb__sep {
+  color: var(--deped-line-strong);
+}
+
+.registrar-breadcrumb__current {
+  color: var(--deped-blue);
 }
 
 .registrar-content {
-  padding: 24px var(--page-inset) 0;
+  padding: 24px var(--page-inset) 24px;
+}
+
+.registrar-layout {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 0;
+  align-items: stretch;
+  min-height: 100%;
+}
+
+.registrar-side-nav {
+  position: sticky;
+  top: 0;
+  min-height: 100%;
+  border-right: 1px solid var(--deped-line);
+  background: #f3f4f6;
+  padding: 14px 12px;
+  display: flex;
+  flex-direction: column;
+}
+
+.registrar-main + .usis-global-footer {
+  margin-top: 0;
+}
+
+.registrar-side-nav__menu {
+  display: grid;
+  gap: 6px;
+}
+
+.registrar-side-nav__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  padding: 10px 10px;
+  color: #1f2937;
+  font-size: 16px;
+  font-weight: 400;
+  text-decoration: none;
+}
+
+.registrar-side-nav__link:hover {
+  border-color: var(--deped-line);
+  background: #eceff3;
+  color: var(--deped-blue);
+}
+
+.registrar-side-nav__link--active {
+  color: #0b3a8f;
+  font-weight: 700;
+  border-color: #bfd0ef;
+  background: #eaf1ff;
+  box-shadow: inset 3px 0 0 #1d4fa8;
+}
+
+.registrar-side-nav__link .material-symbols-outlined {
+  font-size: 18px;
+  color: #111827;
+}
+
+.registrar-side-nav__link--active .material-symbols-outlined {
+  color: #0b3a8f;
+}
+
+.registrar-side-nav__footer {
+  margin-top: 0;
+  padding-top: 6px;
+}
+
+.registrar-side-nav__logout {
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--deped-red);
+  font-size: 16px;
+  font-weight: 400;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+.registrar-side-nav__logout:hover {
+  background: #fdf2f3;
+  border-color: rgba(206, 17, 38, 0.16);
+}
+
+.registrar-side-nav__logout .material-symbols-outlined {
+  font-size: 18px;
+}
+
+/* Registrar typography baseline: enforce stable text rhythm without overriding component sizing. */
+.registrar-main :where(p, li, label, a, td, th, caption, small):not(.material-symbols-outlined),
+.registrar-chrome :where(p, li, label, a, td, th, caption, small):not(.material-symbols-outlined) {
+  font-weight: 400;
+}
+
+.registrar-main :where(p, span, li, label, input, select, textarea, button, a, td, th, caption, small),
+.registrar-chrome :where(p, span, li, label, input, select, textarea, button, a, td, th, caption, small) {
+  letter-spacing: normal;
+}
+
+.registrar-main :where(h1, h2, h3, h4, h5, h6, th, strong, b),
+.registrar-chrome :where(h1, h2, h3, h4, h5, h6, th, strong, b) {
+  font-weight: 700;
+  letter-spacing: normal;
+}
+
+/* Force regular tracking across registrar pages to avoid overly wide text spacing. */
+.registrar-main :where(h1, h2, h3, h4, h5, h6, p, span, li, label, input, select, textarea, button, a, td, th, caption, small, strong, b),
+.registrar-chrome :where(h1, h2, h3, h4, h5, h6, p, span, li, label, input, select, textarea, button, a, td, th, caption, small, strong, b) {
+  letter-spacing: normal !important;
+}
+
+/* Remove top margin from text elements across registrar pages. */
+.registrar-main :where(h1, h2, h3, h4, h5, h6, p, span, li, label, a, td, th, caption, small, strong, b),
+.registrar-chrome :where(h1, h2, h3, h4, h5, h6, p, span, li, label, a, td, th, caption, small, strong, b) {
+  margin-top: 0 !important;
 }
 
 .registrar-content > div {
@@ -181,6 +366,13 @@
   transform: none;
 }
 
+.registrar-main .portal-panel__header p {
+  margin: 6px 0 0;
+  color: var(--deped-muted);
+  font-size: var(--usis-helper-size);
+  line-height: 1.5;
+}
+
 .registrar-dashboard__stat-icon {
   display: inline-flex;
   align-items: center;
@@ -188,6 +380,14 @@
   width: 44px;
   height: 44px;
   border-radius: var(--usis-radius-control);
+}
+
+.academic-cycles__create .searchable-select__field input,
+.academic-cycles__create .searchable-select__field button {
+  min-height: 30px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  font-size: 14px;
 }
 
 .registrar-dashboard__stat-value {
@@ -198,15 +398,74 @@
   line-height: 1;
 }
 
+/* Hard fallback formatting for admin pages (Dashboard/Learners) */
+.registrar-dashboard-page,
+.registrar-learners-page {
+  display: grid;
+  gap: 24px;
+}
+
+.registrar-dashboard-page__stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.registrar-dashboard-page__charts {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 20px;
+}
+
+.registrar-dashboard-page__charts > :first-child {
+  grid-column: span 1;
+}
+
+.registrar-learners-page__search {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px;
+  border: 1px solid var(--deped-line);
+  border-radius: var(--usis-radius-surface);
+  background: var(--deped-white);
+}
+
+.registrar-learners-page__search-input {
+  width: 100%;
+  min-height: 48px;
+  padding: 12px 18px 12px 50px;
+  border: 1px solid rgba(18, 35, 61, 0.14);
+  border-radius: var(--usis-radius-surface);
+  background: var(--deped-canvas);
+  color: var(--deped-ink);
+  font-size: var(--usis-body-size);
+  line-height: 1.35;
+}
+
+.registrar-learners-page__search-input:focus {
+  border-color: rgba(0, 56, 168, 0.44);
+  box-shadow: 0 0 0 4px rgba(0, 56, 168, 0.08);
+}
+
+.registrar-learners-page__empty {
+  min-height: 280px;
+  display: grid;
+  place-items: center;
+  gap: 14px;
+}
+
 .registrar-login-page {
   background: #f3f6fb;
 }
 
 .registrar-login {
   display: grid;
-  min-height: 520px;
-  place-items: center;
-  padding-top: 32px;
+  min-height: 0;
+  place-items: start center;
+  padding-top: 12px;
+  margin-top: 8px;
 }
 
 .registrar-login__panel {
@@ -267,11 +526,28 @@
   color: var(--deped-muted);
   font-size: var(--usis-helper-size);
   font-weight: 700;
-  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 @media (max-width: 920px) {
+  .registrar-layout {
+    grid-template-columns: 1fr;
+    min-height: 100%;
+  }
+
+  .registrar-side-nav {
+    position: static;
+    min-height: 100%;
+    border-right: 0;
+    border: 1px solid var(--deped-line);
+    border-radius: var(--usis-radius-surface);
+    background: var(--deped-white);
+  }
+
+  .registrar-side-nav__menu {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .registrar-header__actions {
     justify-content: flex-start;
   }
@@ -283,9 +559,21 @@
     padding-top: 8px;
     padding-bottom: 8px;
   }
+
+  .registrar-dashboard-page__stats {
+    grid-template-columns: 1fr;
+  }
+
+  .registrar-dashboard-page__charts {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 640px) {
+  .registrar-side-nav__menu {
+    grid-template-columns: 1fr;
+  }
+
   .registrar-page-intro,
   .registrar-content {
     padding-left: 0;
@@ -295,7 +583,8 @@
   .registrar-login {
     padding-left: 0;
     padding-right: 0;
-    min-height: 420px;
+    min-height: 0;
+    margin-top: 6px;
   }
 
   .registrar-signout {
@@ -306,3 +595,4 @@
     justify-self: stretch;
   }
 }
+

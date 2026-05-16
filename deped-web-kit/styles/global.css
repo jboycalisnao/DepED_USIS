@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "../../common/css/index.css";
 
 @theme inline {
   --color-deped-blue: #0038a8;
@@ -8,10 +9,13 @@
   --color-deped-ink: #12233d;
   --color-deped-canvas: #f4f7fb;
   --color-deped-muted: #68758d;
-  --font-sans: "Helvetica Neue", Helvetica, sans-serif;
+  --font-sans: "Segoe UI", sans-serif;
 }
 
 :root {
+  --usis-module-label: "USIS - DepED System Web Kit";
+  --usis-module-kicker: "DepED System";
+  --usis-module-title: "WEB KIT";
   --deped-blue: #0038a8;
   --deped-red: #ce1126;
   --deped-yellow: #fcd116;
@@ -22,7 +26,7 @@
   --deped-line: rgba(18, 35, 61, 0.12);
   --deped-line-strong: rgba(0, 56, 168, 0.24);
   --deped-shadow: 0 24px 56px rgba(13, 30, 68, 0.12);
-  --deped-font: "Helvetica Neue", Helvetica, sans-serif;
+  --deped-font: "Segoe UI", sans-serif;
   --page-inset: 28px;
 }
 
@@ -67,7 +71,8 @@ select {
 }
 
 .content-width {
-  width: min(1180px, calc(100% - 32px));
+  width: 100%;
+  max-width: none;
   margin: 0 auto;
 }
 
@@ -75,44 +80,6 @@ select {
   width: 100%;
   background: #ffffff;
   box-shadow: 0 2px 0 rgba(18, 35, 61, 0.04);
-}
-
-.brand-header {
-  background: #ffffff;
-  padding: 0 var(--page-inset);
-  border-radius: 0 0 10px 10px;
-}
-
-.brand-header__utility {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 12px 0;
-  font-size: 0.88rem;
-  color: var(--deped-ink);
-  border-bottom: 1px solid var(--deped-line);
-}
-
-.brand-header__main {
-  display: flex;
-  justify-content: space-between;
-  gap: 24px;
-  align-items: center;
-  padding: 22px 0 18px;
-  border-bottom: 4px solid var(--deped-blue);
-}
-
-.brand-header__identity {
-  display: flex;
-  gap: 18px;
-  align-items: center;
-}
-
-.brand-header__logo {
-  width: 68px;
-  height: 68px;
-  flex: 0 0 68px;
-  object-fit: contain;
 }
 
 .brand-header__copy h1,
@@ -128,12 +95,6 @@ select {
   margin: 0;
   font-family: var(--deped-font);
   font-weight: 700;
-  letter-spacing: -0.03em;
-}
-
-.brand-header__copy h1 {
-  font-size: clamp(1.8rem, 4vw, 2.8rem);
-  color: var(--deped-blue);
 }
 
 .brand-header__copy p:last-child,
@@ -158,33 +119,7 @@ select {
   margin: 0;
   font-size: 0.75rem;
   line-height: 1.3;
-  letter-spacing: 0.16em;
   text-transform: uppercase;
-  font-weight: 700;
-}
-
-.brand-header__search {
-  display: flex;
-  gap: 10px;
-  align-items: stretch;
-  min-width: min(100%, 420px);
-}
-
-.brand-header__search input {
-  flex: 1;
-  min-width: 220px;
-  padding: 12px 14px;
-  border: 1px solid var(--deped-line);
-  border-radius: 10px;
-  background: #ffffff;
-}
-
-.brand-header__search button {
-  padding: 0 16px;
-  border: 0;
-  border-radius: 10px;
-  background: var(--deped-blue);
-  color: var(--deped-white);
   font-weight: 700;
 }
 
@@ -525,7 +460,6 @@ select {
   margin: 0;
   color: var(--deped-red);
   font-size: 0.88rem;
-  letter-spacing: 0.08em;
   text-transform: uppercase;
   font-weight: 700;
 }
@@ -767,7 +701,6 @@ select {
   color: #94a3b8;
   font-size: 0.82rem;
   text-transform: uppercase;
-  letter-spacing: 0.12em;
 }
 
 .code-sample__copy {
@@ -788,7 +721,7 @@ select {
 }
 
 .code-sample code {
-  font-family: "Consolas", "Courier New", Courier, monospace;
+  font-family: var(--deped-font);
   font-size: 0.92rem;
   line-height: 1.7;
   color: #dbe7ff;
@@ -947,6 +880,7 @@ select {
 .searchable-select__empty {
   width: 100%;
   padding: 12px 14px;
+  font-size: 14px;
   text-align: left;
 }
 
@@ -1191,15 +1125,9 @@ select {
     grid-template-columns: 1fr;
   }
 
-  .brand-header,
-  .brand-header__main,
   .portal-preview__masthead {
     flex-direction: column;
     align-items: flex-start;
-  }
-
-  .brand-header__search {
-    width: 100%;
   }
 
   .site-footer__inner {
@@ -1217,3 +1145,4 @@ select {
     padding: 20px 0 56px;
   }
 }
+

@@ -9,7 +9,13 @@
   --color-deped-ink: #12233d;
   --color-deped-canvas: #f4f7fb;
   --color-deped-muted: #68758d;
-  --font-sans: "Helvetica Neue", Helvetica, sans-serif;
+  --font-sans: "Segoe UI", sans-serif;
+}
+
+:root {
+  --usis-module-label: "USIS - SP Portal";
+  --usis-module-kicker: "School";
+  --usis-module-title: "SP PORTAL";
 }
 
 .portal-hero {
@@ -83,7 +89,6 @@
   color: var(--deped-muted);
   font-size: var(--usis-helper-size);
   font-weight: 700;
-  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
@@ -152,7 +157,6 @@
   color: var(--deped-muted);
   font-size: var(--usis-helper-size);
   font-weight: 700;
-  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
@@ -354,7 +358,6 @@
 .application-closed-panel strong {
   color: var(--deped-ink);
   font-size: var(--usis-helper-size);
-  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
@@ -631,3 +634,4 @@
     justify-content: flex-start;
   }
 }
+

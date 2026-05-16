@@ -6,6 +6,7 @@
   align-items: center;
   justify-content: center;
   padding: 24px;
+  pointer-events: none;
 }
 
 .modal-overlay--high {
@@ -16,11 +17,14 @@
   position: fixed;
   inset: 0;
   background: rgba(18, 35, 61, 0.18);
+  z-index: 0;
+  pointer-events: auto;
 }
 
 .modal-dialog {
   position: relative;
   z-index: 1;
+  pointer-events: auto;
   display: flex;
   flex-direction: column;
   width: min(100%, 520px);
@@ -65,7 +69,6 @@
   font-size: var(--usis-helper-size);
   font-weight: 700;
   line-height: 1.2;
-  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
@@ -76,7 +79,6 @@
   font-size: var(--usis-title-size);
   font-weight: 700;
   line-height: 1.08;
-  letter-spacing: 0;
 }
 
 .modal-dialog__close {
@@ -136,7 +138,6 @@
   color: var(--deped-ink);
   font-size: var(--usis-helper-size);
   font-weight: 700;
-  letter-spacing: 0.08em;
   text-transform: uppercase;
   cursor: pointer;
 }
@@ -156,6 +157,9 @@
 }
 
 .alert-modal {
+  position: relative;
+  z-index: 1;
+  pointer-events: auto;
   display: grid;
   gap: 16px;
   width: min(100%, 520px);
@@ -208,7 +212,6 @@
   color: var(--deped-muted);
   font-size: var(--usis-helper-size);
   font-weight: 700;
-  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
@@ -227,7 +230,6 @@
   color: var(--deped-ink);
   font-size: var(--usis-helper-size);
   font-weight: 700;
-  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
@@ -252,7 +254,6 @@
   font-size: var(--usis-helper-size);
   font-weight: 700;
   line-height: 1.2;
-  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 

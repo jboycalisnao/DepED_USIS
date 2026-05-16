@@ -1,0 +1,110 @@
+.enrollment-public-enrollment {
+  background: #f3f6fb;
+  font-family: "Segoe UI", "Segoe UI Variable", Tahoma, Arial, sans-serif;
+}
+
+.enrollment-public-enrollment *,
+.enrollment-public-enrollment button,
+.enrollment-public-enrollment input,
+.enrollment-public-enrollment select,
+.enrollment-public-enrollment textarea {
+  font-family: "Segoe UI", "Segoe UI Variable", Tahoma, Arial, sans-serif !important;
+}
+
+.enrollment-public-enrollment .section-shell {
+  padding-top: 20px;
+  padding-bottom: 28px;
+}
+
+.enrollment-public-enrollment__form {
+  display: grid;
+  gap: 20px;
+  font-family: var(--deped-font);
+}
+
+.enrollment-public-enrollment__section {
+  display: grid;
+  gap: 14px;
+}
+
+.enrollment-public-enrollment__section h3 {
+  margin: 0;
+  color: var(--deped-blue);
+  font-size: var(--usis-helper-size);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.enrollment-public-enrollment__consent .choice-row {
+  align-items: flex-start;
+}
+
+.enrollment-public-enrollment__consent .choice-row span {
+  color: var(--deped-muted);
+  font-size: var(--usis-helper-size);
+  line-height: 1.6;
+}
+
+.enrollment-public-enrollment .portal-panel__header p {
+  margin: 6px 0 0;
+  color: var(--deped-muted);
+  font-size: var(--usis-helper-size);
+  line-height: 1.6;
+}
+
+.enrollment-public-enrollment .portal-panel {
+  overflow: visible;
+}
+
+.enrollment-public-enrollment .floating-field__control select,
+.enrollment-public-enrollment .floating-field__control input,
+.enrollment-public-enrollment .floating-field__control textarea {
+  font-family: "Segoe UI", "Segoe UI Variable", Tahoma, Arial, sans-serif !important;
+  font-weight: 400;
+}
+
+.enrollment-public-enrollment .floating-field__control span,
+.enrollment-public-enrollment .searchable-select__option,
+.enrollment-public-enrollment .searchable-select__empty,
+.enrollment-public-enrollment .searchable-select__toggle {
+  font-family: "Segoe UI", "Segoe UI Variable", Tahoma, Arial, sans-serif !important;
+  font-weight: 400;
+}
+
+.enrollment-public-enrollment .searchable-select__field input:disabled,
+.enrollment-public-enrollment .searchable-select__field button:disabled,
+.enrollment-public-enrollment .searchable-select--floating .floating-field__control input:disabled,
+.enrollment-public-enrollment .searchable-select--floating .floating-field__control button:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+  background: #edf1f7;
+  color: var(--deped-muted);
+}
+
+.enrollment-public-enrollment .searchable-select--floating .floating-field__control input:focus ~ span,
+.enrollment-public-enrollment .searchable-select--floating .floating-field__control input[data-has-value="true"] ~ span {
+  top: 11px;
+  color: var(--deped-blue);
+  font-size: 0.74rem;
+  transform: translateY(0);
+}
+
+.enrollment-public-enrollment .floating-field__control span {
+  max-width: calc(100% - 64px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.enrollment-public-enrollment .searchable-select__menu {
+  left: -1px;
+  right: -1px;
+  width: auto;
+}
+
+@media (max-width: 720px) {
+  .enrollment-public-enrollment .portal-panel__body {
+    padding: 16px;
+  }
+}

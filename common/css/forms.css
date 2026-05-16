@@ -15,6 +15,7 @@
 .floating-field {
   display: grid;
   gap: 8px;
+  text-transform: none;
 }
 
 .floating-field small {
@@ -35,6 +36,7 @@
   border-radius: 12px;
   background: #fbfcff;
   color: var(--deped-ink);
+  text-transform: none;
   outline: none;
   transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
 }
@@ -53,6 +55,9 @@
   top: 50%;
   left: 16px;
   color: var(--deped-muted);
+  font-size: var(--usis-body-size);
+  font-weight: 400;
+  text-transform: none;
   pointer-events: none;
   transform: translateY(-50%);
   transform-origin: left top;
@@ -96,12 +101,16 @@
 .floating-field__control input:focus + span,
 .floating-field__control select:focus + span,
 .floating-field__control textarea:focus + span,
+.floating-field__control input:focus ~ span,
 .floating-field__control input:not(:placeholder-shown) + span,
 .floating-field__control textarea:not(:placeholder-shown) + span,
-.floating-field__control select[data-has-value="true"] + span {
+.floating-field__control select[data-has-value="true"] + span,
+.floating-field__control input[data-has-value="true"] ~ span {
   top: 11px;
   color: var(--deped-blue);
-  font-size: 0.74rem;
+  font-size: var(--usis-helper-size);
+  font-weight: 400;
+  text-transform: none;
   transform: translateY(0);
 }
 
@@ -114,15 +123,42 @@
 .searchable-select__label {
   color: var(--deped-blue);
   font-size: var(--usis-helper-size);
-  font-weight: 700;
+  font-weight: 400;
   line-height: 1.2;
-  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 .searchable-select__field {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
+.searchable-select--floating .floating-field__control {
+  position: relative;
+}
+
+.searchable-select--floating .floating-field__control input {
+  padding-right: 52px;
+}
+
+.searchable-select--floating .searchable-select__toggle {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  min-width: 0;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--deped-blue);
+  transform: translateY(-50%);
+}
+
+.searchable-select--floating .searchable-select__toggle svg {
+  display: block;
+  margin: auto;
 }
 
 .searchable-select__field input,
@@ -192,7 +228,7 @@
 .searchable-select__empty {
   width: 100%;
   padding: 12px 14px;
-  font-size: var(--usis-body-size);
+  font-size: 14px;
   line-height: 1.35;
   text-align: left;
 }
@@ -237,7 +273,6 @@
   border-radius: 4px;
   font-size: var(--usis-helper-size);
   font-weight: 700;
-  letter-spacing: 0.08em;
   text-transform: uppercase;
   cursor: pointer;
 }
@@ -263,7 +298,6 @@
   color: var(--deped-blue);
   font-size: var(--usis-helper-size);
   font-weight: 700;
-  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
@@ -272,7 +306,6 @@
   padding: 10px 14px;
   line-height: 1.25;
   text-align: center;
-  letter-spacing: 0;
 }
 
 .portal-side-button--red {

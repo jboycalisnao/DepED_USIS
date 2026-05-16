@@ -6,8 +6,8 @@ import {
 
 const adminLinks = [
   { label: 'Credentials', path: '/admin/credentials' },
+  { label: 'Schools', path: '/admin/schools' },
   { label: 'Registry', path: '/admin/registry' },
-  { label: 'Code Registry', path: '/admin/codes' },
 ];
 
 export function AdminLayout() {
@@ -30,14 +30,6 @@ export function AdminLayout() {
         </div>
         <div className="admin-shell__context">
           <dl className="admin-context-box">
-            <div>
-              <dt>Region</dt>
-              <dd>{contextValue(access?.region || '', 'Region unavailable')}</dd>
-            </div>
-            <div>
-              <dt>Division</dt>
-              <dd>{contextValue(access?.division || '', 'Division unavailable')}</dd>
-            </div>
             <div>
               <dt>School ID</dt>
               <dd>{contextValue(access?.schoolId || '', 'School ID unavailable')}</dd>

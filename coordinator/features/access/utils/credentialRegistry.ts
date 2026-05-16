@@ -1,4 +1,6 @@
 import { supabase } from '../../../../packages/shared-supabase/src';
+import { fetchDepedSchools, fetchDepedSchoolById } from '../../schools/services/depedSchoolApi';
+import { mapToLocalSchoolSchema } from '../../schools/utils/depedSchoolParser';
 import type { CoordinatorAccessRecord } from '@/features/auth/utils/coordinatorAccess';
 import {
   canAssignCoreAccessLevel,
@@ -7,11 +9,13 @@ import {
 } from './coreAccessRules';
 
 export interface CredentialRegistrySnapshot {
+  attendanceCoordinators: RegistryUserRecord[];
   accessibleSchools: RegistrySchoolContext[];
   coreCoordinators: RegistryUserRecord[];
   electionCoordinators: RegistryUserRecord[];
   electionEvents: RegistryElectionEvent[];
   spPortalCoordinators: RegistryUserRecord[];
+  registrarCoordinators: RegistryUserRecord[];
   school: RegistrySchoolContext;
 }
 
@@ -71,6 +75,13 @@ export interface RegistryUserRecord {
 export interface CreateCoreCredentialInput {
   accessLevel: string;
   actorAccess: CoordinatorAccessRecord;
+  credentialType:
+    | 'school_usis_coordinator'
+    | 'registrar_coordinator'
+    | 'attendance_coordinator'
+    | 'system_admin'
+    | 'registrar'
+    | 'attendance';
   email: string;
   employeeId: string;
   firstName: string;
@@ -129,6 +140,29 @@ export interface UpdateElectionCredentialInput extends Omit<CreateElectionCreden
   password?: string;
 }
 
+const syncSchoolFromDepedApi = async (schoolCode: string) => {
+  const record = await fetchDepedSchoolById(schoolCode);
+  
+  if (!record || !record.schoolId || !record.schoolName) {
+    console.warn('Incomplete school record received from API:', record);
+    throw new Error(`School ID ${schoolCode} returned incomplete data from the DepEd API masterlist.`);
+  }
+
+  console.log('Syncing school from DepEd API:', record);
+
+  const { data, error } = await supabase
+    .from('usis_schools')
+    .insert([mapToLocalSchoolSchema(record)])
+    .select('id, school_code, school_name, division, region, division_code, region_code')
+    .single();
+
+  if (error) {
+    throw new Error(error.message || 'Unable to sync school record to the local database.');
+  }
+
+  return data;
+};
+
 const getSchoolContext = async (schoolCode: string) => {
   const { data, error } = await supabase
     .from('usis_schools')
@@ -140,11 +174,11 @@ const getSchoolContext = async (schoolCode: string) => {
     throw new Error('Unable to load the matching school from Supabase.');
   }
 
-  if (!data?.id) {
-    throw new Error('The supplied school does not exist in the shared USIS school registry.');
+  if (data?.id) {
+    return data;
   }
 
-  return data;
+  return syncSchoolFromDepedApi(schoolCode);
 };
 
 const getScopedSchools = async (access: CoordinatorAccessRecord) => {
@@ -153,16 +187,11 @@ const getScopedSchools = async (access: CoordinatorAccessRecord) => {
     .select('id, school_code, school_name, division, region, division_code, region_code')
     .eq('is_active', true);
 
-  if (!access.isSuperAdmin && access.accountSource === 'usis_core_coordinators') {
-    if (access.accessLevel === 'region') {
-      query = query.eq('region_code', access.regionCode);
-    } else if (access.accessLevel === 'division') {
-      query = query.eq('division_code', access.divisionCode);
-    } else {
-      query = query.eq('school_code', access.schoolId);
-    }
-  } else if (!access.isSuperAdmin) {
+  if (!access.isSuperAdmin && access.schoolId) {
     query = query.eq('school_code', access.schoolId);
+  } else if (!access.isSuperAdmin && access.regionCode && access.divisionCode) {
+    // Legacy registration portal context still scopes by region/division when no school ID is available.
+    query = query.eq('region_code', access.regionCode).eq('division_code', access.divisionCode);
   }
 
   const { data, error } = await query.order('region').order('division').order('school_name');
@@ -250,6 +279,31 @@ export const loadCredentialRegistrySnapshot = async (
   }
 
   return {
+    attendanceCoordinators: (coreResponse.data || [])
+      .filter((record) => record.role === 'attendance_coordinator')
+      .map((record) => ({
+        division: schoolById.get(record.school_id)?.division || school.division,
+        divisionCode: record.division_code || schoolById.get(record.school_id)?.divisionCode || school.divisionCode,
+        email: record.email,
+        employeeId: record.employee_id,
+        firstName: record.first_name || '',
+        id: record.id,
+        isActive: record.is_active,
+        label: [record.first_name, record.last_name].filter(Boolean).join(' ') || record.username,
+        lastName: record.last_name || '',
+        lastLoginAt: record.last_login_at,
+        middleName: record.middle_name || '',
+        mobileNo: record.mobile_no || '',
+        region: schoolById.get(record.school_id)?.region || school.region,
+        regionCode: record.region_code || schoolById.get(record.school_id)?.regionCode || school.regionCode,
+        role: record.role,
+        accessLevel: record.access_level,
+        scope: 'attendance',
+        schoolCode: schoolById.get(record.school_id)?.schoolCode || school.schoolCode,
+        schoolName: schoolById.get(record.school_id)?.schoolName || school.schoolName,
+        schoolUuid: record.school_id,
+        username: record.username,
+      })),
     accessibleSchools,
     school: {
       division: school.division,
@@ -260,29 +314,56 @@ export const loadCredentialRegistrySnapshot = async (
       schoolName: school.schoolName,
       schoolUuid: school.schoolUuid,
     },
-    coreCoordinators: (coreResponse.data || []).map((record) => ({
-      division: schoolById.get(record.school_id)?.division || school.division,
-      divisionCode: record.division_code || schoolById.get(record.school_id)?.divisionCode || school.divisionCode,
-      email: record.email,
-      employeeId: record.employee_id,
-      firstName: record.first_name || '',
-      id: record.id,
-      isActive: record.is_active,
-      label: [record.first_name, record.last_name].filter(Boolean).join(' ') || record.username,
-      lastName: record.last_name || '',
-      lastLoginAt: record.last_login_at,
-      middleName: record.middle_name || '',
-      mobileNo: record.mobile_no || '',
-      region: schoolById.get(record.school_id)?.region || school.region,
-      regionCode: record.region_code || schoolById.get(record.school_id)?.regionCode || school.regionCode,
-      role: record.role,
-      accessLevel: record.access_level,
-      scope: record.access_level,
-      schoolCode: schoolById.get(record.school_id)?.schoolCode || school.schoolCode,
-      schoolName: schoolById.get(record.school_id)?.schoolName || school.schoolName,
-      schoolUuid: record.school_id,
-      username: record.username,
-    })),
+    coreCoordinators: (coreResponse.data || [])
+      .filter((record) => record.role !== 'registrar_coordinator' && record.role !== 'attendance_coordinator')
+      .map((record) => ({
+        division: schoolById.get(record.school_id)?.division || school.division,
+        divisionCode: record.division_code || schoolById.get(record.school_id)?.divisionCode || school.divisionCode,
+        email: record.email,
+        employeeId: record.employee_id,
+        firstName: record.first_name || '',
+        id: record.id,
+        isActive: record.is_active,
+        label: [record.first_name, record.last_name].filter(Boolean).join(' ') || record.username,
+        lastName: record.last_name || '',
+        lastLoginAt: record.last_login_at,
+        middleName: record.middle_name || '',
+        mobileNo: record.mobile_no || '',
+        region: schoolById.get(record.school_id)?.region || school.region,
+        regionCode: record.region_code || schoolById.get(record.school_id)?.regionCode || school.regionCode,
+        role: record.role,
+        accessLevel: record.access_level,
+        scope: record.access_level,
+        schoolCode: schoolById.get(record.school_id)?.schoolCode || school.schoolCode,
+        schoolName: schoolById.get(record.school_id)?.schoolName || school.schoolName,
+        schoolUuid: record.school_id,
+        username: record.username,
+      })),
+    registrarCoordinators: (coreResponse.data || [])
+      .filter((record) => record.role === 'registrar_coordinator')
+      .map((record) => ({
+        division: schoolById.get(record.school_id)?.division || school.division,
+        divisionCode: record.division_code || schoolById.get(record.school_id)?.divisionCode || school.divisionCode,
+        email: record.email,
+        employeeId: record.employee_id,
+        firstName: record.first_name || '',
+        id: record.id,
+        isActive: record.is_active,
+        label: [record.first_name, record.last_name].filter(Boolean).join(' ') || record.username,
+        lastName: record.last_name || '',
+        lastLoginAt: record.last_login_at,
+        middleName: record.middle_name || '',
+        mobileNo: record.mobile_no || '',
+        region: schoolById.get(record.school_id)?.region || school.region,
+        regionCode: record.region_code || schoolById.get(record.school_id)?.regionCode || school.regionCode,
+        role: record.role,
+        accessLevel: record.access_level,
+        scope: 'registrar',
+        schoolCode: schoolById.get(record.school_id)?.schoolCode || school.schoolCode,
+        schoolName: schoolById.get(record.school_id)?.schoolName || school.schoolName,
+        schoolUuid: record.school_id,
+        username: record.username,
+      })),
     electionCoordinators: (electionResponse.data || []).map((record) => ({
       division: schoolById.get(record.school_id)?.division || school.division,
       divisionCode: schoolById.get(record.school_id)?.divisionCode || school.divisionCode,
@@ -393,10 +474,10 @@ export const loadRegistrationPortalSnapshot = async (
   access: RegistrationPortalAccessRecord,
 ): Promise<CredentialRegistrySnapshot> => {
   const scopedSchools = await getScopedSchools({
-    accessLevel: 'division',
+    accessLevel: 'school',
     accountSource: 'usis_core_coordinators',
     coordinatorName: 'Registration Portal',
-    coordinatorRole: 'division_usis_coordinator',
+    coordinatorRole: 'school_usis_coordinator',
     division: access.divisionCode,
     divisionCode: access.divisionCode,
     isSuperAdmin: false,
@@ -406,6 +487,9 @@ export const loadRegistrationPortalSnapshot = async (
     schoolId: '',
     schoolName: '',
     schoolUuid: '',
+    userId: '',
+    lastLoginAt: null,
+    mustResetPassword: false,
   });
 
   const schoolIds = scopedSchools.map((entry) => entry.schoolUuid);
@@ -437,6 +521,7 @@ export const loadRegistrationPortalSnapshot = async (
 
   return {
     accessibleSchools: scopedSchools,
+    attendanceCoordinators: [],
     coreCoordinators: [],
     electionCoordinators: (coordinatorData || []).map((record) => ({
       division: schoolById.get(record.school_id)?.division || primarySchool?.division || access.divisionCode,
@@ -516,13 +601,17 @@ export const createSpPortalCoordinatorCredential = async (input: CreateSpPortalC
 };
 
 export const createCoreCoordinatorCredential = async (input: CreateCoreCredentialInput) => {
-  const school = await getSchoolContext(input.schoolCode);
-  const nextAccessLevel = getDefaultCoreAccessLevelForRole(input.role, input.accessLevel);
-  const nextRole = getDefaultCoreRoleForAccessLevel(nextAccessLevel, input.role);
+  const moduleScopedRole = input.role === 'registrar_coordinator' || input.role === 'attendance_coordinator';
+  const nextAccessLevel = 'school';
+  const nextRole = moduleScopedRole
+    ? input.role
+    : getDefaultCoreRoleForAccessLevel(nextAccessLevel, input.role);
 
   if (!canAssignCoreAccessLevel(input.actorAccess, nextAccessLevel)) {
     throw new Error('This coordinator account cannot assign the requested account scope.');
   }
+
+  const school = await getSchoolContext(input.schoolCode);
 
   const { error } = await supabase.from('usis_core_coordinators').insert([
     {
@@ -619,8 +708,11 @@ export const createElectionCoordinatorCredential = async (input: CreateElectionC
 
 export const updateCoreCoordinatorCredential = async (input: UpdateCoreCredentialInput) => {
   const school = await getSchoolContext(input.schoolCode);
-  const nextAccessLevel = getDefaultCoreAccessLevelForRole(input.role, input.accessLevel);
-  const nextRole = getDefaultCoreRoleForAccessLevel(nextAccessLevel, input.role);
+  const moduleScopedRole = input.role === 'registrar_coordinator' || input.role === 'attendance_coordinator';
+  const nextAccessLevel = 'school';
+  const nextRole = moduleScopedRole
+    ? input.role
+    : getDefaultCoreRoleForAccessLevel(nextAccessLevel, input.role);
 
   if (!canAssignCoreAccessLevel(input.actorAccess, nextAccessLevel)) {
     throw new Error('This coordinator account cannot assign the requested account scope.');

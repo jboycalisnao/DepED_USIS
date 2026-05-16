@@ -1,0 +1,206 @@
+@import "../../common/css/index.css";
+@import "./enrollmentForm.css";
+
+:root {
+  --usis-module-label: "USIS - School Enrollment Portal";
+  --usis-module-kicker: "School";
+  --usis-module-title: "ENROLLMENT PORTAL";
+}
+
+body {
+  margin: 0;
+  background: var(--deped-canvas);
+  color: var(--deped-ink);
+  font-family: var(--deped-font);
+}
+
+.enrollment-app {
+  min-height: 100vh;
+}
+
+.enrollment-hint {
+  margin-top: 24px;
+}
+
+.enrollment-status-breadcrumb {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  color: #1f2a3d;
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.enrollment-status-hero {
+  position: relative;
+  overflow: hidden;
+  margin-top: 14px;
+  border: 1px solid var(--deped-line);
+  border-radius: 12px;
+  background: var(--deped-blue);
+  padding: 48px 52px;
+}
+
+.enrollment-status-hero h2,
+.enrollment-status-hero p {
+  margin: 0;
+  position: relative;
+  z-index: 1;
+  font-family: var(--deped-font);
+}
+
+.enrollment-status-hero h2 {
+  color: var(--deped-white);
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.enrollment-status-hero p {
+  margin-top: 10px;
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.45;
+}
+
+.enrollment-status-signout {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 14px;
+  border-color: rgba(255, 255, 255, 0.45);
+  color: var(--deped-white);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.enrollment-status-signout:hover {
+  background: rgba(255, 255, 255, 0.16);
+  color: var(--deped-white);
+}
+
+.enrollment-status-signout .material-symbols-outlined {
+  font-size: 18px;
+}
+
+.enrollment-status-hero__shape {
+  position: absolute;
+  border-radius: 999px 999px 0 0;
+  pointer-events: none;
+}
+
+.enrollment-status-hero__shape--left {
+  width: 260px;
+  height: 120px;
+  left: -30px;
+  bottom: 0;
+  background: var(--deped-yellow);
+  border-radius: 999px 999px 0 0;
+  opacity: 0.95;
+}
+
+.enrollment-status-hero__shape--right {
+  width: 420px;
+  height: 220px;
+  right: -40px;
+  bottom: 0;
+  background: var(--deped-red);
+  border-radius: 999px 999px 0 0;
+}
+
+.enrollment-status-hero::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 5px;
+  background: var(--deped-red);
+}
+
+.enrollment-status-hero::after {
+  content: "";
+  position: absolute;
+  top: 5px;
+  left: 0;
+  width: 24%;
+  height: 3px;
+  background: var(--deped-yellow);
+}
+
+.enrollment-status-row-status {
+  color: var(--deped-blue);
+  font-weight: 700;
+}
+
+.enrollment-hint__box {
+  margin-top: 12px;
+}
+
+.enrollment-workspace {
+  margin-top: 24px;
+}
+
+.enrollment-workspace__header h2 {
+  color: var(--deped-blue);
+}
+
+.enrollment-workspace__cards {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.enrollment-info-card {
+  border: 1px solid var(--deped-line);
+  border-radius: var(--usis-radius-surface);
+  background: var(--deped-white);
+  padding: 18px;
+}
+
+.enrollment-info-card h3,
+.enrollment-info-card p {
+  margin: 0;
+}
+
+.enrollment-info-card h3 {
+  color: var(--deped-blue);
+  font-size: var(--usis-body-size);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.enrollment-info-card p {
+  margin-top: 8px;
+  color: var(--deped-muted);
+  font-size: var(--usis-body-size);
+  line-height: 1.6;
+}
+
+@media (max-width: 720px) {
+  .enrollment-status-breadcrumb {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .enrollment-status-hero {
+    padding: 30px 20px;
+  }
+
+  .enrollment-status-hero h2 {
+    font-size: 22px;
+  }
+
+  .enrollment-status-signout {
+    top: 10px;
+    right: 10px;
+    min-height: 36px;
+    padding: 0 12px;
+  }
+}
+

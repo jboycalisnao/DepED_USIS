@@ -7,32 +7,37 @@ export interface SearchableSelectOption {
 
 interface SearchableSelectProps {
   disabled?: boolean;
+  isLoading?: boolean;
   label: string;
   onChange: (value: string) => void;
+  onSearch?: (query: string) => void;
   options: SearchableSelectOption[];
   value: string;
 }
 
 export function SearchableSelect({
   disabled = false,
+  isLoading = false,
   label,
   onChange,
+  onSearch,
   options,
   value,
 }: SearchableSelectProps) {
   const [query, setQuery] = useState('');
   const [isOpen, setIsOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
-  const selectedOption = options.find((option) => option.value === value) || options[0];
+  const safeOptions = Array.isArray(options) ? options : [];
+  const selectedOption = safeOptions.find((option) => option.value === value) || safeOptions[0];
 
   const filteredOptions = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
-    if (!normalizedQuery) return options;
+    if (!normalizedQuery) return safeOptions;
 
-    return options.filter((option) =>
+    return safeOptions.filter((option) =>
       option.label.toLowerCase().includes(normalizedQuery)
     );
-  }, [options, query]);
+  }, [safeOptions, query]);
 
   useEffect(() => {
     function handlePointerDown(event: MouseEvent) {
@@ -45,6 +50,12 @@ export function SearchableSelect({
     window.addEventListener('mousedown', handlePointerDown);
     return () => window.removeEventListener('mousedown', handlePointerDown);
   }, []);
+
+  useEffect(() => {
+    // Always collapse the menu after a value commit from parent state.
+    setIsOpen(false);
+    setQuery('');
+  }, [value]);
 
   const selectOption = (nextValue: string) => {
     onChange(nextValue);
@@ -60,8 +71,10 @@ export function SearchableSelect({
           <input
             disabled={disabled}
             onChange={(event) => {
-              setQuery(event.target.value);
+              const nextQuery = event.target.value;
+              setQuery(nextQuery);
               setIsOpen(true);
+              onSearch?.(nextQuery);
             }}
             onFocus={() => {
               if (!disabled) setIsOpen(true);
@@ -73,7 +86,7 @@ export function SearchableSelect({
           <button
             aria-label={`Toggle ${label} options`}
             className="searchable-select__toggle"
-            disabled={disabled || options.length === 0}
+            disabled={disabled || safeOptions.length === 0}
             onClick={() => {
               setQuery('');
               setIsOpen((open) => !open);
@@ -86,7 +99,9 @@ export function SearchableSelect({
 
         {isOpen ? (
           <div className="searchable-select__menu" role="listbox">
-            {filteredOptions.length > 0 ? (
+            {isLoading ? (
+              <div className="searchable-select__empty">Searching schools...</div>
+            ) : filteredOptions.length > 0 ? (
               filteredOptions.map((option) => (
                 <button
                   aria-selected={option.value === value}

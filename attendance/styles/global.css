@@ -1,0 +1,211 @@
+@import "../../common/css/index.css";
+
+:root {
+  --attendance-shell-max: 1180px;
+  --usis-module-label: "USIS - Attendance Portal";
+  --usis-module-kicker: "School";
+  --usis-module-title: "ATTENDANCE PORTAL";
+}
+
+body {
+  margin: 0;
+  background: var(--deped-canvas);
+  color: var(--deped-ink);
+  font-family: var(--deped-font);
+}
+
+.attendance-app {
+  min-height: 100vh;
+  background: var(--deped-canvas);
+  color: var(--deped-ink);
+}
+
+.attendance-shell {
+  width: min(var(--attendance-shell-max), 100% - 32px);
+  margin: 0 auto;
+  padding: 24px 0 32px;
+}
+
+.attendance-header {
+  display: block;
+}
+
+.attendance-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: -6px;
+}
+
+.attendance-toolbar__kiosk {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--deped-line);
+  border-radius: 10px;
+  background: var(--deped-white);
+  color: var(--deped-blue);
+  font-size: var(--usis-helper-size);
+  font-weight: 700;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.attendance-toolbar__monitors {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.attendance-toolbar__monitor {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 8px;
+  border: 1px solid var(--deped-line);
+  border-radius: 10px;
+  background: var(--deped-white);
+}
+
+.attendance-toolbar__label {
+  color: var(--deped-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.attendance-toolbar__monitor select {
+  min-height: 28px;
+  border: 1px solid var(--deped-line);
+  border-radius: 6px;
+  padding: 0 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--deped-ink);
+  background: #f6f6f6;
+}
+
+.attendance-toolbar__monitor button {
+  min-height: 28px;
+  min-width: 44px;
+  border: 0;
+  border-radius: 6px;
+  padding: 0 10px;
+  background: var(--deped-blue);
+  color: var(--deped-white);
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.attendance-session-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: -8px;
+}
+
+.attendance-session-row__text {
+  margin: 0;
+  color: var(--deped-muted);
+  font-size: var(--usis-helper-size);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.attendance-session-row__logout {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid rgba(206, 17, 38, 0.24);
+  border-radius: 10px;
+  background: var(--deped-white);
+  color: var(--deped-red);
+  font-size: var(--usis-helper-size);
+  font-weight: 700;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.attendance-main {
+  margin-top: 18px;
+}
+
+.attendance-main .bg-white,
+.attendance-main .rounded-xl,
+.attendance-main .rounded-2xl,
+.attendance-main .rounded-3xl,
+.attendance-main .rounded-full,
+.attendance-main .shadow-sm,
+.attendance-main .shadow-md,
+.attendance-main .shadow-lg {
+  border-radius: 12px;
+  box-shadow: none;
+}
+
+.attendance-main .bg-white {
+  border: 1px solid var(--deped-line);
+  background: var(--deped-white);
+}
+
+.attendance-main input,
+.attendance-main select,
+.attendance-main button,
+.attendance-main textarea {
+  font-family: var(--deped-font);
+}
+
+.attendance-footer {
+  margin-top: auto;
+  border-top: 1px solid var(--deped-line);
+  background: var(--deped-white);
+}
+
+.attendance-footer__inner {
+  width: min(var(--attendance-shell-max), 100% - 32px);
+  margin: 0 auto;
+  padding: 16px 0 20px;
+}
+
+.attendance-login-page {
+  background: #f3f6fb;
+}
+
+.attendance-login {
+  display: grid;
+  min-height: 520px;
+  place-items: center;
+  padding-top: 32px;
+}
+
+.attendance-login__panel {
+  width: min(100%, 460px);
+}
+
+.attendance-login__form {
+  display: grid;
+  gap: 20px;
+  padding: 20px;
+}
+
+@media (max-width: 640px) {
+  .attendance-shell,
+  .attendance-footer__inner {
+    width: calc(100% - 24px);
+  }
+
+  .attendance-toolbar__monitors {
+    justify-content: flex-start;
+  }
+
+  .attendance-login {
+    min-height: 420px;
+    padding-left: 0;
+    padding-right: 0;
+  }
+}
+

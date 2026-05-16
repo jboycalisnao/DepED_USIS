@@ -48,7 +48,6 @@
   font-size: var(--usis-title-size);
   font-weight: 700;
   line-height: 1.08;
-  letter-spacing: 0;
 }
 
 .section-card__content h3,
@@ -58,7 +57,6 @@
   font-size: var(--usis-body-size);
   font-weight: 700;
   line-height: 1.2;
-  letter-spacing: 0;
   text-transform: uppercase;
 }
 
@@ -83,6 +81,5 @@
   color: var(--deped-ink);
   font-size: var(--usis-helper-size);
   font-weight: 700;
-  letter-spacing: 0.08em;
   text-transform: uppercase;
 }

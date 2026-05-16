@@ -41,21 +41,6 @@ export function RegistryPage() {
                   records={snapshot?.coreCoordinators || []}
                   tertiaryValue={(record) => record.email}
                 />
-                {selectedCoreRecord ? (
-                  <CoreCredentialEditor
-                    access={access}
-                    isSubmitting={isUpdatingCore}
-                    onCancel={() => setSelectedCoreRecord(null)}
-                    onSubmit={async (payload) => {
-                      try {
-                        await updateCore(payload);
-                        setSelectedCoreRecord(null);
-                      } catch {}
-                    }}
-                    record={selectedCoreRecord}
-                    schools={snapshot?.accessibleSchools || []}
-                  />
-                ) : null}
               </>
             )}
           </div>
@@ -78,27 +63,64 @@ export function RegistryPage() {
                   records={snapshot?.electionCoordinators || []}
                   tertiaryValue={(record) => record.scope}
                 />
-                {selectedElectionRecord ? (
-                  <ElectionCredentialEditor
-                    access={access}
-                    events={snapshot?.electionEvents || []}
-                    isSubmitting={isUpdatingElection}
-                    onCancel={() => setSelectedElectionRecord(null)}
-                    onSubmit={async (payload) => {
-                      try {
-                        await updateElection(payload);
-                        setSelectedElectionRecord(null);
-                      } catch {}
-                    }}
-                    record={selectedElectionRecord}
-                    schools={snapshot?.accessibleSchools || []}
-                  />
-                ) : null}
               </>
             )}
           </div>
         </article>
       </div>
+
+      {selectedCoreRecord ? (
+        <div className="registry-modal" role="dialog" aria-modal="true">
+          <button
+            aria-label="Close editor"
+            className="registry-modal__backdrop"
+            onClick={() => setSelectedCoreRecord(null)}
+            type="button"
+          />
+          <div className="registry-modal__panel">
+            <CoreCredentialEditor
+              access={access}
+              isSubmitting={isUpdatingCore}
+              onCancel={() => setSelectedCoreRecord(null)}
+              onSubmit={async (payload) => {
+                try {
+                  await updateCore(payload);
+                  setSelectedCoreRecord(null);
+                } catch {}
+              }}
+              record={selectedCoreRecord}
+              schools={snapshot?.accessibleSchools || []}
+            />
+          </div>
+        </div>
+      ) : null}
+
+      {selectedElectionRecord ? (
+        <div className="registry-modal" role="dialog" aria-modal="true">
+          <button
+            aria-label="Close editor"
+            className="registry-modal__backdrop"
+            onClick={() => setSelectedElectionRecord(null)}
+            type="button"
+          />
+          <div className="registry-modal__panel">
+            <ElectionCredentialEditor
+              access={access}
+              events={snapshot?.electionEvents || []}
+              isSubmitting={isUpdatingElection}
+              onCancel={() => setSelectedElectionRecord(null)}
+              onSubmit={async (payload) => {
+                try {
+                  await updateElection(payload);
+                  setSelectedElectionRecord(null);
+                } catch {}
+              }}
+              record={selectedElectionRecord}
+              schools={snapshot?.accessibleSchools || []}
+            />
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

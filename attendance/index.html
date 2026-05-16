@@ -1,0 +1,128 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>USIS Attendance | USIS</title>
+    <link rel="icon" type="image/png" sizes="32x32" href="/common/assets/USIS_Icon.png?v=20260514b">
+    <link rel="shortcut icon" href="/common/assets/USIS_Icon.png?v=20260514b">
+    <link rel="apple-touch-icon" href="/common/assets/USIS_Icon.png?v=20260514b">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              primary: {
+                50: '#e6e7ef',
+                100: '#cdcfdf',
+                200: '#9ba0bf',
+                300: '#69719f',
+                400: '#37427f',
+                500: '#010e5b',
+                600: '#010d52',
+                700: '#010a40',
+                800: '#01082e',
+                900: '#00051c',
+              },
+              accent: {
+                50: '#f9e6e7',
+                100: '#f4cdcf',
+                200: '#e99ba0',
+                300: '#df6971',
+                400: '#d43742',
+                500: '#ca080b',
+                600: '#b6070a',
+                700: '#8e0608',
+                800: '#650406',
+                900: '#3d0204',
+              },
+              gray: {
+                25: '#FCFCFD',
+                50: '#F9FAFB',
+                100: '#F2F4F7',
+                200: '#EAECF0',
+                300: '#D0D5DD',
+                400: '#98A2B3',
+                500: '#667085',
+                600: '#475467',
+                700: '#344054',
+                800: '#1D2939',
+                900: '#101828',
+              },
+              success: {
+                50: '#ECFDF3',
+                600: '#039855',
+                700: '#027A48',
+              },
+              error: {
+                50: '#f9e6e7',
+                600: '#ca080b',
+                700: '#b6070a',
+              },
+              warning: {
+                50: '#FFFAEB',
+                600: '#DC6803',
+                700: '#B54708',
+              }
+            },
+            borderRadius: {
+              'xl': '12px',
+              '2xl': '16px',
+              '3xl': '24px',
+            },
+            fontFamily: {
+              sans: ['"Segoe UI"', 'sans-serif'],
+              mono: ['"JetBrains Mono"', 'monospace'],
+            },
+          }
+        }
+      }
+    </script>
+    <style>
+        body {
+            background-color: #F9FAFB;
+            color: #101828;
+            font-family: "Segoe UI", sans-serif;
+        }
+        .material-symbols-outlined {
+          font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+          display: inline-block;
+          vertical-align: middle;
+          white-space: nowrap;
+          word-wrap: normal;
+          direction: ltr;
+          line-height: 1;
+          letter-spacing: normal;
+          text-transform: none;
+          overflow: hidden;
+          width: 1em;
+          height: 1em;
+        }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@19.2.3",
+    "react/": "https://esm.sh/react@19.2.3/",
+    "react-dom": "https://esm.sh/react-dom@19.2.3",
+    "react-dom/": "https://esm.sh/react-dom@19.2.3/",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.48.1"
+  }
+}
+</script>
+</head>
+<body class="selection:bg-primary selection:text-white">
+    <div id="root"></div>
+<script type="module" src="/index.tsx"></script>
+</body>
+</html>
+
+

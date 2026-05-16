@@ -15,13 +15,15 @@ The project is intended to function as a **monorepo-style repository**:
 
 The repository currently contains these active modules:
 
+- `attendance/` - attendance monitoring and RFID logging subsystem
 - `coordinator/` - coordinator-facing USIS operations portal
 - `deped-web-kit/` - DepEd web branding and UI reference kit
+- `enrollment/` - school enrollment management portal
 - `election/` - DepED school election system
 - `sp-portal/` - Special Program admissions portal for school-specific application bulletins
 - `registrar/` - Registrar and learner records system
 
-Both modules are currently standalone Vite + React applications.
+These modules are currently standalone Vite + React applications.
 
 ## Initialized Monorepo Foundation
 
@@ -41,6 +43,7 @@ This keeps the current module folders intact while establishing the shared-platf
 
 - `election/` has a larger feature set with admin tools, public results, tally monitoring, candidate management, and Supabase-backed state.
 - `election/` now also includes an election registration flow scaffold where coordinators can generate the active election code required by voter sign-in after LRN recognition.
+- `attendance/` supports attendance monitoring workflows and RFID logging flows.
 - `coordinator/` now provides a DepED-Web-Kit-aligned subsystem shell for coordinator-facing operations, access guidance, and future school-level administration workflows.
 - `sp-portal/` provides the initial school-based Special Program admissions landing page at `/admissions/{region_slug}/{division_slug}/{school_id}`.
 - `registrar/` has dashboard, learner list, enrollment, bulk import, section management, settings, and Supabase-backed services.
@@ -60,10 +63,12 @@ This keeps the current module folders intact while establishing the shared-platf
 The intended end state is a unified school platform with multiple modules under one repository, such as:
 
 - `election/`
+- `attendance/`
 - `coordinator/`
 - `registrar/`
 - `sp-portal/`
 - `deped-web-kit/`
+- `enrollment/`
 - future modules like `guidance/`, `library/`, `clinic/`, `finance/`, `hr/`, or `student-portal/`
 
 All modules should follow these platform rules:
@@ -133,7 +138,7 @@ Right now, both apps hardcode the same Supabase credentials in:
 - `election/lib/supabase.ts`
 - `registrar/lib/supabase.ts`
 
-This proved both modules already targeted the same backend. The repo is now initialized with a shared package at `packages/shared-supabase/` so Supabase setup can be managed centrally.
+This proved core modules already targeted the same backend. The repo is now initialized with a shared package at `packages/shared-supabase/` so Supabase setup can be managed centrally.
 
 ## Development Rules for Modules
 

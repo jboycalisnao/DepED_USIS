@@ -14,6 +14,9 @@ export interface CoordinatorAccessRecord {
   schoolId: string;
   schoolName: string;
   schoolUuid: string;
+  userId: string;
+  lastLoginAt: string | null;
+  mustResetPassword: boolean;
 }
 
 export const COORDINATOR_ACCESS_STORAGE_KEY = 'usis_coordinator_portal_access';
@@ -49,16 +52,14 @@ const isMissingRelationError = (error: { code?: string; message?: string } | nul
   error?.code === '42P01' || error?.message?.includes('sp_portal_coordinators');
 
 export const resolveCoordinatorAccess = async (
-  schoolId: string,
   username: string,
   password: string,
 ) => {
-  const normalizedSchoolId = schoolId.trim();
   const normalizedUsername = username.trim().toLowerCase();
 
-  if (!/^\d{6}$/.test(normalizedSchoolId) || !normalizedUsername || password.trim().length < 6) {
+  if (!normalizedUsername || password.trim().length < 6) {
     return {
-      error: 'Provide a valid 6-digit school ID, username, and password with at least 6 characters.',
+      error: 'Provide a valid username and password with at least 6 characters.',
       record: null,
     };
   }
@@ -85,21 +86,21 @@ export const resolveCoordinatorAccess = async (
       .select(sharedSelect)
       .eq('username', normalizedUsername)
       .eq('is_active', true)
-      .eq('usis_schools.school_code', normalizedSchoolId)
+      .limit(1)
       .maybeSingle(),
     supabase
       .from('election_coordinators')
       .select(sharedSelect)
       .eq('username', normalizedUsername)
       .eq('is_active', true)
-      .eq('usis_schools.school_code', normalizedSchoolId)
+      .limit(1)
       .maybeSingle(),
     supabase
       .from('sp_portal_coordinators')
       .select(sharedSelect)
       .eq('username', normalizedUsername)
       .eq('is_active', true)
-      .eq('usis_schools.school_code', normalizedSchoolId)
+      .limit(1)
       .maybeSingle(),
   ]);
 
@@ -150,18 +151,19 @@ export const resolveCoordinatorAccess = async (
           : accountSource === 'sp_portal_coordinators'
             ? 'SP Portal Coordinator'
             : 'Election Coordinator'),
-      accessLevel:
-        coordinatorRecord.access_level ||
-        (accountSource === 'usis_core_coordinators' ? 'school' : 'school'),
+      accessLevel: 'school',
       division: schoolRecord?.division || 'Schools Division of Iloilo',
       divisionCode: schoolRecord?.division_code || schoolRecord?.division || 'SDI',
       isSuperAdmin: Boolean(coordinatorRecord.is_super_admin) || coordinatorRecord.role === 'system_admin',
       region: schoolRecord?.region || 'Region VI - Western Visayas',
       regionCode: schoolRecord?.region_code || schoolRecord?.region || 'R6',
       schoolAddress: schoolAddress || 'School address not yet configured in the coordinator registry.',
-      schoolId: normalizedSchoolId,
+      schoolId: schoolRecord?.school_code || '',
       schoolName: schoolRecord?.school_name || 'USIS School',
       schoolUuid: schoolRecord?.id || '',
+      userId: coordinatorRecord.id,
+      lastLoginAt: coordinatorRecord.last_login_at || null,
+      mustResetPassword: !coordinatorRecord.last_login_at,
     } satisfies CoordinatorAccessRecord;
   };
 
@@ -172,7 +174,7 @@ export const resolveCoordinatorAccess = async (
 
   if (!resolvedRecord) {
     return {
-      error: 'No active coordinator account matches the supplied school ID, username, and password.',
+      error: 'No active coordinator account matches the supplied username and password.',
       record: null,
     };
   }
@@ -181,4 +183,49 @@ export const resolveCoordinatorAccess = async (
     error: null,
     record: resolvedRecord,
   };
+};
+
+export const finalizeCoordinatorLogin = async (
+  access: CoordinatorAccessRecord,
+  nextPassword?: string,
+) => {
+  const tableBySource: Record<CoordinatorAccessRecord['accountSource'], string> = {
+    election_coordinators: 'election_coordinators',
+    sp_portal_coordinators: 'sp_portal_coordinators',
+    usis_core_coordinators: 'usis_core_coordinators',
+  };
+
+  const updatePayload: Record<string, unknown> = {
+    last_login_at: new Date().toISOString(),
+  };
+
+  if (nextPassword?.trim()) {
+    updatePayload.password_hash = nextPassword.trim();
+    if (access.accountSource !== 'usis_core_coordinators') {
+      updatePayload.password_plain = nextPassword.trim();
+    }
+  }
+
+  const { error } = await supabase
+    .from(tableBySource[access.accountSource])
+    .update(updatePayload)
+    .eq('id', access.userId);
+
+  if (!error) {
+    return;
+  }
+
+  // Fallback path for environments that block PATCH preflight: use upsert (POST) for the same mutation.
+  const upsertPayload = {
+    id: access.userId,
+    ...updatePayload,
+  };
+
+  const { error: upsertError } = await supabase
+    .from(tableBySource[access.accountSource])
+    .upsert(upsertPayload, { onConflict: 'id' });
+
+  if (upsertError) {
+    throw new Error('Unable to finalize coordinator login. Please try again.');
+  }
 };

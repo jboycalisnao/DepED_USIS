@@ -15,6 +15,10 @@
   border-bottom: 1px solid var(--deped-line);
 }
 
+.usis-header__module-label::before {
+  content: var(--usis-module-label, "USIS Module");
+}
+
 .brand-header__main,
 .kit-header__main {
   display: flex;
@@ -29,6 +33,7 @@
 .kit-header__identity {
   display: flex;
   align-items: center;
+  gap: 16px;
   min-width: 0;
 }
 
@@ -38,6 +43,36 @@
   height: 50px;
   max-width: 100%;
   object-fit: contain;
+}
+
+.usis-header__module-block {
+  display: grid;
+  gap: 0;
+  padding-left: 20px;
+  border-left: 4px solid #c7ccd6;
+}
+
+.usis-header__module-kicker {
+  color: var(--deped-red);
+  font-size: var(--usis-title-size);
+  font-weight: 500;
+  line-height: 1;
+}
+
+.usis-header__module-kicker::before {
+  content: var(--usis-module-kicker, "School");
+}
+
+.usis-header__module-title {
+  color: var(--deped-blue);
+  font-size: var(--usis-title-size);
+  font-weight: 700;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.usis-header__module-title::before {
+  content: var(--usis-module-title, "USIS MODULE");
 }
 
 .brand-header__search,
@@ -107,7 +142,6 @@
   font-size: var(--usis-body-size);
   font-weight: 700;
   line-height: 1.2;
-  letter-spacing: 0;
   text-transform: uppercase;
 }
 
@@ -120,6 +154,12 @@
   .brand-header__main,
   .kit-header__main {
     flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .brand-header__identity,
+  .kit-header__identity {
+    width: 100%;
     align-items: flex-start;
   }
 
@@ -151,6 +191,15 @@
   .brand-header__search button,
   .kit-header__search button {
     min-height: 44px;
+  }
+
+  .usis-header__module-block {
+    padding-left: 12px;
+  }
+
+  .usis-header__module-kicker,
+  .usis-header__module-title {
+    font-size: var(--usis-body-size);
   }
 
   .kit-nav__grid {

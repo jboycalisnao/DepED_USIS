@@ -4,6 +4,10 @@
 
 DepED USIS currently uses a monorepo-style repository with module applications at the repository root:
 
+- `attendance/`
+- `coordinator/`
+- `deped-web-kit/`
+- `enrollment/`
 - `election/`
 - `registrar/`
 - `sp-portal/`

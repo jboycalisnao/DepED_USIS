@@ -1,0 +1,140 @@
+.registrar-public-enrollment {
+  background: #f3f6fb;
+  font-family: "Segoe UI", "Segoe UI Variable", Tahoma, Arial, sans-serif;
+}
+
+.registrar-public-enrollment *,
+.registrar-public-enrollment button,
+.registrar-public-enrollment input,
+.registrar-public-enrollment select,
+.registrar-public-enrollment textarea {
+  font-family: "Segoe UI", "Segoe UI Variable", Tahoma, Arial, sans-serif !important;
+}
+
+.registrar-public-enrollment .section-shell {
+  padding-top: 20px;
+  padding-bottom: 28px;
+}
+
+.registrar-public-enrollment__form {
+  display: grid;
+  gap: 20px;
+  font-family: var(--deped-font);
+}
+
+.registrar-public-enrollment__section {
+  display: grid;
+  gap: 14px;
+}
+
+.registrar-public-enrollment__section h3 {
+  margin: 0;
+  color: var(--deped-blue);
+  font-size: var(--usis-helper-size);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.registrar-public-enrollment__consent .choice-row {
+  align-items: flex-start;
+}
+
+.registrar-public-enrollment__consent .choice-row span {
+  color: var(--deped-muted);
+  font-size: var(--usis-helper-size);
+  line-height: 1.6;
+}
+
+.registrar-public-enrollment .portal-panel__header p {
+  margin: 6px 0 0;
+  color: var(--deped-muted);
+  font-size: var(--usis-helper-size);
+  line-height: 1.6;
+}
+
+.registrar-public-enrollment .floating-field__control select,
+.registrar-public-enrollment .floating-field__control input,
+.registrar-public-enrollment .floating-field__control textarea {
+  font-family: "Segoe UI", "Segoe UI Variable", Tahoma, Arial, sans-serif !important;
+}
+
+.registrar-public-enrollment .floating-field__control input,
+.registrar-public-enrollment .floating-field__control select,
+.registrar-public-enrollment .searchable-select--floating .floating-field__control input,
+.registrar-public-enrollment .searchable-select--floating .searchable-select__toggle {
+  min-height: 64px;
+  height: 64px;
+}
+
+.registrar-public-enrollment .searchable-select__field input:disabled,
+.registrar-public-enrollment .searchable-select__field button:disabled,
+.registrar-public-enrollment .searchable-select--floating .floating-field__control input:disabled,
+.registrar-public-enrollment .searchable-select--floating .floating-field__control button:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+  background: #edf1f7;
+  color: var(--deped-muted);
+}
+
+.registrar-public-enrollment .searchable-select--floating .floating-field__control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.registrar-public-enrollment .searchable-select--floating .floating-field__control input {
+  border-right: 0;
+  border-radius: 12px 0 0 12px;
+  padding-right: 16px;
+}
+
+.registrar-public-enrollment .searchable-select--floating .searchable-select__toggle {
+  position: static;
+  top: auto;
+  right: auto;
+  width: 56px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 56px;
+  min-height: 64px;
+  transform: none;
+  border: 1px solid rgba(18, 35, 61, 0.14);
+  border-left: 0;
+  border-radius: 0 12px 12px 0;
+  background: #fbfcff;
+  color: var(--deped-blue);
+  cursor: pointer;
+}
+
+.registrar-public-enrollment .searchable-select--floating .searchable-select__toggle svg {
+  display: block;
+}
+
+.registrar-public-enrollment .searchable-select--floating .floating-field__control input:focus ~ span,
+.registrar-public-enrollment .searchable-select--floating .floating-field__control input[data-has-value="true"] ~ span {
+  top: 11px;
+  color: var(--deped-blue);
+  font-size: var(--usis-helper-size);
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  transform: translateY(0);
+}
+
+.registrar-public-enrollment-submissions .usis-table th,
+.registrar-public-enrollment-submissions .usis-table td,
+.registrar-public-enrollment-submissions .status-badge,
+.registrar-public-enrollment-submissions .secondary-button {
+  font-size: 14px;
+}
+
+.registrar-public-enrollment-submissions .modal-dialog__body {
+  padding-right: 28px;
+}
+
+@media (max-width: 720px) {
+  .registrar-public-enrollment .portal-panel__body {
+    padding: 16px;
+  }
+}

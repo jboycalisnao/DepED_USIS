@@ -3,25 +3,31 @@
   "private": true,
   "version": "0.1.0",
   "workspaces": [
+    "attendance",
     "coordinator",
     "deped-web-kit",
+    "enrollment",
     "election",
     "sp-portal",
     "registrar",
     "packages/*"
   ],
   "scripts": {
+    "dev:attendance": "npm run dev --workspace ./attendance",
     "dev:coordinator": "npm run dev --workspace ./coordinator",
     "dev:deped-web-kit": "npm run dev --workspace ./deped-web-kit",
+    "dev:enrollment": "npm run dev --workspace ./enrollment",
     "dev:election": "npm run dev --workspace ./election",
     "dev:sp-portal": "npm run dev --workspace ./sp-portal",
     "dev:registrar": "npm run dev --workspace ./registrar",
+    "build:attendance": "npm run build --workspace ./attendance",
     "build:coordinator": "npm run build --workspace ./coordinator",
     "build:deped-web-kit": "npm run build --workspace ./deped-web-kit",
+    "build:enrollment": "npm run build --workspace ./enrollment",
     "build:election": "npm run build --workspace ./election",
     "build:sp-portal": "npm run build --workspace ./sp-portal",
     "build:registrar": "npm run build --workspace ./registrar",
-    "build": "npm run build:coordinator && npm run build:deped-web-kit && npm run build:election && npm run build:sp-portal && npm run build:registrar"
+    "build": "npm run build:attendance && npm run build:coordinator && npm run build:deped-web-kit && npm run build:enrollment && npm run build:election && npm run build:sp-portal && npm run build:registrar"
   },
   "engines": {
     "node": ">=20"

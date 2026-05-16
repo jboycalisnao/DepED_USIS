@@ -2,6 +2,7 @@ import { FormEvent, useState } from 'react';
 import type { CoordinatorAccessRecord } from '@/features/auth/utils/coordinatorAccess';
 import { FloatingField } from '@/features/shared/components/FloatingField';
 import { SearchableSelect } from '@/features/shared/components/SearchableSelect';
+import { useDepedSchoolOptions } from '@/features/schools/hooks/useDepedSchoolOptions';
 import type { CreateSpPortalCredentialInput, RegistrySchoolContext } from '../utils/credentialRegistry';
 
 interface SpPortalCoordinatorCredentialFormProps {
@@ -25,7 +26,9 @@ export function SpPortalCoordinatorCredentialForm({
   schools,
   schoolCode,
 }: SpPortalCoordinatorCredentialFormProps) {
-  const [targetSchoolCode, setTargetSchoolCode] = useState(schoolCode);
+  const initialSchoolCode = schoolCode === '123456' ? '' : schoolCode;
+  const [targetSchoolCode, setTargetSchoolCode] = useState(initialSchoolCode);
+  const schoolOptions = useDepedSchoolOptions(schools, access?.region);
   const [form, setForm] = useState<CreateSpPortalCredentialInput>({
     actorAccess: access,
     email: '',
@@ -37,7 +40,7 @@ export function SpPortalCoordinatorCredentialForm({
     password: '',
     permissions: 'portal.manage, applications.review, announcements.manage',
     role: 'sp_portal_admin',
-    schoolCode,
+    schoolCode: initialSchoolCode,
     username: '',
   });
 
@@ -46,13 +49,13 @@ export function SpPortalCoordinatorCredentialForm({
       ...current,
       [field]: value,
       actorAccess: access,
-      schoolCode: targetSchoolCode || schoolCode,
+      schoolCode: targetSchoolCode || initialSchoolCode,
     }));
   };
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
-    await onSubmit({ ...form, actorAccess: access, schoolCode: targetSchoolCode || schoolCode });
+    await onSubmit({ ...form, actorAccess: access, schoolCode: targetSchoolCode || initialSchoolCode });
     setForm({
       actorAccess: access,
       email: '',
@@ -64,25 +67,22 @@ export function SpPortalCoordinatorCredentialForm({
       password: '',
       permissions: 'portal.manage, applications.review, announcements.manage',
       role: 'sp_portal_admin',
-      schoolCode: targetSchoolCode || schoolCode,
+      schoolCode: targetSchoolCode || initialSchoolCode,
       username: '',
     });
   };
 
   return (
     <form className="registry-form" onSubmit={handleSubmit}>
-      {schools.length > 1 ? (
+      {schools.length ? (
         <SearchableSelect
           label="Target School"
           onChange={(value) => {
             setTargetSchoolCode(value);
             setForm((current) => ({ ...current, actorAccess: access, schoolCode: value }));
           }}
-          options={schools.map((entry) => ({
-            label: `${entry.schoolCode} - ${entry.schoolName}`,
-            value: entry.schoolCode,
-          }))}
-          value={targetSchoolCode || schoolCode}
+          options={schoolOptions}
+          value={targetSchoolCode || initialSchoolCode}
         />
       ) : null}
       <FloatingField id="sp-first-name" label="First Name" value={form.firstName} onChange={(event) => updateField('firstName', event.target.value)} required />

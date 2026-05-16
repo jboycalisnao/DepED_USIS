@@ -35,7 +35,6 @@ const ElectionRegistrationPage: React.FC<ElectionRegistrationPageProps> = ({
 }) => {
   const [accessForm, setAccessForm] = useState({
     password: TEMP_ELECTION_REGISTRATION_CREDENTIALS.password,
-    schoolId: TEMP_ELECTION_REGISTRATION_CREDENTIALS.schoolId,
     username: TEMP_ELECTION_REGISTRATION_CREDENTIALS.username,
   });
   const [accessError, setAccessError] = useState('');
@@ -76,7 +75,6 @@ const ElectionRegistrationPage: React.FC<ElectionRegistrationPageProps> = ({
     setAccessError('');
     setAccessForm({
       password: TEMP_ELECTION_REGISTRATION_CREDENTIALS.password,
-      schoolId: TEMP_ELECTION_REGISTRATION_CREDENTIALS.schoolId,
       username: TEMP_ELECTION_REGISTRATION_CREDENTIALS.username,
     });
     onStepChange('access');
@@ -88,7 +86,6 @@ const ElectionRegistrationPage: React.FC<ElectionRegistrationPageProps> = ({
     setIsAccessSubmitting(true);
     try {
       const result = await resolveElectionRegistrationAccess(
-        accessForm.schoolId,
         accessForm.username,
         accessForm.password,
         schoolName,
@@ -154,13 +151,6 @@ const ElectionRegistrationPage: React.FC<ElectionRegistrationPageProps> = ({
             </h2>
           </div>
           <form className="mt-[22px] grid gap-5" onSubmit={handleAccessSubmit}>
-            <FloatingField
-              id="school-id"
-              label="School ID"
-              onChange={(event) => setAccessForm({ ...accessForm, schoolId: event.target.value })}
-              required
-              value={accessForm.schoolId}
-            />
             <FloatingField
               id="coordinator-username"
               label="Username"

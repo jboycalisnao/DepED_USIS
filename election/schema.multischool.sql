@@ -69,7 +69,7 @@ CREATE TABLE IF NOT EXISTS public.usis_core_coordinators (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT usis_core_coordinators_role_check
-    CHECK (role IN ('school_usis_coordinator', 'division_usis_coordinator', 'regional_usis_coordinator', 'system_admin'))
+    CHECK (role IN ('school_usis_coordinator', 'registrar_coordinator', 'division_usis_coordinator', 'regional_usis_coordinator', 'system_admin'))
 );
 
 CREATE INDEX IF NOT EXISTS usis_core_coordinators_school_idx

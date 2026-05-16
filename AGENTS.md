@@ -9,7 +9,11 @@ DepED USIS is planned as a **monorepo-style school systems repository** that con
 ## Current Module Inventory
 
 - `deped-web-kit/` - DepEd web branding and interface reference app
+- `attendance/` - attendance monitoring and RFID logging system
+- `coordinator/` - coordinator operations and credential management portal
+- `enrollment/` - school enrollment management portal
 - `election/` - election management system
+- `sp-portal/` - special program admissions and application portal
 - `registrar/` - registrar and learner information system
 
 These are currently the active modules already present in the repository.
@@ -34,10 +38,21 @@ Additional guidance for `deped-web-kit/`:
 - keep interface typography within the shared USIS cap unless explicitly overridden: `24px` maximum for titles, `16px` maximum for regular body text, and `13px` maximum for subtitles, helper text, labels, and similar supporting text
 - whenever DepED-Web-Kit rules, components, behaviors, or standards change, update `deped-web-kit/public/usis-ai-reference.txt` so the deployed public AI reference remains aligned with the current system
 
+Typography and modal standards applied globally:
+
+- global font family is strictly `Segoe UI, sans-serif`
+- do not introduce module-local font-family overrides unless a maintainer explicitly approves an exception
+- regular text weight must be `400` globally
+- maximum font weight allowed globally is `700`
+- avoid forced letter-spacing and forced uppercase styling for normal system text
+- form labels and floating labels must render in natural tracking (no spaced-out lettering)
+- modal and alert styling must use shared common CSS patterns (`common/css/modals.css`) and shared reusable components where available
+- login modals must use the shared `common/components/UsisLoginModal.tsx` and `common/css/login-modal.css` implementation; page-specific login formatting forks are not allowed
+
 Favicon rule for USIS subsystems:
 
 - all USIS subsystem apps other than `deped-web-kit/` must use `common/assets/USIS_Icon.png` as the favicon
-- this applies to current modules such as `election/`, `registrar/`, and `coordinator/`, and to future subsystem apps unless a maintainer explicitly approves an exception
+- this applies to current modules such as `attendance/`, `election/`, `registrar/`, and `coordinator/`, and to future subsystem apps unless a maintainer explicitly approves an exception
 - keep the favicon proportional and unstretched, and prefer cache-busted favicon tags when updating existing subsystem shells
 
 ## Core Architecture Direction
@@ -151,6 +166,50 @@ Refactor expectation:
 
 - if a component file becomes large, split it into sub-components, hooks, and helpers under a focused folder
 - if multiple files work together for one business feature, keep them together in a dedicated subfolder instead of scattering them by technical type only
+
+## Unified Header Rule
+
+- all USIS modules must use one shared header structure and markup from shared/common UI
+- module-level differences are limited to shared header token overrides only
+- top-right utility label text must be set through module CSS token (`--usis-module-label`)
+- beside-logo module name block must be set through module CSS tokens (`--usis-module-kicker`, `--usis-module-title`)
+- do not add module-specific header layout variants, logo variants, or custom header component structures
+- remove and avoid local/system-specific header CSS overrides when shared header styles already exist
+- shared header TSX source of truth: `common/header/UsisUnifiedHeader.tsx`
+- shared header CSS source of truth: `common/css/header.css`
+- do not duplicate or fork these files inside module folders; extend only through approved tokens and shared CSS variables
+
+## Unified Footer Rule
+
+- all USIS modules must use one shared global footer template from `common/footer/UsisGlobalFooter.tsx`
+- all footer styling must come from `common/css/footer.css`
+- do not create module-local footer templates for subsystem pages
+- if footer text or band format changes, update the shared common footer files and apply globally
+
+## Coordinator Credential Semantics
+
+For the `coordinator/` credential creation workflow, treat the two selectors as distinct concepts:
+
+- `Role` means **access level scope only**:
+  - `Regional`
+  - `Division`
+  - `School`
+- `Credential Type` means **module access**:
+  - examples: `Coordinator Portal (Core)`, `Registrar`, `Attendance`, `Election`, `SP Portal`, and future subsystem module choices
+
+Implementation rule:
+
+- do not use `Role` to represent module identity
+- do not use `Credential Type` to represent scope
+- keep scope and module assignment explicit and independently selectable in both UI and payload mapping
+
+Regional and division credential code format:
+
+- when creating credentials with `Role` = `Regional` or `Division`, generated scope IDs must use numeric code format only
+- do not use textual codes like `CAR-D1`
+- use six-digit scope ID format equivalent to `000101` pattern:
+  - first four digits = region prefix (mapped from Region 01..18)
+  - last two digits = division code (`00` for regional scope, `01..99` for division scope)
 
 ## Documentation Expectations
 

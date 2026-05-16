@@ -1,15 +1,11 @@
 import { useState } from 'react';
-import { SearchableSelect } from '@/features/shared/components/SearchableSelect';
 import { CoreCoordinatorCredentialForm } from '../components/CoreCoordinatorCredentialForm';
 import { ElectionCoordinatorCredentialForm } from '../components/ElectionCoordinatorCredentialForm';
 import { SpPortalCoordinatorCredentialForm } from '../components/SpPortalCoordinatorCredentialForm';
 import { useCredentialRegistry } from '../hooks/useCredentialRegistry';
 
-const credentialTypeOptions = [
-  { label: 'Create USIS Admin', value: 'core' },
-  { label: 'Create Election Coordinator', value: 'election' },
-  { label: 'Create SP Portal Coordinator', value: 'sp-portal' },
-] as const;
+type CredentialMode = 'core' | 'election' | 'sp-portal' | 'registrar' | 'attendance';
+type AccessLevelChoice = 'school';
 
 export function CredentialsPage() {
   const {
@@ -25,8 +21,24 @@ export function CredentialsPage() {
     notice,
     snapshot,
   } = useCredentialRegistry();
-  const [credentialType, setCredentialType] = useState<'core' | 'election' | 'sp-portal'>('core');
+
+  const canManageCoordinatorCredentials = Boolean(
+    access && (access.isSuperAdmin || access.accountSource === 'usis_core_coordinators'),
+  );
+  const roleType: AccessLevelChoice = 'school';
+  const [credentialType, setCredentialType] = useState<CredentialMode>('core');
   const isCoreMode = credentialType === 'core';
+  const credentialTypeOptions = [
+    { label: 'Coordinator Portal (Core)', value: 'core' },
+    { label: 'Registrar', value: 'registrar' },
+    { label: 'Attendance', value: 'attendance' },
+    { label: 'Election', value: 'election' },
+    { label: 'SP Portal', value: 'sp-portal' },
+  ] as const;
+
+  const coreRoleByAccessLevel = {
+    school: 'school_usis_coordinator',
+  } as const;
 
   return (
     <div className="admin-panel">
@@ -51,6 +63,8 @@ export function CredentialsPage() {
             ) : (
               <div className="registry-summary">
                 <p><strong>Core Access:</strong> {snapshot?.coreCoordinators.length || 0}</p>
+                <p><strong>Attendance Access:</strong> {snapshot?.attendanceCoordinators.length || 0}</p>
+                <p><strong>Registrar Access:</strong> {snapshot?.registrarCoordinators.length || 0}</p>
                 <p><strong>Election Access:</strong> {snapshot?.electionCoordinators.length || 0}</p>
                 <p><strong>SP Portal Access:</strong> {snapshot?.spPortalCoordinators.length || 0}</p>
                 <p><strong>Election Events:</strong> {snapshot?.electionEvents.length || 0}</p>
@@ -67,31 +81,86 @@ export function CredentialsPage() {
         <article className="section-card">
           <div className="section-card__bar" />
           <div className="section-card__content">
+            {!canManageCoordinatorCredentials ? (
+              <p className="registry-copy">
+                This account does not have authority to create coordinator credentials. Use a USIS core coordinator account.
+              </p>
+            ) : null}
+            {canManageCoordinatorCredentials ? (
+              <>
             <p className="section-card__eyebrow">
-              {isCoreMode ? 'Core Access' : credentialType === 'sp-portal' ? 'SP Portal Access' : 'Election Access'}
+              {isCoreMode
+                ? 'Core Access'
+                : credentialType === 'registrar'
+                  ? 'Registrar Access'
+                  : credentialType === 'attendance'
+                    ? 'Attendance Access'
+                    : credentialType === 'sp-portal'
+                      ? 'SP Portal Access'
+                      : 'Election Access'}
             </p>
             <div className="registry-form__header">
               <h3>
                 {isCoreMode
-                  ? 'Create USIS Admin'
-                  : credentialType === 'sp-portal'
-                    ? 'Create SP Portal Coordinator'
-                    : 'Create Election Coordinator'}
+                  ? 'Create School Coordinator'
+                  : credentialType === 'registrar'
+                    ? 'Create Registrar Coordinator'
+                    : credentialType === 'attendance'
+                      ? 'Create Attendance Coordinator'
+                    : credentialType === 'sp-portal'
+                      ? 'Create SP Portal Coordinator'
+                      : 'Create Election Coordinator'}
               </h3>
-              <SearchableSelect
-                label="Credential Type"
-                onChange={(value) => setCredentialType(value as 'core' | 'election' | 'sp-portal')}
-                options={[...credentialTypeOptions]}
-                value={credentialType}
-              />
+              <fieldset className="registry-radio-group">
+                <legend>Credential Type</legend>
+                <div className="registry-radio-list">
+                  {credentialTypeOptions.map((option) => (
+                    <label key={option.value} className="registry-radio-option">
+                      <input
+                        type="radio"
+                        name="credential-type"
+                        value={option.value}
+                        checked={credentialType === option.value}
+                        onChange={() => setCredentialType(option.value as CredentialMode)}
+                      />
+                      <span>{option.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
             </div>
 
             {isCoreMode ? (
               <CoreCoordinatorCredentialForm
+                key={`core-form-${roleType}`}
                 access={access}
+                accessLevel={roleType}
+                credentialType={coreRoleByAccessLevel[roleType]}
                 isSubmitting={isSubmittingCore}
                 onSubmit={createCore}
-                schools={snapshot?.accessibleSchools || []}
+                role={coreRoleByAccessLevel[roleType]}
+                schoolCode={access?.schoolId || ''}
+              />
+            ) : credentialType === 'attendance' ? (
+              <CoreCoordinatorCredentialForm
+                key="attendance-form"
+                access={access}
+                accessLevel={roleType}
+                credentialType="attendance_coordinator"
+                isSubmitting={isSubmittingCore}
+                onSubmit={createCore}
+                role="attendance_coordinator"
+                schoolCode={access?.schoolId || ''}
+              />
+            ) : credentialType === 'registrar' ? (
+              <CoreCoordinatorCredentialForm
+                key="registrar-form"
+                access={access}
+                accessLevel={roleType}
+                credentialType="registrar_coordinator"
+                isSubmitting={isSubmittingCore}
+                onSubmit={createCore}
+                role="registrar_coordinator"
                 schoolCode={access?.schoolId || ''}
               />
             ) : credentialType === 'sp-portal' ? (
@@ -112,6 +181,8 @@ export function CredentialsPage() {
                 schoolCode={access?.schoolId || ''}
               />
             )}
+              </>
+            ) : null}
           </div>
         </article>
       </div>

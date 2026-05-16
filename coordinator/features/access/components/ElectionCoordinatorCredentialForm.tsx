@@ -2,6 +2,7 @@ import { FormEvent, useMemo, useState } from 'react';
 import type { CoordinatorAccessRecord } from '@/features/auth/utils/coordinatorAccess';
 import { FloatingField } from '@/features/shared/components/FloatingField';
 import { SearchableSelect } from '@/features/shared/components/SearchableSelect';
+import { useDepedSchoolOptions } from '@/features/schools/hooks/useDepedSchoolOptions';
 import type {
   CreateElectionCredentialInput,
   RegistryElectionEvent,
@@ -32,10 +33,12 @@ export function ElectionCoordinatorCredentialForm({
   schools,
   schoolCode,
 }: ElectionCoordinatorCredentialFormProps) {
-  const [targetSchoolCode, setTargetSchoolCode] = useState(schoolCode);
+  const initialSchoolCode = schoolCode === '123456' ? '' : schoolCode;
+  const [targetSchoolCode, setTargetSchoolCode] = useState(initialSchoolCode);
+  const schoolOptions = useDepedSchoolOptions(schools, access?.region);
   const filteredEvents = useMemo(
-    () => events.filter((event) => event.schoolCode === (targetSchoolCode || schoolCode)),
-    [events, schoolCode, targetSchoolCode],
+    () => events.filter((event) => event.schoolCode === (targetSchoolCode || initialSchoolCode)),
+    [events, initialSchoolCode, targetSchoolCode],
   );
   const defaultEventId = filteredEvents[0]?.id || '';
   const [form, setForm] = useState<CreateElectionCredentialInput>({
@@ -50,7 +53,7 @@ export function ElectionCoordinatorCredentialForm({
     password: '',
     permissions: 'candidate.manage, ballot.audit, settings.manage',
     role: 'election_admin',
-    schoolCode,
+    schoolCode: initialSchoolCode,
     username: '',
   });
 
@@ -72,7 +75,7 @@ export function ElectionCoordinatorCredentialForm({
       [field]: value,
       electionId: field === 'electionId' ? value : current.electionId || activeEvents[0]?.id || '',
       actorAccess: access,
-      schoolCode: targetSchoolCode || schoolCode,
+      schoolCode: targetSchoolCode || initialSchoolCode,
     }));
   };
 
@@ -82,7 +85,7 @@ export function ElectionCoordinatorCredentialForm({
       ...form,
       actorAccess: access,
       electionId: form.electionId || activeEvents[0]?.id || '',
-      schoolCode: targetSchoolCode || schoolCode,
+      schoolCode: targetSchoolCode || initialSchoolCode,
     });
     setForm({
       actorAccess: access,
@@ -96,14 +99,14 @@ export function ElectionCoordinatorCredentialForm({
       password: '',
       permissions: 'candidate.manage, ballot.audit, settings.manage',
       role: 'election_admin',
-      schoolCode: targetSchoolCode || schoolCode,
+      schoolCode: targetSchoolCode || initialSchoolCode,
       username: '',
     });
   };
 
   return (
     <form className="registry-form" onSubmit={handleSubmit}>
-      {schools.length > 1 ? (
+      {schools.length ? (
         <SearchableSelect
           label="Target School"
           onChange={(value) => {
@@ -115,11 +118,8 @@ export function ElectionCoordinatorCredentialForm({
               schoolCode: value,
             }));
           }}
-          options={schools.map((entry) => ({
-            label: `${entry.schoolCode} - ${entry.schoolName}`,
-            value: entry.schoolCode,
-          }))}
-          value={targetSchoolCode || schoolCode}
+          options={schoolOptions}
+          value={targetSchoolCode || initialSchoolCode}
         />
       ) : null}
       <FloatingField

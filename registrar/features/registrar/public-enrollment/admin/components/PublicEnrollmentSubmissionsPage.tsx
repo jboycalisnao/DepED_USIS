@@ -1,0 +1,914 @@
+import React, { useEffect, useMemo, useState } from 'react';
+import { usePublicEnrollmentSubmissions } from '../../hooks/usePublicEnrollmentSubmissions';
+import { useStore } from '../../../../../store';
+import { supabase } from '../../../../../lib/supabase';
+import { SearchableSelect } from '../../../../../components/ui/SearchableSelect';
+import ConfirmationModal from '../../../../../components/ConfirmationModal';
+import TopCenterAlert from '../../../../../components/TopCenterAlert';
+import type { EnrollmentDraft, PublicEnrollmentSubmission } from '../../types';
+import {
+  createPublicEnrollmentSubmissionRecord,
+  deletePublicEnrollmentSubmissionRecord,
+  updatePublicEnrollmentSubmissionRecord,
+} from '../../services/publicEnrollmentSubmissions';
+import { validatePublicEnrollmentDraft } from '../../utils/validation';
+import {
+  deviceOptions,
+  gradeLevelOptions,
+  learnerCategoryOptions,
+  modalityOptions,
+  religionOptions,
+  semesterOptions,
+  studentTypeOptions,
+} from '../../data/enrollmentOptions';
+import '../../../../../styles/publicEnrollment.css';
+
+const SAME_SCHOOL_LABEL = 'Same School';
+const SHS_GRADES = new Set(['Grade 11', 'Grade 12']);
+const gradeLevelOrder = gradeLevelOptions.map((level) => ({ label: level, value: Number(level.replace(/\D/g, '')) }));
+
+function formatDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString();
+}
+
+function CloseIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" style={{ width: 18, height: 18 }}>
+      <path d="M6 6l12 12M18 6 6 18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+
+const emptyDraft = (schoolId: string): EnrollmentDraft => ({
+  schoolId,
+  schoolYear: '',
+  schoolToEnroll: '',
+  studentType: studentTypeOptions[0],
+  learnerCategory: learnerCategoryOptions[0],
+  previousSchool: '',
+  previousSchoolYear: '',
+  lastGradeLevel: '',
+  gradeToEnroll: '',
+  track: 'Academic Track',
+  strand: '',
+  semester: '',
+  birthCertificateNo: '',
+  lrn: '',
+  email: '',
+  lastName: '',
+  firstName: '',
+  middleName: '',
+  extensionName: '',
+  birthDate: '',
+  gender: 'Male',
+  placeOfBirth: '',
+  motherTongue: '',
+  religion: religionOptions[0],
+  is4Ps: 'No',
+  fourPsHouseholdId: '',
+  currentAddress: '',
+  permanentAddress: '',
+  fatherName: '',
+  fatherContact: '',
+  motherName: '',
+  motherContact: '',
+  guardianName: '',
+  guardianContact: '',
+  hasSpedNeed: 'No',
+  preferredModality: modalityOptions[0],
+  deviceAccess: deviceOptions[0],
+  hasInternet: 'Yes',
+  consent: true,
+});
+
+export default function PublicEnrollmentSubmissionsPage() {
+  const { registrarAccess, refreshData } = useStore();
+  const { submissions, isLoading, errorMessage, refresh } = usePublicEnrollmentSubmissions();
+  const [query, setQuery] = useState('');
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [editingSubmission, setEditingSubmission] = useState<PublicEnrollmentSubmission | null>(null);
+  const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const [isEnrollModalOpen, setIsEnrollModalOpen] = useState(false);
+  const [enrollingSubmission, setEnrollingSubmission] = useState<PublicEnrollmentSubmission | null>(null);
+  const [availableSections, setAvailableSections] = useState<Array<{ id: string; name: string }>>([]);
+  const [selectedSectionId, setSelectedSectionId] = useState('');
+  const [isEnrolling, setIsEnrolling] = useState(false);
+  const [enrollError, setEnrollError] = useState<string | null>(null);
+  const [topAlert, setTopAlert] = useState<{ title: string; message: string } | null>(null);
+  const [existingLearnerLrns, setExistingLearnerLrns] = useState<Set<string>>(new Set());
+  const [learnerEnrollmentYearsByLrn, setLearnerEnrollmentYearsByLrn] = useState<Record<string, Set<string>>>({});
+  const [collapsedGrades, setCollapsedGrades] = useState<Record<string, boolean>>({});
+  const [pendingDeleteSubmissionId, setPendingDeleteSubmissionId] = useState<string | null>(null);
+  const [isDeletingSubmission, setIsDeletingSubmission] = useState(false);
+  const schoolId = registrarAccess?.schoolId || '302522';
+  const [draftEditor, setDraftEditor] = useState<EnrollmentDraft>(() => emptyDraft(schoolId));
+  const isEditorSeniorHighTargetGrade = SHS_GRADES.has(draftEditor.gradeToEnroll);
+
+  const filtered = useMemo(() => {
+    const normalized = query.trim().toLowerCase();
+    if (!normalized) return submissions;
+    return submissions.filter((row) => {
+      const fullName = [row.last_name, row.first_name, row.middle_name].filter(Boolean).join(' ').toLowerCase();
+      const lrn = (row.lrn || '').toLowerCase();
+      const grade = (row.grade_to_enroll || '').toLowerCase();
+      return fullName.includes(normalized) || lrn.includes(normalized) || grade.includes(normalized);
+    });
+  }, [query, submissions]);
+
+  useEffect(() => {
+    const loadExistingLearners = async () => {
+      const lrns = Array.from(
+        new Set(
+          submissions
+            .map((row) => (row.lrn || row.payload?.lrn || '').trim())
+            .filter(Boolean)
+        )
+      );
+      if (!lrns.length) {
+        setExistingLearnerLrns(new Set());
+        setLearnerEnrollmentYearsByLrn({});
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('registrar_learners')
+        .select('lrn,enrollment_history')
+        .in('lrn', lrns);
+      if (error) return;
+
+      const allExistingLrns = new Set<string>();
+      const yearsByLrn: Record<string, Set<string>> = {};
+      for (const row of data || []) {
+        const lrn = String((row as any).lrn || '').trim();
+        if (!lrn) continue;
+        allExistingLrns.add(lrn);
+        const history = Array.isArray((row as any).enrollment_history) ? (row as any).enrollment_history : [];
+        yearsByLrn[lrn] = new Set(
+          history
+            .map((entry: any) => String(entry?.schoolYear || '').trim())
+            .filter(Boolean)
+        );
+      }
+
+      setExistingLearnerLrns(allExistingLrns);
+      setLearnerEnrollmentYearsByLrn(yearsByLrn);
+    };
+    loadExistingLearners();
+  }, [submissions]);
+
+  useEffect(() => {
+    if (!errorMessage) return;
+    setTopAlert({ title: 'Submission Issue', message: errorMessage });
+  }, [errorMessage]);
+
+  useEffect(() => {
+    if (!actionError) return;
+    setTopAlert({ title: 'Submission Issue', message: actionError });
+  }, [actionError]);
+
+  useEffect(() => {
+    if (!enrollError) return;
+    setTopAlert({ title: 'Enrollment Issue', message: enrollError });
+  }, [enrollError]);
+
+  const groupedByGrade = useMemo(() => {
+    const groups = new Map<string, PublicEnrollmentSubmission[]>();
+    filtered.forEach((row) => {
+      const grade = (row.grade_to_enroll || 'Unspecified').trim() || 'Unspecified';
+      if (!groups.has(grade)) groups.set(grade, []);
+      groups.get(grade)!.push(row);
+    });
+    return Array.from(groups.entries()).sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric: true }));
+  }, [filtered]);
+
+  useEffect(() => {
+    setCollapsedGrades((current) => {
+      const next = { ...current };
+      groupedByGrade.forEach(([grade]) => {
+        if (typeof next[grade] !== 'boolean') next[grade] = false;
+      });
+      return next;
+    });
+  }, [groupedByGrade]);
+
+  const openCreate = () => {
+    setActionError(null);
+    setEditingSubmission(null);
+    setDraftEditor(emptyDraft(schoolId));
+    setIsEditorOpen(true);
+  };
+
+  const openEdit = (row: PublicEnrollmentSubmission) => {
+    setActionError(null);
+    setEditingSubmission(row);
+    setDraftEditor({
+      ...emptyDraft(row.school_id || schoolId),
+      ...row.payload,
+      schoolId: row.school_id || row.payload?.schoolId || schoolId,
+      schoolYear: row.school_year || row.payload?.schoolYear || '',
+      lrn: row.lrn || row.payload?.lrn || '',
+      email: row.payload?.email || '',
+      firstName: row.first_name || row.payload?.firstName || '',
+      middleName: row.middle_name || row.payload?.middleName || '',
+      lastName: row.last_name || row.payload?.lastName || '',
+      gradeToEnroll: row.grade_to_enroll || row.payload?.gradeToEnroll || '',
+      guardianContact: row.guardian_contact || row.payload?.guardianContact || '',
+    });
+    setIsEditorOpen(true);
+  };
+
+  const closeEditor = () => {
+    setIsEditorOpen(false);
+    setEditingSubmission(null);
+    setActionError(null);
+  };
+
+  const updateDraftField = (name: keyof EnrollmentDraft, value: string | boolean) => {
+    if (typeof value === 'string') {
+      if (name === 'lrn') {
+        const next = value.replace(/\D/g, '').slice(0, 12);
+        setDraftEditor((current) => ({ ...current, [name]: next }));
+        return;
+      }
+      if (name === 'fatherContact' || name === 'motherContact' || name === 'guardianContact') {
+        const next = value.replace(/[^\d+]/g, '').slice(0, 15);
+        setDraftEditor((current) => ({ ...current, [name]: next }));
+        return;
+      }
+      if (name === 'previousSchoolYear') {
+        const next = value.replace(/[^\d-]/g, '').slice(0, 9);
+        setDraftEditor((current) => ({ ...current, [name]: next }));
+        return;
+      }
+    }
+    setDraftEditor((current) => ({ ...current, [name]: value }));
+  };
+
+  useEffect(() => {
+    const currentGrade = gradeLevelOrder.find((grade) => grade.label === draftEditor.lastGradeLevel);
+    const targetGrade = gradeLevelOrder.find((grade) => grade.label === draftEditor.gradeToEnroll);
+    const sameSchoolBlocked = draftEditor.learnerCategory === SAME_SCHOOL_LABEL && draftEditor.gradeToEnroll === 'Grade 7';
+    const progressionBlocked = currentGrade && targetGrade ? targetGrade.value <= currentGrade.value : false;
+    if (sameSchoolBlocked || progressionBlocked) {
+      setDraftEditor((current) => ({ ...current, gradeToEnroll: '' }));
+    }
+  }, [draftEditor.lastGradeLevel, draftEditor.gradeToEnroll, draftEditor.learnerCategory]);
+
+  useEffect(() => {
+    if (!isEditorSeniorHighTargetGrade) {
+      if (!draftEditor.strand && !draftEditor.semester) return;
+      setDraftEditor((current) => ({ ...current, strand: '', semester: '' }));
+      return;
+    }
+
+    if (!draftEditor.semester) {
+      setDraftEditor((current) => ({ ...current, semester: semesterOptions[0] }));
+    }
+  }, [isEditorSeniorHighTargetGrade, draftEditor.strand, draftEditor.semester]);
+
+  const saveSubmission = async () => {
+    setIsSaving(true);
+    setActionError(null);
+    try {
+      if (!draftEditor.consent) {
+        throw new Error('Please validate the privacy consent before continuing.');
+      }
+      if (!draftEditor.schoolId.trim()) {
+        throw new Error('School ID is required before submitting the enrollment form.');
+      }
+      const validationError = validatePublicEnrollmentDraft(draftEditor);
+      if (validationError) {
+        throw new Error(validationError);
+      }
+
+      const dbPayload = {
+        school_id: draftEditor.schoolId.trim() || null,
+        school_year: draftEditor.schoolYear.trim() || null,
+        first_name: draftEditor.firstName.trim() || null,
+        middle_name: draftEditor.middleName.trim() || null,
+        last_name: draftEditor.lastName.trim() || null,
+        lrn: draftEditor.lrn.trim() || null,
+        grade_to_enroll: draftEditor.gradeToEnroll.trim() || null,
+        guardian_contact: draftEditor.guardianContact.trim() || null,
+        payload: draftEditor,
+      };
+
+      if (editingSubmission) {
+        await updatePublicEnrollmentSubmissionRecord(editingSubmission.id, dbPayload);
+      } else {
+        await createPublicEnrollmentSubmissionRecord(dbPayload);
+      }
+
+      await refresh();
+      closeEditor();
+    } catch (error: any) {
+      setActionError(error?.message || 'Unable to save submission.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const removeSubmission = async (id: string) => {
+    setActionError(null);
+    setIsDeletingSubmission(true);
+    const visibleInList = submissions.some((entry) => entry.id === id);
+    try {
+      await deletePublicEnrollmentSubmissionRecord(id);
+      await refresh();
+      setPendingDeleteSubmissionId(null);
+    } catch (error: any) {
+      if (error?.code === 'NO_ROWS_DELETED' && visibleInList) {
+        setActionError('Delete blocked by database permission policy (RLS). The row is visible but current role is not allowed to delete it.');
+        return;
+      }
+      const diagnostics = [error?.message, error?.details, error?.hint].filter(Boolean).join(' | ');
+      setActionError(diagnostics || 'Unable to delete submission.');
+    } finally {
+      setIsDeletingSubmission(false);
+    }
+  };
+
+  const requestDeleteSubmission = (id: string | null | undefined) => {
+    if (!id) {
+      setActionError('Delete failed: submission id is missing.');
+      return;
+    }
+    setPendingDeleteSubmissionId(id);
+  };
+
+  const deleteSubmissionNow = async (id: string | null | undefined) => {
+    if (!id) {
+      setActionError('Delete failed: submission id is missing.');
+      return;
+    }
+    await removeSubmission(id);
+  };
+
+  const openEnrollModal = async (row: PublicEnrollmentSubmission) => {
+    setEnrollError(null);
+    setEnrollingSubmission(row);
+    setSelectedSectionId('');
+    setAvailableSections([]);
+    setIsEnrollModalOpen(true);
+    try {
+      const gradeLevel = row.grade_to_enroll || row.payload?.gradeToEnroll || '';
+      if (!gradeLevel) throw new Error('Submission has no Grade Level to Enroll.');
+      const { data: activeSchoolYear, error: syError } = await supabase
+        .from('registrar_school_years')
+        .select('id')
+        .eq('is_active', true)
+        .limit(1)
+        .maybeSingle();
+      if (syError || !activeSchoolYear?.id) throw new Error('Active school year not found.');
+      const { data: sectionRows, error: sectionError } = await supabase
+        .from('registrar_sections')
+        .select('id,name')
+        .eq('school_year_id', String(activeSchoolYear.id))
+        .eq('grade_level', gradeLevel)
+        .order('name', { ascending: true });
+      if (sectionError) throw sectionError;
+      setAvailableSections((sectionRows || []).map((rowData: any) => ({ id: String(rowData.id), name: String(rowData.name || '') })));
+    } catch (error: any) {
+      setEnrollError(error?.message || 'Unable to load section options.');
+    }
+  };
+
+  const closeEnrollModal = () => {
+    setIsEnrollModalOpen(false);
+    setEnrollingSubmission(null);
+    setAvailableSections([]);
+    setSelectedSectionId('');
+    setEnrollError(null);
+  };
+
+  const enrollToSchool = async () => {
+    if (!enrollingSubmission) return;
+    if (!selectedSectionId) {
+      setEnrollError('Please select a section.');
+      return;
+    }
+    const payload = enrollingSubmission.payload || ({} as EnrollmentDraft);
+    const lrn = (enrollingSubmission.lrn || payload.lrn || '').trim();
+    const gradeToEnroll = (enrollingSubmission.grade_to_enroll || payload.gradeToEnroll || '').trim();
+    if (!lrn) {
+      setEnrollError('LRN is required before enrolling this submission.');
+      return;
+    }
+    if (!gradeToEnroll) {
+      setEnrollError('Grade Level to Enroll is required.');
+      return;
+    }
+
+    setIsEnrolling(true);
+    setEnrollError(null);
+    try {
+      const { data: sectionInfo, error: sectionInfoError } = await supabase
+        .from('registrar_sections')
+        .select('name,school_year_id')
+        .eq('id', selectedSectionId)
+        .maybeSingle();
+      if (sectionInfoError || !sectionInfo) throw new Error('Selected section is invalid.');
+
+      const { data: schoolYearInfo } = await supabase
+        .from('registrar_school_years')
+        .select('label')
+        .eq('id', String(sectionInfo.school_year_id))
+        .maybeSingle();
+
+      const enrollmentEntry = {
+        id: crypto.randomUUID(),
+        schoolYear: String(schoolYearInfo?.label || enrollingSubmission.school_year || payload.schoolYear || ''),
+        gradeLevel: gradeToEnroll,
+        section: String(sectionInfo.name || ''),
+        enrollmentDate: new Date().toISOString(),
+        status: 'Enrolled',
+        submissionPayload: payload,
+      };
+
+      const { data: existingLearner } = await supabase
+        .from('registrar_learners')
+        .select('id,enrollment_history')
+        .eq('lrn', lrn)
+        .maybeSingle();
+
+      const upsertPayload: Record<string, any> = {
+        id: existingLearner?.id || crypto.randomUUID(),
+        lrn,
+        first_name: (enrollingSubmission.first_name || payload.firstName || '').trim() || null,
+        middle_name: (enrollingSubmission.middle_name || payload.middleName || '').trim() || null,
+        last_name: (enrollingSubmission.last_name || payload.lastName || '').trim() || null,
+        birth_date: (payload.birthDate || '').trim() || null,
+        gender: (payload.gender || '').trim() || null,
+        address: (payload.currentAddress || payload.permanentAddress || '').trim() || null,
+        contact_number: (enrollingSubmission.guardian_contact || payload.guardianContact || '').trim() || null,
+        guardian_name: (payload.guardianName || '').trim() || null,
+        father_name: (payload.fatherName || '').trim() || null,
+        mother_name: (payload.motherName || '').trim() || null,
+        status: 'Enrolled',
+        section_id: selectedSectionId,
+        school_id: (enrollingSubmission.school_id || payload.schoolId || schoolId).trim(),
+        email: (payload.email || '').trim() || null,
+        enrollment_history: [...(Array.isArray(existingLearner?.enrollment_history) ? existingLearner.enrollment_history : []), enrollmentEntry],
+      };
+
+      const { error: upsertError } = await supabase.from('registrar_learners').upsert(upsertPayload, { onConflict: 'lrn' });
+      if (upsertError) throw upsertError;
+
+      await updatePublicEnrollmentSubmissionRecord(enrollingSubmission.id, {
+        payload: {
+          ...payload,
+          consent: true,
+        },
+      });
+
+      await refresh();
+      closeEnrollModal();
+    } catch (error: any) {
+      setEnrollError(error?.message || 'Unable to enroll submission to learner records.');
+    } finally {
+      setIsEnrolling(false);
+    }
+  };
+
+  const updateLearnerInformation = async (row: PublicEnrollmentSubmission) => {
+    const payload = row.payload || ({} as EnrollmentDraft);
+    const lrn = (row.lrn || payload.lrn || '').trim();
+    if (!lrn) {
+      setActionError('LRN is required before updating learner information.');
+      return;
+    }
+
+    setIsSaving(true);
+    setActionError(null);
+    try {
+      const { data: existingLearner, error: findError } = await supabase
+        .from('registrar_learners')
+        .select('id,lrn,enrollment_history')
+        .eq('lrn', lrn)
+        .maybeSingle();
+
+      if (findError) throw findError;
+      if (!existingLearner?.id) throw new Error('Existing learner record not found for this LRN.');
+
+      const updatePayload: Record<string, any> = {
+        first_name: (row.first_name || payload.firstName || '').trim() || null,
+        middle_name: (row.middle_name || payload.middleName || '').trim() || null,
+        last_name: (row.last_name || payload.lastName || '').trim() || null,
+        birth_date: (payload.birthDate || '').trim() || null,
+        gender: (payload.gender || '').trim() || null,
+        address: (payload.currentAddress || payload.permanentAddress || '').trim() || null,
+        contact_number: (row.guardian_contact || payload.guardianContact || '').trim() || null,
+        guardian_name: (payload.guardianName || '').trim() || null,
+        father_name: (payload.fatherName || '').trim() || null,
+        mother_name: (payload.motherName || '').trim() || null,
+        school_id: (row.school_id || payload.schoolId || schoolId).trim(),
+        email: (payload.email || '').trim() || null,
+        enrollment_history: [
+          ...(Array.isArray(existingLearner.enrollment_history) ? existingLearner.enrollment_history : []),
+          {
+            id: crypto.randomUUID(),
+            schoolYear: (row.school_year || payload.schoolYear || '').trim(),
+            gradeLevel: (row.grade_to_enroll || payload.gradeToEnroll || '').trim(),
+            section: '',
+            enrollmentDate: new Date().toISOString(),
+            status: 'Information Updated',
+            submissionPayload: payload,
+          },
+        ],
+      };
+
+      // Keep the learner's existing LRN intact by updating via row id only.
+      const { error: updateError } = await supabase.from('registrar_learners').update(updatePayload).eq('id', existingLearner.id);
+      if (updateError) throw updateError;
+
+      setTopAlert({
+        title: 'Information Updated',
+        message: 'Learner information was updated. LRN was kept unchanged.',
+      });
+      await refreshData(true);
+    } catch (error: any) {
+      setActionError(error?.message || 'Unable to update learner information.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <section className="portal-panel registrar-public-enrollment-submissions">
+      <header className="portal-panel__header">
+        <h2>Online Enrollment Submissions</h2>
+        <p>Public enrollment form submissions received via the online enrollment page.</p>
+      </header>
+
+      <div className="portal-panel__body" style={{ display: 'grid', gap: 16 }}>
+        <div className="form-grid" style={{ gridTemplateColumns: 'minmax(240px, 1fr) auto auto', alignItems: 'stretch' }}>
+          <label className="floating-field">
+            <div className="floating-field__control">
+              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder=" " />
+              <span>Search name / LRN / grade</span>
+            </div>
+          </label>
+          <button type="button" className="secondary-button" style={{ minHeight: 56 }} onClick={() => refresh()} disabled={isLoading}>Refresh</button>
+          <div className="status-badge status-badge--open" style={{ minHeight: 56, display: 'flex', alignItems: 'center' }} aria-label="Submission count">{filtered.length} shown</div>
+        </div>
+
+        {isLoading ? (
+          <div className="table-card"><table className="usis-table"><tbody><tr><td>Loading submissions...</td></tr></tbody></table></div>
+        ) : groupedByGrade.length ? (
+          groupedByGrade.map(([grade, rows]) => (
+            <div key={grade} className="table-card">
+              <button
+                type="button"
+                onClick={() => setCollapsedGrades((current) => ({ ...current, [grade]: !current[grade] }))}
+                style={{ width: '100%', padding: '10px 14px', fontWeight: 800, color: 'var(--deped-blue)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+              >
+                <span>{grade} ({rows.length})</span>
+                <span className="material-symbols-outlined">{collapsedGrades[grade] ? 'expand_more' : 'expand_less'}</span>
+              </button>
+              {!collapsedGrades[grade] && (
+              <table className="usis-table">
+                <thead>
+                  <tr>
+                    <th>Date Received</th>
+                    <th>Learner</th>
+                    <th>LRN</th>
+                    <th>Status</th>
+                    <th>Guardian Contact</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((row) => {
+                    const displayName = [row.last_name, row.first_name, row.middle_name].filter(Boolean).join(', ') || '--';
+                    const rowLrn = (row.lrn || row.payload?.lrn || '').trim();
+                    const rowSchoolYear = (row.school_year || row.payload?.schoolYear || '').trim();
+                    const isExistingLearner = rowLrn ? existingLearnerLrns.has(rowLrn) : false;
+                    const enrolledYears = learnerEnrollmentYearsByLrn[rowLrn] || new Set<string>();
+                    const isExistingForSubmissionYear = rowSchoolYear ? enrolledYears.has(rowSchoolYear) : false;
+                    return (
+                      <tr key={row.id}>
+                        <td>{formatDate(row.created_at)}</td>
+                        <td>{displayName}</td>
+                        <td>{row.lrn || '--'}</td>
+                        <td>
+                          <span className={`status-badge ${isExistingForSubmissionYear ? 'status-badge--open' : ''}`}>
+                            {isExistingForSubmissionYear
+                              ? `Already in Learners (${rowSchoolYear || 'This S.Y.'})`
+                              : isExistingLearner
+                                ? `Existing Learner (${Array.from(enrolledYears).join(', ') || 'No S.Y. history'})`
+                                : 'New Applicant'}
+                          </span>
+                        </td>
+                        <td>{row.guardian_contact || '--'}</td>
+                        <td>
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            <button
+                              type="button"
+                              className="secondary-button"
+                              onClick={() => openEdit(row)}
+                              title="Edit submission"
+                              aria-label="Edit submission"
+                              style={{ minWidth: 40, width: 40, height: 40, padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                            >
+                              <span className="material-symbols-outlined" aria-hidden="true">edit</span>
+                            </button>
+                            <button
+                              type="button"
+                              className="secondary-button"
+                              onClick={() => {
+                                if (isExistingForSubmissionYear) return;
+                                if (isExistingLearner) {
+                                  void updateLearnerInformation(row);
+                                  return;
+                                }
+                                void openEnrollModal(row);
+                              }}
+                              disabled={isExistingForSubmissionYear}
+                              title={
+                                isExistingForSubmissionYear
+                                  ? `Already enrolled for ${rowSchoolYear || 'this school year'}`
+                                  : isExistingLearner
+                                    ? 'Update learner information'
+                                    : 'Enroll to school'
+                              }
+                              aria-label={
+                                isExistingForSubmissionYear
+                                  ? 'Already enrolled in learners for this school year'
+                                  : isExistingLearner
+                                    ? 'Update learner information'
+                                    : 'Enroll to school'
+                              }
+                              style={{ minHeight: 40, padding: '0 10px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                            >
+                              <span className="material-symbols-outlined" aria-hidden="true">
+                                {isExistingForSubmissionYear ? 'check_circle' : isExistingLearner ? 'sync' : 'school'}
+                              </span>
+                              <span>{isExistingLearner ? 'Update Information' : 'Enroll'}</span>
+                            </button>
+                            <button
+                              type="button"
+                              className="secondary-button"
+                              onClick={() => requestDeleteSubmission(row.id)}
+                              title="Delete submission"
+                              aria-label="Delete submission"
+                              style={{ minWidth: 40, width: 40, height: 40, padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                            >
+                              <span className="material-symbols-outlined" aria-hidden="true">delete</span>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              )}
+            </div>
+          ))
+        ) : (
+          <div className="table-card"><table className="usis-table"><tbody><tr><td>No submissions found.</td></tr></tbody></table></div>
+        )}
+      </div>
+
+      {isEditorOpen && (
+        <div className="modal-overlay modal-overlay--high" role="presentation">
+          <div className="modal-backdrop" onClick={closeEditor} />
+          <div className="modal-dialog modal-dialog--wide" role="dialog" aria-modal="true" aria-labelledby="public-enrollment-editor-title">
+            <div className="modal-dialog__header">
+              <div className="modal-dialog__title-group">
+                <h3 id="public-enrollment-editor-title">{editingSubmission ? 'Edit Submission' : 'Create Submission'}</h3>
+              </div>
+              <button type="button" className="modal-dialog__close" onClick={closeEditor} aria-label="Close edit submission">
+                <CloseIcon />
+              </button>
+            </div>
+
+            <div className="modal-dialog__body custom-scrollbar" style={{ paddingRight: 28 }}>
+              <div className="grid gap-6">
+              <section className="registrar-public-enrollment__section">
+                <h3>Enrollment Context</h3>
+                <div className="floating-field-grid">
+                <InputField label="School ID" value={draftEditor.schoolId} onChange={(value) => updateDraftField('schoolId', value)} />
+                <InputField label="School Year" value={draftEditor.schoolYear} onChange={(value) => updateDraftField('schoolYear', value)} />
+                <SelectField label="Student Type" value={draftEditor.studentType} onChange={(value) => updateDraftField('studentType', value)} options={studentTypeOptions as unknown as string[]} />
+                <SelectField label="Learner Category" value={draftEditor.learnerCategory} onChange={(value) => updateDraftField('learnerCategory', value)} options={learnerCategoryOptions as unknown as string[]} />
+                <InputField label="School to Enroll" value={draftEditor.schoolToEnroll} onChange={(value) => updateDraftField('schoolToEnroll', value)} />
+                <InputField label="Previous School Attended" value={draftEditor.previousSchool} onChange={(value) => updateDraftField('previousSchool', value)} />
+                <InputField
+                  label="Last S.Y. Attended"
+                  value={draftEditor.previousSchoolYear}
+                  onChange={(value) => updateDraftField('previousSchoolYear', value)}
+                  inputMode="numeric"
+                  maxLength={9}
+                  pattern="\\d{4}-\\d{4}"
+                />
+                <SelectField label="Last Grade Level Attended" value={draftEditor.lastGradeLevel} onChange={(value) => updateDraftField('lastGradeLevel', value)} options={gradeLevelOptions as unknown as string[]} />
+                <SelectField label="Grade Level to Enroll" value={draftEditor.gradeToEnroll} onChange={(value) => updateDraftField('gradeToEnroll', value)} options={gradeLevelOptions as unknown as string[]} />
+                <InputField label="Track" value={draftEditor.track} onChange={(value) => updateDraftField('track', value)} />
+                <InputField
+                  label="Preferred Strand"
+                  value={draftEditor.strand}
+                  onChange={(value) => updateDraftField('strand', value)}
+                  disabled={!isEditorSeniorHighTargetGrade}
+                />
+                <SelectField
+                  label="Semester"
+                  value={draftEditor.semester}
+                  onChange={(value) => updateDraftField('semester', value)}
+                  options={semesterOptions as unknown as string[]}
+                  disabled={!isEditorSeniorHighTargetGrade || !draftEditor.strand}
+                />
+              </div>
+              </section>
+
+              <section className="registrar-public-enrollment__section">
+                <h3>Learner Personal Information</h3>
+                <div className="floating-field-grid">
+                <InputField label="PSA Birth Certificate No." value={draftEditor.birthCertificateNo} onChange={(value) => updateDraftField('birthCertificateNo', value)} />
+                <InputField
+                  label="LRN"
+                  value={draftEditor.lrn}
+                  onChange={(value) => updateDraftField('lrn', value)}
+                  inputMode="numeric"
+                  maxLength={12}
+                  pattern="\\d{12}"
+                />
+                <InputField label="Email Address" value={draftEditor.email} onChange={(value) => updateDraftField('email', value)} type="email" />
+                <InputField label="Last Name" value={draftEditor.lastName} onChange={(value) => updateDraftField('lastName', value)} />
+                <InputField label="First Name" value={draftEditor.firstName} onChange={(value) => updateDraftField('firstName', value)} />
+                <InputField label="Middle Name" value={draftEditor.middleName} onChange={(value) => updateDraftField('middleName', value)} />
+                <InputField label="Extension Name" value={draftEditor.extensionName} onChange={(value) => updateDraftField('extensionName', value)} />
+                <InputField label="Date of Birth" value={draftEditor.birthDate} onChange={(value) => updateDraftField('birthDate', value)} type="date" />
+                <SelectField label="Gender" value={draftEditor.gender} onChange={(value) => updateDraftField('gender', value)} options={['Male', 'Female']} />
+                <InputField label="Place of Birth" value={draftEditor.placeOfBirth} onChange={(value) => updateDraftField('placeOfBirth', value)} />
+                <InputField label="Mother Tongue" value={draftEditor.motherTongue} onChange={(value) => updateDraftField('motherTongue', value)} />
+                <SelectField label="Religion" value={draftEditor.religion} onChange={(value) => updateDraftField('religion', value)} options={religionOptions as unknown as string[]} />
+                <SelectField label="4Ps Beneficiary" value={draftEditor.is4Ps} onChange={(value) => updateDraftField('is4Ps', value)} options={['Yes', 'No']} />
+                <InputField label="4Ps Household ID" value={draftEditor.fourPsHouseholdId} onChange={(value) => updateDraftField('fourPsHouseholdId', value)} />
+              </div>
+              </section>
+
+              <section className="registrar-public-enrollment__section">
+                <h3>Address Information</h3>
+                <div className="floating-field-grid">
+                <InputField label="Current Address" value={draftEditor.currentAddress} onChange={(value) => updateDraftField('currentAddress', value)} />
+                <InputField label="Permanent Address" value={draftEditor.permanentAddress} onChange={(value) => updateDraftField('permanentAddress', value)} />
+              </div>
+              </section>
+
+              <section className="registrar-public-enrollment__section">
+                <h3>Parent, Guardian, and Access</h3>
+                <div className="floating-field-grid">
+                <InputField label="Father's Full Name" value={draftEditor.fatherName} onChange={(value) => updateDraftField('fatherName', value)} />
+                <InputField label="Father's Contact Number" value={draftEditor.fatherContact} onChange={(value) => updateDraftField('fatherContact', value)} inputMode="tel" maxLength={15} />
+                <InputField label="Mother's Maiden Name" value={draftEditor.motherName} onChange={(value) => updateDraftField('motherName', value)} />
+                <InputField label="Mother's Contact Number" value={draftEditor.motherContact} onChange={(value) => updateDraftField('motherContact', value)} inputMode="tel" maxLength={15} />
+                <InputField label="Legal Guardian's Name" value={draftEditor.guardianName} onChange={(value) => updateDraftField('guardianName', value)} />
+                <InputField label="Guardian's Contact Number" value={draftEditor.guardianContact} onChange={(value) => updateDraftField('guardianContact', value)} inputMode="tel" maxLength={15} />
+                <SelectField label="SPED Need" value={draftEditor.hasSpedNeed} onChange={(value) => updateDraftField('hasSpedNeed', value)} options={['Yes', 'No']} />
+                <SelectField label="Preferred Learning Modality" value={draftEditor.preferredModality} onChange={(value) => updateDraftField('preferredModality', value)} options={modalityOptions as unknown as string[]} />
+                <SelectField label="Preferred Device" value={draftEditor.deviceAccess} onChange={(value) => updateDraftField('deviceAccess', value)} options={deviceOptions as unknown as string[]} />
+                <SelectField label="Internet Access" value={draftEditor.hasInternet} onChange={(value) => updateDraftField('hasInternet', value)} options={['Yes', 'No']} />
+              </div>
+              </section>
+            </div>
+            </div>
+
+            <div className="modal-dialog__actions">
+              <button type="button" className="modal-dialog__primary" onClick={closeEditor} disabled={isSaving}>Cancel</button>
+              <button type="button" className="modal-dialog__blue" onClick={saveSubmission} disabled={isSaving}>
+                {isSaving ? 'Saving...' : 'Save Submission'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isEnrollModalOpen && enrollingSubmission && (
+        <div className="modal-overlay modal-overlay--high" role="presentation">
+          <div className="modal-backdrop" onClick={closeEnrollModal} />
+          <div className="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="enroll-to-school-title">
+            <div className="modal-dialog__header">
+              <div className="modal-dialog__title-group">
+                <h3 id="enroll-to-school-title">Enroll to School</h3>
+              </div>
+              <button type="button" className="modal-dialog__close" onClick={closeEnrollModal} disabled={isEnrolling} aria-label="Close enroll modal">
+                <CloseIcon />
+              </button>
+            </div>
+            <div className="modal-dialog__body">
+              <div className="grid gap-3">
+              <InputField label="Learner" value={[enrollingSubmission.last_name, enrollingSubmission.first_name].filter(Boolean).join(', ')} onChange={() => {}} readOnly />
+              <InputField label="Grade Level to Enroll" value={enrollingSubmission.grade_to_enroll || ''} onChange={() => {}} readOnly />
+              <label className="grid gap-1">
+                <span className="text-[11px] font-bold text-outline uppercase tracking-wide">Section (Active School Year)</span>
+                <select
+                  value={selectedSectionId}
+                  onChange={(event) => setSelectedSectionId(event.target.value)}
+                  className="w-full rounded-xl border border-surfaceVariant bg-white px-3 py-2 text-sm text-onSurface outline-none focus:ring-2 focus:ring-primary/20"
+                >
+                  <option value="">Select section</option>
+                  {availableSections.map((sectionRow) => (
+                    <option key={sectionRow.id} value={sectionRow.id}>{sectionRow.name}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            </div>
+            <div className="modal-dialog__actions">
+              <button type="button" className="modal-dialog__primary" onClick={closeEnrollModal} disabled={isEnrolling}>Cancel</button>
+              <button type="button" className="modal-dialog__blue" onClick={enrollToSchool} disabled={isEnrolling || !availableSections.length}>
+                {isEnrolling ? 'Enrolling...' : 'Enroll to Learners'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <ConfirmationModal
+        isOpen={!!pendingDeleteSubmissionId}
+        type="danger"
+        title="Delete Submission"
+        message="Delete this enrollment submission? This cannot be undone."
+        confirmLabel="Delete Submission"
+        onConfirm={async () => {
+          await deleteSubmissionNow(pendingDeleteSubmissionId);
+        }}
+        onCancel={() => {
+          if (isDeletingSubmission) return;
+          setPendingDeleteSubmissionId(null);
+        }}
+        isLoading={isDeletingSubmission}
+      />
+
+      <TopCenterAlert
+        open={!!topAlert}
+        title={topAlert?.title || 'Notice'}
+        message={topAlert?.message || ''}
+        type="danger"
+        onClose={() => setTopAlert(null)}
+      />
+    </section>
+  );
+}
+
+type InputProps = {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  type?: string;
+  readOnly?: boolean;
+  disabled?: boolean;
+  inputMode?: 'text' | 'search' | 'none' | 'tel' | 'url' | 'email' | 'numeric' | 'decimal';
+  maxLength?: number;
+  pattern?: string;
+};
+
+function InputField({ label, value, onChange, type = 'text', readOnly = false, disabled = false, inputMode, maxLength, pattern }: InputProps) {
+  return (
+    <label className="floating-field">
+      <div className="floating-field__control">
+        <input
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          type={type}
+          readOnly={readOnly}
+          disabled={disabled}
+          inputMode={inputMode}
+          maxLength={maxLength}
+          pattern={pattern}
+          placeholder=" "
+        />
+        <span>{label}</span>
+      </div>
+    </label>
+  );
+}
+
+type SelectProps = {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: string[];
+  disabled?: boolean;
+};
+
+function SelectField({ label, value, onChange, options, disabled = false }: SelectProps) {
+  const normalizedOptions = options.map((option) => ({ value: option, label: option }));
+  return (
+    <SearchableSelect
+      label={label}
+      placeholder={label}
+      floatingLabel
+      showLabel={false}
+      value={value}
+      onChange={onChange}
+      disabled={disabled}
+      options={normalizedOptions}
+    />
+  );
+}
