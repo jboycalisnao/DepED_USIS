@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@deped-usis/shared-supabase';
 import { FloatingInput } from '@/components/ui/FloatingField';
 import { storeSpPortalAdminAccess } from '@/features/admin/utils/spPortalAdminAccess';
+import { hasCoordinatorModuleAccess } from '../../../../../common/auth/moduleAccess';
 
 type AccessMode = 'sign-in' | 'sign-up';
 
@@ -106,10 +107,11 @@ async function resolveSeededCredentialAccess(schoolId: string, email: string, pa
     return null;
   }
 
-  const hasCoreAccess = coreRecords.some(
-    (record) =>
-      hasValidPassword(record) && allowedSchoolIds.has(record.school_id),
-  );
+  const hasCoreAccess = coreRecords.some((record) => {
+    if (!hasValidPassword(record) || !allowedSchoolIds.has(record.school_id)) return false;
+    if (record.is_super_admin || record.role === 'system_admin') return true;
+    return hasCoordinatorModuleAccess(record.id, 'sp_portal');
+  });
 
   if (hasCoreAccess) {
     return { type: 'applicant' };

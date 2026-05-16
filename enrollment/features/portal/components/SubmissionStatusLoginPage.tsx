@@ -41,36 +41,15 @@ export function SubmissionStatusLoginPage({ onLogin }: Props) {
             password={password}
             isSubmitting={isSubmitting}
             submitLabel="Sign In"
+            noticeTitle="Login Notice"
+            noticeMessage={error}
+            onDismissNotice={() => setError(null)}
             onUsernameChange={setUsername}
             onPasswordChange={setPassword}
             onSubmit={onSubmit}
           />
         </section>
       </div>
-
-      {error ? (
-        <div className="modal-overlay">
-          <div className="modal-backdrop" onClick={() => setError(null)}></div>
-          <div className="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="submission-login-notice-title">
-            <div className="modal-dialog__header">
-              <div className="modal-dialog__title-group">
-                <h3 id="submission-login-notice-title">Login Notice</h3>
-              </div>
-              <button type="button" className="modal-dialog__close" onClick={() => setError(null)} aria-label="Close login notice">
-                <span className="material-symbols-outlined">close</span>
-              </button>
-            </div>
-            <div className="modal-dialog__body">
-              <p>{error}</p>
-            </div>
-            <div className="modal-dialog__actions">
-              <button type="button" className="modal-dialog__blue" onClick={() => setError(null)}>
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
     </main>
   );
 }

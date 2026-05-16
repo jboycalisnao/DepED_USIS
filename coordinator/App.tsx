@@ -7,8 +7,6 @@ import { CredentialsPage } from './features/access/pages/CredentialsPage';
 import { RegistryPage } from './features/access/pages/RegistryPage';
 import { RequireRegistrationAccess } from './features/registration/components/RequireRegistrationAccess';
 import { RegistrationCredentialsPage } from './features/registration/pages/RegistrationCredentialsPage';
-import { RegistrationPortalPage } from './features/registration/pages/RegistrationPortalPage';
-import { SchoolsDirectoryPage } from './features/schools/pages/SchoolsDirectoryPage';
 
 export default function App() {
   return (
@@ -21,11 +19,10 @@ export default function App() {
             <Route path="/admin" element={<AdminLayout />}>
               <Route index element={<Navigate to="/admin/credentials" replace />} />
               <Route path="credentials" element={<CredentialsPage />} />
-              <Route path="schools" element={<SchoolsDirectoryPage />} />
               <Route path="registry" element={<RegistryPage />} />
             </Route>
           </Route>
-          <Route path="/registration" element={<RegistrationPortalPage />} />
+          <Route path="/registration" element={<Navigate to="/login" replace />} />
           <Route element={<RequireRegistrationAccess />}>
             <Route path="/registration/credentials" element={<RegistrationCredentialsPage />} />
           </Route>

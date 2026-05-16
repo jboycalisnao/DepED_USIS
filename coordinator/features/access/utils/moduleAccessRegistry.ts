@@ -1,0 +1,26 @@
+import {
+  getCoordinatorModuleAccessMap,
+  setCoordinatorAccountModuleAccess,
+} from '../../../../common/auth/moduleAccess';
+import type { UsisModuleKey } from '../../../../common/auth/moduleAccess';
+
+export type { UsisModuleKey };
+
+export const moduleOptions: Array<{ key: UsisModuleKey; label: string }> = [
+  { key: 'coordinator', label: 'Coordinator Portal' },
+  { key: 'registrar', label: 'Registrar' },
+  { key: 'attendance', label: 'Attendance' },
+  { key: 'election', label: 'Election' },
+  { key: 'sp_portal', label: 'SP Portal' },
+  { key: 'learner_portal', label: 'Learner Portal' },
+];
+
+type ModuleAccessMap = Record<string, UsisModuleKey[]>;
+
+export const getModuleAccessMap = (): ModuleAccessMap => getCoordinatorModuleAccessMap();
+
+export const setAccountModuleAccess = (accountId: string, modules: UsisModuleKey[]) => {
+  setCoordinatorAccountModuleAccess(accountId, modules);
+};
+
+export const getAccountModuleAccess = (accountId: string) => getModuleAccessMap()[accountId] || [];

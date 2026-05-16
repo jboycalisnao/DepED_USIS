@@ -14,16 +14,18 @@ const LandingContent: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
 
   const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setLoading(true);
+    setError(null);
     const result = await login(username, password);
     if (result.ok) {
       message.success('Access granted. Synchronizing systems...');
       return;
     }
-    message.error(result.error || 'Authentication failed. Please verify credentials.');
+    setError(result.error || 'Authentication failed. Please verify credentials.');
     setLoading(false);
   };
 
@@ -48,6 +50,9 @@ const LandingContent: React.FC = () => {
               password={password}
               isSubmitting={loading}
               submitLabel="Login"
+              noticeTitle="Access Denied"
+              noticeMessage={error}
+              onDismissNotice={() => setError(null)}
               onUsernameChange={setUsername}
               onPasswordChange={setPassword}
               onSubmit={onSubmit}

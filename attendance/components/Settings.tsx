@@ -50,7 +50,7 @@ const Settings: React.FC<SettingsProps> = ({ settings, onUpdate }) => {
   );
 
   return (
-    <div className="max-w-4xl mx-auto w-full space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
+    <div className="w-full space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
       <div className="flex items-center gap-6">
         <div className="w-14 h-14 bg-white border border-gray-200 rounded-xl flex items-center justify-center shadow-sm">
           <span className="material-symbols-outlined text-primary-600 text-3xl leading-none">tune</span>

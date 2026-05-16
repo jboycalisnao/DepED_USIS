@@ -50,6 +50,8 @@ const determineAttendanceType = (now: Date, settings: TimeSlotSettings): Attenda
 
 const App: React.FC = () => {
   const [access, setAccess] = useState<AttendanceAccessRecord | null>(() => getStoredAttendanceAccess());
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement | null>(null);
   const monitor1 = useSerial(0);
   const monitor2 = useSerial(1);
   const monitor3 = useSerial(2);
@@ -257,6 +259,29 @@ const App: React.FC = () => {
   );
 
   const selectedLearner = learners.find(l => l.id === selectedLearnerId) || null;
+  const profileInitials = String(access.displayName || '')
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((token) => token.charAt(0).toUpperCase())
+    .join('') || 'US';
+  const currentSectionLabel =
+    currentView === 'registrar'
+      ? 'Registrar'
+      : currentView === 'attendance'
+        ? 'Attendance Records'
+        : 'Settings';
+
+  useEffect(() => {
+    if (!isProfileOpen) return;
+    const handleClickOutside = (event: MouseEvent) => {
+      if (!profileMenuRef.current) return;
+      if (profileMenuRef.current.contains(event.target as Node)) return;
+      setIsProfileOpen(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isProfileOpen]);
 
   if (isStandbyMode) {
     return (
@@ -286,98 +311,143 @@ const App: React.FC = () => {
               searchValue={searchQuery}
               onSearchChange={setSearchQuery}
             />
-            <nav className="kit-nav" aria-label="Attendance module sections">
-              <div className="kit-nav__grid">
-                <a
-                  href="#"
-                  onClick={(event) => {
-                    event.preventDefault();
-                    setCurrentView('registrar');
-                  }}
-                  className={`kit-nav__link ${currentView === 'registrar' ? 'kit-nav__link--active' : ''}`}
-                >
-                  Registrar
-                </a>
-                <a
-                  href="#"
-                  onClick={(event) => {
-                    event.preventDefault();
-                    setCurrentView('attendance');
-                  }}
-                  className={`kit-nav__link ${currentView === 'attendance' ? 'kit-nav__link--active' : ''}`}
-                >
-                  Attendance Records
-                </a>
-                <a
-                  href="#"
-                  onClick={(event) => {
-                    event.preventDefault();
-                    setCurrentView('settings');
-                  }}
-                  className={`kit-nav__link ${currentView === 'settings' ? 'kit-nav__link--active' : ''}`}
-                >
-                  Settings
-                </a>
-              </div>
-            </nav>
           </div>
         </div>
       </header>
-      <div className="attendance-shell flex-grow space-y-8">
-        <div className="attendance-toolbar">
-          <button
-            onClick={() => setIsStandbyMode(true)}
-            className="attendance-toolbar__kiosk"
-            type="button"
-          >
-            Kiosk Mode
-          </button>
-          <div className="attendance-toolbar__monitors">
-            {monitors.map((m, i) => (
-              <div key={i} className="attendance-toolbar__monitor">
-                <span className="attendance-toolbar__label">M{i + 1}</span>
-                <select
-                  value={baudRates[i]}
-                  onChange={e => {
-                    const baudRate = Number(e.target.value);
-                    setBaudRates(prev => {
-                      const next = [...prev];
-                      next[i] = baudRate;
-                      return next;
-                    });
-                    localStorage.setItem(`last_baud_rate_${i}`, baudRate.toString());
-                  }}
-                >
-                  <option value={9600}>9600</option>
-                  <option value={115200}>115200</option>
-                </select>
-                <button
-                  onClick={m.status === 'connected' ? () => monitors[i].disconnect() : () => monitors[i].connect({ baudRate: baudRates[i] })}
-                  type="button"
-                >
-                  {m.status === 'connected' ? 'OFF' : 'ON'}
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="attendance-session-row">
-          <p className="attendance-session-row__text">
-            Signed in: <strong>{access.displayName}</strong> | {access.schoolName}
+      <div className="attendance-shell flex-grow">
+        <section className="attendance-page-intro" aria-label="Current attendance page">
+          <p className="attendance-breadcrumb">
+            <span className="attendance-breadcrumb__root">Attendance Portal</span>
+            <span className="attendance-breadcrumb__sep" aria-hidden="true">/</span>
+            <span className="attendance-breadcrumb__current">{currentSectionLabel}</span>
           </p>
-          <button
-            className="attendance-session-row__logout"
-            type="button"
-            onClick={() => {
-              clearStoredAttendanceAccess();
-              setAccess(null);
-            }}
-          >
-            Sign Out
-          </button>
-        </div>
-
-        <main className="attendance-main animate-in fade-in duration-700">
+          <div className="attendance-header__actions">
+            <div className="attendance-profile-menu" ref={profileMenuRef}>
+              <button
+                type="button"
+                className="attendance-profile-chip"
+                title={access.displayName}
+                aria-label={`Signed in as ${access.displayName}`}
+                aria-haspopup="menu"
+                aria-expanded={isProfileOpen}
+                onClick={() => setIsProfileOpen((current) => !current)}
+              >
+                {profileInitials}
+              </button>
+              {isProfileOpen ? (
+                <div className="attendance-profile-popover" role="menu" aria-label="Profile menu">
+                  <div className="attendance-profile-popover__avatar" aria-hidden="true">
+                    {profileInitials}
+                  </div>
+                  <p className="attendance-profile-popover__name">{access.displayName}</p>
+                  <p className="attendance-profile-popover__meta">{access.schoolName}</p>
+                  <div className="attendance-profile-popover__divider" />
+                  <button
+                    type="button"
+                    className="attendance-profile-popover__logout"
+                    onClick={() => {
+                      clearStoredAttendanceAccess();
+                      setAccess(null);
+                    }}
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true" className="attendance-logout-icon">
+                      <path d="M3 4.5h10v15H3v-15Z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                      <path d="M13 12h8" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                      <path d="m18 8 4 4-4 4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    Logout
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </section>
+        <div className="attendance-layout">
+          <aside className="attendance-side-nav" aria-label="Attendance sections">
+            <nav className="attendance-side-nav__menu">
+              <button
+                type="button"
+                className={`attendance-side-nav__link ${currentView === 'registrar' ? 'attendance-side-nav__link--active' : ''}`}
+                onClick={() => setCurrentView('registrar')}
+              >
+                <span className="material-symbols-outlined" aria-hidden="true">badge</span>
+                Registrar
+              </button>
+              <button
+                type="button"
+                className={`attendance-side-nav__link ${currentView === 'attendance' ? 'attendance-side-nav__link--active' : ''}`}
+                onClick={() => setCurrentView('attendance')}
+              >
+                <span className="material-symbols-outlined" aria-hidden="true">event_note</span>
+                Attendance Records
+              </button>
+              <button
+                type="button"
+                className={`attendance-side-nav__link ${currentView === 'settings' ? 'attendance-side-nav__link--active' : ''}`}
+                onClick={() => setCurrentView('settings')}
+              >
+                <span className="material-symbols-outlined" aria-hidden="true">settings</span>
+                Settings
+              </button>
+            </nav>
+            <div className="attendance-side-nav__footer">
+              <button
+                className="attendance-side-nav__logout"
+                type="button"
+                onClick={() => {
+                  clearStoredAttendanceAccess();
+                  setAccess(null);
+                }}
+              >
+                <span className="material-symbols-outlined" aria-hidden="true">logout</span>
+                Sign Out
+              </button>
+            </div>
+          </aside>
+          <div className="attendance-content space-y-8">
+            <div className="attendance-toolbar">
+              <button
+                onClick={() => setIsStandbyMode(true)}
+                className="attendance-toolbar__kiosk"
+                type="button"
+              >
+                Kiosk Mode
+              </button>
+              <div className="attendance-toolbar__monitors">
+                {monitors.map((m, i) => (
+                  <div key={i} className="attendance-toolbar__monitor">
+                    <span className="attendance-toolbar__label">M{i + 1}</span>
+                    <select
+                      value={baudRates[i]}
+                      onChange={e => {
+                        const baudRate = Number(e.target.value);
+                        setBaudRates(prev => {
+                          const next = [...prev];
+                          next[i] = baudRate;
+                          return next;
+                        });
+                        localStorage.setItem(`last_baud_rate_${i}`, baudRate.toString());
+                      }}
+                    >
+                      <option value={9600}>9600</option>
+                      <option value={115200}>115200</option>
+                    </select>
+                    <button
+                      onClick={m.status === 'connected' ? () => monitors[i].disconnect() : () => monitors[i].connect({ baudRate: baudRates[i] })}
+                      type="button"
+                    >
+                      {m.status === 'connected' ? 'OFF' : 'ON'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="attendance-session-row">
+              <p className="attendance-session-row__text">
+                Session active for <strong>{access.displayName}</strong>
+              </p>
+            </div>
+            <main className="attendance-main animate-in fade-in duration-700">
           {currentView === 'registrar' && (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
               <div className="lg:col-span-4 space-y-6">
@@ -438,7 +508,9 @@ const App: React.FC = () => {
           {currentView === 'settings' && (
             <Settings settings={settings} onUpdate={updateSettings} />
           )}
-        </main>
+            </main>
+          </div>
+        </div>
       </div>
 
       <UsisGlobalFooter />

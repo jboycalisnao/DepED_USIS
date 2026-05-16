@@ -133,8 +133,72 @@
   padding-right: 28px;
 }
 
+/* Let searchable dropdown menus overlay above modal content (not clipped inside body). */
+.registrar-public-enrollment-submissions .modal-dialog {
+  overflow: visible;
+}
+
+.registrar-public-enrollment-submissions .modal-dialog__body {
+  overflow: visible;
+}
+
+.registrar-public-enrollment-submissions .searchable-select {
+  position: relative;
+  z-index: 30;
+}
+
+.registrar-public-enrollment-submissions .searchable-select__menu {
+  z-index: 1200;
+}
+
 @media (max-width: 720px) {
   .registrar-public-enrollment .portal-panel__body {
     padding: 16px;
   }
+}
+
+/* Normalize floating input/select heights across submission and learner edit modals */
+.registrar-public-enrollment-submissions .floating-field__control input,
+.registrar-public-enrollment-submissions .floating-field__control select,
+.registrar-public-enrollment-submissions .searchable-select--floating .floating-field__control input,
+.registrar-public-enrollment-submissions .searchable-select--floating .searchable-select__toggle,
+.registrar-learners-page .floating-field__control input,
+.registrar-learners-page .floating-field__control select,
+.registrar-learners-page .searchable-select--floating .floating-field__control input,
+.registrar-learners-page .searchable-select--floating .searchable-select__toggle {
+  min-height: 64px;
+  height: 64px;
+  font-family: "Segoe UI", "Segoe UI Variable", Tahoma, Arial, sans-serif !important;
+}
+
+.registrar-public-enrollment-submissions .searchable-select--floating .floating-field__control,
+.registrar-learners-page .searchable-select--floating .floating-field__control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.registrar-public-enrollment-submissions .searchable-select--floating .floating-field__control input,
+.registrar-learners-page .searchable-select--floating .floating-field__control input {
+  border-right: 0;
+  border-radius: 12px 0 0 12px;
+  padding-right: 16px;
+}
+
+.registrar-public-enrollment-submissions .searchable-select--floating .searchable-select__toggle,
+.registrar-learners-page .searchable-select--floating .searchable-select__toggle {
+  position: static;
+  top: auto;
+  right: auto;
+  width: 56px;
+  min-width: 56px;
+  min-height: 64px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transform: none;
+  border: 1px solid rgba(18, 35, 61, 0.14);
+  border-left: 0;
+  border-radius: 0 12px 12px 0;
+  background: #fbfcff;
+  color: var(--deped-blue);
 }

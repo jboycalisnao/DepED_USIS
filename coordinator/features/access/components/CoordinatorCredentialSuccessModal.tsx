@@ -42,77 +42,28 @@ Thank you for ensuring the DepEd delivers quality education.`;
   };
 
   return (
-    <div className="modal-overlay">
-      <div className="modal-content section-card">
-        <div className="section-card__bar" />
-        <div className="section-card__content">
-          <p className="section-card__eyebrow">Account Created Successfully</p>
-          <h3 className="admin-shell__title" style={{ margin: '8px 0 16px' }}>Credential Summary</h3>
-          
-          <p className="registry-copy" style={{ marginBottom: '20px' }}>
-            The account has been created. Please copy the summary below and share it securely with the user.
-          </p>
-
-          <div className="credential-summary-box">
-            <pre className="credential-summary-text">{summaryText}</pre>
-          </div>
-
-          <div className="modal-actions" style={{ marginTop: '24px', display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-            <button 
-              className="admin-shell__logout" 
-              onClick={handleCopy}
-              style={{ background: copied ? '#0f6b3c' : 'var(--deped-blue)' }}
-            >
-              {copied ? 'Copied to Clipboard!' : 'Copy to Clipboard'}
-            </button>
-            <button 
-              className="admin-shell__logout" 
-              onClick={onClose}
-              style={{ background: 'transparent', border: '1px solid var(--deped-line)', color: 'var(--deped-ink)' }}
-            >
-              Close
-            </button>
+    <div className="modal-overlay modal-overlay--high" role="presentation">
+      <div className="modal-backdrop" onClick={onClose} />
+      <div className="modal-dialog modal-dialog--wide" role="dialog" aria-modal="true" aria-label="Credential summary">
+        <div className="modal-dialog__header">
+          <div className="modal-dialog__title-group">
+            <p className="modal-dialog__eyebrow">Account Created Successfully</p>
+            <h3>Credential Summary</h3>
           </div>
         </div>
+        <div className="modal-dialog__body">
+          <p className="registry-copy">The account has been created. Please copy the summary below and share it securely with the user.</p>
+          <div className="modal-record" style={{ marginTop: 12 }}>
+            <pre className="credential-summary-text" style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{summaryText}</pre>
+          </div>
+        </div>
+        <div className="modal-dialog__actions">
+          <button type="button" className="modal-dialog__blue" onClick={handleCopy}>
+            {copied ? 'Copied to Clipboard!' : 'Copy to Clipboard'}
+          </button>
+          <button type="button" onClick={onClose}>Close</button>
+        </div>
       </div>
-
-      <style dangerouslySetInnerHTML={{ __html: `
-        .modal-overlay {
-          position: fixed;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background: rgba(18, 35, 61, 0.4);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          z-index: 9999;
-          padding: 20px;
-          backdrop-filter: blur(4px);
-        }
-        .modal-content {
-          width: 100%;
-          max-width: 600px;
-          box-shadow: var(--deped-shadow);
-        }
-        .credential-summary-box {
-          background: #f8fafc;
-          border: 1px solid var(--deped-line);
-          border-radius: 8px;
-          padding: 16px;
-          max-height: 300px;
-          overflow-y: auto;
-        }
-        .credential-summary-text {
-          margin: 0;
-          white-space: pre-wrap;
-          font-family: inherit;
-          font-size: 13px;
-          line-height: 1.5;
-          color: var(--deped-ink);
-        }
-      `}} />
     </div>
   );
 }

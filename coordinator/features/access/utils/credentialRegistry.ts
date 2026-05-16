@@ -2,6 +2,7 @@ import { supabase } from '../../../../packages/shared-supabase/src';
 import { fetchDepedSchools, fetchDepedSchoolById } from '../../schools/services/depedSchoolApi';
 import { mapToLocalSchoolSchema } from '../../schools/utils/depedSchoolParser';
 import type { CoordinatorAccessRecord } from '@/features/auth/utils/coordinatorAccess';
+import type { UsisModuleKey } from '../../../../common/auth/moduleAccess';
 import {
   canAssignCoreAccessLevel,
   getDefaultCoreAccessLevelForRole,
@@ -92,6 +93,7 @@ export interface CreateCoreCredentialInput {
   role: string;
   schoolCode: string;
   username: string;
+  allowedModules?: UsisModuleKey[];
 }
 
 export interface CreateElectionCredentialInput {
@@ -213,6 +215,9 @@ const getScopedSchools = async (access: CoordinatorAccessRecord) => {
 
 const normalizeName = (value: string) => value.trim();
 const normalizeIdentity = (value: string) => value.trim().toLowerCase();
+const resolveCoreEmail = (username: string) => `${normalizeIdentity(username)}@usis.local`;
+const resolvePersistedCoreRole = (role: string) =>
+  role === 'attendance_coordinator' ? 'school_usis_coordinator' : role;
 
 const parsePermissions = (value: string) =>
   value
@@ -236,6 +241,11 @@ const formatPermissions = (value: unknown) => {
 
 const isMissingSpPortalTable = (error: { code?: string; message?: string } | null) =>
   error?.code === '42P01' || error?.message?.includes('sp_portal_coordinators');
+
+const formatDbError = (error: { message?: string; details?: string; hint?: string } | null, fallback: string) => {
+  if (!error) return fallback;
+  return [error.message, error.details, error.hint].filter(Boolean).join(' | ') || fallback;
+};
 
 export const loadCredentialRegistrySnapshot = async (
   access: CoordinatorAccessRecord,
@@ -596,7 +606,7 @@ export const createSpPortalCoordinatorCredential = async (input: CreateSpPortalC
   ]);
 
   if (error) {
-    throw new Error(error.message || 'Unable to create the SP Portal coordinator credential.');
+    throw new Error(formatDbError(error, 'Unable to create the SP Portal coordinator credential.'));
   }
 };
 
@@ -604,7 +614,7 @@ export const createCoreCoordinatorCredential = async (input: CreateCoreCredentia
   const moduleScopedRole = input.role === 'registrar_coordinator' || input.role === 'attendance_coordinator';
   const nextAccessLevel = 'school';
   const nextRole = moduleScopedRole
-    ? input.role
+    ? resolvePersistedCoreRole(input.role)
     : getDefaultCoreRoleForAccessLevel(nextAccessLevel, input.role);
 
   if (!canAssignCoreAccessLevel(input.actorAccess, nextAccessLevel)) {
@@ -613,29 +623,35 @@ export const createCoreCoordinatorCredential = async (input: CreateCoreCredentia
 
   const school = await getSchoolContext(input.schoolCode);
 
-  const { error } = await supabase.from('usis_core_coordinators').insert([
-    {
-      division_code: school.division_code || school.division || null,
-      school_id: school.id,
-      employee_id: input.employeeId.trim() || null,
-      region_code: school.region_code || school.region || null,
-      username: normalizeIdentity(input.username),
-      email: normalizeIdentity(input.email),
-      password_hash: input.password.trim(),
-      first_name: normalizeName(input.firstName),
-      last_name: normalizeName(input.lastName),
-      middle_name: normalizeName(input.middleName) || null,
-      mobile_no: input.mobileNo.trim() || null,
-      role: nextRole,
-      access_level: nextAccessLevel,
-      is_super_admin: false,
-      is_active: true,
-    },
-  ]);
+  const { data, error } = await supabase
+    .from('usis_core_coordinators')
+    .insert([
+      {
+        division_code: school.division_code || school.division || null,
+        school_id: school.id,
+        employee_id: input.employeeId.trim() || null,
+        region_code: school.region_code || school.region || null,
+        username: normalizeIdentity(input.username),
+        email: resolveCoreEmail(input.username),
+        password_hash: input.password.trim(),
+        first_name: normalizeName(input.firstName),
+        last_name: normalizeName(input.lastName),
+        middle_name: normalizeName(input.middleName) || null,
+        mobile_no: input.mobileNo.trim() || null,
+        role: nextRole,
+        access_level: nextAccessLevel,
+        is_super_admin: false,
+        is_active: true,
+      },
+    ])
+    .select('id')
+    .single();
 
   if (error) {
-    throw new Error(error.message || 'Unable to create the USIS core coordinator credential.');
+    throw new Error(formatDbError(error, 'Unable to create the USIS core coordinator credential.'));
   }
+
+  return data.id as string;
 };
 
 export const createElectionCoordinatorCredential = async (input: CreateElectionCredentialInput) => {
@@ -702,7 +718,7 @@ export const createElectionCoordinatorCredential = async (input: CreateElectionC
   ]);
 
   if (error) {
-    throw new Error(error.message || 'Unable to create the election coordinator credential.');
+    throw new Error(formatDbError(error, 'Unable to create the election coordinator credential.'));
   }
 };
 
@@ -711,7 +727,7 @@ export const updateCoreCoordinatorCredential = async (input: UpdateCoreCredentia
   const moduleScopedRole = input.role === 'registrar_coordinator' || input.role === 'attendance_coordinator';
   const nextAccessLevel = 'school';
   const nextRole = moduleScopedRole
-    ? input.role
+    ? resolvePersistedCoreRole(input.role)
     : getDefaultCoreRoleForAccessLevel(nextAccessLevel, input.role);
 
   if (!canAssignCoreAccessLevel(input.actorAccess, nextAccessLevel)) {
@@ -724,7 +740,7 @@ export const updateCoreCoordinatorCredential = async (input: UpdateCoreCredentia
     employee_id: input.employeeId.trim() || null,
     region_code: school.region_code || school.region || null,
     username: normalizeIdentity(input.username),
-    email: normalizeIdentity(input.email),
+    email: resolveCoreEmail(input.username),
     first_name: normalizeName(input.firstName),
     last_name: normalizeName(input.lastName),
     middle_name: normalizeName(input.middleName) || null,
@@ -745,7 +761,7 @@ export const updateCoreCoordinatorCredential = async (input: UpdateCoreCredentia
     .eq('id', input.id);
 
   if (error) {
-    throw new Error(error.message || 'Unable to update the USIS core coordinator credential.');
+    throw new Error(formatDbError(error, 'Unable to update the USIS core coordinator credential.'));
   }
 };
 
@@ -805,6 +821,27 @@ export const updateElectionCoordinatorCredential = async (input: UpdateElectionC
     .eq('id', input.id);
 
   if (error) {
-    throw new Error(error.message || 'Unable to update the election coordinator credential.');
+    throw new Error(formatDbError(error, 'Unable to update the election coordinator credential.'));
+  }
+};
+
+export const deleteCoreCoordinatorCredential = async (id: string) => {
+  const { error } = await supabase.from('usis_core_coordinators').delete().eq('id', id);
+  if (error) {
+    throw new Error(formatDbError(error, 'Unable to delete the USIS core coordinator credential.'));
+  }
+};
+
+export const deleteElectionCoordinatorCredential = async (id: string) => {
+  const { error } = await supabase.from('election_coordinators').delete().eq('id', id);
+  if (error) {
+    throw new Error(formatDbError(error, 'Unable to delete the election coordinator credential.'));
+  }
+};
+
+export const deleteSpPortalCoordinatorCredential = async (id: string) => {
+  const { error } = await supabase.from('sp_portal_coordinators').delete().eq('id', id);
+  if (error) {
+    throw new Error(formatDbError(error, 'Unable to delete the SP Portal coordinator credential.'));
   }
 };

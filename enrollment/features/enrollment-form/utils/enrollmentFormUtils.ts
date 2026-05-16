@@ -49,6 +49,7 @@ export const initialDraft: EnrollmentDraft = {
   birthDate: '',
   gender: 'Male',
   placeOfBirth: '',
+  learnerContact: '',
   motherTongue: '',
   religion: 'Roman Catholic',
   is4Ps: 'No',
@@ -120,6 +121,7 @@ export const validateCommonFields = (
     if (!Number.isNaN(birthDate.getTime()) && birthDate > now) return 'Date of Birth cannot be in the future.';
   }
   for (const entry of [
+    { label: "Learner's Contact Number", value: draft.learnerContact },
     { label: "Father's Contact Number", value: draft.fatherContact },
     { label: "Mother's Contact Number", value: draft.motherContact },
     { label: "Guardian's Contact Number", value: draft.guardianContact },

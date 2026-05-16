@@ -5,6 +5,8 @@ import type {
   CreateCoreCredentialInput,
 } from '../utils/credentialRegistry';
 import { CoordinatorCredentialSuccessModal } from './CoordinatorCredentialSuccessModal';
+import { moduleOptions } from '../utils/moduleAccessRegistry';
+import type { UsisModuleKey } from '../../../../common/auth/moduleAccess';
 
 interface CoreCoordinatorCredentialFormProps {
   access: CoordinatorAccessRecord | null;
@@ -33,9 +35,16 @@ export function CoreCoordinatorCredentialForm({
   role,
   schoolCode,
 }: CoreCoordinatorCredentialFormProps) {
+  const getDefaultAllowedModules = (): UsisModuleKey[] => {
+    if (credentialType === 'attendance_coordinator') return ['attendance'];
+    if (credentialType === 'registrar_coordinator') return ['registrar'];
+    return ['coordinator'];
+  };
+
   const defaultSchoolCode = schoolCode === '123456' ? '' : schoolCode;
   const defaultRole = role;
   const effectiveSchoolCode = defaultSchoolCode;
+  const [allowedModules, setAllowedModules] = useState<UsisModuleKey[]>(getDefaultAllowedModules);
   const [form, setForm] = useState<CreateCoreCredentialInput>({
     accessLevel,
     actorAccess: access as CoordinatorAccessRecord,
@@ -81,6 +90,7 @@ export function CoreCoordinatorCredentialForm({
         schoolCode: nextSchoolCode,
       };
     });
+    setAllowedModules(getDefaultAllowedModules());
 
   }, [access, accessLevel, credentialType, defaultRole, defaultSchoolCode, effectiveSchoolCode]);
 
@@ -113,6 +123,7 @@ export function CoreCoordinatorCredentialForm({
         actorAccess: access as CoordinatorAccessRecord,
         accessLevel,
         credentialType,
+        allowedModules,
         role: form.role,
         schoolCode: finalSchoolCode,
       });
@@ -143,9 +154,16 @@ export function CoreCoordinatorCredentialForm({
         schoolCode: finalSchoolCode,
         username: '',
       });
+      setAllowedModules(getDefaultAllowedModules());
     } catch (err) {
       console.error('Form submission failed:', err);
     }
+  };
+
+  const toggleModule = (moduleKey: UsisModuleKey) => {
+    setAllowedModules((current) =>
+      current.includes(moduleKey) ? current.filter((item) => item !== moduleKey) : [...current, moduleKey],
+    );
   };
 
   if (!access) {
@@ -215,6 +233,21 @@ export function CoreCoordinatorCredentialForm({
           required
         />
       </div>
+      <fieldset className="registry-radio-group">
+        <legend>Allowed Modules</legend>
+        <div className="registry-radio-list">
+          {moduleOptions.map((option) => (
+            <label key={option.key} className="registry-radio-option">
+              <input
+                type="checkbox"
+                checked={allowedModules.includes(option.key)}
+                onChange={() => toggleModule(option.key)}
+              />
+              <span>{option.label}</span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
       <div className="registry-form__actions">
         <button className="login-card__submit" disabled={isSubmitting} type="submit">
           {isSubmitting ? 'Saving...' : 'Create Core Access'}

@@ -4,14 +4,52 @@ import {
   createCoreCoordinatorCredential,
   createElectionCoordinatorCredential,
   createSpPortalCoordinatorCredential,
+  deleteCoreCoordinatorCredential,
+  deleteElectionCoordinatorCredential,
+  deleteSpPortalCoordinatorCredential,
   loadCredentialRegistrySnapshot,
   updateCoreCoordinatorCredential,
   updateElectionCoordinatorCredential,
   type CredentialRegistrySnapshot,
 } from '../utils/credentialRegistry';
+import { setCoordinatorAccountModuleAccess } from '../../../../common/auth/moduleAccess';
+
+const REGISTRY_CACHE_TTL_MS = 1000 * 60 * 5;
+const buildRegistryCacheKey = (userId: string, schoolId: string) =>
+  `usis_coordinator_registry_snapshot:${userId}:${schoolId}`;
+
+type RegistryCachePayload = {
+  cachedAt: number;
+  snapshot: CredentialRegistrySnapshot;
+};
+
+const readRegistryCache = (cacheKey: string): RegistryCachePayload | null => {
+  if (typeof window === 'undefined') return null;
+  const raw = window.localStorage.getItem(cacheKey);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as RegistryCachePayload;
+    if (!parsed || typeof parsed !== 'object' || !parsed.snapshot || typeof parsed.cachedAt !== 'number') {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+};
+
+const writeRegistryCache = (cacheKey: string, snapshot: CredentialRegistrySnapshot) => {
+  if (typeof window === 'undefined') return;
+  const payload: RegistryCachePayload = { cachedAt: Date.now(), snapshot };
+  window.localStorage.setItem(cacheKey, JSON.stringify(payload));
+};
 
 export function useCredentialRegistry() {
   const access = useMemo(() => getStoredCoordinatorAccess(), []);
+  const cacheKey = useMemo(
+    () => (access?.userId && access?.schoolId ? buildRegistryCacheKey(access.userId, access.schoolId) : ''),
+    [access],
+  );
   const [snapshot, setSnapshot] = useState<CredentialRegistrySnapshot | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmittingCore, setIsSubmittingCore] = useState(false);
@@ -19,30 +57,55 @@ export function useCredentialRegistry() {
   const [isSubmittingSpPortal, setIsSubmittingSpPortal] = useState(false);
   const [isUpdatingCore, setIsUpdatingCore] = useState(false);
   const [isUpdatingElection, setIsUpdatingElection] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (options?: { silent?: boolean }) => {
     if (!access?.schoolId) {
       setIsLoading(false);
       return;
     }
 
-    setIsLoading(true);
+    if (!options?.silent) {
+      setIsLoading(true);
+    }
     try {
       const nextSnapshot = await loadCredentialRegistrySnapshot(access);
       setSnapshot(nextSnapshot);
+      if (cacheKey) {
+        writeRegistryCache(cacheKey, nextSnapshot);
+      }
       setError('');
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'Unable to load the credential registry.');
     } finally {
-      setIsLoading(false);
+      if (!options?.silent) {
+        setIsLoading(false);
+      }
     }
-  }, [access]);
+  }, [access, cacheKey]);
 
   useEffect(() => {
+    if (!access?.schoolId || !cacheKey) {
+      setIsLoading(false);
+      return;
+    }
+
+    const cached = readRegistryCache(cacheKey);
+    if (cached?.snapshot) {
+      setSnapshot(cached.snapshot);
+      setIsLoading(false);
+
+      const isStale = Date.now() - cached.cachedAt > REGISTRY_CACHE_TTL_MS;
+      if (isStale) {
+        void refresh({ silent: true });
+      }
+      return;
+    }
+
     void refresh();
-  }, [refresh]);
+  }, [access, cacheKey, refresh]);
 
   const createCore = useCallback(
     async (payload: Parameters<typeof createCoreCoordinatorCredential>[0]) => {
@@ -51,7 +114,10 @@ export function useCredentialRegistry() {
       setError('');
 
       try {
-        await createCoreCoordinatorCredential(payload);
+        const createdId = await createCoreCoordinatorCredential(payload);
+        if (payload.allowedModules?.length) {
+          setCoordinatorAccountModuleAccess(createdId, payload.allowedModules);
+        }
         setNotice('Core USIS access created.');
         await refresh();
       } catch (submissionError) {
@@ -161,6 +227,75 @@ export function useCredentialRegistry() {
     [refresh],
   );
 
+  const deleteCore = useCallback(
+    async (id: string) => {
+      setIsDeleting(true);
+      setNotice('');
+      setError('');
+      try {
+        await deleteCoreCoordinatorCredential(id);
+        setNotice('Core account deleted.');
+        await refresh();
+      } catch (submissionError) {
+        setError(
+          submissionError instanceof Error
+            ? submissionError.message
+            : 'Unable to delete the core coordinator credential.',
+        );
+        throw submissionError;
+      } finally {
+        setIsDeleting(false);
+      }
+    },
+    [refresh],
+  );
+
+  const deleteElection = useCallback(
+    async (id: string) => {
+      setIsDeleting(true);
+      setNotice('');
+      setError('');
+      try {
+        await deleteElectionCoordinatorCredential(id);
+        setNotice('Election account deleted.');
+        await refresh();
+      } catch (submissionError) {
+        setError(
+          submissionError instanceof Error
+            ? submissionError.message
+            : 'Unable to delete the election coordinator credential.',
+        );
+        throw submissionError;
+      } finally {
+        setIsDeleting(false);
+      }
+    },
+    [refresh],
+  );
+
+  const deleteSpPortal = useCallback(
+    async (id: string) => {
+      setIsDeleting(true);
+      setNotice('');
+      setError('');
+      try {
+        await deleteSpPortalCoordinatorCredential(id);
+        setNotice('SP Portal account deleted.');
+        await refresh();
+      } catch (submissionError) {
+        setError(
+          submissionError instanceof Error
+            ? submissionError.message
+            : 'Unable to delete the SP Portal coordinator credential.',
+        );
+        throw submissionError;
+      } finally {
+        setIsDeleting(false);
+      }
+    },
+    [refresh],
+  );
+
   return {
     access,
     createCore,
@@ -173,8 +308,12 @@ export function useCredentialRegistry() {
     isSubmittingSpPortal,
     isUpdatingCore,
     isUpdatingElection,
+    isDeleting,
     notice,
     snapshot,
+    deleteCore,
+    deleteElection,
+    deleteSpPortal,
     updateCore,
     updateElection,
   };

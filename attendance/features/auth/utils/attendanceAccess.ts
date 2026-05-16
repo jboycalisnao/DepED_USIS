@@ -1,4 +1,5 @@
 import { supabase } from '../../../lib/supabase';
+import { hasCoordinatorModuleAccess } from '../../../../common/auth/moduleAccess';
 
 export interface AttendanceAccessRecord {
   accountSource: 'usis_core_users' | 'usis_core_coordinators';
@@ -101,6 +102,16 @@ export const resolveAttendanceAccess = async (
   for (const candidate of candidates) {
     if (!matchesPassword(candidate.data, normalizedPassword)) {
       continue;
+    }
+
+    if (
+      candidate.source === 'usis_core_coordinators' &&
+      !hasCoordinatorModuleAccess(candidate.data.id, 'attendance')
+    ) {
+      return {
+        error: 'Access denied. This account is not granted Attendance module access in Coordinator Portal.',
+        record: null,
+      };
     }
 
     const school = Array.isArray(candidate.data.usis_schools)

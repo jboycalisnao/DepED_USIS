@@ -30,6 +30,7 @@ export const validatePublicEnrollmentDraft = (draft: EnrollmentDraft): string | 
   }
 
   const contactChecks: Array<{ label: string; value: string }> = [
+    { label: "Learner's Contact Number", value: draft.learnerContact },
     { label: "Father's Contact Number", value: draft.fatherContact },
     { label: "Mother's Contact Number", value: draft.motherContact },
     { label: "Guardian's Contact Number", value: draft.guardianContact },

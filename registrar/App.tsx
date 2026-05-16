@@ -10,6 +10,7 @@ import Settings from './views/Settings';
 import Credentials from './views/Credentials';
 import Landing from './views/Landing';
 import PublicEnrollmentSubmissionsPage from './features/registrar/public-enrollment/admin/components/PublicEnrollmentSubmissionsPage';
+import PublicEnrollmentSubmissionDetailsPage from './features/registrar/public-enrollment/admin/components/PublicEnrollmentSubmissionDetailsPage';
 import { useStore } from './store';
 
 const App: React.FC = () => {
@@ -33,6 +34,7 @@ const App: React.FC = () => {
           <Route path="/" element={<Dashboard />} />
           <Route path="/learners" element={<LearnerList />} />
           <Route path="/enroll" element={<PublicEnrollmentSubmissionsPage />} />
+          <Route path="/enroll/:id" element={<PublicEnrollmentSubmissionDetailsPage />} />
           <Route path="/sections" element={<SectionManagement />} />
           <Route path="/import" element={<BulkImport />} />
           <Route path="/settings" element={<Settings />} />

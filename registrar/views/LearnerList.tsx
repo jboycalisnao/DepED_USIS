@@ -4,9 +4,10 @@ import { EnrollmentRecord, GradeLevel, Student } from '../types';
 import ConfirmationModal from '../components/ConfirmationModal';
 import LearnerDetailsModal from '../components/LearnerDetailsModal';
 import { openLearnerInformationPrintWindow } from '../features/registrar/learners/utils/printLearnerInformation';
+import LearnerEditModal from './learners/LearnerEditModal';
 
 const LearnerList: React.FC = () => {
-  const { learners, sections, activeSchoolYear, removeLearner, clearSectionLearners, loading } = useStore();
+  const { learners, sections, activeSchoolYear, availableStrands, removeLearner, clearSectionLearners, updateLearner, loading } = useStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [deletingStudent, setDeletingStudent] = useState<Student | null>(null);
@@ -15,6 +16,7 @@ const LearnerList: React.FC = () => {
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
   const [revealedPasswordLearnerId, setRevealedPasswordLearnerId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
 
   const isLocked = activeSchoolYear.isLocked;
 
@@ -128,6 +130,9 @@ const LearnerList: React.FC = () => {
   };
 
   const GENDER_ORDER = ['Male', 'Female', 'Other'];
+  const openEditStudent = (student: Student) => {
+    setEditingStudent(student);
+  };
 
   return (
     <div className="registrar-learners-page">
@@ -268,6 +273,13 @@ const LearnerList: React.FC = () => {
                                                     </span>
                                                   </button>
                                                   <button
+                                                    onClick={() => openEditStudent(student)}
+                                                    className="icon-btn"
+                                                    title="Edit Learner Information"
+                                                  >
+                                                    <span className="material-symbols-outlined">edit</span>
+                                                  </button>
+                                                  <button
                                                     onClick={() => {
                                                       const ok = openLearnerInformationPrintWindow({
                                                         learners: [student],
@@ -339,6 +351,15 @@ const LearnerList: React.FC = () => {
       />
 
       <LearnerDetailsModal student={selectedStudent} history={derivedHistory} onClose={() => setSelectedStudent(null)} />
+      <LearnerEditModal
+        student={editingStudent}
+        activeSchoolYearLabel={activeSchoolYear.label}
+        strandOptions={availableStrands.map((strand) => strand.acronym).filter(Boolean)}
+        loading={loading}
+        onClose={() => setEditingStudent(null)}
+        onError={(message) => setFeedback(message)}
+        onSubmit={updateLearner}
+      />
       <ConfirmationModal
         isOpen={!!feedback}
         type="accent"

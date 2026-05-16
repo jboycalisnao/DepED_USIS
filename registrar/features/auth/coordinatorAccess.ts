@@ -1,6 +1,8 @@
 import { supabase } from '../../lib/supabase';
+import { hasCoordinatorModuleAccess } from '../../../common/auth/moduleAccess';
 
 export interface RegistrarCoordinatorAccess {
+  userId: string;
   coordinatorName: string;
   coordinatorRole: string;
   schoolId: string;
@@ -86,11 +88,19 @@ export const resolveRegistrarCoordinatorAccess = async (
     };
   }
 
+  if (!hasCoordinatorModuleAccess(data.id, 'registrar')) {
+    return {
+      error: 'Access denied. This account is not granted Registrar module access in Coordinator Portal.',
+      record: null,
+    };
+  }
+
   const school = Array.isArray(data.usis_schools) ? data.usis_schools[0] : data.usis_schools;
 
   return {
     error: null,
     record: {
+      userId: data.id,
       coordinatorName:
         [data.first_name, data.middle_name, data.last_name].filter(Boolean).join(' ') ||
         toTitleCase(normalizedUsername),

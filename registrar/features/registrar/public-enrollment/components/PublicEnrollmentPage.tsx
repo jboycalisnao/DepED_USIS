@@ -54,6 +54,7 @@ const initialDraft: EnrollmentDraft = {
   birthDate: '',
   gender: 'Male',
   placeOfBirth: '',
+  learnerContact: '',
   motherTongue: '',
   religion: 'Roman Catholic',
   is4Ps: 'No',
@@ -447,6 +448,7 @@ export default function PublicEnrollmentPage() {
                     <DateField label="Date of Birth" value={draft.birthDate} onChange={(value) => updateField('birthDate', value)} required />
                     <SelectField label="Gender" value={draft.gender} onChange={(value) => updateField('gender', value)} options={['Male', 'Female']} />
                     <TextField label="Place of Birth" value={draft.placeOfBirth} onChange={(value) => updateField('placeOfBirth', value)} />
+                    <TextField label="Learner Contact Number" value={draft.learnerContact} onChange={(value) => updateField('learnerContact', value)} inputMode="tel" />
                     <TextField label="Mother Tongue" value={draft.motherTongue} onChange={(value) => updateField('motherTongue', value)} />
                     <SelectField label="Religion" value={draft.religion} onChange={(value) => updateField('religion', value)} options={religionOptions as unknown as string[]} />
                     <SelectField label="4Ps Beneficiary" value={draft.is4Ps} onChange={(value) => updateField('is4Ps', value)} options={['Yes', 'No']} />

@@ -19,6 +19,7 @@ The repository currently contains these active modules:
 - `coordinator/` - coordinator-facing USIS operations portal
 - `deped-web-kit/` - DepEd web branding and UI reference kit
 - `enrollment/` - school enrollment management portal
+- `learner-portal/` - learner self-service access portal
 - `election/` - DepED school election system
 - `sp-portal/` - Special Program admissions portal for school-specific application bulletins
 - `registrar/` - Registrar and learner records system

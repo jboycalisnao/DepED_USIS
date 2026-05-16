@@ -48,7 +48,11 @@ export function SubmissionStatusPage({ access, onLogout }: Props) {
           </nav>
           <header className="enrollment-status-hero" role="banner">
             <button type="button" className="secondary-button enrollment-status-signout" onClick={onLogout}>
-              <span className="material-symbols-outlined" aria-hidden="true">logout</span>
+              <svg viewBox="0 0 24 24" aria-hidden="true" className="enrollment-logout-icon">
+                <path d="M3 4.5h10v15H3v-15Z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M13 12h8" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                <path d="m18 8 4 4-4 4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
               <span>Sign Out</span>
             </button>
             <div className="enrollment-status-hero__shape enrollment-status-hero__shape--left" aria-hidden="true" />

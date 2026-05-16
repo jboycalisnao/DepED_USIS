@@ -29,7 +29,7 @@ const SectionManagement: React.FC = () => {
   const [editName, setEditName] = useState('');
   const [editAdviser, setEditAdviser] = useState('');
   const [editClassification, setEditClassification] = useState('');
-  const [pendingAction, setPendingAction] = useState<{ type: 'delete' | 'update' | 'create' | 'clear'; data: any } | null>(null);
+  const [pendingAction, setPendingAction] = useState<{ type: 'delete' | 'update' | 'create' | 'clear' | 'dedupe'; data: any } | null>(null);
   const [systemError, setSystemError] = useState<string | null>(null);
   const [createModalOpen, setCreateModalOpen] = useState(false);
 
@@ -125,6 +125,19 @@ const SectionManagement: React.FC = () => {
     setPendingAction(null);
   };
 
+  const executeDedupe = async () => {
+    if (pendingAction?.type !== 'dedupe') return;
+    const targets: Section[] = Array.isArray(pendingAction.data?.sections) ? pendingAction.data.sections : [];
+    for (const section of targets) {
+      const res = await removeSection(section.id);
+      if (res.error) {
+        setSystemError(res.error);
+        break;
+      }
+    }
+    setPendingAction(null);
+  };
+
   const getLearnerCount = (sectionId: string) => {
     const cleanId = String(sectionId).trim();
     return learners.filter((l) => String(l.sectionId).trim() === cleanId).length;
@@ -154,6 +167,33 @@ const SectionManagement: React.FC = () => {
     return groups;
   }, [normalizedSectionSearch, sectionsByProgram]);
 
+  const duplicateZeroLearnerSections = useMemo(() => {
+    const groups = new Map<string, Section[]>();
+    currentSections.forEach((section) => {
+      const key = String(section.name || '').trim().toLowerCase();
+      if (!key) return;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(section);
+    });
+
+    const removable: Section[] = [];
+    groups.forEach((group) => {
+      if (group.length <= 1) return;
+      const withCount = group.map((section) => ({ section, count: getLearnerCount(section.id) }));
+      const zeroLearner = withCount.filter((entry) => entry.count === 0);
+      if (zeroLearner.length === 0) return;
+
+      // Keep at least one record when all duplicates are empty.
+      if (zeroLearner.length === group.length) {
+        zeroLearner.slice(1).forEach((entry) => removable.push(entry.section));
+      } else {
+        zeroLearner.forEach((entry) => removable.push(entry.section));
+      }
+    });
+
+    return removable;
+  }, [currentSections, learners]);
+
   return (
     <div className="registrar-sections-page">
       <div className="registrar-sections-page__layout">
@@ -182,17 +222,31 @@ const SectionManagement: React.FC = () => {
           <section className="registrar-sections-page__panel">
             <div className="registrar-sections-page__main-head">
               <h3 className="registrar-sections-page__title">{selectedGrade}</h3>
-              {!isLocked && (
-                <button
-                  disabled={loading}
-                  type="button"
-                  className="primary-button"
-                  onClick={() => setCreateModalOpen(true)}
-                >
-                  <span className="material-symbols-outlined">add</span>
-                  Add Section
-                </button>
-              )}
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {!isLocked && duplicateZeroLearnerSections.length > 0 && (
+                  <button
+                    disabled={loading}
+                    type="button"
+                    className="secondary-button"
+                    onClick={() => setPendingAction({ type: 'dedupe', data: { sections: duplicateZeroLearnerSections } })}
+                    title="Delete duplicate section names with 0 learners"
+                  >
+                    <span className="material-symbols-outlined">cleaning_services</span>
+                    Delete Duplicate Section List ({duplicateZeroLearnerSections.length})
+                  </button>
+                )}
+                {!isLocked && (
+                  <button
+                    disabled={loading}
+                    type="button"
+                    className="primary-button"
+                    onClick={() => setCreateModalOpen(true)}
+                  >
+                    <span className="material-symbols-outlined">add</span>
+                    Add Section
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="registrar-sections-page__content">
@@ -349,6 +403,16 @@ const SectionManagement: React.FC = () => {
         message={`Remove all ${getLearnerCount(pendingAction?.data?.id || '')} learners from "${pendingAction?.data?.name}"?`}
         confirmLabel="Purge Learners"
         onConfirm={executeClear}
+        onCancel={() => setPendingAction(null)}
+        isLoading={loading}
+      />
+      <ConfirmationModal
+        isOpen={pendingAction?.type === 'dedupe'}
+        type="danger"
+        title="Delete Duplicate Section List"
+        message={`Delete ${Array.isArray(pendingAction?.data?.sections) ? pendingAction.data.sections.length : 0} duplicate section record(s) with 0 learners for ${selectedGrade}?`}
+        confirmLabel="Delete Duplicates"
+        onConfirm={executeDedupe}
         onCancel={() => setPendingAction(null)}
         isLoading={loading}
       />

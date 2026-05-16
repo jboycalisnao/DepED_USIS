@@ -1,6 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FloatingField } from '@/features/shared/components/FloatingField';
+import { UsisLoginModal } from '../../../../common/components/UsisLoginModal';
 import {
   finalizeCoordinatorLogin,
   resolveCoordinatorAccess,
@@ -84,41 +85,24 @@ export function LoginPage() {
   };
 
   return (
-    <section className="section-shell">
+    <section className="section-shell coordinator-login-page">
       <div className="login-shell">
-        <div className="login-shell__header">
-          <div className="admin-shell__heading">
-            <p className="page-intro__eyebrow">Coordinator Access</p>
-            <h1 className="login-shell__title">Coordinator Registry Login</h1>
-          </div>
-        </div>
-
         {!pendingAccess ? (
-          <form className="login-form" onSubmit={handleSubmit}>
-            <FloatingField
-              id="coordinator-username"
-              label="Username"
-              type="text"
-              value={username}
-              onChange={(event) => setUsername(event.target.value)}
+          <>
+            <UsisLoginModal
+              title="Coordinator Registry Login"
+              username={username}
+              password={password}
+              isSubmitting={isSubmitting}
+              submitLabel="Continue"
+              noticeTitle="Access Notice"
+              noticeMessage={error || null}
+              onDismissNotice={() => setError('')}
+              onUsernameChange={setUsername}
+              onPasswordChange={setPassword}
+              onSubmit={handleSubmit}
             />
-
-            <FloatingField
-              id="coordinator-password"
-              label="Password"
-              type="password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-            />
-
-            {error ? <p className="login-card__error">{error}</p> : null}
-
-            <div className="login-card__actions">
-              <button className="login-card__submit" type="submit" disabled={isSubmitting}>
-                {isSubmitting ? 'Checking...' : 'Continue'}
-              </button>
-            </div>
-          </form>
+          </>
         ) : (
           <form className="login-form" onSubmit={handlePasswordReset}>
             <p className="registry-copy">Temporary password detected. Set a new password before continuing.</p>

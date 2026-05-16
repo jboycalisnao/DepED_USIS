@@ -21,6 +21,7 @@ export type EnrollmentDraft = {
   birthDate: string;
   gender: string;
   placeOfBirth: string;
+  learnerContact: string;
   motherTongue: string;
   religion: string;
   is4Ps: string;

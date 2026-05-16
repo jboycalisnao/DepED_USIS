@@ -40,6 +40,20 @@ import {
 import { DateField, SelectField, TextField } from './form/FormFields';
 
 const gradeLevelOrder = gradeLevelOptions.map((level) => ({ label: level, value: Number(level.replace(/\D/g, '')) }));
+const SHS_GRADES = new Set(['Grade 11', 'Grade 12']);
+const getNextGradeLevel = (gradeLevel: string) => {
+  const current = gradeLevelOrder.find((entry) => entry.label === gradeLevel);
+  if (!current) return '';
+  const next = gradeLevelOrder.find((entry) => entry.value === current.value + 1);
+  return next?.label || '';
+};
+
+type LrnLookupState =
+  | { status: 'empty'; message: string }
+  | { status: 'checking'; message: string }
+  | { status: 'invalid'; message: string }
+  | { status: 'matched'; message: string }
+  | { status: 'not_found'; message: string };
 
 export function EnrollmentFormPage() {
   const [draft, setDraft] = useState<EnrollmentDraft>(initialDraft);
@@ -62,7 +76,10 @@ export function EnrollmentFormPage() {
   const [currentAddress, setCurrentAddress] = useState<AddressSelection>(initialAddressSelection);
   const [sameAsPermanent, setSameAsPermanent] = useState(false);
   const [strandOptions, setStrandOptions] = useState<Array<{ value: string; label: string }>>([]);
-  const [isAutofillingLearner, setIsAutofillingLearner] = useState(false);
+  const [lrnLookupState, setLrnLookupState] = useState<LrnLookupState>({
+    status: 'empty',
+    message: 'Enter a 12-digit LRN to unlock and continue the form.',
+  });
 
   useEffect(() => {
     const loadFormAvailability = async () => {
@@ -162,42 +179,97 @@ export function EnrollmentFormPage() {
 
   useEffect(() => {
     const normalizedLrn = digitsOnly(draft.lrn || '');
-    if (normalizedLrn.length !== 12) return;
+    if (!normalizedLrn) {
+      setLrnLookupState({ status: 'empty', message: 'Enter a 12-digit LRN to unlock and continue the form.' });
+      return;
+    }
+    if (normalizedLrn.length !== 12) {
+      setLrnLookupState({ status: 'invalid', message: 'LRN must be exactly 12 digits. Other fields stay locked.' });
+      return;
+    }
 
     let isCancelled = false;
     const loadLearnerByLrn = async () => {
-      setIsAutofillingLearner(true);
+      setLrnLookupState({ status: 'checking', message: 'Checking learner record by LRN...' });
       try {
         const { data, error } = await supabase
           .from('registrar_learners')
-          .select('lrn,first_name,last_name,middle_name,birth_date,gender,address,guardian_name,father_name,mother_name,is_4ps')
+          .select('lrn,first_name,last_name,middle_name,birth_date,gender,address,contact_number,guardian_name,father_name,mother_name,is_4ps,email,enrollment_history')
           .eq('lrn', normalizedLrn)
           .maybeSingle();
-        if (isCancelled || error || !data) return;
+        if (isCancelled) return;
+        if (error) {
+          setLrnLookupState({ status: 'invalid', message: 'Unable to validate LRN right now. Please try again.' });
+          return;
+        }
+
+        if (!data) {
+          setLrnLookupState({
+            status: 'not_found',
+            message: 'New Enrollment – No existing learner record found. Continue by completing the form.',
+          });
+          setDraft((current) => ({
+            ...current,
+            lrn: normalizedLrn,
+            studentType: 'New Student',
+            learnerCategory: SAME_SCHOOL_LABEL,
+          }));
+          return;
+        }
+
+        const enrollmentHistory = Array.isArray((data as any).enrollment_history)
+          ? ([...(data as any).enrollment_history] as Array<any>)
+          : [];
+        const latestEnrollment = enrollmentHistory
+          .filter((entry) => entry && typeof entry === 'object')
+          .sort((a, b) => new Date(String(b.enrollmentDate || b.created_at || 0)).getTime() - new Date(String(a.enrollmentDate || a.created_at || 0)).getTime())[0];
+        const latestSchoolYear = String(latestEnrollment?.schoolYear || '').trim();
+        const latestGradeLevel = String(latestEnrollment?.gradeLevel || '').trim();
+        const nextGradeLevel = getNextGradeLevel(latestGradeLevel);
+        const submissionPayload = latestEnrollment?.submissionPayload && typeof latestEnrollment.submissionPayload === 'object'
+          ? latestEnrollment.submissionPayload
+          : {};
 
         setDraft((current) => ({
           ...current,
           lrn: normalizedLrn,
-          email: String((data as any).email || current.email || ''),
-          firstName: String(data.first_name || current.firstName || ''),
-          lastName: String(data.last_name || current.lastName || ''),
-          middleName: String(data.middle_name || current.middleName || ''),
-          birthDate: data.birth_date ? String(data.birth_date) : current.birthDate,
-          gender: String(data.gender || current.gender || 'Male'),
-          guardianName: String(data.guardian_name || current.guardianName || ''),
-          fatherName: String(data.father_name || current.fatherName || ''),
-          motherName: String(data.mother_name || current.motherName || ''),
-          is4Ps: data.is_4ps ? 'Yes' : current.is4Ps,
-          currentAddress: current.currentAddress,
-          permanentAddress: current.permanentAddress,
+          studentType: 'Continuing Student',
+          learnerCategory: SAME_SCHOOL_LABEL,
+          previousSchool: LEON_NHS_NAME,
+          previousSchoolYear: latestSchoolYear || current.previousSchoolYear,
+          lastGradeLevel: latestGradeLevel || current.lastGradeLevel,
+          gradeToEnroll: nextGradeLevel || current.gradeToEnroll,
+          email: String((data as any).email || submissionPayload.email || current.email || ''),
+          firstName: String(data.first_name || submissionPayload.firstName || current.firstName || ''),
+          lastName: String(data.last_name || submissionPayload.lastName || current.lastName || ''),
+          middleName: String(data.middle_name || submissionPayload.middleName || current.middleName || ''),
+          birthDate: data.birth_date ? String(data.birth_date) : String(submissionPayload.birthDate || current.birthDate || ''),
+          gender: String(data.gender || submissionPayload.gender || current.gender || 'Male'),
+          placeOfBirth: String(submissionPayload.placeOfBirth || current.placeOfBirth || ''),
+          motherTongue: String(submissionPayload.motherTongue || current.motherTongue || ''),
+          religion: String(submissionPayload.religion || current.religion || ''),
+          learnerContact: String((data as any).contact_number || submissionPayload.learnerContact || current.learnerContact || ''),
+          guardianName: String(data.guardian_name || submissionPayload.guardianName || current.guardianName || ''),
+          fatherName: String(data.father_name || submissionPayload.fatherName || current.fatherName || ''),
+          motherName: String(data.mother_name || submissionPayload.motherName || current.motherName || ''),
+          fatherContact: String(submissionPayload.fatherContact || current.fatherContact || ''),
+          motherContact: String(submissionPayload.motherContact || current.motherContact || ''),
+          guardianContact: String(submissionPayload.guardianContact || current.guardianContact || ''),
+          is4Ps: data.is_4ps ? 'Yes' : String(submissionPayload.is4Ps || current.is4Ps || 'No'),
+          fourPsHouseholdId: String(submissionPayload.fourPsHouseholdId || current.fourPsHouseholdId || ''),
+          currentAddress: String((data as any).address || submissionPayload.currentAddress || current.currentAddress || ''),
+          permanentAddress: String(submissionPayload.permanentAddress || current.permanentAddress || ''),
+          hasSpedNeed: String(submissionPayload.hasSpedNeed || current.hasSpedNeed || 'No'),
+          preferredModality: String(submissionPayload.preferredModality || current.preferredModality || ''),
+          deviceAccess: String(submissionPayload.deviceAccess || current.deviceAccess || ''),
+          hasInternet: String(submissionPayload.hasInternet || current.hasInternet || ''),
         }));
-        setModalNotice({
-          type: 'success',
-          title: 'Learner Record Found',
-          message: 'Existing learner record found. Matching fields were pre-filled.',
+        setLrnLookupState({
+          status: 'matched',
+          message: 'Continuing Student - Record Update (For Updating Existing Records). Review and confirm existing information.',
         });
-      } finally {
-        if (!isCancelled) setIsAutofillingLearner(false);
+      } catch {
+        if (!isCancelled) setLrnLookupState({ status: 'invalid', message: 'Unable to validate LRN right now. Please try again.' });
       }
     };
     loadLearnerByLrn();
@@ -368,6 +440,22 @@ export function EnrollmentFormPage() {
   }, [draft.lastGradeLevel, draft.gradeToEnroll, draft.learnerCategory]);
 
   useEffect(() => {
+    if (!draft.lastGradeLevel) return;
+    const currentGrade = gradeLevelOrder.find((grade) => grade.label === draft.lastGradeLevel);
+    if (!currentGrade) return;
+
+    const nextAllowed = gradeLevelOrder.find((grade) => {
+      if (grade.value <= currentGrade.value) return false;
+      if (draft.learnerCategory === SAME_SCHOOL_LABEL && grade.label === 'Grade 7') return false;
+      return true;
+    });
+
+    if (!nextAllowed) return;
+    if (draft.gradeToEnroll === nextAllowed.label) return;
+    setDraft((current) => ({ ...current, gradeToEnroll: nextAllowed.label }));
+  }, [draft.lastGradeLevel, draft.learnerCategory]);
+
+  useEffect(() => {
     if (!draft.strand) setDraft((current) => ({ ...current, semester: '1st Sem' }));
   }, [draft.strand]);
 
@@ -442,10 +530,29 @@ export function EnrollmentFormPage() {
     const selected = previousSchoolOptions.find((entry) => entry.schoolName === draft.previousSchool);
     return selected ? `${selected.schoolId}::${selected.schoolName}` : '';
   }, [draft.learnerCategory, draft.previousSchool, previousSchoolOptions]);
+  const isSeniorHighTargetGrade = SHS_GRADES.has(draft.gradeToEnroll);
+  const isLrnResolved = lrnLookupState.status === 'matched' || lrnLookupState.status === 'not_found';
+  const isFormLockedByLrn = !isLrnResolved;
+
+  useEffect(() => {
+    if (isSeniorHighTargetGrade) return;
+    if (!draft.strand && !draft.semester) return;
+    setDraft((current) => ({ ...current, strand: '', semester: '' }));
+  }, [isSeniorHighTargetGrade, draft.strand, draft.semester]);
+
+  useEffect(() => {
+    if (!isSeniorHighTargetGrade) return;
+    if (draft.semester) return;
+    setDraft((current) => ({ ...current, semester: '1st Sem' }));
+  }, [isSeniorHighTargetGrade, draft.semester]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setModalNotice(null);
+    if (isFormLockedByLrn) {
+      setModalNotice({ type: 'error', title: 'Validation Notice', message: 'Please enter and validate a 12-digit LRN before continuing.' });
+      return;
+    }
     if (!draft.consent) {
       setModalNotice({ type: 'error', title: 'Validation Notice', message: 'Please validate the privacy consent before continuing.' });
       return;
@@ -583,16 +690,56 @@ export function EnrollmentFormPage() {
                 </p>
               </section>
               <section className="enrollment-public-enrollment__section">
+                <h3>LRN Validation</h3>
+                <div className="floating-field-grid">
+                  <TextField
+                    label={lrnLookupState.status === 'checking' ? 'Learner Reference Number (LRN) - Checking...' : 'Learner Reference Number (LRN)'}
+                    value={draft.lrn}
+                    onChange={(value) => updateField('lrn', digitsOnly(value).slice(0, 12))}
+                    inputMode="numeric"
+                    maxLength={12}
+                    pattern="[0-9]{12}"
+                    required
+                  />
+                </div>
+                <p
+                  style={{
+                    margin: 0,
+                    color:
+                      lrnLookupState.status === 'matched'
+                        ? 'var(--deped-blue)'
+                        : lrnLookupState.status === 'invalid'
+                          ? 'var(--deped-red)'
+                          : 'var(--deped-muted)',
+                    fontSize: '13px',
+                    fontWeight: lrnLookupState.status === 'matched' ? 700 : 400,
+                  }}
+                >
+                  {lrnLookupState.message}
+                </p>
+              </section>
+              <fieldset
+                disabled={isFormLockedByLrn}
+                style={{
+                  border: 0,
+                  margin: 0,
+                  padding: 0,
+                  display: 'grid',
+                  gap: 20,
+                  opacity: isFormLockedByLrn ? 0.65 : 1,
+                }}
+              >
+              <section className="enrollment-public-enrollment__section">
                 <h3>1. Enrollment Context</h3>
                 <div className="floating-field-grid">
                   <TextField label="School Year" value={draft.schoolYear} onChange={() => {}} disabled />
-                  <SelectField label="Student Type" value={draft.studentType} onChange={(value) => updateField('studentType', value)} options={studentTypeOptions as unknown as string[]} />
+                  <SelectField label="Student Type" value={draft.studentType} onChange={(value) => updateField('studentType', value)} options={studentTypeOptions as unknown as string[]} disabled={lrnLookupState.status === 'matched'} />
                   <SelectField
                     label="Learner Category"
                     value={draft.learnerCategory}
                     onChange={(value) => updateField('learnerCategory', value)}
                     options={learnerCategoryOptions as unknown as string[]}
-                    disabled={draft.studentType === 'Continuing Student'}
+                    disabled={draft.studentType === 'Continuing Student' || lrnLookupState.status === 'matched'}
                   />
                   <SearchableSelect
                     label="Previous School Attended"
@@ -624,15 +771,14 @@ export function EnrollmentFormPage() {
                   />
                   <SelectField label="Last Grade Level" value={draft.lastGradeLevel} onChange={(value) => updateField('lastGradeLevel', value)} options={gradeLevelOptions as unknown as string[]} />
                   <SelectField label="Grade Level to Enroll" value={draft.gradeToEnroll} onChange={(value) => updateField('gradeToEnroll', value)} options={availableGradeToEnrollOptions as unknown as string[]} />
-                  <SelectField label="Preferred Strand (Optional - SHS only)" value={draft.strand} onChange={(value) => updateField('strand', value)} options={strandOptions} />
-                  <SelectField label="Semester" value={draft.semester} onChange={(value) => updateField('semester', value)} options={semesterOptions as unknown as string[]} disabled={!draft.strand} />
+                  <SelectField label="Preferred Strand (Optional - SHS only)" value={draft.strand} onChange={(value) => updateField('strand', value)} options={strandOptions} disabled={!isSeniorHighTargetGrade} />
+                  <SelectField label="Semester" value={draft.semester} onChange={(value) => updateField('semester', value)} options={semesterOptions as unknown as string[]} disabled={!isSeniorHighTargetGrade || !draft.strand} />
                 </div>
               </section>
               <section className="enrollment-public-enrollment__section">
                 <h3>2. Learner Personal Information</h3>
                 <div className="floating-field-grid">
                   <TextField label="PSA Birth Certificate No." value={draft.birthCertificateNo} onChange={(value) => updateField('birthCertificateNo', digitsOnly(value).slice(0, 12))} inputMode="numeric" maxLength={12} pattern="[0-9]{12}" />
-                  <TextField label={isAutofillingLearner ? 'Learner Reference Number (LRN) - Checking...' : 'Learner Reference Number (LRN)'} value={draft.lrn} onChange={(value) => updateField('lrn', digitsOnly(value).slice(0, 12))} inputMode="numeric" maxLength={12} pattern="[0-9]{12}" />
                   <TextField label="Email Address" value={draft.email} onChange={(value) => updateField('email', value)} inputMode="email" type="email" />
                   <TextField label="Last Name" value={draft.lastName} onChange={(value) => updateField('lastName', value)} required />
                   <TextField label="First Name" value={draft.firstName} onChange={(value) => updateField('firstName', value)} required />
@@ -641,6 +787,7 @@ export function EnrollmentFormPage() {
                   <DateField label="Date of Birth" value={draft.birthDate} onChange={(value) => updateField('birthDate', value)} required />
                   <SelectField label="Gender" value={draft.gender} onChange={(value) => updateField('gender', value)} options={['Male', 'Female']} />
                   <TextField label="Place of Birth" value={draft.placeOfBirth} onChange={(value) => updateField('placeOfBirth', value)} />
+                  <TextField label="Learner Contact Number" value={draft.learnerContact} onChange={(value) => updateField('learnerContact', digitsOnly(value).slice(0, 11))} inputMode="numeric" maxLength={11} pattern="[0-9]{11}" />
                   <TextField label="Mother Tongue" value={draft.motherTongue} onChange={(value) => updateField('motherTongue', value)} />
                   <SelectField label="Religion" value={draft.religion} onChange={(value) => updateField('religion', value)} options={religionOptions as unknown as string[]} />
                   <SelectField label="4Ps Beneficiary" value={draft.is4Ps} onChange={(value) => updateField('is4Ps', value)} options={['Yes', 'No']} />
@@ -704,6 +851,7 @@ export function EnrollmentFormPage() {
               <div className="form-actions">
                 <button type="submit" className="primary-button" disabled={isSubmitting}>{isSubmitting ? 'Submitting' : 'Next'}</button>
               </div>
+              </fieldset>
             </form>
           </div>
         </section>

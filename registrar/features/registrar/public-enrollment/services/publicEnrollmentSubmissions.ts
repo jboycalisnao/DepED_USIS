@@ -59,6 +59,20 @@ export async function fetchPublicEnrollmentSubmissions(limit = 500): Promise<Pub
   return (data || []) as PublicEnrollmentSubmission[];
 }
 
+export async function fetchPublicEnrollmentSubmissionById(id: string): Promise<PublicEnrollmentSubmission | null> {
+  const { data, error } = await supabase
+    .from(REGISTRAR_PUBLIC_ENROLLMENT_TABLE)
+    .select('id,created_at,school_id,school_year,lrn,last_name,first_name,middle_name,grade_to_enroll,guardian_contact,payload')
+    .eq('id', id)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return (data || null) as PublicEnrollmentSubmission | null;
+}
+
 export async function createPublicEnrollmentSubmissionRecord(input: PublicEnrollmentSubmissionMutation): Promise<CreateSubmissionResult> {
   const { data, error } = await supabase
     .from(REGISTRAR_PUBLIC_ENROLLMENT_TABLE)

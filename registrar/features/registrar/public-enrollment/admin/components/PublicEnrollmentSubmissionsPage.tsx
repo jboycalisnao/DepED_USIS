@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { usePublicEnrollmentSubmissions } from '../../hooks/usePublicEnrollmentSubmissions';
 import { useStore } from '../../../../../store';
 import { supabase } from '../../../../../lib/supabase';
@@ -26,6 +27,12 @@ import '../../../../../styles/publicEnrollment.css';
 const SAME_SCHOOL_LABEL = 'Same School';
 const SHS_GRADES = new Set(['Grade 11', 'Grade 12']);
 const gradeLevelOrder = gradeLevelOptions.map((level) => ({ label: level, value: Number(level.replace(/\D/g, '')) }));
+type SubmissionAuditEntry = {
+  id: string;
+  action: string;
+  at: string;
+  detail: string;
+};
 
 function formatDate(value: string) {
   const date = new Date(value);
@@ -65,6 +72,7 @@ const emptyDraft = (schoolId: string): EnrollmentDraft => ({
   birthDate: '',
   gender: 'Male',
   placeOfBirth: '',
+  learnerContact: '',
   motherTongue: '',
   religion: religionOptions[0],
   is4Ps: 'No',
@@ -84,8 +92,24 @@ const emptyDraft = (schoolId: string): EnrollmentDraft => ({
   consent: true,
 });
 
+const appendSubmissionAudit = (payload: EnrollmentDraft, entry: Omit<SubmissionAuditEntry, 'id' | 'at'>): EnrollmentDraft => {
+  const currentPayload = (payload || {}) as any;
+  const currentTrail = Array.isArray(currentPayload.auditTrail) ? currentPayload.auditTrail : [];
+  const nextEntry: SubmissionAuditEntry = {
+    id: crypto.randomUUID(),
+    at: new Date().toISOString(),
+    action: entry.action,
+    detail: entry.detail,
+  };
+  return {
+    ...currentPayload,
+    auditTrail: [...currentTrail, nextEntry],
+  } as EnrollmentDraft;
+};
+
 export default function PublicEnrollmentSubmissionsPage() {
-  const { registrarAccess, refreshData } = useStore();
+  const navigate = useNavigate();
+  const { registrarAccess, refreshData, availableStrands } = useStore();
   const { submissions, isLoading, errorMessage, refresh } = usePublicEnrollmentSubmissions();
   const [query, setQuery] = useState('');
   const [actionError, setActionError] = useState<string | null>(null);
@@ -217,6 +241,7 @@ export default function PublicEnrollmentSubmissionsPage() {
       lastName: row.last_name || row.payload?.lastName || '',
       gradeToEnroll: row.grade_to_enroll || row.payload?.gradeToEnroll || '',
       guardianContact: row.guardian_contact || row.payload?.guardianContact || '',
+      learnerContact: row.payload?.learnerContact || '',
     });
     setIsEditorOpen(true);
   };
@@ -234,7 +259,7 @@ export default function PublicEnrollmentSubmissionsPage() {
         setDraftEditor((current) => ({ ...current, [name]: next }));
         return;
       }
-      if (name === 'fatherContact' || name === 'motherContact' || name === 'guardianContact') {
+      if (name === 'learnerContact' || name === 'fatherContact' || name === 'motherContact' || name === 'guardianContact') {
         const next = value.replace(/[^\d+]/g, '').slice(0, 15);
         setDraftEditor((current) => ({ ...current, [name]: next }));
         return;
@@ -294,7 +319,12 @@ export default function PublicEnrollmentSubmissionsPage() {
         lrn: draftEditor.lrn.trim() || null,
         grade_to_enroll: draftEditor.gradeToEnroll.trim() || null,
         guardian_contact: draftEditor.guardianContact.trim() || null,
-        payload: draftEditor,
+        payload: appendSubmissionAudit(draftEditor, {
+          action: editingSubmission ? 'Submission Edited' : 'Submission Created (Admin)',
+          detail: editingSubmission
+            ? `Record updated by registrar. Target grade: ${draftEditor.gradeToEnroll || 'unspecified'}.`
+            : `Submission created by registrar. Target grade: ${draftEditor.gradeToEnroll || 'unspecified'}.`,
+        }),
       };
 
       if (editingSubmission) {
@@ -444,7 +474,7 @@ export default function PublicEnrollmentSubmissionsPage() {
         birth_date: (payload.birthDate || '').trim() || null,
         gender: (payload.gender || '').trim() || null,
         address: (payload.currentAddress || payload.permanentAddress || '').trim() || null,
-        contact_number: (enrollingSubmission.guardian_contact || payload.guardianContact || '').trim() || null,
+        contact_number: (payload.learnerContact || enrollingSubmission.guardian_contact || payload.guardianContact || '').trim() || null,
         guardian_name: (payload.guardianName || '').trim() || null,
         father_name: (payload.fatherName || '').trim() || null,
         mother_name: (payload.motherName || '').trim() || null,
@@ -459,10 +489,16 @@ export default function PublicEnrollmentSubmissionsPage() {
       if (upsertError) throw upsertError;
 
       await updatePublicEnrollmentSubmissionRecord(enrollingSubmission.id, {
-        payload: {
-          ...payload,
-          consent: true,
-        },
+        payload: appendSubmissionAudit(
+          {
+            ...payload,
+            consent: true,
+          } as EnrollmentDraft,
+          {
+            action: existingLearner?.id ? 'Learner Re-enrolled' : 'Learner Enrolled',
+            detail: `Assigned to ${String(sectionInfo.name || 'section')} (${gradeToEnroll}) for ${String(schoolYearInfo?.label || enrollingSubmission.school_year || payload.schoolYear || 'active school year')}.`,
+          }
+        ),
       });
 
       await refresh();
@@ -501,7 +537,7 @@ export default function PublicEnrollmentSubmissionsPage() {
         birth_date: (payload.birthDate || '').trim() || null,
         gender: (payload.gender || '').trim() || null,
         address: (payload.currentAddress || payload.permanentAddress || '').trim() || null,
-        contact_number: (row.guardian_contact || payload.guardianContact || '').trim() || null,
+        contact_number: (payload.learnerContact || row.guardian_contact || payload.guardianContact || '').trim() || null,
         guardian_name: (payload.guardianName || '').trim() || null,
         father_name: (payload.fatherName || '').trim() || null,
         mother_name: (payload.motherName || '').trim() || null,
@@ -590,7 +626,12 @@ export default function PublicEnrollmentSubmissionsPage() {
                     const enrolledYears = learnerEnrollmentYearsByLrn[rowLrn] || new Set<string>();
                     const isExistingForSubmissionYear = rowSchoolYear ? enrolledYears.has(rowSchoolYear) : false;
                     return (
-                      <tr key={row.id}>
+                      <tr
+                        key={row.id}
+                        onClick={() => navigate(`/enroll/${row.id}`)}
+                        style={{ cursor: 'pointer' }}
+                        title="Open submission details"
+                      >
                         <td>{formatDate(row.created_at)}</td>
                         <td>{displayName}</td>
                         <td>{row.lrn || '--'}</td>
@@ -609,7 +650,10 @@ export default function PublicEnrollmentSubmissionsPage() {
                             <button
                               type="button"
                               className="secondary-button"
-                              onClick={() => openEdit(row)}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                openEdit(row);
+                              }}
                               title="Edit submission"
                               aria-label="Edit submission"
                               style={{ minWidth: 40, width: 40, height: 40, padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
@@ -619,12 +663,9 @@ export default function PublicEnrollmentSubmissionsPage() {
                             <button
                               type="button"
                               className="secondary-button"
-                              onClick={() => {
+                              onClick={(event) => {
+                                event.stopPropagation();
                                 if (isExistingForSubmissionYear) return;
-                                if (isExistingLearner) {
-                                  void updateLearnerInformation(row);
-                                  return;
-                                }
                                 void openEnrollModal(row);
                               }}
                               disabled={isExistingForSubmissionYear}
@@ -632,27 +673,30 @@ export default function PublicEnrollmentSubmissionsPage() {
                                 isExistingForSubmissionYear
                                   ? `Already enrolled for ${rowSchoolYear || 'this school year'}`
                                   : isExistingLearner
-                                    ? 'Update learner information'
+                                    ? 'Re-enroll learner'
                                     : 'Enroll to school'
                               }
                               aria-label={
                                 isExistingForSubmissionYear
                                   ? 'Already enrolled in learners for this school year'
                                   : isExistingLearner
-                                    ? 'Update learner information'
+                                    ? 'Re-enroll learner'
                                     : 'Enroll to school'
                               }
                               style={{ minHeight: 40, padding: '0 10px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
                             >
                               <span className="material-symbols-outlined" aria-hidden="true">
-                                {isExistingForSubmissionYear ? 'check_circle' : isExistingLearner ? 'sync' : 'school'}
+                                {isExistingForSubmissionYear ? 'check_circle' : 'school'}
                               </span>
-                              <span>{isExistingLearner ? 'Update Information' : 'Enroll'}</span>
+                              <span>{isExistingLearner ? 'Re-enroll' : 'Enroll'}</span>
                             </button>
                             <button
                               type="button"
                               className="secondary-button"
-                              onClick={() => requestDeleteSubmission(row.id)}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                requestDeleteSubmission(row.id);
+                              }}
                               title="Delete submission"
                               aria-label="Delete submission"
                               style={{ minWidth: 40, width: 40, height: 40, padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
@@ -692,7 +736,7 @@ export default function PublicEnrollmentSubmissionsPage() {
               <section className="registrar-public-enrollment__section">
                 <h3>Enrollment Context</h3>
                 <div className="floating-field-grid">
-                <InputField label="School ID" value={draftEditor.schoolId} onChange={(value) => updateDraftField('schoolId', value)} />
+                <InputField label="School ID" value={draftEditor.schoolId} onChange={(value) => updateDraftField('schoolId', value)} readOnly />
                 <InputField label="School Year" value={draftEditor.schoolYear} onChange={(value) => updateDraftField('schoolYear', value)} />
                 <SelectField label="Student Type" value={draftEditor.studentType} onChange={(value) => updateDraftField('studentType', value)} options={studentTypeOptions as unknown as string[]} />
                 <SelectField label="Learner Category" value={draftEditor.learnerCategory} onChange={(value) => updateDraftField('learnerCategory', value)} options={learnerCategoryOptions as unknown as string[]} />
@@ -709,10 +753,11 @@ export default function PublicEnrollmentSubmissionsPage() {
                 <SelectField label="Last Grade Level Attended" value={draftEditor.lastGradeLevel} onChange={(value) => updateDraftField('lastGradeLevel', value)} options={gradeLevelOptions as unknown as string[]} />
                 <SelectField label="Grade Level to Enroll" value={draftEditor.gradeToEnroll} onChange={(value) => updateDraftField('gradeToEnroll', value)} options={gradeLevelOptions as unknown as string[]} />
                 <InputField label="Track" value={draftEditor.track} onChange={(value) => updateDraftField('track', value)} />
-                <InputField
+                <SelectField
                   label="Preferred Strand"
                   value={draftEditor.strand}
                   onChange={(value) => updateDraftField('strand', value)}
+                  options={availableStrands.map((strand) => strand.acronym).filter(Boolean)}
                   disabled={!isEditorSeniorHighTargetGrade}
                 />
                 <SelectField
@@ -745,6 +790,7 @@ export default function PublicEnrollmentSubmissionsPage() {
                 <InputField label="Date of Birth" value={draftEditor.birthDate} onChange={(value) => updateDraftField('birthDate', value)} type="date" />
                 <SelectField label="Gender" value={draftEditor.gender} onChange={(value) => updateDraftField('gender', value)} options={['Male', 'Female']} />
                 <InputField label="Place of Birth" value={draftEditor.placeOfBirth} onChange={(value) => updateDraftField('placeOfBirth', value)} />
+                <InputField label="Learner Contact Number" value={draftEditor.learnerContact} onChange={(value) => updateDraftField('learnerContact', value)} inputMode="tel" maxLength={15} />
                 <InputField label="Mother Tongue" value={draftEditor.motherTongue} onChange={(value) => updateDraftField('motherTongue', value)} />
                 <SelectField label="Religion" value={draftEditor.religion} onChange={(value) => updateDraftField('religion', value)} options={religionOptions as unknown as string[]} />
                 <SelectField label="4Ps Beneficiary" value={draftEditor.is4Ps} onChange={(value) => updateDraftField('is4Ps', value)} options={['Yes', 'No']} />
@@ -806,16 +852,15 @@ export default function PublicEnrollmentSubmissionsPage() {
               <InputField label="Grade Level to Enroll" value={enrollingSubmission.grade_to_enroll || ''} onChange={() => {}} readOnly />
               <label className="grid gap-1">
                 <span className="text-[11px] font-bold text-outline uppercase tracking-wide">Section (Active School Year)</span>
-                <select
+                <SearchableSelect
+                  label="Section (Active School Year)"
+                  placeholder="Select section"
+                  floatingLabel
+                  showLabel={false}
                   value={selectedSectionId}
-                  onChange={(event) => setSelectedSectionId(event.target.value)}
-                  className="w-full rounded-xl border border-surfaceVariant bg-white px-3 py-2 text-sm text-onSurface outline-none focus:ring-2 focus:ring-primary/20"
-                >
-                  <option value="">Select section</option>
-                  {availableSections.map((sectionRow) => (
-                    <option key={sectionRow.id} value={sectionRow.id}>{sectionRow.name}</option>
-                  ))}
-                </select>
+                  onChange={setSelectedSectionId}
+                  options={availableSections.map((sectionRow) => ({ value: sectionRow.id, label: sectionRow.name }))}
+                />
               </label>
             </div>
             </div>

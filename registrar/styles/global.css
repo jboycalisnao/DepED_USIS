@@ -33,6 +33,87 @@
   color: var(--deped-muted);
 }
 
+.registrar-user--button {
+  cursor: pointer;
+}
+
+.registrar-profile-menu {
+  position: relative;
+}
+
+.registrar-profile-popover {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 40;
+  min-width: 250px;
+  border: 1px solid var(--deped-line);
+  border-radius: 12px;
+  background: #f9fafb;
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.18);
+  padding: 14px 14px 10px;
+}
+
+.registrar-profile-popover__avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  background: #f6bc00;
+  color: #1f2937;
+  font-size: 18px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+  margin: 0 auto 10px;
+}
+
+.registrar-profile-popover__name {
+  margin: 0;
+  text-align: center;
+  color: #18345b;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.registrar-profile-popover__meta {
+  margin: 4px 0 0;
+  text-align: center;
+  color: #6b7280;
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.registrar-profile-popover__divider {
+  margin: 12px -14px 8px;
+  border-top: 1px solid var(--deped-line);
+}
+
+.registrar-profile-popover__logout {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--deped-red);
+  font-size: 16px;
+  font-weight: 400;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 6px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.registrar-profile-popover__logout:hover {
+  background: rgba(206, 17, 38, 0.08);
+}
+
+.registrar-logout-icon {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  display: block;
+}
+
 .registrar-user > span {
   font-size: 18px;
   color: var(--deped-blue);
@@ -275,10 +356,6 @@
 .registrar-side-nav__logout:hover {
   background: #fdf2f3;
   border-color: rgba(206, 17, 38, 0.16);
-}
-
-.registrar-side-nav__logout .material-symbols-outlined {
-  font-size: 18px;
 }
 
 /* Registrar typography baseline: enforce stable text rhythm without overriding component sizing. */

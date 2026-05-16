@@ -1,4 +1,5 @@
 import { FormEvent, useState } from 'react';
+import { UsisLoginModal } from '../../../../common/components/UsisLoginModal';
 import { UsisGlobalFooter } from '../../../../common/footer/UsisGlobalFooter';
 import { UsisUnifiedHeader } from '../../../../common/header/UsisUnifiedHeader';
 import {
@@ -61,51 +62,19 @@ export default function AttendanceLandingPage({ onAuthenticated }: AttendanceLan
       <main className="page-frame attendance-login-page">
         <div className="content-width">
           <section className="section-shell attendance-login">
-            <section className="portal-panel attendance-login__panel" aria-labelledby="attendance-login-title">
-              <header className="portal-panel__header">
-                <p className="page-intro__eyebrow">USIS Subsystem</p>
-                <h2 id="attendance-login-title">Attendance Portal</h2>
-                <p>Sign in with your assigned USIS core attendance credential.</p>
-              </header>
-
-              <form className="attendance-login__form" onSubmit={handleSubmit}>
-                <label className="floating-field">
-                  <div className="floating-field__control">
-                    <input
-                      type="text"
-                      autoComplete="username"
-                      value={username}
-                      onChange={(event) => setUsername(event.target.value)}
-                      required
-                      placeholder=" "
-                    />
-                    <span>Username</span>
-                  </div>
-                </label>
-
-                <label className="floating-field">
-                  <div className="floating-field__control">
-                    <input
-                      type="password"
-                      autoComplete="current-password"
-                      value={password}
-                      onChange={(event) => setPassword(event.target.value)}
-                      required
-                      placeholder=" "
-                    />
-                    <span>Password</span>
-                  </div>
-                </label>
-
-                {error ? <p className="login-card__error">{error}</p> : null}
-
-                <div className="login-card__actions">
-                  <button className="login-card__submit" type="submit" disabled={isSubmitting}>
-                    {isSubmitting ? 'Checking Access...' : 'Secure Access'}
-                  </button>
-                </div>
-              </form>
-            </section>
+            <UsisLoginModal
+              title="Attendance Portal"
+              username={username}
+              password={password}
+              isSubmitting={isSubmitting}
+              submitLabel="Secure Access"
+              noticeTitle="Access Denied"
+              noticeMessage={error || null}
+              onDismissNotice={() => setError('')}
+              onUsernameChange={setUsername}
+              onPasswordChange={setPassword}
+              onSubmit={handleSubmit}
+            />
           </section>
         </div>
       </main>

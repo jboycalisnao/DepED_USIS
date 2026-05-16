@@ -7,6 +7,9 @@ type UsisLoginModalProps = {
   password: string;
   isSubmitting?: boolean;
   submitLabel?: string;
+  noticeMessage?: string | null;
+  noticeTitle?: string;
+  onDismissNotice?: () => void;
   onUsernameChange: (value: string) => void;
   onPasswordChange: (value: string) => void;
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
@@ -18,6 +21,9 @@ export function UsisLoginModal({
   password,
   isSubmitting = false,
   submitLabel = 'Login',
+  noticeMessage = null,
+  noticeTitle = 'Login Notice',
+  onDismissNotice,
   onUsernameChange,
   onPasswordChange,
   onSubmit,
@@ -96,6 +102,23 @@ export function UsisLoginModal({
           </button>
         </form>
       </div>
+
+      {noticeMessage ? (
+        <div className="modal-overlay modal-overlay--high" role="presentation">
+          <div className="modal-backdrop" onClick={onDismissNotice} />
+          <div className="alert-modal alert-modal--danger" role="dialog" aria-modal="true" aria-label={noticeTitle}>
+            <div className="alert-modal__content">
+              <h3>{noticeTitle}</h3>
+              <p>{noticeMessage}</p>
+            </div>
+            <div className="alert-modal__actions">
+              <button type="button" className="alert-modal__blue" onClick={onDismissNotice}>
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }

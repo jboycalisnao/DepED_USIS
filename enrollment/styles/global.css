@@ -84,8 +84,11 @@ body {
   color: var(--deped-white);
 }
 
-.enrollment-status-signout .material-symbols-outlined {
-  font-size: 18px;
+.enrollment-logout-icon {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  display: block;
 }
 
 .enrollment-status-hero__shape {

@@ -37,6 +37,7 @@ const AcademicCycles: React.FC = () => {
   }, []);
 
   const availableSourceSchoolYears = useMemo(() => schoolYears.filter((schoolYear) => schoolYear.id !== activeSchoolYear.id), [activeSchoolYear.id, schoolYears]);
+  const pendingTargetHasSections = pendingSYActive ? getSectionsInSY(pendingSYActive.id) > 0 : false;
 
   const handleSwitchCycle = async (strategy: 'none' | 'copy') => {
     if (!pendingSYActive) return;
@@ -113,9 +114,14 @@ const AcademicCycles: React.FC = () => {
             <div className="modal-dialog__body">
               <p>Set {pendingSYActive.label} as active and choose what to do with current sections.</p>
               {switchError && <p>{switchError}</p>}
+              {pendingTargetHasSections && (
+                <p>Target cycle already has existing sections. Copy option is hidden to prevent duplicate section creation.</p>
+              )}
               <div className="settings-cycles__switch-actions">
                 <button type="button" onClick={() => handleSwitchCycle('none')} disabled={loading}>Switch Only</button>
-                <button type="button" onClick={() => handleSwitchCycle('copy')} disabled={loading}>Copy Sections</button>
+                {!pendingTargetHasSections && (
+                  <button type="button" onClick={() => handleSwitchCycle('copy')} disabled={loading}>Copy Sections</button>
+                )}
               </div>
             </div>
           </div>
