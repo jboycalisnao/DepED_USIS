@@ -300,7 +300,7 @@ function App() {
 
   return (
     <div className="attendance-app min-h-screen bg-gray-50 text-gray-900 flex flex-col font-sans selection:bg-primary-100 selection:text-primary-900">
-      <header className="site-chrome">
+      <header className="site-chrome attendance-chrome">
         <div className="content-width">
           <div className="attendance-header">
             <UsisUnifiedHeader
@@ -441,11 +441,6 @@ function App() {
                   </div>
                 ))}
               </div>
-            </div>
-            <div className="attendance-session-row">
-              <p className="attendance-session-row__text">
-                Session active for <strong>{access.displayName}</strong>
-              </p>
             </div>
             <main className="attendance-main animate-in fade-in duration-700">
           {currentView === 'registrar' && (

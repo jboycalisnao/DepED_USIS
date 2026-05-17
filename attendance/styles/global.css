@@ -149,6 +149,35 @@ body {
   border-color: rgba(206, 17, 38, 0.16);
 }
 
+/* Attendance typography baseline: align with registrar text rhythm without overriding component sizing. */
+.attendance-main :where(p, span, li, label, input, select, textarea, button, a, td, th, caption, small, strong, b):not(.material-symbols-outlined),
+.attendance-chrome :where(p, span, li, label, input, select, textarea, button, a, td, th, caption, small, strong, b):not(.material-symbols-outlined) {
+  font-weight: 400;
+}
+
+.attendance-main :where(p, span, li, label, input, select, textarea, button, a, td, th, caption, small),
+.attendance-chrome :where(p, span, li, label, input, select, textarea, button, a, td, th, caption, small) {
+  letter-spacing: normal;
+}
+
+.attendance-main :where(h1, h2, h3, h4, h5, h6),
+.attendance-chrome :where(h1, h2, h3, h4, h5, h6) {
+  font-weight: 700;
+  letter-spacing: normal;
+}
+
+/* Force regular tracking across attendance pages to avoid wide text spacing drift. */
+.attendance-main :where(h1, h2, h3, h4, h5, h6, p, span, li, label, input, select, textarea, button, a, td, th, caption, small, strong, b),
+.attendance-chrome :where(h1, h2, h3, h4, h5, h6, p, span, li, label, input, select, textarea, button, a, td, th, caption, small, strong, b) {
+  letter-spacing: normal !important;
+}
+
+/* Remove top margin from text elements across attendance pages. */
+.attendance-main :where(h1, h2, h3, h4, h5, h6, p, span, li, label, a, td, th, caption, small, strong, b),
+.attendance-chrome :where(h1, h2, h3, h4, h5, h6, p, span, li, label, a, td, th, caption, small, strong, b) {
+  margin-top: 0 !important;
+}
+
 .attendance-content {
   padding: 24px var(--page-inset) 24px;
 }
@@ -328,23 +357,6 @@ body {
   cursor: pointer;
 }
 
-.attendance-session-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-top: -8px;
-}
-
-.attendance-session-row__text {
-  margin: 0;
-  color: var(--deped-muted);
-  font-size: var(--usis-helper-size);
-  font-weight: 700;
-  text-transform: uppercase;
-}
-
 .attendance-user-line {
   min-height: 42px;
   border: 1px solid var(--deped-line);
@@ -382,19 +394,6 @@ body {
   color: var(--deped-muted);
   font-size: var(--usis-helper-size);
   font-weight: 700;
-}
-
-.attendance-session-row__logout {
-  min-height: 36px;
-  padding: 0 12px;
-  border: 1px solid rgba(206, 17, 38, 0.24);
-  border-radius: 10px;
-  background: var(--deped-white);
-  color: var(--deped-red);
-  font-size: var(--usis-helper-size);
-  font-weight: 700;
-  text-transform: uppercase;
-  cursor: pointer;
 }
 
 .attendance-main {
