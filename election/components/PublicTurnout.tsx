@@ -22,7 +22,7 @@ interface PublicTurnoutProps {
   schoolYearLabel: string;
 }
 
-const shellWidthClass = 'mx-auto w-[min(1180px,calc(100%-32px))] px-[28px]';
+const shellWidthClass = 'w-full px-[var(--page-inset)]';
 
 const PublicTurnout: React.FC<PublicTurnoutProps> = ({
   voters,

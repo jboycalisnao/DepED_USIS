@@ -19,9 +19,9 @@ const Credentials: React.FC = () => {
   const sectionsForGrade = useMemo(
     () =>
       sections
-        .filter((section) => section.gradeLevel === selectedGrade && section.schoolYearId === activeSchoolYear.id)
+        .filter((section) => section.gradeLevel === selectedGrade)
         .sort((a, b) => a.name.localeCompare(b.name)),
-    [sections, selectedGrade, activeSchoolYear.id],
+    [sections, selectedGrade],
   );
 
   const sectionMap = useMemo(() => {
@@ -33,14 +33,20 @@ const Credentials: React.FC = () => {
   }, [sectionsForGrade]);
 
   const targetLearners = useMemo(() => {
+    const hasEnrollmentInActiveSchoolYear = (learner: Student) => {
+      const history = Array.isArray(learner.enrollments) ? learner.enrollments : [];
+      return history.some((entry) => String(entry?.schoolYear || '').trim() === activeSchoolYear.label);
+    };
+
     const activeSectionIds = new Set(sectionsForGrade.map((section) => section.id));
     const scopeFiltered =
       selectedSectionId === 'all'
         ? learners.filter((learner) => activeSectionIds.has(String(learner.sectionId || '').trim()))
         : learners.filter((learner) => String(learner.sectionId || '').trim() === selectedSectionId);
+    const historyFiltered = scopeFiltered.filter(hasEnrollmentInActiveSchoolYear);
     const query = searchTerm.trim().toLowerCase();
     const filtered = query
-      ? scopeFiltered.filter((learner) => {
+      ? historyFiltered.filter((learner) => {
           const sectionLabel = sectionMap[String(learner.sectionId || '').trim()] || '';
           const searchable = [
             learner.lrn,
@@ -55,11 +61,11 @@ const Credentials: React.FC = () => {
             .toLowerCase();
           return searchable.includes(query);
         })
-      : scopeFiltered;
+      : historyFiltered;
     return filtered.sort((a, b) =>
       `${a.lastName}, ${a.firstName}`.toUpperCase().localeCompare(`${b.lastName}, ${b.firstName}`.toUpperCase()),
     );
-  }, [learners, sectionsForGrade, selectedSectionId, searchTerm, sectionMap]);
+  }, [learners, sectionsForGrade, selectedSectionId, searchTerm, sectionMap, activeSchoolYear.label]);
 
   useEffect(() => {
     setSelectedLearnerIds((prev) => {

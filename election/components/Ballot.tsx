@@ -107,7 +107,7 @@ const Ballot: React.FC<BallotProps> = ({ candidates, selections, onSelect, onSub
         }
       }, 350);
     } 
-    else if (isLast && ids.length > 0) {
+    else if (isLast && ids.length === limit) {
       setTimeout(() => {
         submitButtonRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }, 350);
@@ -115,7 +115,7 @@ const Ballot: React.FC<BallotProps> = ({ candidates, selections, onSelect, onSub
   };
 
   return (
-    <div className="mx-auto w-[min(1180px,calc(100%-32px))] px-[28px] py-8 pb-20">
+    <div className="w-full px-[var(--page-inset)] py-8 pb-20">
       <div className="mb-10 text-center">
         <div className="inline-block p-4 bg-white rounded-[12px] border border-[rgba(18,35,61,0.08)] mb-4">
            <img src={LEON_NHS_LOGO_URL} className="h-16 w-auto" alt="Leon NHS Seal" />

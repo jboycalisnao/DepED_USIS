@@ -67,7 +67,7 @@ export default function AttendanceLandingPage({ onAuthenticated }: AttendanceLan
               username={username}
               password={password}
               isSubmitting={isSubmitting}
-              submitLabel="Secure Access"
+              submitLabel="Login"
               noticeTitle="Access Denied"
               noticeMessage={error || null}
               onDismissNotice={() => setError('')}

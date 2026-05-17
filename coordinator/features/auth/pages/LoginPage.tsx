@@ -94,7 +94,7 @@ export function LoginPage() {
               username={username}
               password={password}
               isSubmitting={isSubmitting}
-              submitLabel="Continue"
+              submitLabel="Login"
               noticeTitle="Access Notice"
               noticeMessage={error || null}
               onDismissNotice={() => setError('')}

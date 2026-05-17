@@ -2,6 +2,7 @@ import type { FormEvent, ReactNode } from 'react';
 import { USIS_HEADER_IMAGE_PATH } from '../config/usisBranding';
 
 type UsisUnifiedHeaderProps = {
+  homeHref?: string;
   searchId: string;
   searchLabel: string;
   searchPlaceholder?: string;
@@ -12,6 +13,7 @@ type UsisUnifiedHeaderProps = {
 };
 
 export function UsisUnifiedHeader({
+  homeHref = '/',
   searchId,
   searchLabel,
   searchPlaceholder = 'Keywords',
@@ -28,7 +30,9 @@ export function UsisUnifiedHeader({
       </div>
       <div className="kit-header__main">
         <div className="kit-header__identity">
-          <img className="kit-header__logo" src={USIS_HEADER_IMAGE_PATH} alt="USIS header logo" />
+          <a className="kit-header__logo-link" href={homeHref} aria-label="Go to module landing page">
+            <img className="kit-header__logo" src={USIS_HEADER_IMAGE_PATH} alt="USIS header logo" />
+          </a>
           <div className="usis-header__module-block" aria-label="Module identity">
             <span className="usis-header__module-kicker" />
             <strong className="usis-header__module-title" />

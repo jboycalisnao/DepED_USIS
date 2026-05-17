@@ -7,3 +7,94 @@
   --usis-module-kicker: "School";
   --usis-module-title: "ELECTION PORTAL";
 }
+
+/* Election typography baseline:
+   - no forced letter spacing
+   - regular text at 400
+   - titles only (h1-h6) at 700 */
+.election-app :where(p, span, li, label, input, select, textarea, button, a, td, th, caption, small, strong, b):not(.material-symbols-outlined):not(.election-header-nav__link),
+.election-main :where(p, span, li, label, input, select, textarea, button, a, td, th, caption, small, strong, b):not(.material-symbols-outlined):not(.election-header-nav__link) {
+  font-weight: 400 !important;
+}
+
+.election-app :where(h1, h2, h3, h4, h5, h6),
+.election-main :where(h1, h2, h3, h4, h5, h6) {
+  font-weight: 700 !important;
+}
+
+/* Keep shared module title weight aligned with learner portal header treatment. */
+.election-app .usis-header__module-kicker,
+.election-main .usis-header__module-kicker {
+  font-weight: 500 !important;
+}
+
+.election-app .usis-header__module-kicker::before,
+.election-main .usis-header__module-kicker::before {
+  font-weight: 500 !important;
+}
+
+.election-app .usis-header__module-title,
+.election-main .usis-header__module-title {
+  font-weight: 700 !important;
+}
+
+.election-app .usis-header__module-title::before,
+.election-main .usis-header__module-title::before {
+  font-weight: 700 !important;
+}
+
+.election-app :where(h1, h2, h3, h4, h5, h6, p, span, li, label, input, select, textarea, button, a, td, th, caption, small, strong, b),
+.election-main :where(h1, h2, h3, h4, h5, h6, p, span, li, label, input, select, textarea, button, a, td, th, caption, small, strong, b) {
+  letter-spacing: normal !important;
+}
+
+.election-header-nav__link {
+  font-weight: 700 !important;
+}
+
+.election-app--identity-focus {
+  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.election-main--identity-focus {
+  flex: 1 1 auto;
+  min-height: 100vh;
+  height: 100vh;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.election-admin-shell {
+  display: grid;
+  grid-template-columns: 230px minmax(0, 1fr);
+  align-items: stretch;
+  gap: 0;
+}
+
+.election-admin-shell .usis-side-nav {
+  border-right: 1px solid var(--deped-line);
+  background: #f3f4f6;
+}
+
+.election-admin-shell__content {
+  padding: 0 0 0 20px;
+  min-width: 0;
+}
+
+.election-admin-shell--embedded .election-admin-shell__content {
+  padding-left: 14px;
+}
+
+@media (max-width: 920px) {
+  .election-admin-shell {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .election-admin-shell__content {
+    padding-left: 0;
+  }
+}

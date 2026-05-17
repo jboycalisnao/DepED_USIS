@@ -139,7 +139,7 @@ const ElectionRegistrationPage: React.FC<ElectionRegistrationPageProps> = ({
   };
 
   return (
-    <section className="mx-auto w-[min(1180px,calc(100%-32px))] px-[28px] py-10">
+    <section className="w-full px-[var(--page-inset)] py-10">
       {step === 'access' && (
         <>
           <div className="max-w-[860px]">

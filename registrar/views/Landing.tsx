@@ -9,8 +9,7 @@ import { RegistrarFooter } from '../components/shell/RegistrarFooter';
 import { UsisLoginModal } from '../../common/components/UsisLoginModal';
 
 const LandingContent: React.FC = () => {
-  const { login } = useStore();
-  const { message } = AntApp.useApp();
+  const { login, registrarLoginDebug } = useStore();
   const [loading, setLoading] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -22,7 +21,6 @@ const LandingContent: React.FC = () => {
     setError(null);
     const result = await login(username, password);
     if (result.ok) {
-      message.success('Access granted. Synchronizing systems...');
       return;
     }
     setError(result.error || 'Authentication failed. Please verify credentials.');
@@ -57,6 +55,29 @@ const LandingContent: React.FC = () => {
               onPasswordChange={setPassword}
               onSubmit={onSubmit}
             />
+            {registrarLoginDebug && (
+              <div
+                style={{
+                  marginTop: '10px',
+                  border: '1px solid #c9d2e3',
+                  borderRadius: '12px',
+                  padding: '10px 12px',
+                  background: '#f6f8fc',
+                  fontSize: '12px',
+                  color: '#213a63',
+                }}
+              >
+                <strong style={{ display: 'block', marginBottom: '4px', fontWeight: 700 }}>Auth Debug (temporary)</strong>
+                <div>user: {registrarLoginDebug.normalizedUsername || '-'}</div>
+                <div>outcome: {registrarLoginDebug.outcome}</div>
+                <div>core_coordinators found: {String(registrarLoginDebug.coordinatorsFound)}</div>
+                <div>sources checked: {registrarLoginDebug.checkedSources.join(', ') || '-'}</div>
+                <div>matched source: {registrarLoginDebug.matchedSource || '-'}</div>
+                <div>matched role: {registrarLoginDebug.matchedRole || '-'}</div>
+                <div>password matched: {String(registrarLoginDebug.passwordMatched)}</div>
+                <div>explicit module deny: {String(registrarLoginDebug.explicitRegistrarDeny)}</div>
+              </div>
+            )}
           </section>
         </div>
       </main>

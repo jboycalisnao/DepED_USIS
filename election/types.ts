@@ -183,6 +183,7 @@ export type AppView =
   | 'results-page'
   | 'election-registration'
   | 'tally-results'
+  | 'admin-access'
   | 'admin'
   | 'public-results'
   | 'public-turnout';

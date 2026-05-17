@@ -1,10 +1,17 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import usisIcon from '../assets/USIS_Icon.png';
 
 type UsisLoginModalProps = {
   title: string;
   username: string;
   password: string;
+  usernameLabel?: string;
+  passwordLabel?: string;
+  usernameInputMode?: React.HTMLAttributes<HTMLInputElement>['inputMode'];
+  passwordInputMode?: React.HTMLAttributes<HTMLInputElement>['inputMode'];
+  usernameAutoComplete?: string;
+  passwordAutoComplete?: string;
   isSubmitting?: boolean;
   submitLabel?: string;
   noticeMessage?: string | null;
@@ -19,6 +26,12 @@ export function UsisLoginModal({
   title,
   username,
   password,
+  usernameLabel = 'Username',
+  passwordLabel = 'Password',
+  usernameInputMode,
+  passwordInputMode,
+  usernameAutoComplete = 'username',
+  passwordAutoComplete = 'current-password',
   isSubmitting = false,
   submitLabel = 'Login',
   noticeMessage = null,
@@ -29,6 +42,7 @@ export function UsisLoginModal({
   onSubmit,
 }: UsisLoginModalProps) {
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+  const canUsePortal = typeof document !== 'undefined' && !!document.body;
 
   return (
     <section className="usis-login-modal" aria-labelledby="usis-login-title">
@@ -51,11 +65,12 @@ export function UsisLoginModal({
                 onChange={(event) => onUsernameChange(event.target.value)}
                 type="text"
                 name="username"
-                autoComplete="username"
+                autoComplete={usernameAutoComplete}
+                inputMode={usernameInputMode}
                 required
                 placeholder=" "
               />
-              <span>Username</span>
+              <span>{usernameLabel}</span>
             </div>
           </label>
 
@@ -66,12 +81,13 @@ export function UsisLoginModal({
                 onChange={(event) => onPasswordChange(event.target.value)}
                 type={isPasswordVisible ? 'text' : 'password'}
                 name="password"
-                autoComplete="current-password"
+                autoComplete={passwordAutoComplete}
+                inputMode={passwordInputMode}
                 required
                 placeholder=" "
                 className="floating-field__input--password"
               />
-              <span>Password</span>
+              <span>{passwordLabel}</span>
               <button
                 type="button"
                 className="floating-field__password-toggle"
@@ -103,7 +119,8 @@ export function UsisLoginModal({
         </form>
       </div>
 
-      {noticeMessage ? (
+      {noticeMessage && canUsePortal
+        ? createPortal(
         <div className="modal-overlay modal-overlay--high" role="presentation">
           <div className="modal-backdrop" onClick={onDismissNotice} />
           <div className="alert-modal alert-modal--danger" role="dialog" aria-modal="true" aria-label={noticeTitle}>
@@ -118,7 +135,10 @@ export function UsisLoginModal({
             </div>
           </div>
         </div>
-      ) : null}
+          ,
+          document.body
+        )
+        : null}
     </section>
   );
 }

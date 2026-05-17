@@ -45,6 +45,10 @@
   object-fit: contain;
 }
 
+.kit-header__logo-link {
+  display: inline-flex;
+}
+
 .usis-header__module-block {
   display: grid;
   gap: 0;

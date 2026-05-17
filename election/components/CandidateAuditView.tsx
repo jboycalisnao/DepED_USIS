@@ -11,7 +11,7 @@ interface CandidateAuditViewProps {
 const CandidateAuditView: React.FC<CandidateAuditViewProps> = ({ candidate, onBack }) => {
   if (!candidate) {
     return (
-      <section className="mx-auto w-[min(1180px,calc(100%-32px))] px-[28px] py-10">
+      <section className="w-full px-[var(--page-inset)] py-10">
         <div className="rounded-[12px] border border-slate-200 bg-white px-6 py-10 text-center shadow-sm">
           <i className="fa-solid fa-user-slash mb-5 text-[24px] text-slate-300"></i>
           <h2 className="text-[24px] font-black uppercase text-slate-900">Invalid Reference</h2>
@@ -51,7 +51,7 @@ const CandidateAuditView: React.FC<CandidateAuditViewProps> = ({ candidate, onBa
   const incompleteCount = auditFields.filter(f => f.required && !checkField(f.value)).length;
 
   return (
-    <section className="mx-auto w-[min(1180px,calc(100%-32px))] px-[28px] py-10">
+    <section className="w-full px-[var(--page-inset)] py-10">
       <div className="rounded-[12px] border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-200 px-6 py-5">
           <p className="text-[13px] font-bold uppercase tracking-[0.18em] text-slate-500">

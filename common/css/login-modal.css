@@ -69,12 +69,15 @@
 .usis-login-modal .floating-field__control input {
   min-height: 64px;
   background: #fbfcff;
+  color: var(--deped-ink);
+  font-size: var(--usis-body-size);
+  line-height: 1.5;
 }
 
 .usis-login-modal .floating-field__control span {
   text-transform: none;
   font-weight: 400;
-  font-size: var(--usis-body-size);
+  font-size: var(--usis-helper-size);
 }
 
 .usis-login-modal .floating-field__control input:focus + span,

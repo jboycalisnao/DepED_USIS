@@ -19,7 +19,7 @@ interface ResultsProps {
 
 const Results: React.FC<ResultsProps> = ({ candidates, turnoutByPosition = {} }) => {
   return (
-    <section className="mx-auto w-[min(1180px,calc(100%-32px))] px-[28px] py-10">
+    <section className="w-full px-[var(--page-inset)] py-10">
       <div className="mb-6 rounded-[12px] border border-slate-200 bg-white px-6 py-6 shadow-sm">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div className="flex items-center gap-4">

@@ -40,7 +40,7 @@ export function SubmissionStatusLoginPage({ onLogin }: Props) {
             username={username}
             password={password}
             isSubmitting={isSubmitting}
-            submitLabel="Sign In"
+            submitLabel="Login"
             noticeTitle="Login Notice"
             noticeMessage={error}
             onDismissNotice={() => setError(null)}

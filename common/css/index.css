@@ -3,8 +3,11 @@
 @import "./layout.css";
 @import "./header.css";
 @import "./footer.css";
+@import "./breadcrumb-bar.css";
 @import "./boxes.css";
 @import "./forms.css";
 @import "./login-modal.css";
 @import "./modals.css";
+@import "./profile-trigger.css";
+@import "./side-nav.css";
 @import "./utilities.css";

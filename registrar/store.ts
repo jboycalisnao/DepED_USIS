@@ -8,6 +8,7 @@ import {
   getStoredRegistrarAccess,
   resolveRegistrarCoordinatorAccess,
   storeRegistrarAccess,
+  type RegistrarAuthDebug,
   type RegistrarCoordinatorAccess,
 } from './features/auth/coordinatorAccess';
 
@@ -68,6 +69,8 @@ let connectionListeners: Array<(err: boolean) => void> = [];
 let authListeners: Array<(auth: boolean) => void> = [];
 let loadingListeners: Array<(load: boolean) => void> = [];
 let registrarAccessListeners: Array<(access: RegistrarCoordinatorAccess | null) => void> = [];
+let registrarLoginDebug: RegistrarAuthDebug | null = null;
+let registrarLoginDebugListeners: Array<(debug: RegistrarAuthDebug | null) => void> = [];
 
 const notifyGradeLevels = () => glListeners.forEach(l => l([...activeGradeLevels]));
 const notifyStrands = () => {
@@ -328,6 +331,7 @@ export const useStore = () => {
   const [isAuth, setIsAuth] = useState<boolean>(isAuthenticated);
   const [loading, setLoading] = useState(isGlobalLoading);
   const [currentRegistrarAccess, setCurrentRegistrarAccess] = useState<RegistrarCoordinatorAccess | null>(registrarAccess);
+  const [currentRegistrarLoginDebug, setCurrentRegistrarLoginDebug] = useState<RegistrarAuthDebug | null>(registrarLoginDebug);
 
   useEffect(() => {
     const lListener = (newList: Student[]) => setCurrentLearners([...newList]);
@@ -342,6 +346,7 @@ export const useStore = () => {
     const aListener = (auth: boolean) => setIsAuth(auth);
     const loadListener = (load: boolean) => setLoading(load);
     const registrarAccessListener = (access: RegistrarCoordinatorAccess | null) => setCurrentRegistrarAccess(access);
+    const registrarLoginDebugListener = (debug: RegistrarAuthDebug | null) => setCurrentRegistrarLoginDebug(debug);
     
     learnersListeners.push(lListener);
     sectionsListeners.push(sListener);
@@ -355,6 +360,7 @@ export const useStore = () => {
     authListeners.push(aListener);
     loadingListeners.push(loadListener);
     registrarAccessListeners.push(registrarAccessListener);
+    registrarLoginDebugListeners.push(registrarLoginDebugListener);
     
     return () => {
       learnersListeners = learnersListeners.filter(l => l !== lListener);
@@ -369,6 +375,7 @@ export const useStore = () => {
       authListeners = authListeners.filter(l => l !== aListener);
       loadingListeners = loadingListeners.filter(l => l !== loadListener);
       registrarAccessListeners = registrarAccessListeners.filter(l => l !== registrarAccessListener);
+      registrarLoginDebugListeners = registrarLoginDebugListeners.filter(l => l !== registrarLoginDebugListener);
     };
   }, []);
 
@@ -409,6 +416,7 @@ export const useStore = () => {
     isAuthenticated: isAuth,
     loading,
     registrarAccess: currentRegistrarAccess,
+    registrarLoginDebug: currentRegistrarLoginDebug,
     refreshData,
     setSchoolYear: (syId: string) => {
       const found = currentSYList.find(s => s.id === syId);
@@ -416,6 +424,8 @@ export const useStore = () => {
     },
     login: async (username: string, password: string) => {
       const result = await resolveRegistrarCoordinatorAccess(username, password);
+      registrarLoginDebug = result.debug || null;
+      registrarLoginDebugListeners.forEach((listener) => listener(registrarLoginDebug));
       if (result.error || !result.record) {
         return { ok: false, error: result.error || 'Authentication failed.' };
       }
@@ -430,7 +440,9 @@ export const useStore = () => {
     logout: () => {
       clearStoredRegistrarAccess();
       registrarAccess = null;
+      registrarLoginDebug = null;
       registrarAccessListeners.forEach((listener) => listener(null));
+      registrarLoginDebugListeners.forEach((listener) => listener(null));
       isAuthenticated = false;
       authListeners.forEach(l => l(false));
     },

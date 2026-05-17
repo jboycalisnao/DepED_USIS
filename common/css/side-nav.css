@@ -1,0 +1,117 @@
+.usis-side-nav {
+  position: sticky;
+  top: 0;
+  min-height: 100%;
+  border-right: 1px solid var(--deped-line);
+  background: #f3f4f6;
+  padding: 14px 12px;
+  display: flex;
+  flex-direction: column;
+}
+
+.usis-side-nav__menu {
+  display: grid;
+  gap: 6px;
+}
+
+.usis-side-nav__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  padding: 10px 10px;
+  color: #1f2937;
+  font-size: 16px;
+  font-weight: 400;
+  text-decoration: none;
+}
+
+.usis-side-nav__link:hover {
+  border-color: var(--deped-line);
+  background: #eceff3;
+  color: var(--deped-blue);
+}
+
+.usis-side-nav__link--active {
+  color: #0b3a8f;
+  font-weight: 700;
+  border-color: #bfd0ef;
+  background: #eaf1ff;
+  box-shadow: inset 3px 0 0 #1d4fa8;
+}
+
+.usis-side-nav__link .material-symbols-outlined {
+  font-size: 18px;
+  color: #111827;
+}
+
+.usis-side-nav__icon {
+  font-size: 18px;
+  width: 18px;
+  text-align: center;
+  flex: 0 0 18px;
+  color: #111827;
+}
+
+.usis-side-nav__link--active .material-symbols-outlined {
+  color: #0b3a8f;
+}
+
+.usis-side-nav__link--active .usis-side-nav__icon {
+  color: #0b3a8f;
+}
+
+.usis-side-nav__footer {
+  margin-top: 0;
+  padding-top: 6px;
+}
+
+.usis-side-nav__logout {
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--deped-red);
+  font-size: 16px;
+  font-weight: 400;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+.usis-side-nav__logout:hover {
+  background: #fdf2f3;
+  border-color: rgba(206, 17, 38, 0.16);
+}
+
+.usis-side-nav__logout-icon {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  display: block;
+}
+
+@media (max-width: 920px) {
+  .usis-side-nav {
+    position: static;
+    min-height: 100%;
+    border-right: 0;
+    border: 1px solid var(--deped-line);
+    border-radius: var(--usis-radius-surface);
+    background: var(--deped-white);
+  }
+
+  .usis-side-nav__menu {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .usis-side-nav__menu {
+    grid-template-columns: 1fr;
+  }
+}

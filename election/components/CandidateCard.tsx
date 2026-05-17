@@ -19,9 +19,9 @@ const CandidateCard: React.FC<CandidateCardProps> = ({ candidate, isSelected, on
   return (
     <div 
       onClick={() => onSelect(candidate.id)}
-      className={`relative flex flex-col items-center p-4 rounded-xl border-2 transition-all cursor-pointer hover:shadow-lg ${
+      className={`relative flex flex-col items-center p-3 rounded-xl border-2 transition-all cursor-pointer hover:shadow-md ${
         isSelected 
-          ? 'border-[#034F8B] bg-blue-50 ring-2 ring-blue-200 shadow-md transform scale-[1.02]' 
+          ? 'border-[#034F8B] bg-blue-50 ring-2 ring-blue-200 shadow-sm' 
           : 'border-gray-200 bg-white'
       }`}
     >
@@ -35,25 +35,25 @@ const CandidateCard: React.FC<CandidateCardProps> = ({ candidate, isSelected, on
         src={optimizedUrl} 
         alt={candidate.name}
         loading="lazy"
-        className="w-24 h-24 rounded-full object-cover mb-4 border-2 border-white shadow-sm bg-gray-50"
+        className="w-20 h-20 rounded-full object-cover mb-3 border-2 border-white shadow-sm bg-gray-50"
         onError={(e) => { (e.target as HTMLImageElement).src = LEON_NHS_LOGO_URL; }}
       />
       
-      <h3 className="text-lg font-bold text-gray-900 text-center leading-tight">
+      <h3 className="text-[16px] font-bold text-gray-900 text-center leading-tight">
         {candidate.name}
       </h3>
-      <p className="text-xs font-semibold text-[#034F8B] mb-1">
+      <p className="text-xs font-semibold text-[#034F8B] mb-0.5">
         {candidate.party}
       </p>
       
-      <div className="mt-3 text-center">
+      <div className="mt-2 text-center">
         <p className="text-xs text-gray-500 italic line-clamp-2">
           "{candidate.vision}"
         </p>
       </div>
 
       <button
-        className={`mt-4 w-full py-2 px-4 rounded-lg text-sm font-bold transition-all ${
+        className={`mt-3 w-full py-1.5 px-3 rounded-lg text-[13px] font-bold transition-all ${
           isSelected 
             ? 'bg-[#034F8B] text-white' 
             : 'bg-gray-100 text-gray-700 hover:bg-gray-200'

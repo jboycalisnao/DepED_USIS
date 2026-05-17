@@ -8,7 +8,7 @@ interface FeaturePlaceholderProps {
 
 const FeaturePlaceholder: React.FC<FeaturePlaceholderProps> = ({ title, label, message }) => {
   return (
-    <section className="mx-auto w-[min(1180px,calc(100%-32px))] px-[28px] py-10">
+    <section className="w-full px-[var(--page-inset)] py-10">
       <div className="rounded-[12px] border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-200 px-6 py-5">
           <p className="text-[13px] font-bold uppercase tracking-[0.18em] text-slate-500">
