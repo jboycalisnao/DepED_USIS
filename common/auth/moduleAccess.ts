@@ -4,7 +4,8 @@ export type UsisModuleKey =
   | 'attendance'
   | 'election'
   | 'sp_portal'
-  | 'learner_portal';
+  | 'learner_portal'
+  | 'support';
 
 const STORAGE_KEY = 'usis_coordinator_module_access_map';
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 30;

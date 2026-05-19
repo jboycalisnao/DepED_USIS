@@ -36,6 +36,8 @@ interface AdminPanelProps {
   ) => void;
   schoolYears: SchoolYear[];
   variant?: 'embedded' | 'standalone';
+  currentUserName?: string | null;
+  currentUserRole?: string | null;
 }
 
 type AdminTab = 'dashboard' | 'candidates' | 'voters' | 'organization' | 'settings';
@@ -160,11 +162,14 @@ const AdminPanel: React.FC<AdminPanelProps> = (props) => {
   };
 
   return (
-    <div className={isEmbedded ? 'w-full py-0' : 'w-full py-6 md:py-8'}>
-      <div className={isEmbedded ? '' : 'px-[28px]'}>
+    <div className={isEmbedded ? 'w-full py-0' : 'w-full pt-2 pb-0 md:pt-3 md:pb-0'}>
+      <div className="election-admin-breadcrumb">
         <UsisBreadcrumbBar
           rootLabel="Admin Console"
           currentLabel={tabs.find((tab) => tab.id === activeTab)?.label || 'Dashboard'}
+          profileName={props.currentUserName || null}
+          profileRole={props.currentUserRole || 'System Administrator'}
+          onLogout={props.onLogout}
         />
       </div>
       <div className={isEmbedded ? 'page-fade-in election-admin-shell election-admin-shell--embedded' : 'page-fade-in election-admin-shell'}>

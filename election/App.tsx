@@ -16,6 +16,7 @@ import NotificationModal, { ModalConfig } from './components/NotificationModal';
 import CandidateAuditView from './components/CandidateAuditView';
 import LiveTallyMonitor from './components/admin/dashboard/LiveTallyMonitor';
 import SystemAlerts from './components/SystemAlerts';
+import MaterialIconAdapter from './components/MaterialIconAdapter';
 import { UsisLoginModal } from '../common/components/UsisLoginModal';
 import { hasCoordinatorModuleAccess } from '../common/auth/moduleAccess';
 import { Candidate, AppView, User, ElectionConfig, ElectionStatus, Position, GradeLevel } from './types';
@@ -532,6 +533,7 @@ const App: React.FC = () => {
 
   return (
     <div className={`election-app flex min-h-screen flex-col bg-[#f8fafc]${isIdentityFocusView ? ' election-app--identity-focus' : ''}`}>
+      <MaterialIconAdapter />
       <SystemAlerts isOnline={store.online} isSyncing={store.loading || isSubmitting} hasError={store.connError} />
       <NotificationModal config={modalConfig} onClose={() => setModalConfig({ ...modalConfig, isOpen: false })} />
       
@@ -667,6 +669,8 @@ const App: React.FC = () => {
             setElectionConfig={handleUpdateElectionConfig}
             onMigrateLegacyData={handleMigrateLegacyData}
             schoolYears={store.schoolYears || []}
+            currentUserName={currentUser?.name}
+            currentUserRole="System Administrator"
           />
         )}
       </main>

@@ -21,19 +21,19 @@ const UppercaseInput: React.FC<UppercaseInputProps> = ({
   };
 
   return (
-    <div className="space-y-2">
-      {label && (
-        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-          {label}
-        </label>
-      )}
-      <input
-        {...props}
-        value={value}
-        onChange={handleChange}
-        className={`coc-input w-full ${error ? 'border-red-300 bg-red-50' : ''} ${className || ''}`}
-      />
-    </div>
+    <label className="floating-field">
+      <div className="floating-field__control">
+        <input
+          {...props}
+          value={value}
+          onChange={handleChange}
+          data-has-value={String(Boolean(String(value || '').trim()))}
+          placeholder=" "
+          className={`coc-input w-full ${error ? 'border-red-300 bg-red-50' : ''} ${className || ''}`}
+        />
+        {label ? <span>{label}</span> : null}
+      </div>
+    </label>
   );
 };
 

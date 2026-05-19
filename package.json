@@ -11,6 +11,7 @@
     "election",
     "sp-portal",
     "registrar",
+    "support",
     "packages/*"
   ],
   "scripts": {
@@ -22,6 +23,7 @@
     "dev:election": "npm run dev --workspace ./election",
     "dev:sp-portal": "npm run dev --workspace ./sp-portal",
     "dev:registrar": "npm run dev --workspace ./registrar",
+    "dev:support": "npm run dev --workspace ./support",
     "build:attendance": "npm run build --workspace ./attendance",
     "build:coordinator": "npm run build --workspace ./coordinator",
     "build:deped-web-kit": "npm run build --workspace ./deped-web-kit",
@@ -30,7 +32,8 @@
     "build:election": "npm run build --workspace ./election",
     "build:sp-portal": "npm run build --workspace ./sp-portal",
     "build:registrar": "npm run build --workspace ./registrar",
-    "build": "npm run build:attendance && npm run build:coordinator && npm run build:deped-web-kit && npm run build:enrollment && npm run build:learner-portal && npm run build:election && npm run build:sp-portal && npm run build:registrar"
+    "build:support": "npm run build --workspace ./support",
+    "build": "npm run build:attendance && npm run build:coordinator && npm run build:deped-web-kit && npm run build:enrollment && npm run build:learner-portal && npm run build:election && npm run build:sp-portal && npm run build:registrar && npm run build:support"
   },
   "engines": {
     "node": ">=20"

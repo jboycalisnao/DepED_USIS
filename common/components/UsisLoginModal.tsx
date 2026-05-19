@@ -33,7 +33,6 @@ export function UsisLoginModal({
   usernameAutoComplete = 'username',
   passwordAutoComplete = 'current-password',
   isSubmitting = false,
-  submitLabel = 'Login',
   noticeMessage = null,
   noticeTitle = 'Login Notice',
   onDismissNotice,
@@ -46,7 +45,7 @@ export function UsisLoginModal({
 
   return (
     <section className="usis-login-modal" aria-labelledby="usis-login-title">
-      <div className="usis-login-modal__card">
+      <div className="usis-login-modal__card rounded-md">
         <div className="usis-login-modal__stripe" aria-hidden="true">
           <span className="usis-login-modal__stripe-blue" />
           <span className="usis-login-modal__stripe-red" />
@@ -114,7 +113,7 @@ export function UsisLoginModal({
           </label>
 
           <button type="submit" className="primary-button usis-login-modal__submit" disabled={isSubmitting}>
-            {isSubmitting ? 'Checking Access' : submitLabel}
+            {isSubmitting ? 'Logging In...' : 'Login'}
           </button>
         </form>
       </div>
@@ -123,7 +122,7 @@ export function UsisLoginModal({
         ? createPortal(
         <div className="modal-overlay modal-overlay--high" role="presentation">
           <div className="modal-backdrop" onClick={onDismissNotice} />
-          <div className="alert-modal alert-modal--danger" role="dialog" aria-modal="true" aria-label={noticeTitle}>
+          <div className="alert-modal alert-modal--danger usis-login-modal__notice rounded-md" role="dialog" aria-modal="true" aria-label={noticeTitle}>
             <div className="alert-modal__content">
               <h3>{noticeTitle}</h3>
               <p>{noticeMessage}</p>

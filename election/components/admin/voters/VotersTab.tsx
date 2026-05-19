@@ -269,7 +269,13 @@ const VotersTab: React.FC<VotersTabProps> = ({ learnerDatabase = [], voters = []
     <div className="space-y-6 pb-20 relative">
       {renderAuditModal()}
 
-      <div className="bg-white p-6 rounded-[12px] shadow-sm border border-[rgba(18,35,61,0.08)]">
+      <div className="bg-white rounded-[12px] shadow-sm border border-[rgba(18,35,61,0.08)] overflow-hidden">
+        <div className="grid grid-cols-3" aria-hidden="true">
+          <span className="h-[4px] bg-[#0038a8]" />
+          <span className="h-[4px] bg-[#fcd116]" />
+          <span className="h-[4px] bg-[#ce1126]" />
+        </div>
+        <div className="p-6 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)]">
         <div className="relative">
           <i className="fa-solid fa-magnifying-glass absolute left-5 top-1/2 -translate-y-1/2 text-[#98a2b3] text-[16px]"></i>
           <input 
@@ -286,6 +292,7 @@ const VotersTab: React.FC<VotersTabProps> = ({ learnerDatabase = [], voters = []
             Demographic audit with gender grouping
           </span>
           <span>{(learnerDatabase || []).length} Total Database Records</span>
+        </div>
         </div>
       </div>
 

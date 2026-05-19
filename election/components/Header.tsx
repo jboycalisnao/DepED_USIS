@@ -103,27 +103,29 @@ const Header: React.FC<HeaderProps> = ({
           onSearchChange={setSearchQuery}
         />
 
-        <nav className="border-b border-[rgba(18,35,61,0.12)] px-[var(--page-inset)]" aria-label="Election portal sections">
-          <div className="flex flex-wrap items-center gap-5 py-5 md:gap-10 lg:gap-16">
-            {navItems.map((item) => {
-              const isActive = item.isActive(currentView);
+        {currentView !== 'admin' && (
+          <nav className="border-b border-[rgba(18,35,61,0.12)] px-[var(--page-inset)]" aria-label="Election portal sections">
+            <div className="flex flex-wrap items-center gap-5 py-5 md:gap-10 lg:gap-16">
+              {navItems.map((item) => {
+                const isActive = item.isActive(currentView);
 
-              return (
-                <a
-                  key={item.label}
-                  href={item.href}
-                  onClick={(e) => navigateToHashRoute(e, item.href)}
-                  className={[
-                    'election-header-nav__link inline-flex items-center text-[0.98rem] uppercase transition-colors',
-                    isActive ? 'text-[#0038a8]' : 'text-[#8a8a8a] hover:text-[#0038a8]',
-                  ].join(' ')}
-                >
-                  {item.label}
-                </a>
-              );
-            })}
-          </div>
-        </nav>
+                return (
+                  <a
+                    key={item.label}
+                    href={item.href}
+                    onClick={(e) => navigateToHashRoute(e, item.href)}
+                    className={[
+                      'election-header-nav__link inline-flex items-center text-[0.98rem] uppercase transition-colors',
+                      isActive ? 'text-[#0038a8]' : 'text-[#8a8a8a] hover:text-[#0038a8]',
+                    ].join(' ')}
+                  >
+                    {item.label}
+                  </a>
+                );
+              })}
+            </div>
+          </nav>
+        )}
       </div>
     </header>
   );

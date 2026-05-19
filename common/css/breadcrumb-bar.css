@@ -12,6 +12,19 @@
   gap: 12px;
 }
 
+.usis-breadcrumb-bar__left-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.usis-breadcrumb-bar__left-actions {
+  display: none;
+  align-items: center;
+  margin-right: 4px;
+}
+
 .usis-breadcrumb {
   display: inline-flex;
   align-items: center;
@@ -35,3 +48,13 @@
   color: var(--deped-blue);
 }
 
+@media (max-width: 920px) {
+  .usis-breadcrumb-bar__left-actions {
+    display: inline-flex;
+  }
+
+  .usis-breadcrumb-bar__row {
+    justify-content: space-between;
+    gap: 12px;
+  }
+}

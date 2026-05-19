@@ -121,18 +121,25 @@ const SettingsTab: React.FC<SettingsTabProps> = ({
       />
 
       {/* Branding Header within Tab */}
-      <div className="bg-white p-6 rounded-[12px] shadow-sm border border-[rgba(18,35,61,0.08)] flex flex-col md:flex-row items-center justify-between gap-6 no-print">
+      <div className="bg-white rounded-[12px] shadow-sm border border-[rgba(18,35,61,0.08)] overflow-hidden flex flex-col no-print">
+        <div className="grid grid-cols-3" aria-hidden="true">
+          <span className="h-[4px] bg-[#0038a8]" />
+          <span className="h-[4px] bg-[#fcd116]" />
+          <span className="h-[4px] bg-[#ce1126]" />
+        </div>
+        <div className="p-6 flex flex-col md:flex-row items-center justify-between gap-6 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)]">
         <div className="flex items-center space-x-6">
           <div className="text-left">
-            <h2 className="text-[#0038a8] font-bold text-[24px] uppercase tracking-tight">System Settings</h2>
-            <p className="text-[#68758d] text-[13px] font-bold uppercase tracking-[0.08em] mt-1">Election Configuration Module</p>
+            <h2 className="text-[#0038a8] font-bold text-[24px] tracking-tight">System Settings</h2>
+            <p className="text-[#68758d] text-[13px] font-bold mt-1">Election configuration and control panel</p>
           </div>
+        </div>
         </div>
       </div>
 
       {/* Public Accessibility Controls */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 no-print">
-        <div className="rounded-[12px] border border-[rgba(18,35,61,0.08)] bg-white p-6 shadow-sm">
+        <div className="rounded-[12px] border border-[rgba(18,35,61,0.08)] bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] p-6 shadow-sm">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center space-x-4">
               <div className={`flex h-10 w-10 items-center justify-center rounded-[12px] transition-colors ${electionConfig.publicResultsEnabled ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
@@ -161,7 +168,7 @@ const SettingsTab: React.FC<SettingsTabProps> = ({
           </div>
         </div>
 
-        <div className="rounded-[12px] border border-[rgba(18,35,61,0.08)] bg-white p-6 shadow-sm">
+        <div className="rounded-[12px] border border-[rgba(18,35,61,0.08)] bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] p-6 shadow-sm">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center space-x-4">
               <div className="flex h-10 w-10 items-center justify-center rounded-[12px] bg-blue-50 text-blue-600">
@@ -228,7 +235,7 @@ const SettingsTab: React.FC<SettingsTabProps> = ({
       {/* Advance Election Controls */}
       <div className="bg-white p-6 rounded-[12px] shadow-sm border border-[rgba(18,35,61,0.08)] no-print">
         <div className="flex items-center justify-between mb-8">
-           <h3 className="text-xl font-black text-gray-900 uppercase flex items-center">
+           <h3 className="text-xl font-black text-[#0038a8] uppercase flex items-center">
             <i className="fa-solid fa-sliders mr-3 text-[#034F8B]"></i>
             Advanced Election Controls
           </h3>

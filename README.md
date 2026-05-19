@@ -23,6 +23,7 @@ The repository currently contains these active modules:
 - `election/` - DepED school election system
 - `sp-portal/` - Special Program admissions portal for school-specific application bulletins
 - `registrar/` - Registrar and learner records system
+- `support/` - learner support subsystem scaffold for guidance, clinic, and child protection services
 
 These modules are currently standalone Vite + React applications.
 
@@ -70,6 +71,7 @@ The intended end state is a unified school platform with multiple modules under 
 - `sp-portal/`
 - `deped-web-kit/`
 - `enrollment/`
+- `support/`
 - future modules like `guidance/`, `library/`, `clinic/`, `finance/`, `hr/`, or `student-portal/`
 
 All modules should follow these platform rules:

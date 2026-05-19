@@ -18,6 +18,8 @@ type SummaryCard = {
   detail: string;
   icon: string;
   accentClassName: string;
+  valueClassName?: string;
+  progressClassName?: string;
   progress?: number;
 };
 
@@ -46,6 +48,8 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ candidates, voters, learner
       detail: `${totalVotersParticipated.toLocaleString()} of ${totalRegistered.toLocaleString()} eligible voters`,
       icon: 'fa-square-poll-vertical',
       accentClassName: 'bg-[#0038a8]',
+      valueClassName: 'text-[#0038a8]',
+      progressClassName: 'bg-[#0038a8]',
       progress: turnoutPercentage,
     },
     {
@@ -53,7 +57,10 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ candidates, voters, learner
       value: totalVotersParticipated.toLocaleString(),
       detail: `${Math.max(0, totalRegistered - totalVotersParticipated).toLocaleString()} remaining`,
       icon: 'fa-check-to-slot',
-      accentClassName: 'bg-[#22c55e]',
+      accentClassName: 'bg-[#ce1126]',
+      valueClassName: 'text-[#ce1126]',
+      progressClassName: 'bg-[#ce1126]',
+      progress: totalRegistered > 0 ? Math.round((totalVotersParticipated / totalRegistered) * 100) : 0,
     },
     {
       title: 'Eligible voters',
@@ -61,6 +68,7 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ candidates, voters, learner
       detail: 'JHS (G7-G10) and SHS (G11)',
       icon: 'fa-id-card-clip',
       accentClassName: 'bg-[#fcd116]',
+      valueClassName: 'text-[#8a6a00]',
     },
     {
       title: 'Bandwidth saved',
@@ -68,6 +76,7 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ candidates, voters, learner
       detail: `${cacheStats.items.toLocaleString()} cached assets`,
       icon: 'fa-server',
       accentClassName: 'bg-[#ce1126]',
+      valueClassName: 'text-[#0038a8]',
     },
   ];
 
@@ -93,13 +102,25 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ candidates, voters, learner
 
   return (
     <div className="space-y-6 opacity-0 transition-opacity duration-300 ease-in" style={{ opacity: 1 }}>
+      <section className={`${panelClassName} overflow-hidden`}>
+        <div className="grid grid-cols-3" aria-hidden="true">
+          <span className="h-[4px] bg-[#0038a8]" />
+          <span className="h-[4px] bg-[#fcd116]" />
+          <span className="h-[4px] bg-[#ce1126]" />
+        </div>
+        <div className="px-5 py-4 md:px-6">
+          <h3 className="text-[24px] font-bold leading-tight text-[#0038a8]">Election Operations Dashboard</h3>
+          <p className="mt-1 text-[13px] text-[#5b6b84]">Unified monitoring for turnout, grade participation, and candidate performance.</p>
+        </div>
+      </section>
+
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         {summaryCards.map((card) => (
-          <section key={card.title} className={`${panelClassName} p-5`}>
+          <section key={card.title} className={`${panelClassName} bg-[linear-gradient(180deg,#ffffff_0%,#f9fbff_100%)] p-5`}>
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-[13px] font-bold uppercase tracking-[0.08em] text-[#68758d]">{card.title}</p>
-                <p className="mt-3 text-[24px] font-bold leading-none text-[#0038a8]">{card.value}</p>
+                <p className="text-[13px] font-bold text-[#68758d]">{card.title}</p>
+                <p className={`mt-3 text-[24px] font-bold leading-none ${card.valueClassName || 'text-[#0038a8]'}`}>{card.value}</p>
                 <p className="mt-3 text-[13px] text-[#4a5568]">{card.detail}</p>
               </div>
 
@@ -112,7 +133,7 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ candidates, voters, learner
 
             {typeof card.progress === 'number' && (
               <div className="mt-4 h-[8px] overflow-hidden rounded-full bg-[#e7edf5]">
-                <div className="h-full bg-[#0038a8]" style={{ width: `${card.progress}%` }}></div>
+                <div className={`h-full ${card.progressClassName || 'bg-[#0038a8]'}`} style={{ width: `${card.progress}%` }}></div>
               </div>
             )}
           </section>
@@ -123,7 +144,7 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ candidates, voters, learner
         <div className="mb-6">
           <div>
             <h3 className="text-[24px] font-bold uppercase leading-tight text-[#0038a8]">Grade-Level Participation</h3>
-            <p className="mt-1 text-[13px] font-bold uppercase tracking-[0.08em] text-[#68758d]">
+            <p className="mt-1 text-[13px] font-bold text-[#68758d]">
               Real-time turnout breakdown
             </p>
           </div>
@@ -142,13 +163,13 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ candidates, voters, learner
             >
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <h4 className="text-[16px] font-bold uppercase tracking-[0.08em] text-[#0038a8]">{stat.grade}</h4>
-                  <p className="mt-1 text-[13px] font-bold uppercase tracking-[0.06em] text-[#68758d]">
+                  <h4 className="text-[16px] font-bold text-[#0038a8]">{stat.grade}</h4>
+                  <p className="mt-1 text-[13px] font-bold text-[#68758d]">
                     {stat.isGrade12 ? 'Non-voting grade' : `${stat.voted} / ${stat.total} voters`}
                   </p>
                 </div>
 
-                <p className={`text-[24px] font-bold leading-none ${stat.isGrade12 ? 'text-[#98a2b3]' : 'text-[#22c55e]'}`}>
+                <p className={`text-[24px] font-bold leading-none ${stat.isGrade12 ? 'text-[#98a2b3]' : 'text-[#ce1126]'}`}>
                   {stat.isGrade12 ? 'N/A' : `${stat.percentage}%`}
                 </p>
               </div>
@@ -156,7 +177,7 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ candidates, voters, learner
               <div className="mt-5 h-[10px] overflow-hidden rounded-full bg-[#e7edf5]">
                 {!stat.isGrade12 ? (
                   <div
-                    className="h-full bg-[#22c55e]"
+                    className="h-full bg-[#ce1126]"
                     style={{ width: `${stat.percentage}%` }}
                   ></div>
                 ) : (
@@ -171,7 +192,7 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ candidates, voters, learner
       <section className={`${panelClassName} p-6 md:p-8`}>
         <div className="mb-6">
           <h3 className="text-[24px] font-bold uppercase leading-tight text-[#0038a8]">Candidate Performance</h3>
-          <p className="mt-1 text-[13px] font-bold uppercase tracking-[0.08em] text-[#68758d]">
+          <p className="mt-1 text-[13px] font-bold text-[#68758d]">
             Vote distribution across all registry
           </p>
         </div>
@@ -198,7 +219,16 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ candidates, voters, learner
               />
               <Bar dataKey="votes" radius={[8, 8, 0, 0]} barSize={40}>
                 {candidates.map((_, index) => (
-                  <Cell key={`cell-${index}`} fill={index % 2 === 0 ? DEPED_COLORS.blue : DEPED_COLORS.red} />
+                  <Cell
+                    key={`cell-${index}`}
+                    fill={
+                      index % 3 === 0
+                        ? DEPED_COLORS.blue
+                        : index % 3 === 1
+                          ? DEPED_COLORS.red
+                          : DEPED_COLORS.yellow
+                    }
+                  />
                 ))}
               </Bar>
             </BarChart>

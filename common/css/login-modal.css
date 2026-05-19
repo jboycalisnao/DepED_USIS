@@ -1,14 +1,14 @@
 .usis-login-modal {
   width: min(100%, 640px);
   margin: 0 auto;
-  padding: 8px 0 6px;
+  padding: 8px 0;
   font-family: var(--deped-font);
 }
 
 .usis-login-modal__card {
   overflow: hidden;
   border: 1px solid var(--deped-line);
-  border-radius: 12px;
+  border-radius: 0.375rem;
   background: var(--deped-white);
   box-shadow: 0 6px 20px rgba(18, 35, 61, 0.08);
   padding: 0 24px 24px;
@@ -39,11 +39,11 @@
 
 .usis-login-modal__header {
   display: grid;
-  gap: 12px;
+  gap: 10px;
   justify-items: center;
   text-align: center;
-  padding: 24px 6px 10px;
-  margin-bottom: 10px;
+  padding: 24px 6px 12px;
+  margin-bottom: 0;
 }
 
 .usis-login-modal__logo {
@@ -61,35 +61,49 @@
 
 .usis-login-modal__form {
   display: grid;
-  gap: 18px;
+  gap: 14px;
   padding: 0;
-  margin-top: 10px;
+  margin-top: 0;
 }
 
 .usis-login-modal .floating-field__control input {
   min-height: 64px;
+  padding: 30px 16px 12px;
   background: #fbfcff;
   color: var(--deped-ink);
   font-size: var(--usis-body-size);
   line-height: 1.5;
+  border-radius: 0.375rem;
 }
 
 .usis-login-modal .floating-field__control span {
   text-transform: none;
   font-weight: 400;
-  font-size: var(--usis-helper-size);
+  font-size: 16px;
 }
 
 .usis-login-modal .floating-field__control input:focus + span,
 .usis-login-modal .floating-field__control input:not(:placeholder-shown) + span,
 .usis-login-modal .floating-field__control input[data-has-value="true"] ~ span {
-  font-size: var(--usis-helper-size);
+  top: 8px;
+  font-size: 16px;
+  line-height: 1.1;
   text-transform: none;
   font-weight: 400;
 }
 
 .usis-login-modal__submit {
-  justify-self: center;
-  min-width: 180px;
-  width: min(100%, 300px);
+  justify-self: stretch;
+  width: 100%;
+  min-width: 0;
+  margin-top: 2px;
+  border-radius: 0.375rem;
+}
+
+.usis-login-modal__notice {
+  border-radius: 0.375rem;
+}
+
+.usis-login-modal__notice .alert-modal__actions button {
+  border-radius: 0.375rem;
 }

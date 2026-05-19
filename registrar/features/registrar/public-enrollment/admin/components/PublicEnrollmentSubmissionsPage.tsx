@@ -40,6 +40,15 @@ function formatDate(value: string) {
   return date.toLocaleString();
 }
 
+function normalizeSchoolYear(value: string) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  const normalized = raw.replace(/^sy\s*/i, '').replace(/\s+/g, ' ');
+  const match = normalized.match(/(20\d{2})\s*[-–]\s*(20\d{2})/);
+  if (match) return `${match[1]}-${match[2]}`;
+  return normalized.toLowerCase();
+}
+
 function CloseIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" style={{ width: 18, height: 18 }}>
@@ -173,7 +182,7 @@ export default function PublicEnrollmentSubmissionsPage() {
         const history = Array.isArray((row as any).enrollment_history) ? (row as any).enrollment_history : [];
         yearsByLrn[lrn] = new Set(
           history
-            .map((entry: any) => String(entry?.schoolYear || '').trim())
+            .map((entry: any) => normalizeSchoolYear(String(entry?.schoolYear || '').trim()))
             .filter(Boolean)
         );
       }
@@ -622,9 +631,12 @@ export default function PublicEnrollmentSubmissionsPage() {
                     const displayName = [row.last_name, row.first_name, row.middle_name].filter(Boolean).join(', ') || '--';
                     const rowLrn = (row.lrn || row.payload?.lrn || '').trim();
                     const rowSchoolYear = (row.school_year || row.payload?.schoolYear || '').trim();
+                    const normalizedRowSchoolYear = normalizeSchoolYear(rowSchoolYear);
                     const isExistingLearner = rowLrn ? existingLearnerLrns.has(rowLrn) : false;
                     const enrolledYears = learnerEnrollmentYearsByLrn[rowLrn] || new Set<string>();
-                    const isExistingForSubmissionYear = rowSchoolYear ? enrolledYears.has(rowSchoolYear) : false;
+                    const isExistingForSubmissionYear = normalizedRowSchoolYear
+                      ? enrolledYears.has(normalizedRowSchoolYear)
+                      : false;
                     return (
                       <tr
                         key={row.id}

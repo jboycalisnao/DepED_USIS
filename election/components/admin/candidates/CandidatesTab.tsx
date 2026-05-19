@@ -120,6 +120,11 @@ const CandidatesTab: React.FC<CandidatesTabProps> = ({
 
   return (
     <div className="bg-white rounded-[12px] shadow-sm border border-[rgba(18,35,61,0.08)] overflow-hidden no-print">
+      <div className="grid grid-cols-3" aria-hidden="true">
+        <span className="h-[4px] bg-[#0038a8]" />
+        <span className="h-[4px] bg-[#fcd116]" />
+        <span className="h-[4px] bg-[#ce1126]" />
+      </div>
       <ManagePartylistsModal 
         isOpen={isPartyModalOpen} 
         onClose={() => setIsPartyModalOpen(false)} 
@@ -139,18 +144,18 @@ const CandidatesTab: React.FC<CandidatesTabProps> = ({
       />
 
       {/* Admin Header */}
-      <div className="p-6 border-b border-[rgba(18,35,61,0.08)] flex flex-col md:flex-row justify-between items-center bg-white gap-4">
+      <div className="p-6 border-b border-[rgba(18,35,61,0.08)] flex flex-col md:flex-row justify-between items-center bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] gap-4">
         <div className="flex flex-col">
-          <h3 className="text-[24px] font-bold text-[#0038a8] uppercase tracking-tight flex items-center">
+          <h3 className="text-[24px] font-bold text-[#0038a8] tracking-tight flex items-center">
             <i className="fa-solid fa-id-card-clip mr-3 text-[#0038a8]"></i>
             Official Candidate Registry
           </h3>
           <div className="flex items-center mt-1 space-x-3">
-             <span className="text-[13px] text-[#68758d] font-bold uppercase tracking-[0.08em]">
+             <span className="text-[13px] text-[#68758d] font-bold">
                {(candidates || []).length} Registered Candidates
              </span>
              {duplicates.size > 0 && (
-               <span className="text-[13px] text-[#ce1126] font-bold uppercase flex items-center">
+               <span className="text-[13px] text-[#ce1126] font-bold flex items-center">
                  <i className="fa-solid fa-triangle-exclamation mr-1.5"></i>
                  {duplicates.size} Registry Duplicates Found
                </span>
@@ -162,7 +167,7 @@ const CandidatesTab: React.FC<CandidatesTabProps> = ({
           <button 
             onClick={handlePrintList}
             disabled={candidates.length === 0}
-            className="bg-white text-[#0038a8] px-5 py-3 rounded-[4px] font-bold text-[13px] uppercase tracking-[0.06em] hover:bg-[#f4f8ff] transition-colors border border-[rgba(18,35,61,0.12)] flex items-center justify-center disabled:opacity-50"
+            className="bg-white text-[#0038a8] px-4 py-2 rounded-[4px] font-bold text-[13px] uppercase tracking-[0.06em] hover:bg-[#f4f8ff] transition-colors border border-[rgba(18,35,61,0.12)] flex items-center justify-center disabled:opacity-50"
           >
             <i className="fa-solid fa-print mr-2"></i>
             Candidates List
@@ -171,7 +176,7 @@ const CandidatesTab: React.FC<CandidatesTabProps> = ({
           <button 
             onClick={() => setIsPartyModalOpen(true)}
             disabled={isProcessing}
-            className="bg-white text-[#0038a8] px-5 py-3 rounded-[4px] font-bold text-[13px] uppercase tracking-[0.06em] hover:bg-[#f4f8ff] transition-colors border border-[rgba(18,35,61,0.12)] flex items-center justify-center disabled:opacity-50"
+            className="bg-white text-[#0038a8] px-4 py-2 rounded-[4px] font-bold text-[13px] uppercase tracking-[0.06em] hover:bg-[#f4f8ff] transition-colors border border-[rgba(18,35,61,0.12)] flex items-center justify-center disabled:opacity-50"
           >
             <i className="fa-solid fa-flag mr-2"></i>
             Partylists
@@ -183,7 +188,7 @@ const CandidatesTab: React.FC<CandidatesTabProps> = ({
               setIsCandidateModalOpen(true);
             }}
             disabled={isProcessing}
-            className="bg-[#0038a8] text-white px-5 py-3 rounded-[4px] font-bold text-[13px] uppercase tracking-[0.06em] hover:bg-[#002f8a] transition-colors flex items-center justify-center disabled:opacity-50"
+            className="bg-[#0038a8] text-white px-4 py-2 rounded-[4px] font-bold text-[13px] uppercase tracking-[0.06em] hover:bg-[#002f8a] transition-colors flex items-center justify-center disabled:opacity-50"
           >
             <i className="fa-solid fa-user-plus mr-2"></i>
             New Candidate
@@ -192,29 +197,22 @@ const CandidatesTab: React.FC<CandidatesTabProps> = ({
       </div>
 
       {/* Search Bar Section */}
-      <div className="px-6 py-5 bg-[#f8fafc] border-b border-[rgba(18,35,61,0.08)]">
-        <div className="relative group max-w-xl">
-          <i className="fa-solid fa-magnifying-glass absolute left-5 top-1/2 -translate-y-1/2 text-[#98a2b3] group-focus-within:text-[#0038a8] transition-colors"></i>
-          <input 
-            type="text"
-            placeholder="Search candidate by name, party, or position"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-14 pr-10 py-4 bg-white border border-[rgba(18,35,61,0.12)] rounded-[12px] focus:border-[#0038a8] outline-none font-medium text-[16px] text-[#12233d] transition-colors shadow-sm"
-          />
-          {searchTerm && (
-            <button 
-              onClick={() => setSearchTerm('')}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300 hover:text-red-500"
-            >
-              <i className="fa-solid fa-circle-xmark"></i>
-            </button>
-          )}
-        </div>
+      <div className="px-6 py-5 bg-[#f8fbff] border-b border-[rgba(18,35,61,0.08)]">
+        <label className="floating-field w-full">
+          <div className="floating-field__control">
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder=" "
+            />
+            <span>Search candidate by name, party, or position</span>
+          </div>
+        </label>
       </div>
 
       {/* Candidate List grouped by Position */}
-      <div className="p-6 space-y-10 bg-[#f8fafc]">
+      <div className="p-6 space-y-10 bg-[#f8fbff]">
         {(POSITIONS || []).map(pos => {
           const positionCandidates = (filteredCandidates || []).filter(c => c.position === pos);
           if (positionCandidates.length === 0) return null;
@@ -242,7 +240,7 @@ const CandidatesTab: React.FC<CandidatesTabProps> = ({
                   const votePercentage = posTotalBallots > 0 ? ((c.votes || 0) / posTotalBallots) * 100 : 0;
 
                   return (
-                    <div key={c.id} className={`bg-white rounded-[12px] p-5 shadow-sm border transition-colors group relative flex flex-col ${isDupe ? 'border-[#ce1126]/20 bg-[#fff7f7]' : 'border-[rgba(18,35,61,0.08)] hover:border-[#0038a8]/20'}`}>
+                    <div key={c.id} className={`bg-white rounded-[12px] p-5 shadow-sm border transition-colors group relative flex flex-col ${isDupe ? 'border-[#ce1126]/20 bg-[#fff9fa]' : 'border-[rgba(18,35,61,0.08)] hover:border-[#0038a8]/20'}`}>
                       {isDupe && (
                         <div className="absolute top-4 right-4 z-10 flex items-center bg-[#fff1f2] text-[#ce1126] px-3 py-1.5 rounded-[12px] border border-[#ce1126]/20">
                           <i className="fa-solid fa-copy mr-2"></i>
@@ -254,7 +252,7 @@ const CandidatesTab: React.FC<CandidatesTabProps> = ({
                         <div className="relative flex-shrink-0">
                           <img 
                             src={c.imageUrl ? optimizeImageUrl(c.imageUrl, 200) : LEON_NHS_LOGO_URL} 
-                            className={`w-20 h-20 rounded-2xl object-cover border-2 shadow-md group-hover:scale-105 transition-transform bg-gray-50 ${isDupe ? 'border-red-200' : 'border-gray-50'}`} 
+                            className={`w-20 h-20 rounded-2xl object-cover border shadow-sm group-hover:scale-105 transition-transform bg-gray-50 ${isDupe ? 'border-red-200' : 'border-[rgba(18,35,61,0.08)]'}`} 
                             alt={c.name} 
                             onError={(e) => { (e.target as HTMLImageElement).src = LEON_NHS_LOGO_URL; }}
                           />
@@ -263,8 +261,8 @@ const CandidatesTab: React.FC<CandidatesTabProps> = ({
                           </div>
                         </div>
                         <div className="flex-grow min-w-0">
-                          <h5 className={`font-black text-sm uppercase leading-tight truncate ${isDupe ? 'text-red-700' : 'text-gray-900'}`}>{c.name}</h5>
-                          <p className={`text-[10px] font-black uppercase mt-1 ${c.party === 'Independent' ? 'text-gray-400' : 'text-[#E11C38]'}`}>
+                          <h5 className={`font-bold text-[24px] leading-tight truncate ${isDupe ? 'text-red-700' : 'text-[#12233d]'}`}>{c.name}</h5>
+                          <p className={`text-[16px] font-medium mt-1 ${c.party === 'Independent' ? 'text-[#68758d]' : 'text-[#ce1126]'}`}>
                             {c.party}
                           </p>
                           <div className="mt-1">
@@ -275,7 +273,7 @@ const CandidatesTab: React.FC<CandidatesTabProps> = ({
 
                       {/* Vote Tally Audit Visualization */}
                       <div className="mb-4 space-y-1.5">
-                        <div className="flex justify-between items-center text-[8px] font-black uppercase tracking-widest text-gray-400 px-1">
+                        <div className="flex justify-between items-center text-[13px] font-bold text-[#94a3b8] px-1">
                           <span>Vote Distribution</span>
                           <span className="text-[#034F8B]">{votePercentage.toFixed(1)}%</span>
                         </div>
@@ -290,8 +288,8 @@ const CandidatesTab: React.FC<CandidatesTabProps> = ({
                         </div>
                       </div>
 
-                      <div className={`rounded-xl p-4 mb-6 flex-grow overflow-hidden ${isDupe ? 'bg-red-50/50 border border-red-100' : 'bg-gray-50'}`}>
-                        <p className={`text-[10px] font-medium leading-relaxed line-clamp-2 italic ${isDupe ? 'text-red-900/60' : 'text-gray-500'}`}>
+                      <div className={`rounded-[12px] p-4 mb-6 flex-grow overflow-hidden ${isDupe ? 'bg-red-50/50 border border-red-100' : 'bg-[#f8fafc] border border-[rgba(18,35,61,0.06)]'}`}>
+                        <p className={`text-[16px] font-medium leading-relaxed line-clamp-2 italic ${isDupe ? 'text-red-900/60' : 'text-[#64748b]'}`}>
                           "{c.vision || 'No platform statement provided.'}"
                         </p>
                       </div>
@@ -300,24 +298,24 @@ const CandidatesTab: React.FC<CandidatesTabProps> = ({
                         <button 
                           onClick={() => handlePrintSlip(c)}
                           title="Print Encoding Slip"
-                          className={`px-4 py-3 rounded-xl font-black text-[9px] uppercase tracking-widest transition-all active:scale-95 ${isDupe ? 'bg-red-100 text-red-600 hover:bg-red-600 hover:text-white' : 'bg-yellow-50 text-yellow-600 hover:bg-yellow-500 hover:text-white'}`}
+                          className={`inline-flex h-10 w-10 items-center justify-center rounded-[12px] border font-bold text-[13px] transition-colors active:scale-95 ${isDupe ? 'border-[#ce1126]/20 bg-[#fff1f2] text-[#ce1126] hover:bg-[#ce1126] hover:text-white' : 'border-[#fcd116]/60 bg-[#fff8db] text-[#8a6a00] hover:bg-[#fcd116] hover:text-[#12233d]'}`}
                         >
-                          <i className="fa-solid fa-print"></i>
+                          <span className="material-symbols-outlined" style={{ fontSize: '18px' }} aria-hidden="true">print</span>
                         </button>
                         <button 
                           onClick={() => handleOpenEditCandidate(c)}
                           disabled={isProcessing}
-                          className={`flex-1 py-3 rounded-xl font-black text-[9px] uppercase tracking-widest transition-all disabled:opacity-30 ${isDupe ? 'bg-red-100 text-red-600 hover:bg-red-600 hover:text-white' : 'bg-blue-50 text-[#034F8B] hover:bg-[#034F8B] hover:text-white'}`}
+                          className={`inline-flex h-10 flex-1 items-center justify-center rounded-[12px] border font-bold text-[14px] transition-colors disabled:opacity-30 ${isDupe ? 'border-[#ce1126]/20 bg-[#fff1f2] text-[#ce1126] hover:bg-[#ce1126] hover:text-white' : 'border-[rgba(0,56,168,0.2)] bg-[#eef4ff] text-[#0038a8] hover:bg-[#0038a8] hover:text-white'}`}
                         >
-                          <i className="fa-solid fa-user-pen mr-2"></i>
+                          <span className="material-symbols-outlined mr-2" style={{ fontSize: '18px' }} aria-hidden="true">edit</span>
                           Edit
                         </button>
                         <button 
                           onClick={() => handleDeleteCandidate(c.id, c.name)}
                           disabled={isProcessing}
-                          className="bg-red-50 text-[#E11C38] px-4 py-3 rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-[#E11C38] hover:text-white transition-all disabled:opacity-30"
+                          className="inline-flex h-10 w-10 items-center justify-center rounded-[12px] border border-[#ce1126]/20 bg-[#fff1f2] text-[#ce1126] font-bold text-[13px] hover:bg-[#ce1126] hover:text-white transition-colors disabled:opacity-30"
                         >
-                          <i className="fa-solid fa-trash"></i>
+                          <span className="material-symbols-outlined" style={{ fontSize: '18px' }} aria-hidden="true">delete</span>
                         </button>
                       </div>
                     </div>

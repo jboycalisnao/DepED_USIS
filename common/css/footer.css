@@ -1,12 +1,12 @@
 .site-footer {
   width: 100%;
-  margin-top: 32px;
+  margin-top: 0;
   background: var(--deped-blue);
   color: var(--deped-white);
 }
 
 .usis-global-footer {
-  margin-top: 32px;
+  margin-top: 0;
   border: 0;
 }
 

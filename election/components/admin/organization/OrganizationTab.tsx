@@ -30,8 +30,13 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ sections, learnerData
         
         return (
           <div key={grade} className="bg-white rounded-[12px] shadow-sm border border-[rgba(18,35,61,0.08)] overflow-hidden">
-            <div className="bg-white px-6 py-5 flex justify-between items-center border-b border-[rgba(18,35,61,0.08)]">
-              <h3 className="text-[24px] font-bold text-[#0038a8] uppercase tracking-tight flex items-center">
+            <div className="grid grid-cols-3" aria-hidden="true">
+              <span className="h-[3px] bg-[#0038a8]" />
+              <span className="h-[3px] bg-[#fcd116]" />
+              <span className="h-[3px] bg-[#ce1126]" />
+            </div>
+            <div className="bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] px-6 py-5 flex justify-between items-center border-b border-[rgba(18,35,61,0.08)]">
+              <h3 className="text-[24px] font-bold text-[#0038a8] tracking-tight flex items-center">
                 <i className="fa-solid fa-graduation-cap mr-3 text-[#0038a8]"></i>
                 {grade}
               </h3>
@@ -50,7 +55,7 @@ const OrganizationTab: React.FC<OrganizationTabProps> = ({ sections, learnerData
               </div>
             </div>
 
-            <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 bg-[#f8fafc]">
+            <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 bg-[#f8fbff]">
               {gradeSections.map(sec => {
                 const secStudents = learnerDatabase.filter(l => l.sectionId === sec.id);
                 const studentCount = secStudents.length;

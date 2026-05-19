@@ -16,6 +16,7 @@ DepED USIS is planned as a **monorepo-style school systems repository** that con
 - `election/` - election management system
 - `sp-portal/` - special program admissions and application portal
 - `registrar/` - registrar and learner information system
+- `support/` - school learner support subsystem for guidance, clinic, child protection, and related learner-support services
 
 These are currently the active modules already present in the repository.
 
@@ -95,7 +96,7 @@ Required convention:
 
 - every table must start with the module name
 - example for registrar-owned tables: `registrar_<table_name>`
-- the same rule applies to all future USIS modules such as `election_<table_name>`, `guidance_<table_name>`, `library_<table_name>`, and so on
+- the same rule applies to all future USIS modules such as `election_<table_name>`, `support_<table_name>`, `guidance_<table_name>`, `library_<table_name>`, and so on
 
 Important note:
 
