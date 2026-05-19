@@ -1,0 +1,170 @@
+@import "../../common/css/index.css";
+
+:root {
+  --usis-module-label: "USIS - School Merchandise Hub";
+  --usis-module-kicker: "School";
+  --usis-module-title: "MERCH";
+}
+
+body {
+  margin: 0;
+  background: var(--deped-canvas);
+  color: var(--deped-ink);
+  font-family: var(--deped-font);
+}
+
+.merch-app {
+  min-height: 100vh;
+}
+
+.merch-main {
+  padding-bottom: 0;
+}
+
+.merch-shell {
+  display: block;
+  padding: 0 20px;
+}
+
+.merch-page {
+  display: grid;
+  gap: 14px;
+  padding: 16px 0 20px;
+}
+
+.merch-page__header h2 {
+  margin: 0;
+  color: var(--deped-blue);
+  font-size: var(--usis-title-size);
+  font-weight: 700;
+}
+
+.merch-page__header p {
+  margin: 8px 0 0;
+  color: var(--deped-muted);
+  font-size: var(--usis-body-size);
+  line-height: 1.45;
+}
+
+.merch-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.merch-store-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 14px;
+}
+
+.merch-store-catalog {
+  display: grid;
+  gap: 10px;
+}
+
+.merch-store-catalog h3,
+.merch-store-summary h3 {
+  margin: 0;
+  color: var(--deped-blue);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.merch-product-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.merch-product-card {
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--deped-line);
+  border-radius: 12px;
+  background: #fbfcff;
+  padding: 14px;
+}
+
+.merch-product-card h4 {
+  margin: 0;
+  color: var(--deped-blue);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.merch-product-card__category,
+.merch-product-card__stock {
+  color: var(--deped-muted);
+  font-size: 13px;
+}
+
+.merch-product-card__price {
+  margin: 0;
+  color: var(--deped-ink);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.merch-store-summary {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  border: 1px solid var(--deped-line);
+  border-radius: 12px;
+  background: #fbfcff;
+  padding: 14px;
+}
+
+.merch-card {
+  border: 1px solid var(--deped-line);
+  border-radius: 12px;
+  background: #fbfcff;
+  padding: 14px;
+}
+
+.merch-card h3 {
+  margin: 0;
+  color: var(--deped-blue);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.merch-card p {
+  margin: 8px 0 0;
+  color: var(--deped-muted);
+  font-size: 16px;
+  line-height: 1.45;
+}
+
+.merch-note-box {
+  display: grid;
+  gap: 6px;
+  border: 1px solid var(--deped-line);
+  border-radius: 12px;
+  background: #fbfcff;
+  padding: 14px;
+}
+
+.merch-note-box strong {
+  color: var(--deped-blue);
+  font-size: var(--usis-helper-size);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.merch-note-box span {
+  color: var(--deped-muted);
+  font-size: var(--usis-body-size);
+  line-height: 1.45;
+}
+
+@media (max-width: 720px) {
+  .merch-shell {
+    padding: 0 14px;
+  }
+
+  .merch-store-layout {
+    grid-template-columns: 1fr;
+  }
+}

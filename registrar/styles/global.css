@@ -487,6 +487,10 @@
   border-radius: var(--usis-radius-control);
 }
 
+.registrar-dashboard__stat-icon .material-symbols-outlined {
+  color: #ffffff;
+}
+
 .academic-cycles__create .searchable-select__field input,
 .academic-cycles__create .searchable-select__field button {
   min-height: 30px;

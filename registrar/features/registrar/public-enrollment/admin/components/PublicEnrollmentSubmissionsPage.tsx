@@ -119,7 +119,9 @@ const appendSubmissionAudit = (payload: EnrollmentDraft, entry: Omit<SubmissionA
 export default function PublicEnrollmentSubmissionsPage() {
   const navigate = useNavigate();
   const { registrarAccess, refreshData, availableStrands } = useStore();
-  const { submissions, isLoading, errorMessage, refresh } = usePublicEnrollmentSubmissions();
+  const schoolId = registrarAccess?.schoolId || '302522';
+  const submissionsScopeKey = registrarAccess?.schoolUuid || schoolId;
+  const { submissions, isLoading, errorMessage, refresh } = usePublicEnrollmentSubmissions(submissionsScopeKey);
   const [query, setQuery] = useState('');
   const [actionError, setActionError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -137,7 +139,6 @@ export default function PublicEnrollmentSubmissionsPage() {
   const [collapsedGrades, setCollapsedGrades] = useState<Record<string, boolean>>({});
   const [pendingDeleteSubmissionId, setPendingDeleteSubmissionId] = useState<string | null>(null);
   const [isDeletingSubmission, setIsDeletingSubmission] = useState(false);
-  const schoolId = registrarAccess?.schoolId || '302522';
   const [draftEditor, setDraftEditor] = useState<EnrollmentDraft>(() => emptyDraft(schoolId));
   const isEditorSeniorHighTargetGrade = SHS_GRADES.has(draftEditor.gradeToEnroll);
 

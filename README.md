@@ -20,6 +20,7 @@ The repository currently contains these active modules:
 - `deped-web-kit/` - DepEd web branding and UI reference kit
 - `enrollment/` - school enrollment management portal
 - `learner-portal/` - learner self-service access portal
+- `merch/` - school merchandise hub for merchandise catalog, orders, and inventory workflows
 - `election/` - DepED school election system
 - `sp-portal/` - Special Program admissions portal for school-specific application bulletins
 - `registrar/` - Registrar and learner records system
@@ -71,6 +72,7 @@ The intended end state is a unified school platform with multiple modules under 
 - `sp-portal/`
 - `deped-web-kit/`
 - `enrollment/`
+- `merch/`
 - `support/`
 - future modules like `guidance/`, `library/`, `clinic/`, `finance/`, `hr/`, or `student-portal/`
 

@@ -142,6 +142,13 @@
   overflow: visible;
 }
 
+.registrar-public-enrollment-submissions .modal-dialog--wide .modal-dialog__body {
+  max-height: min(68vh, 820px);
+  overflow-y: auto;
+  overflow-x: visible;
+  overscroll-behavior: contain;
+}
+
 .registrar-public-enrollment-submissions .searchable-select {
   position: relative;
   z-index: 30;

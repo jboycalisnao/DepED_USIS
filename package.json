@@ -8,6 +8,7 @@
     "deped-web-kit",
     "enrollment",
     "learner-portal",
+    "merch",
     "election",
     "sp-portal",
     "registrar",
@@ -20,6 +21,7 @@
     "dev:deped-web-kit": "npm run dev --workspace ./deped-web-kit",
     "dev:enrollment": "npm run dev --workspace ./enrollment",
     "dev:learner-portal": "npm run dev --workspace ./learner-portal",
+    "dev:merch": "npm run dev --workspace ./merch",
     "dev:election": "npm run dev --workspace ./election",
     "dev:sp-portal": "npm run dev --workspace ./sp-portal",
     "dev:registrar": "npm run dev --workspace ./registrar",
@@ -29,11 +31,12 @@
     "build:deped-web-kit": "npm run build --workspace ./deped-web-kit",
     "build:enrollment": "npm run build --workspace ./enrollment",
     "build:learner-portal": "npm run build --workspace ./learner-portal",
+    "build:merch": "npm run build --workspace ./merch",
     "build:election": "npm run build --workspace ./election",
     "build:sp-portal": "npm run build --workspace ./sp-portal",
     "build:registrar": "npm run build --workspace ./registrar",
     "build:support": "npm run build --workspace ./support",
-    "build": "npm run build:attendance && npm run build:coordinator && npm run build:deped-web-kit && npm run build:enrollment && npm run build:learner-portal && npm run build:election && npm run build:sp-portal && npm run build:registrar && npm run build:support"
+    "build": "npm run build:attendance && npm run build:coordinator && npm run build:deped-web-kit && npm run build:enrollment && npm run build:learner-portal && npm run build:merch && npm run build:election && npm run build:sp-portal && npm run build:registrar && npm run build:support"
   },
   "engines": {
     "node": ">=20"
