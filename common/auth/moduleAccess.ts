@@ -4,6 +4,7 @@ export type UsisModuleKey =
   | 'attendance'
   | 'election'
   | 'sp_portal'
+  | 'spta'
   | 'learner_portal'
   | 'support';
 

@@ -34,6 +34,9 @@
 .usis-side-nav__mobile-toggle--inline {
   position: static;
   z-index: auto;
+  left: auto;
+  top: auto;
+  margin: 0;
 }
 
 .usis-side-nav__mobile-backdrop {
@@ -136,6 +139,10 @@
     display: inline-flex;
   }
 
+  .usis-side-nav__mobile-toggle--inline {
+    display: inline-flex;
+  }
+
   .usis-side-nav__mobile-backdrop {
     display: block;
   }
@@ -144,6 +151,7 @@
     position: fixed;
     top: 0;
     left: 0;
+    z-index: 1200;
     width: min(82vw, 320px);
     height: 100vh;
     min-height: 100vh;

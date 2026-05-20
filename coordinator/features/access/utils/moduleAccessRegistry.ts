@@ -12,6 +12,7 @@ export const moduleOptions: Array<{ key: UsisModuleKey; label: string }> = [
   { key: 'attendance', label: 'Attendance' },
   { key: 'election', label: 'Election' },
   { key: 'sp_portal', label: 'SP Portal' },
+  { key: 'spta', label: 'SPTA' },
   { key: 'learner_portal', label: 'Learner Portal' },
   { key: 'support', label: 'Support' },
 ];

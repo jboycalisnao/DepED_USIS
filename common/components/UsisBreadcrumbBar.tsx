@@ -6,6 +6,7 @@ type UsisBreadcrumbBarProps = {
   currentLabel: string;
   profileName?: string | null;
   profileRole?: string | null;
+  profileSubtitle?: string | null;
   onLogout?: () => void;
   leftActions?: React.ReactNode;
 };
@@ -15,6 +16,7 @@ export function UsisBreadcrumbBar({
   currentLabel,
   profileName,
   profileRole,
+  profileSubtitle,
   onLogout,
   leftActions,
 }: UsisBreadcrumbBarProps) {
@@ -35,6 +37,7 @@ export function UsisBreadcrumbBar({
           <UsisProfileTrigger
             name={profileName}
             role={profileRole || 'School Coordinator'}
+            subtitle={profileSubtitle || undefined}
             onLogout={onLogout}
           />
         ) : null}

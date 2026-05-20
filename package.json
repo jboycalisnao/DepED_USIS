@@ -11,6 +11,7 @@
     "merch",
     "election",
     "sp-portal",
+    "spta",
     "registrar",
     "support",
     "packages/*"
@@ -24,6 +25,7 @@
     "dev:merch": "npm run dev --workspace ./merch",
     "dev:election": "npm run dev --workspace ./election",
     "dev:sp-portal": "npm run dev --workspace ./sp-portal",
+    "dev:spta": "npm run dev --workspace ./spta -- --host 0.0.0.0 --port 5180",
     "dev:registrar": "npm run dev --workspace ./registrar",
     "dev:support": "npm run dev --workspace ./support",
     "build:attendance": "npm run build --workspace ./attendance",
@@ -34,9 +36,10 @@
     "build:merch": "npm run build --workspace ./merch",
     "build:election": "npm run build --workspace ./election",
     "build:sp-portal": "npm run build --workspace ./sp-portal",
+    "build:spta": "npm run build --workspace ./spta",
     "build:registrar": "npm run build --workspace ./registrar",
     "build:support": "npm run build --workspace ./support",
-    "build": "npm run build:attendance && npm run build:coordinator && npm run build:deped-web-kit && npm run build:enrollment && npm run build:learner-portal && npm run build:merch && npm run build:election && npm run build:sp-portal && npm run build:registrar && npm run build:support"
+    "build": "npm run build:attendance && npm run build:coordinator && npm run build:deped-web-kit && npm run build:enrollment && npm run build:learner-portal && npm run build:merch && npm run build:election && npm run build:sp-portal && npm run build:spta && npm run build:registrar && npm run build:support"
   },
   "engines": {
     "node": ">=20"

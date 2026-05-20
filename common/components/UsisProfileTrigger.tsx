@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 type UsisProfileTriggerProps = {
   name: string;
   role?: string;
+  subtitle?: string;
   onLogout: () => void;
   ariaLabel?: string;
 };
@@ -10,6 +11,7 @@ type UsisProfileTriggerProps = {
 export function UsisProfileTrigger({
   name,
   role = 'School Coordinator',
+  subtitle,
   onLogout,
   ariaLabel = 'Profile menu',
 }: UsisProfileTriggerProps) {
@@ -58,7 +60,7 @@ export function UsisProfileTrigger({
             {initials}
           </div>
           <p className="usis-profile-popover__name">{name}</p>
-          <p className="usis-profile-popover__meta">{role}</p>
+          <p className="usis-profile-popover__meta">{subtitle || role}</p>
           <div className="usis-profile-popover__divider" />
           <button type="button" className="usis-profile-popover__logout" onClick={onLogout}>
             <svg viewBox="0 0 24 24" aria-hidden="true" className="usis-profile-popover__logout-icon">
@@ -73,4 +75,3 @@ export function UsisProfileTrigger({
     </div>
   );
 }
-
