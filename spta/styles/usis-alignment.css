@@ -1,0 +1,210 @@
+.spta-usis {
+  font-family: "Segoe UI", sans-serif;
+}
+
+.spta-usis .font-display,
+.spta-usis .font-fancy,
+.spta-usis .font-serif {
+  font-family: "Segoe UI", sans-serif !important;
+}
+
+.spta-usis .uppercase {
+  text-transform: none !important;
+}
+
+.spta-usis [class*="tracking-"] {
+  letter-spacing: normal !important;
+}
+
+.spta-usis .rounded-2xl,
+.spta-usis .rounded-3xl,
+.spta-usis .rounded-full,
+.spta-usis .rounded-none,
+.spta-usis .rounded-\[24px\],
+.spta-usis .rounded-\[28px\],
+.spta-usis .rounded-\[32px\] {
+  border-radius: 0.375rem !important;
+}
+
+.spta-usis .rounded-xl,
+.spta-usis .rounded-lg,
+.spta-usis .rounded-md,
+.spta-usis .rounded-sm,
+.spta-usis .rounded,
+.spta-usis .rounded-\[12px\] {
+  border-radius: 0.375rem !important;
+}
+
+.spta-usis [class*="rounded-"] {
+  border-radius: 0.375rem !important;
+}
+
+.spta-usis .usis-side-nav,
+.spta-usis .usis-side-nav__link,
+.spta-usis .usis-side-nav__logout,
+.spta-usis .usis-side-nav__mobile-toggle,
+.spta-usis .floating-field__control input,
+.spta-usis .floating-field__control select,
+.spta-usis .floating-field__control textarea,
+.spta-usis .floating-field__password-toggle,
+.spta-usis .portal-panel,
+.spta-usis .notice-box,
+.spta-usis .usis-login-modal__card,
+.spta-usis .usis-profile-trigger__button,
+.spta-usis .usis-profile-trigger__avatar,
+.spta-usis .usis-profile-popover {
+  border-radius: 0.375rem !important;
+}
+
+.spta-usis .usis-profile-trigger__avatar,
+.spta-usis .usis-profile-popover__avatar {
+  border-radius: 9999px !important;
+}
+
+.spta-usis .text-4xl,
+.spta-usis .text-5xl,
+.spta-usis .text-6xl {
+  font-size: 24px !important;
+  line-height: 1.2 !important;
+}
+
+.spta-usis [class*="bg-\\[linear-gradient"],
+.spta-usis [class*="bg-gradient"],
+.spta-usis [class*="bg-\\[radial-gradient"] {
+  background-image: none !important;
+}
+
+.spta-usis .shadow-2xl,
+.spta-usis .shadow-xl,
+.spta-usis .shadow-lg {
+  box-shadow: 0 6px 18px -14px rgba(10, 23, 39, 0.35) !important;
+}
+
+.spta-usis .bg-blue-600,
+.spta-usis .bg-green-600,
+.spta-usis .bg-purple-50,
+.spta-usis .bg-blue-50,
+.spta-usis .bg-green-50 {
+  background: #ffffff !important;
+  color: #18222d !important;
+  border: 1px solid var(--deped-line) !important;
+}
+
+.spta-usis [class*="bg-blue-"],
+.spta-usis [class*="bg-green-"],
+.spta-usis [class*="bg-purple-"],
+.spta-usis [class*="bg-pink-"],
+.spta-usis [class*="bg-rose-"],
+.spta-usis [class*="bg-indigo-"],
+.spta-usis [class*="bg-violet-"],
+.spta-usis [class*="bg-amber-"],
+.spta-usis [class*="bg-orange-"] {
+  background: #ffffff !important;
+  border-color: var(--deped-line) !important;
+}
+
+.spta-usis [class*="text-blue-"],
+.spta-usis [class*="text-green-"],
+.spta-usis [class*="text-purple-"],
+.spta-usis [class*="text-pink-"],
+.spta-usis [class*="text-rose-"],
+.spta-usis [class*="text-indigo-"],
+.spta-usis [class*="text-violet-"],
+.spta-usis [class*="text-amber-"],
+.spta-usis [class*="text-orange-"] {
+  color: #18222d !important;
+}
+
+.spta-usis .text-blue-900,
+.spta-usis .text-green-900,
+.spta-usis .text-purple-900,
+.spta-usis .text-blue-800,
+.spta-usis .text-green-800,
+.spta-usis .text-purple-800 {
+  color: #18222d !important;
+}
+
+.spta-usis .m3-btn-primary,
+.spta-usis .m3-btn-tonal,
+.spta-usis .m3-btn-outlined,
+.spta-usis .primary-button,
+.spta-usis .secondary-button,
+.spta-usis .portal-button,
+.spta-usis .portal-side-button {
+  border-radius: 4px !important;
+  font-size: var(--usis-helper-size) !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  min-height: 44px !important;
+  padding: 0 18px !important;
+  border: 0 !important;
+  background: var(--deped-blue) !important;
+  color: var(--deped-white) !important;
+  box-shadow: none !important;
+}
+
+.spta-usis .m3-btn-primary:hover,
+.spta-usis .m3-btn-tonal:hover,
+.spta-usis .m3-btn-outlined:hover,
+.spta-usis .primary-button:hover,
+.spta-usis .secondary-button:hover,
+.spta-usis .portal-button:hover,
+.spta-usis .portal-side-button:hover {
+  opacity: 0.92 !important;
+}
+
+.spta-usis .m3-btn-primary:disabled,
+.spta-usis .m3-btn-tonal:disabled,
+.spta-usis .m3-btn-outlined:disabled,
+.spta-usis .primary-button:disabled,
+.spta-usis .secondary-button:disabled,
+.spta-usis .portal-button:disabled,
+.spta-usis .portal-side-button:disabled,
+.spta-usis .portal-button[aria-disabled="true"],
+.spta-usis .portal-side-button[aria-disabled="true"] {
+  opacity: 0.7 !important;
+  pointer-events: none !important;
+}
+
+.spta-usis .floating-field__password-toggle {
+  min-height: 36px !important;
+  min-width: 36px !important;
+  width: 36px !important;
+  height: 36px !important;
+  padding: 0 !important;
+  border: 1px solid rgba(18, 35, 61, 0.1) !important;
+  border-radius: 10px !important;
+  background: var(--deped-white) !important;
+  color: var(--deped-blue) !important;
+}
+
+.spta-usis .floating-field__password-toggle:hover {
+  opacity: 1 !important;
+  background: #eef4ff !important;
+}
+
+.spta-usis .spta-access-page .usis-login-modal {
+  margin-top: 12px;
+}
+
+.spta-usis .section-shell .section-shell__header.text-center {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.spta-usis .spta-admin-frame {
+  padding: 0 !important;
+}
+
+.spta-usis .spta-admin-shell {
+  gap: 0 !important;
+}
+
+.spta-usis .spta-admin-dashboard .section-shell__header {
+  max-width: none !important;
+}
+
+.spta-usis .spta-parent-access .usis-login-modal .floating-field:nth-of-type(2),
+.spta-usis .spta-adviser-access .usis-login-modal .floating-field:nth-of-type(2) {
+  display: none !important;
+}

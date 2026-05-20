@@ -1,0 +1,21 @@
+@import '../../common/css/tokens.css';
+@import '../../common/css/base.css';
+@import '../../common/css/header.css';
+@import '../../common/css/footer.css';
+@import '../../common/css/layout.css';
+@import '../../common/css/boxes.css';
+@import '../../common/css/forms.css';
+@import '../../common/css/side-nav.css';
+@import '../../common/css/breadcrumb-bar.css';
+@import '../../common/css/profile-trigger.css';
+@import '../../common/css/modals.css';
+@import '../../common/css/login-modal.css';
+@import './tokens.css';
+@import './base.css';
+@import './ui.css';
+@import './usis-alignment.css';
+@import './print.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;

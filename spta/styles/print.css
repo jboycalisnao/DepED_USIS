@@ -1,0 +1,85 @@
+@media print {
+  @page {
+    margin: 0.5in;
+    size: auto;
+  }
+
+  body,
+  html {
+    visibility: hidden;
+    height: auto !important;
+    overflow: visible !important;
+    background: white !important;
+  }
+
+  .print-area {
+    visibility: visible;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: auto !important;
+    min-height: 100vh;
+    margin: 0;
+    padding: 0;
+    overflow: visible !important;
+    background: white !important;
+    color: black !important;
+    display: block !important;
+  }
+
+  .print-area * {
+    visibility: visible;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  ::-webkit-scrollbar {
+    display: none;
+  }
+
+  .immersive-bg,
+  header,
+  aside,
+  .m3-card {
+    display: none !important;
+  }
+
+  .page-break-marker {
+    height: 0 !important;
+    border: none !important;
+    margin: 0 !important;
+    overflow: hidden !important;
+    color: transparent !important;
+  }
+
+  .page-break-marker::after {
+    display: none !important;
+  }
+
+  .page-break-before {
+    page-break-before: always;
+  }
+
+  .break-inside-avoid {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  p {
+    orphans: 2;
+    widows: 2;
+  }
+
+  .doc-container {
+    display: block !important;
+    height: auto !important;
+  }
+
+  .doc-body {
+    height: auto !important;
+    overflow: visible !important;
+  }
+}
