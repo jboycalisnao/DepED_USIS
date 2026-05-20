@@ -29,6 +29,8 @@ export function AccessPage({ onAccessSuccess }: AccessPageProps) {
 
     const canAccessSpta =
       result.record.isSuperAdmin ||
+      result.record.accountSource === 'usis_core_coordinators' ||
+      result.record.accountSource === 'sp_portal_coordinators' ||
       hasCoordinatorModuleAccess(result.record.userId, 'spta') ||
       hasCoordinatorModuleAccess(result.record.userId, 'sp_portal') ||
       hasCoordinatorModuleAccess(result.record.userId, 'coordinator');
