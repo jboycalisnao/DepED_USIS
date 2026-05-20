@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
+import { SPTA_FINANCIAL_TRANSACTIONS_TABLE, fromDbFinancialTransaction } from '../lib/financeTransactionDb';
 import { Resolution, SystemConfig, FinancialTransaction } from '../types';
 
 export const VerificationPage = () => {
@@ -23,8 +24,12 @@ export const VerificationPage = () => {
                 if (configData) setConfig(configData.config as SystemConfig);
 
                 if (isFinance) {
-                    const { data: txData } = await supabase.from('financial_transactions').select('*').eq('id', id).single();
-                    if (txData) setTransaction(txData as FinancialTransaction);
+                    const { data: txData } = await supabase
+                        .from(SPTA_FINANCIAL_TRANSACTIONS_TABLE)
+                        .select('*')
+                        .eq('id', id)
+                        .single();
+                    if (txData) setTransaction(fromDbFinancialTransaction(txData));
                 } else {
                     const { data: resData } = await supabase.from('resolutions').select('*').eq('id', id).single();
                     if (resData) setResolution(resData as Resolution);

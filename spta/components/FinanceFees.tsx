@@ -130,26 +130,34 @@ export const FinanceFees: React.FC<FinanceFeesProps> = ({ config, setConfig }) =
                 <div className="bg-white p-6 rounded-2xl w-full max-w-md shadow-2xl animate-fade-in">
                     <h3 className="text-xl font-bold mb-4">{editingFeeIndex !== null ? 'Edit' : 'Add'} Fee Item</h3>
                     <form onSubmit={handleSaveFee} className="space-y-4">
-                        <div>
-                            <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Fee Name</label>
-                            <input className="m3-input w-full" placeholder="e.g. PTA Membership" required value={feeForm.name || ''} onChange={e => setFeeForm({...feeForm, name: e.target.value})} />
-                        </div>
-                        <div>
-                            <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Applicable To</label>
-                            <select className="m3-input w-full" value={feeForm.type} onChange={e => setFeeForm({...feeForm, type: e.target.value as any})}>
+                        <label className="floating-field">
+                            <div className="floating-field__control">
+                                <input placeholder=" " required value={feeForm.name || ''} onChange={e => setFeeForm({...feeForm, name: e.target.value})} />
+                                <span>Fee Name</span>
+                            </div>
+                        </label>
+                        <label className="floating-field">
+                            <div className="floating-field__control">
+                                <select value={feeForm.type} onChange={e => setFeeForm({...feeForm, type: e.target.value as any})} data-has-value={(feeForm.type || '').length > 0}>
                                 <option value="Base">All Students (Base)</option>
                                 <option value="SHS_Only">Senior High School Only</option>
                                 <option value="STE_SPA_Only">Special Programs (STE/SPA) Only</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Amount (PHP)</label>
-                            <input type="number" step="0.01" className="m3-input w-full" placeholder="0.00" required value={feeForm.amount} onChange={e => setFeeForm({...feeForm, amount: parseFloat(e.target.value)})} />
-                        </div>
-                        <div>
-                            <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Description (Optional)</label>
-                            <input className="m3-input w-full" placeholder="Notes..." value={feeForm.description || ''} onChange={e => setFeeForm({...feeForm, description: e.target.value})} />
-                        </div>
+                                </select>
+                                <span>Applicable To</span>
+                            </div>
+                        </label>
+                        <label className="floating-field">
+                            <div className="floating-field__control">
+                                <input type="number" step="0.01" placeholder=" " required value={feeForm.amount} onChange={e => setFeeForm({...feeForm, amount: parseFloat(e.target.value)})} />
+                                <span>Amount (PHP)</span>
+                            </div>
+                        </label>
+                        <label className="floating-field">
+                            <div className="floating-field__control">
+                                <input placeholder=" " value={feeForm.description || ''} onChange={e => setFeeForm({...feeForm, description: e.target.value})} />
+                                <span>Description (Optional)</span>
+                            </div>
+                        </label>
                         <div className="flex justify-end gap-2 pt-4 border-t">
                             <button type="button" onClick={() => setIsFeeModalOpen(false)} className="m3-btn-tonal">Cancel</button>
                             <button type="submit" className="m3-btn-primary">Save Fee</button>

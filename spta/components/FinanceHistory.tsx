@@ -3,6 +3,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { FinancialTransaction, Learner, Section, TransactionType, SystemConfig, GradeLevel } from '../types';
 import { supabase } from '../lib/supabaseClient';
+import { SPTA_FINANCIAL_TRANSACTIONS_TABLE } from '../lib/financeTransactionDb';
 import { UsisSearchableSelect } from '../../common/components/ui/UsisSearchableSelect';
 import { UsisAlertModal } from '../../common/components/UsisAlertModal';
 
@@ -37,6 +38,8 @@ export const FinanceHistory: React.FC<FinanceHistoryProps> = ({ transactions, se
   // Edit State
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingTx, setEditingTx] = useState<FinancialTransaction | null>(null);
+  const [editEntityName, setEditEntityName] = useState('');
+  const [editReferenceNo, setEditReferenceNo] = useState('');
   // Edit Collection Specific State
   const [editSelectedFees, setEditSelectedFees] = useState<Set<string>>(new Set());
   const [editAmount, setEditAmount] = useState<number>(0);
@@ -108,7 +111,7 @@ export const FinanceHistory: React.FC<FinanceHistoryProps> = ({ transactions, se
   const handleDelete = async () => {
       if (!confirmDeleteId) return;
       
-      const { error } = await supabase.from('financial_transactions').delete().eq('id', confirmDeleteId);
+      const { error } = await supabase.from(SPTA_FINANCIAL_TRANSACTIONS_TABLE).delete().eq('id', confirmDeleteId);
       
       if (!error) {
           // Instant update: Remove from local state immediately
@@ -122,6 +125,8 @@ export const FinanceHistory: React.FC<FinanceHistoryProps> = ({ transactions, se
   const handleEditClick = (tx: FinancialTransaction) => {
       setEditingTx({ ...tx });
       setEditAmount(tx.amount);
+      setEditEntityName(tx.type === TransactionType.COLLECTION ? (tx.learnerName ?? '') : (tx.payee ?? ''));
+      setEditReferenceNo(tx.type === TransactionType.COLLECTION ? (tx.referenceNo ?? '') : (tx.disbursementCode ?? ''));
       
       // If collection, analyze particulars to pre-check fees
       if (tx.type === TransactionType.COLLECTION) {
@@ -250,20 +255,28 @@ export const FinanceHistory: React.FC<FinanceHistoryProps> = ({ transactions, se
       }
 
       const { error } = await supabase
-          .from('financial_transactions')
+          .from(SPTA_FINANCIAL_TRANSACTIONS_TABLE)
           .update({
-              date: editingTx.date,
+              txn_date: editingTx.date,
               amount: editAmount, // Use the state amount
               particulars: finalParticulars, // Use reconstructed particulars
-              referenceNo: editingTx.referenceNo,
-              disbursementCode: editingTx.disbursementCode,
-              learnerName: editingTx.learnerName,
-              payee: editingTx.payee
+              reference_no: editingTx.type === TransactionType.COLLECTION ? editReferenceNo : editingTx.referenceNo,
+              disbursement_code: editingTx.type === TransactionType.EXPENSE ? editReferenceNo : editingTx.disbursementCode,
+              learner_name: editingTx.type === TransactionType.COLLECTION ? editEntityName : editingTx.learnerName,
+              payee: editingTx.type === TransactionType.EXPENSE ? editEntityName : editingTx.payee
           })
           .eq('id', editingTx.id);
 
       if (!error) {
-          setTransactions(prev => prev.map(t => t.id === editingTx.id ? { ...editingTx, amount: editAmount, particulars: finalParticulars } : t));
+          setTransactions(prev => prev.map(t => t.id === editingTx.id ? {
+              ...editingTx,
+              amount: editAmount,
+              particulars: finalParticulars,
+              referenceNo: editingTx.type === TransactionType.COLLECTION ? editReferenceNo : editingTx.referenceNo,
+              disbursementCode: editingTx.type === TransactionType.EXPENSE ? editReferenceNo : editingTx.disbursementCode,
+              learnerName: editingTx.type === TransactionType.COLLECTION ? editEntityName : editingTx.learnerName,
+              payee: editingTx.type === TransactionType.EXPENSE ? editEntityName : editingTx.payee
+          } : t));
           setIsEditModalOpen(false);
           setEditingTx(null);
       } else {
@@ -674,59 +687,77 @@ export const FinanceHistory: React.FC<FinanceHistoryProps> = ({ transactions, se
 
         {/* Edit Transaction Modal */}
         {isEditModalOpen && editingTx && createPortal(
-            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
-                <div className="bg-white w-full max-w-xl rounded-2xl p-6 shadow-2xl animate-fade-in max-h-[90vh] overflow-y-auto">
-                    <h3 className="text-xl font-bold mb-4">Edit Transaction</h3>
+            <div className="fixed inset-0 z-[200] flex items-center justify-center bg-[rgba(18,35,61,0.45)] p-4">
+                <div className="w-full max-w-xl overflow-hidden border border-[var(--deped-line)] bg-[var(--deped-white)] shadow-2xl rounded-md animate-fade-in max-h-[90vh] flex flex-col">
+                    <div className="h-2 grid grid-cols-3">
+                        <span className="bg-[var(--deped-blue)]" />
+                        <span className="bg-[var(--deped-red)]" />
+                        <span className="bg-[var(--deped-yellow)]" />
+                    </div>
+                    <div className="flex items-center justify-between border-b border-[var(--deped-line)] bg-[var(--deped-white)] px-6 py-4">
+                        <h3 className="text-xl font-bold text-[var(--deped-ink)]">Edit Transaction</h3>
+                        <button
+                            type="button"
+                            onClick={() => setIsEditModalOpen(false)}
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-[var(--deped-line)] bg-[var(--deped-white)] text-[var(--deped-muted)] hover:border-[var(--deped-line-strong)] hover:text-[var(--deped-blue)]"
+                            aria-label="Close edit transaction modal"
+                        >
+                            <span className="material-symbols-outlined">close</span>
+                        </button>
+                    </div>
+                    <div className="min-h-0 flex-1 overflow-y-auto p-6">
                     <form onSubmit={handleUpdate} className="space-y-4">
                         <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Date</label>
-                                <input 
-                                    type="date" 
-                                    className="m3-input w-full"
-                                    value={editingTx.date}
-                                    onChange={e => setEditingTx({...editingTx, date: e.target.value})}
-                                    required
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Amount</label>
-                                <input 
-                                    type="number" 
-                                    step="0.01"
-                                    className="m3-input w-full font-bold text-lg text-blue-700"
-                                    value={editAmount}
-                                    onChange={e => setEditAmount(parseFloat(e.target.value) || 0)}
-                                    required
-                                />
-                            </div>
+                            <label className="floating-field">
+                                <div className="floating-field__control">
+                                    <input
+                                        type="date"
+                                        value={editingTx.date}
+                                        onChange={e => setEditingTx({...editingTx, date: e.target.value})}
+                                        required
+                                        placeholder=" "
+                                    />
+                                    <span>Date</span>
+                                </div>
+                            </label>
+                            <label className="floating-field">
+                                <div className="floating-field__control">
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        value={editAmount}
+                                        onChange={e => setEditAmount(parseFloat(e.target.value) || 0)}
+                                        required
+                                        placeholder=" "
+                                    />
+                                    <span>Amount</span>
+                                </div>
+                            </label>
                         </div>
                         
-                        <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
-                                {editingTx.type === TransactionType.COLLECTION ? 'Learner / Payer Name' : 'Payee'}
-                            </label>
-                            <input 
-                                className="m3-input w-full"
-                                value={editingTx.type === TransactionType.COLLECTION ? (editingTx.learnerName || '') : (editingTx.payee || '')}
-                                onChange={e => {
-                                    if (editingTx.type === TransactionType.COLLECTION) setEditingTx({...editingTx, learnerName: e.target.value});
-                                    else setEditingTx({...editingTx, payee: e.target.value});
-                                }}
-                            />
-                        </div>
+                        <label className="floating-field">
+                            <div className="floating-field__control">
+                                <input
+                                    value={editEntityName}
+                                    onChange={e => setEditEntityName(e.target.value)}
+                                    placeholder=" "
+                                    readOnly
+                                />
+                                <span>{editingTx.type === TransactionType.COLLECTION ? 'Learner / Payer Name' : 'Payee'}</span>
+                            </div>
+                        </label>
 
-                        <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Reference No.</label>
-                            <input 
-                                className="m3-input w-full"
-                                value={editingTx.referenceNo || editingTx.disbursementCode || ''}
-                                onChange={e => {
-                                     if (editingTx.type === TransactionType.COLLECTION) setEditingTx({...editingTx, referenceNo: e.target.value});
-                                     else setEditingTx({...editingTx, disbursementCode: e.target.value});
-                                }}
-                            />
-                        </div>
+                        <label className="floating-field">
+                            <div className="floating-field__control">
+                                <input
+                                    value={editReferenceNo}
+                                    onChange={e => setEditReferenceNo(e.target.value)}
+                                    placeholder=" "
+                                    readOnly
+                                />
+                                <span>Reference No.</span>
+                            </div>
+                        </label>
 
                         {/* CONDITIONAL UI: Fee Table for Collections, Textarea for Expenses */}
                         {editingTx.type === TransactionType.COLLECTION && allocationPreview ? (
@@ -765,22 +796,36 @@ export const FinanceHistory: React.FC<FinanceHistoryProps> = ({ transactions, se
                                 </div>
                             </div>
                         ) : (
-                            <div>
-                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Particulars</label>
-                                <textarea 
-                                    className="m3-input w-full"
-                                    rows={3}
-                                    value={editingTx.particulars || ''}
-                                    onChange={e => setEditingTx({...editingTx, particulars: e.target.value})}
-                                />
-                            </div>
+                            <label className="floating-field">
+                                <div className="floating-field__control">
+                                    <textarea
+                                        rows={3}
+                                        value={editingTx.particulars || ''}
+                                        onChange={e => setEditingTx({...editingTx, particulars: e.target.value})}
+                                        placeholder=" "
+                                    />
+                                    <span>Particulars</span>
+                                </div>
+                            </label>
                         )}
 
-                        <div className="flex justify-end gap-2 pt-4 border-t">
-                            <button type="button" onClick={() => setIsEditModalOpen(false)} className="m3-btn-tonal">Cancel</button>
-                            <button type="submit" className="m3-btn-primary">Save Changes</button>
+                        <div className="flex justify-end gap-2 pt-4 border-t border-[var(--deped-line)]">
+                            <button
+                                type="button"
+                                onClick={() => setIsEditModalOpen(false)}
+                                className="inline-flex items-center justify-center rounded-md border border-[var(--deped-line)] bg-[var(--deped-white)] px-5 py-2.5 text-sm font-bold text-[var(--deped-ink)] transition-colors hover:bg-[var(--deped-canvas)] hover:border-[var(--deped-line-strong)]"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                className="inline-flex items-center justify-center rounded-md border border-[var(--deped-blue)] bg-[var(--deped-blue)] px-5 py-2.5 text-sm font-bold text-white transition-colors hover:opacity-90"
+                            >
+                                Save Changes
+                            </button>
                         </div>
                     </form>
+                    </div>
                 </div>
             </div>, document.body
         )}
@@ -806,20 +851,24 @@ export const FinanceHistory: React.FC<FinanceHistoryProps> = ({ transactions, se
                     <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-xl animate-fade-in">
                         <h3 className="text-xl font-bold mb-4 text-gray-800">Generate Report</h3>
                         <div className="space-y-4">
-                            <div>
-                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Grade Level</label>
-                                <select className="m3-input w-full" value={printGradeLevel} onChange={e => { setPrintGradeLevel(e.target.value); setPrintSectionId(''); }}>
+                            <label className="floating-field">
+                                <div className="floating-field__control">
+                                <select value={printGradeLevel} onChange={e => { setPrintGradeLevel(e.target.value); setPrintSectionId(''); }} data-has-value={printGradeLevel.length > 0}>
                                     <option value="">Select Grade...</option>
                                     {Object.values(GradeLevel).map(g => (<option key={g} value={g}>{g}</option>))}
                                 </select>
-                            </div>
-                            <div>
-                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Class Section</label>
-                                <select className="m3-input w-full" value={printSectionId} onChange={e => setPrintSectionId(e.target.value)} disabled={!printGradeLevel}>
+                                <span>Grade Level</span>
+                                </div>
+                            </label>
+                            <label className="floating-field">
+                                <div className="floating-field__control">
+                                <select value={printSectionId} onChange={e => setPrintSectionId(e.target.value)} disabled={!printGradeLevel} data-has-value={printSectionId.length > 0}>
                                     <option value="">{printGradeLevel ? 'Select Section...' : 'Select Grade First'}</option>
                                     {sections.filter(s => s.gradeLevel === printGradeLevel).sort((a,b) => a.name.localeCompare(b.name)).map(s => (<option key={s.id} value={s.id}>{s.name} {s.strand ? `(${s.strand})` : ''}</option>))}
                                 </select>
-                            </div>
+                                <span>Class Section</span>
+                                </div>
+                            </label>
                             <div className="flex gap-2 justify-end">
                                 <button onClick={() => setIsPrintModalOpen(false)} className="m3-btn-tonal">Cancel</button>
                                 <button onClick={handlePrintSectionReport} className="m3-btn-primary" disabled={!printSectionId}>Print Report</button>
@@ -837,10 +886,12 @@ export const FinanceHistory: React.FC<FinanceHistoryProps> = ({ transactions, se
                     <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-xl animate-fade-in">
                         <h3 className="text-xl font-bold mb-4 text-gray-800">Daily Closing Report</h3>
                         <div className="space-y-4">
-                            <div>
-                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Select Date</label>
-                                <input type="date" className="m3-input w-full" value={dailyReportDate} onChange={e => setDailyReportDate(e.target.value)} />
-                            </div>
+                            <label className="floating-field">
+                                <div className="floating-field__control">
+                                <input type="date" value={dailyReportDate} onChange={e => setDailyReportDate(e.target.value)} placeholder=" " />
+                                <span>Select Date</span>
+                                </div>
+                            </label>
                             <div className="flex gap-2 justify-end">
                                 <button onClick={() => setIsDailyReportOpen(false)} className="m3-btn-tonal">Cancel</button>
                                 <button onClick={handlePrintDailyReport} className="m3-btn-primary">Print Report</button>
@@ -860,3 +911,4 @@ export const FinanceHistory: React.FC<FinanceHistoryProps> = ({ transactions, se
     </div>
   );
 };
+

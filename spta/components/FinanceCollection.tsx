@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { QRCodeCanvas } from 'qrcode.react';
 import { FinancialTransaction, Learner, Section, TransactionType, SystemConfig, GradeLevel } from '../types';
 import { supabase } from '../lib/supabaseClient';
+import { SPTA_FINANCIAL_TRANSACTIONS_TABLE, toDbFinancialTransaction } from '../lib/financeTransactionDb';
 import { createIdleKioskState, publishKioskState } from '../lib/kiosk';
 import { UsisSearchableSelect } from '../../common/components/ui/UsisSearchableSelect';
 import { UsisAlertModal } from '../../common/components/UsisAlertModal';
@@ -462,7 +463,9 @@ export const FinanceCollection: React.FC<FinanceCollectionProps> = ({ transactio
       };
 
       // --- SAVE TO DATABASE ---
-      const { error } = await supabase.from('financial_transactions').insert(newTx);
+      const { error } = await supabase
+        .from(SPTA_FINANCIAL_TRANSACTIONS_TABLE)
+        .insert(toDbFinancialTransaction(newTx));
       
       if (error) {
           setNotice({ open: true, title: 'Save Failed', message: `Error saving transaction: ${error.message}`, tone: 'danger' });
@@ -985,11 +988,11 @@ export const FinanceCollection: React.FC<FinanceCollectionProps> = ({ transactio
 
         {/* PAYMENT SUMMARY MODAL */}
         {isSummaryOpen && currentTx && createPortal(
-            <div className="fixed inset-0 z-[100] bg-[var(--md-sys-color-surface)] flex flex-col animate-fade-in">
+            <div className="fixed inset-0 z-[100] bg-[rgba(18,35,61,0.45)] flex flex-col animate-fade-in">
                 {/* Header */}
-                <div className="px-8 py-6 flex justify-between items-center border-b border-[var(--md-sys-color-outline-variant)] bg-[var(--md-sys-color-surface)]">
+                <div className="px-8 py-6 flex justify-between items-center border-b border-[var(--deped-line)] bg-[var(--deped-white)]">
                     <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center text-green-700">
+                        <div className="w-12 h-12 rounded-md border border-green-200 bg-green-100 flex items-center justify-center text-green-700">
                             <span className="material-symbols-outlined text-2xl">check_circle</span>
                         </div>
                         <div>
@@ -999,14 +1002,14 @@ export const FinanceCollection: React.FC<FinanceCollectionProps> = ({ transactio
                     </div>
                     <button 
                         onClick={() => setIsSummaryOpen(false)} 
-                        className="p-2 rounded-full hover:bg-[var(--md-sys-color-surface-container)] text-[var(--md-sys-color-on-surface-variant)] transition-colors"
+                        className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-[var(--deped-line)] bg-[var(--deped-white)] text-[var(--deped-muted)] transition-colors hover:border-[var(--deped-line-strong)] hover:text-[var(--deped-blue)]"
                     >
                         <span className="material-symbols-outlined text-3xl">close</span>
                     </button>
                 </div>
 
                 {/* Content Body */}
-                <div className="flex-1 overflow-y-auto p-8 md:p-12">
+                <div className="flex-1 overflow-y-auto p-8 md:p-12 bg-[var(--deped-canvas)]">
                     <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-12">
                         {/* Details */}
                         <div className="space-y-8">
@@ -1016,7 +1019,7 @@ export const FinanceCollection: React.FC<FinanceCollectionProps> = ({ transactio
                                 <p className="text-xl text-[var(--md-sys-color-on-surface-variant)]">{currentTx.gradeSection}</p>
                                 {receiptLearner?.lrn && <p className="font-mono text-sm text-[var(--md-sys-color-primary)] mt-1 tracking-widest">{receiptLearner.lrn}</p>}
                             </div>
-                            <div className="p-6 bg-[var(--md-sys-color-surface-container)] rounded-[24px] border border-[var(--md-sys-color-outline-variant)]">
+                            <div className="p-6 bg-[var(--deped-white)] rounded-md border border-[var(--deped-line)]">
                                 <p className="text-sm font-bold text-[var(--md-sys-color-on-surface-variant)] uppercase mb-4">Transaction Details</p>
                                 <div className="grid grid-cols-2 gap-y-4 gap-x-8">
                                     <div><p className="text-xs text-[var(--md-sys-color-outline)]">Reference No.</p><p className="font-mono font-bold text-[var(--md-sys-color-on-surface)]">{currentTx.referenceNo}</p></div>
@@ -1027,10 +1030,10 @@ export const FinanceCollection: React.FC<FinanceCollectionProps> = ({ transactio
                         </div>
                         <div className="flex flex-col h-full">
                             <p className="text-sm font-bold text-[var(--md-sys-color-outline)] uppercase tracking-wider mb-4">Fee Allocation Breakdown</p>
-                            <div className="flex-1 bg-white border border-[var(--md-sys-color-outline-variant)] rounded-[24px] overflow-hidden shadow-sm flex flex-col">
+                            <div className="flex-1 bg-[var(--deped-white)] border border-[var(--deped-line)] rounded-md overflow-hidden shadow-sm flex flex-col">
                                 <div className="overflow-y-auto flex-1 p-0">
                                     <table className="w-full text-left">
-                                        <thead className="bg-[var(--md-sys-color-surface-container)] text-[var(--md-sys-color-on-surface-variant)] text-xs uppercase font-bold sticky top-0"><tr><th className="p-4">Particulars</th><th className="p-4 text-right">Applied</th><th className="p-4 text-right">Balance</th></tr></thead>
+                                        <thead className="bg-[var(--deped-canvas)] text-[var(--deped-muted)] text-xs uppercase font-bold sticky top-0"><tr><th className="p-4">Particulars</th><th className="p-4 text-right">Applied</th><th className="p-4 text-right">Balance</th></tr></thead>
                                         <tbody className="divide-y divide-gray-100 text-sm">
                                             {currentBreakdown.map((item, idx) => (<tr key={idx} className="hover:bg-[var(--md-sys-color-surface-container-low)]"><td className="p-4 font-medium text-[var(--md-sys-color-on-surface)]">{item.name}</td><td className="p-4 text-right font-bold text-[var(--md-sys-color-primary)]">{item.paid > 0 ? `₱${item.paid.toLocaleString()}` : '-'}</td><td className={`p-4 text-right font-medium ${item.bal > 0 ? 'text-[var(--md-sys-color-error)]' : 'text-green-600'}`}>₱{item.bal.toLocaleString()}</td></tr>))}
                                         </tbody>
@@ -1041,9 +1044,9 @@ export const FinanceCollection: React.FC<FinanceCollectionProps> = ({ transactio
                     </div>
                 </div>
 
-                <div className="p-6 border-t border-[var(--md-sys-color-outline-variant)] bg-white flex justify-end gap-4">
-                    <button onClick={resetForNewTransaction} className="px-8 py-4 rounded-full border border-[var(--md-sys-color-outline)] text-[var(--md-sys-color-on-surface)] font-bold hover:bg-[var(--md-sys-color-surface-container)] transition-colors flex items-center gap-2"><span className="material-symbols-outlined">add</span>New Transaction</button>
-                    <button onClick={handlePrintReceipt} className="m3-btn-primary px-8 py-4 rounded-md flex items-center gap-2"><span className="material-symbols-outlined">print</span>Print Official Receipt</button>
+                <div className="p-6 border-t border-[var(--deped-line)] bg-[var(--deped-white)] flex justify-end gap-4">
+                    <button onClick={resetForNewTransaction} className="inline-flex items-center gap-2 px-8 py-4 rounded-md border border-[var(--deped-line)] text-[var(--deped-ink)] font-bold hover:bg-[var(--deped-canvas)] transition-colors"><span className="material-symbols-outlined">add</span>New Transaction</button>
+                    <button onClick={handlePrintReceipt} className="inline-flex items-center gap-2 px-8 py-4 rounded-md border border-[var(--deped-blue)] bg-[var(--deped-blue)] text-[var(--deped-white)] font-bold hover:opacity-90 transition-colors"><span className="material-symbols-outlined">print</span>Print Official Receipt</button>
                 </div>
             </div>, document.body
         )}
@@ -1057,3 +1060,5 @@ export const FinanceCollection: React.FC<FinanceCollectionProps> = ({ transactio
     </div>
   );
 };
+
+

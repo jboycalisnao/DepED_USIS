@@ -134,42 +134,49 @@ export const Administration: React.FC<AdministrationProps> = ({ config, setConfi
                     <div className="bg-[var(--md-sys-color-surface-container-high)] w-full max-w-md p-6 rounded-[28px] shadow-elevation-3 border border-white/20">
                         <h3 className="text-xl font-normal text-[var(--md-sys-color-on-surface)] mb-6">{userForm.id ? 'Edit' : 'Create'} User Account</h3>
                         <form onSubmit={handleSaveUser} className="space-y-4">
-                            <div>
-                                <label className="text-xs font-bold text-[var(--md-sys-color-on-surface-variant)] uppercase ml-1 block mb-1">Full Name</label>
-                                <input className="m3-input w-full" placeholder="Full Name" required value={userForm.fullName || ''} onChange={e => setUserForm({...userForm, fullName: e.target.value})} />
-                            </div>
-                            
-                            <div>
-                                <label className="text-xs font-bold text-[var(--md-sys-color-on-surface-variant)] uppercase ml-1 block mb-1">Username</label>
-                                <input className="m3-input w-full" placeholder="Username" required value={userForm.username || ''} onChange={e => setUserForm({...userForm, username: e.target.value})} />
-                            </div>
-
-                            <div>
-                                <label className="text-xs font-bold text-[var(--md-sys-color-on-surface-variant)] uppercase ml-1 block mb-1">Password</label>
-                                <input 
-                                    className="m3-input w-full" 
-                                    type="text" 
-                                    placeholder={userForm.id ? "Leave blank to keep current" : "Password"} 
-                                    value={userForm.password || ''} 
-                                    onChange={e => setUserForm({...userForm, password: e.target.value})} 
-                                    required={!userForm.id}
-                                />
-                            </div>
+                            <label className="floating-field">
+                                <div className="floating-field__control">
+                                    <input placeholder=" " required value={userForm.fullName || ''} onChange={e => setUserForm({...userForm, fullName: e.target.value})} />
+                                    <span>Full Name</span>
+                                </div>
+                            </label>
+                            <label className="floating-field">
+                                <div className="floating-field__control">
+                                    <input placeholder=" " required value={userForm.username || ''} onChange={e => setUserForm({...userForm, username: e.target.value})} />
+                                    <span>Username</span>
+                                </div>
+                            </label>
+                            <label className="floating-field">
+                                <div className="floating-field__control">
+                                    <input
+                                        type="text"
+                                        placeholder=" "
+                                        value={userForm.password || ''}
+                                        onChange={e => setUserForm({...userForm, password: e.target.value})}
+                                        required={!userForm.id}
+                                    />
+                                    <span>Password{userForm.id ? ' (Optional)' : ''}</span>
+                                </div>
+                            </label>
 
                             <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="text-xs font-bold text-[var(--md-sys-color-on-surface-variant)] uppercase ml-1 block mb-1">Role</label>
-                                    <select className="m3-input w-full" required value={userForm.role} onChange={e => setUserForm({...userForm, role: e.target.value as UserRole})}>
+                                <label className="floating-field">
+                                    <div className="floating-field__control">
+                                    <select required value={userForm.role} onChange={e => setUserForm({...userForm, role: e.target.value as UserRole})} data-has-value={Boolean(userForm.role)}>
                                         {Object.values(UserRole).map(r => <option key={r} value={r}>{r}</option>)}
                                     </select>
-                                </div>
-                                <div>
-                                    <label className="text-xs font-bold text-[var(--md-sys-color-on-surface-variant)] uppercase ml-1 block mb-1">Status</label>
-                                    <select className="m3-input w-full" required value={userForm.status} onChange={e => setUserForm({...userForm, status: e.target.value as any})}>
+                                    <span>Role</span>
+                                    </div>
+                                </label>
+                                <label className="floating-field">
+                                    <div className="floating-field__control">
+                                    <select required value={userForm.status} onChange={e => setUserForm({...userForm, status: e.target.value as any})} data-has-value={Boolean(userForm.status)}>
                                         <option value="Active">Active</option>
                                         <option value="Inactive">Inactive</option>
                                     </select>
-                                </div>
+                                    <span>Status</span>
+                                    </div>
+                                </label>
                             </div>
 
                             <div className="flex justify-end gap-2 pt-4 border-t border-[var(--md-sys-color-outline-variant)]">

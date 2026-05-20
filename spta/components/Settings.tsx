@@ -592,20 +592,30 @@ export const Settings: React.FC<SettingsProps> = ({ config, setConfig, embedded 
                                 return (
                                     <div key={key} className="grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 md:grid-cols-[120px_1fr_1fr] md:items-center">
                                         <span className="text-[16px] font-bold text-slate-800">{key.toUpperCase()}</span>
-                                        <input
-                                            type="date"
-                                            className="m3-input py-3 text-sm"
-                                            value={scheduleForm[key].start}
-                                            onChange={e => setScheduleForm({ ...scheduleForm, [key]: { ...scheduleForm[key], start: e.target.value } })}
-                                            required
-                                        />
-                                        <input
-                                            type="date"
-                                            className="m3-input py-3 text-sm"
-                                            value={scheduleForm[key].end}
-                                            onChange={e => setScheduleForm({ ...scheduleForm, [key]: { ...scheduleForm[key], end: e.target.value } })}
-                                            required
-                                        />
+                                        <label className="floating-field">
+                                            <div className="floating-field__control">
+                                                <input
+                                                    type="date"
+                                                    value={scheduleForm[key].start}
+                                                    onChange={e => setScheduleForm({ ...scheduleForm, [key]: { ...scheduleForm[key], start: e.target.value } })}
+                                                    placeholder=" "
+                                                    required
+                                                />
+                                                <span>Start Date</span>
+                                            </div>
+                                        </label>
+                                        <label className="floating-field">
+                                            <div className="floating-field__control">
+                                                <input
+                                                    type="date"
+                                                    value={scheduleForm[key].end}
+                                                    onChange={e => setScheduleForm({ ...scheduleForm, [key]: { ...scheduleForm[key], end: e.target.value } })}
+                                                    placeholder=" "
+                                                    required
+                                                />
+                                                <span>End Date</span>
+                                            </div>
+                                        </label>
                                     </div>
                                 );
                             })}

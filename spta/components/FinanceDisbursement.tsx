@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom';
 import { QRCodeCanvas } from 'qrcode.react';
 import { FinancialTransaction, TransactionType, Activity, SystemConfig, SignatoryProfile } from '../types';
 import { supabase } from '../lib/supabaseClient';
+import { SPTA_FINANCIAL_TRANSACTIONS_TABLE, toDbFinancialTransaction } from '../lib/financeTransactionDb';
 import { UsisAlertModal } from '../../common/components/UsisAlertModal';
 
 const SCHOOL_ORGS = ['SSLG', 'ENGLISH CLUB', 'MATH CLUB', 'KAMFIL', 'YES-O', 'AP CLUB', 'KPSEP', 'BKD', 'MAPEH CLUB', 'RCY', 'STEP'];
@@ -199,7 +200,9 @@ export const FinanceDisbursement: React.FC<FinanceDisbursementProps> = ({
           isDeficit: false
       };
       
-      const { error } = await supabase.from('financial_transactions').upsert(newTx);
+      const { error } = await supabase
+        .from(SPTA_FINANCIAL_TRANSACTIONS_TABLE)
+        .upsert(toDbFinancialTransaction(newTx));
       if(!error) {
           setTransactions(prev => {
               if (isUpdate) return prev.map(t => t.id === newTx.id ? newTx : t);
@@ -239,7 +242,7 @@ export const FinanceDisbursement: React.FC<FinanceDisbursementProps> = ({
           title: "Delete Disbursement",
           message: "Are you sure you want to delete this disbursement record? This cannot be undone.",
           onConfirm: async () => {
-              const { error } = await supabase.from('financial_transactions').delete().eq('id', id);
+              const { error } = await supabase.from(SPTA_FINANCIAL_TRANSACTIONS_TABLE).delete().eq('id', id);
               if(!error) {
                   setTransactions(prev => prev.filter(t => t.id !== id));
                   setConfirmModal(prev => ({...prev, isOpen: false}));
@@ -373,28 +376,30 @@ export const FinanceDisbursement: React.FC<FinanceDisbursementProps> = ({
                    <form onSubmit={handleSaveExpense} className="space-y-4">
                        <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
                            <div className="grid grid-cols-2 gap-3 mb-2">
-                               <div>
-                                   <label className="text-xs font-bold text-[var(--md-sys-color-outline)] uppercase block mb-1">Fund Source</label>
+                               <div className="floating-field">
+                                   <div className="floating-field__control">
                                    <select 
-                                        className="m3-input w-full" 
                                         required 
                                         value={expenseForm.category || ''} 
                                         onChange={e => {
                                             setExpenseForm({...expenseForm, category: e.target.value});
                                             setSelectedOrg('');
                                         }}
+                                        data-has-value={(expenseForm.category || '').length > 0}
                                     >
                                        <option value="">Select Category...</option>
                                        <option value="Unallocated / General Fund">Unallocated / General Fund</option>
                                        {categories.map(c => <option key={c} value={c}>{c}</option>)}
                                    </select>
+                                   <span>Fund Source</span>
+                                   </div>
                                </div>
-                               <div>
-                                   <label className="text-xs font-bold text-[var(--md-sys-color-outline)] uppercase mb-1 block">Period</label>
+                               <div className="floating-field">
+                                   <div className="floating-field__control">
                                    <select 
-                                        className="m3-input w-full" 
                                         value={expenseForm.quarter || ''} 
                                         onChange={e => setExpenseForm({...expenseForm, quarter: e.target.value as any})}
+                                        data-has-value={(expenseForm.quarter || '').length > 0}
                                         required
                                    >
                                        <option value="">Select Quarter...</option>
@@ -403,22 +408,26 @@ export const FinanceDisbursement: React.FC<FinanceDisbursementProps> = ({
                                        <option value="Q3">Q3</option>
                                        <option value="Q4">Q4</option>
                                    </select>
+                                   <span>Period</span>
+                                   </div>
                                </div>
                            </div>
 
                            {/* SCHOOL ORGANIZATION SELECTOR */}
                            {expenseForm.category === 'SCHOOL ORGANIZATIONS' && (
-                               <div className="mt-2 animate-fade-in">
-                                   <label className="text-xs font-bold text-blue-600 uppercase block mb-1">Organization</label>
+                               <div className="floating-field mt-2 animate-fade-in">
+                                   <div className="floating-field__control">
                                    <select 
-                                        className="m3-input w-full border-blue-200 bg-blue-50"
                                         value={selectedOrg}
                                         onChange={e => setSelectedOrg(e.target.value)}
+                                        data-has-value={selectedOrg.length > 0}
                                         required
                                    >
                                        <option value="">Select Organization...</option>
                                        {SCHOOL_ORGS.map(o => <option key={o} value={o}>{o}</option>)}
                                    </select>
+                                   <span>Organization</span>
+                                   </div>
                                </div>
                            )}
                            
@@ -444,24 +453,32 @@ export const FinanceDisbursement: React.FC<FinanceDisbursementProps> = ({
                            )}
                        </div>
 
-                       <div>
-                           <label className="text-xs font-bold text-[var(--md-sys-color-outline)] uppercase mb-1 block">Payee Name</label>
-                           <input className="m3-input w-full" placeholder="e.g. Supplier / Teacher" required value={expenseForm.payee || ''} onChange={e => setExpenseForm({...expenseForm, payee: e.target.value})} />
-                       </div>
-                       <div>
-                           <label className="text-xs font-bold text-[var(--md-sys-color-outline)] uppercase mb-1 block">Particulars / Purpose</label>
-                           <textarea className="m3-input w-full" placeholder="Describe the expense" required rows={2} value={expenseForm.particulars || ''} onChange={e => setExpenseForm({...expenseForm, particulars: e.target.value})} />
-                       </div>
+                       <label className="floating-field">
+                           <div className="floating-field__control">
+                           <input placeholder=" " required value={expenseForm.payee || ''} onChange={e => setExpenseForm({...expenseForm, payee: e.target.value})} />
+                           <span>Payee Name</span>
+                           </div>
+                       </label>
+                       <label className="floating-field">
+                           <div className="floating-field__control">
+                           <textarea placeholder=" " required rows={2} value={expenseForm.particulars || ''} onChange={e => setExpenseForm({...expenseForm, particulars: e.target.value})} />
+                           <span>Particulars / Purpose</span>
+                           </div>
+                       </label>
                        
                        <div className="grid grid-cols-2 gap-4">
-                           <div className="col-span-1">
-                               <label className="text-xs font-bold text-[var(--md-sys-color-outline)] uppercase mb-1 block">Amount</label>
-                               <input type="number" className="m3-input w-full font-bold" placeholder="0.00" required value={expenseForm.amount || ''} onChange={e => setExpenseForm({...expenseForm, amount: parseFloat(e.target.value)})} />
-                           </div>
-                           <div className="col-span-1">
-                               <label className="text-xs font-bold text-[var(--md-sys-color-outline)] uppercase mb-1 block">Date</label>
-                               <input type="date" className="m3-input w-full" value={expenseForm.date || ''} onChange={e => setExpenseForm({...expenseForm, date: e.target.value})} />
-                           </div>
+                           <label className="floating-field col-span-1">
+                               <div className="floating-field__control">
+                               <input type="number" placeholder=" " required value={expenseForm.amount || ''} onChange={e => setExpenseForm({...expenseForm, amount: parseFloat(e.target.value)})} />
+                               <span>Amount</span>
+                               </div>
+                           </label>
+                           <label className="floating-field col-span-1">
+                               <div className="floating-field__control">
+                               <input type="date" placeholder=" " value={expenseForm.date || ''} onChange={e => setExpenseForm({...expenseForm, date: e.target.value})} />
+                               <span>Date</span>
+                               </div>
+                           </label>
                        </div>
 
                        {/* Liquidation Control */}
@@ -470,23 +487,28 @@ export const FinanceDisbursement: React.FC<FinanceDisbursementProps> = ({
                                <label className="text-xs font-bold text-[var(--md-sys-color-outline)] uppercase">Liquidation Status</label>
                            </div>
                            <div className="grid grid-cols-2 gap-4">
-                               <select 
-                                    className="m3-input w-full" 
-                                    value={expenseForm.liquidationStatus || 'Pending'} 
-                                    onChange={e => setExpenseForm({...expenseForm, liquidationStatus: e.target.value})}
-                               >
+                               <label className="floating-field">
+                                   <div className="floating-field__control">
+                                   <select value={expenseForm.liquidationStatus || 'Pending'} onChange={e => setExpenseForm({...expenseForm, liquidationStatus: e.target.value})} data-has-value>
                                    <option value="Pending">Pending</option>
                                    <option value="Liquidated">Liquidated</option>
-                               </select>
+                                   </select>
+                                   <span>Liquidation Status</span>
+                                   </div>
+                               </label>
                                {expenseForm.liquidationStatus === 'Liquidated' && (
-                                   <input 
-                                        type="date" 
-                                        className="m3-input w-full" 
-                                        placeholder="Liquidation Date"
-                                        value={expenseForm.liquidationDate || ''} 
-                                        onChange={e => setExpenseForm({...expenseForm, liquidationDate: e.target.value})}
-                                        required
-                                   />
+                                   <label className="floating-field">
+                                       <div className="floating-field__control">
+                                       <input 
+                                            type="date" 
+                                            placeholder=" "
+                                            value={expenseForm.liquidationDate || ''} 
+                                            onChange={e => setExpenseForm({...expenseForm, liquidationDate: e.target.value})}
+                                            required
+                                       />
+                                       <span>Liquidation Date</span>
+                                       </div>
+                                   </label>
                                )}
                            </div>
                        </div>
@@ -526,18 +548,48 @@ export const FinanceDisbursement: React.FC<FinanceDisbursementProps> = ({
                        <div className="space-y-4 flex-1">
                            <div className="p-3 bg-white border border-gray-200 rounded-lg">
                                <p className="text-xs font-bold text-gray-400 uppercase mb-2">Box A: Prepared By</p>
-                               <input className="m3-input w-full text-sm mb-2" value={signatories.prepared.name} onChange={e => setSignatories({...signatories, prepared: {...signatories.prepared, name: e.target.value}})} />
-                               <input className="m3-input w-full text-sm" value={signatories.prepared.title} onChange={e => setSignatories({...signatories, prepared: {...signatories.prepared, title: e.target.value}})} />
+                               <label className="floating-field mb-2">
+                                   <div className="floating-field__control">
+                                       <input placeholder=" " value={signatories.prepared.name} onChange={e => setSignatories({...signatories, prepared: {...signatories.prepared, name: e.target.value}})} />
+                                       <span>Name</span>
+                                   </div>
+                               </label>
+                               <label className="floating-field">
+                                   <div className="floating-field__control">
+                                       <input placeholder=" " value={signatories.prepared.title} onChange={e => setSignatories({...signatories, prepared: {...signatories.prepared, title: e.target.value}})} />
+                                       <span>Title</span>
+                                   </div>
+                               </label>
                            </div>
                            <div className="p-3 bg-white border border-gray-200 rounded-lg">
                                <p className="text-xs font-bold text-gray-400 uppercase mb-2">Box B: Certified By</p>
-                               <input className="m3-input w-full text-sm mb-2" value={signatories.certified.name} onChange={e => setSignatories({...signatories, certified: {...signatories.certified, name: e.target.value}})} />
-                               <input className="m3-input w-full text-sm" value={signatories.certified.title} onChange={e => setSignatories({...signatories, certified: {...signatories.certified, title: e.target.value}})} />
+                               <label className="floating-field mb-2">
+                                   <div className="floating-field__control">
+                                       <input placeholder=" " value={signatories.certified.name} onChange={e => setSignatories({...signatories, certified: {...signatories.certified, name: e.target.value}})} />
+                                       <span>Name</span>
+                                   </div>
+                               </label>
+                               <label className="floating-field">
+                                   <div className="floating-field__control">
+                                       <input placeholder=" " value={signatories.certified.title} onChange={e => setSignatories({...signatories, certified: {...signatories.certified, title: e.target.value}})} />
+                                       <span>Title</span>
+                                   </div>
+                               </label>
                            </div>
                            <div className="p-3 bg-white border border-gray-200 rounded-lg">
                                <p className="text-xs font-bold text-gray-400 uppercase mb-2">Box C: Approved By</p>
-                               <input className="m3-input w-full text-sm mb-2" value={signatories.approved.name} onChange={e => setSignatories({...signatories, approved: {...signatories.approved, name: e.target.value}})} />
-                               <input className="m3-input w-full text-sm" value={signatories.approved.title} onChange={e => setSignatories({...signatories, approved: {...signatories.approved, title: e.target.value}})} />
+                               <label className="floating-field mb-2">
+                                   <div className="floating-field__control">
+                                       <input placeholder=" " value={signatories.approved.name} onChange={e => setSignatories({...signatories, approved: {...signatories.approved, name: e.target.value}})} />
+                                       <span>Name</span>
+                                   </div>
+                               </label>
+                               <label className="floating-field">
+                                   <div className="floating-field__control">
+                                       <input placeholder=" " value={signatories.approved.title} onChange={e => setSignatories({...signatories, approved: {...signatories.approved, title: e.target.value}})} />
+                                       <span>Title</span>
+                                   </div>
+                               </label>
                            </div>
                        </div>
                        <div className="flex gap-2 pt-4 border-t border-gray-200">
@@ -617,3 +669,4 @@ export const FinanceDisbursement: React.FC<FinanceDisbursementProps> = ({
     </div>
   );
 };
+

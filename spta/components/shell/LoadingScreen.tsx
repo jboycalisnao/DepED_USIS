@@ -12,7 +12,6 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = ({ config }) => (
     ) : (
       <span className="material-symbols-outlined text-4xl text-[var(--md-sys-color-primary)] mb-4">account_balance</span>
     )}
-    <h2 className="font-display text-2xl font-bold text-gray-800 mb-2">{config.schoolName || 'System Loading'}</h2>
     <p className="text-gray-500 text-sm">Loading system...</p>
   </div>
 );
