@@ -289,3 +289,41 @@
 .doc-body {
   flex: 1;
 }
+
+.modal-dialog__actions {
+  margin-top: 10px;
+  border-top: 1px solid var(--deped-line);
+  padding-top: 14px;
+}
+
+.spta-collection-fullscreen {
+  --spta-radius-md: 0.375rem;
+}
+
+.spta-collection-fullscreen .rounded-xl,
+.spta-collection-fullscreen .rounded-2xl,
+.spta-collection-fullscreen .rounded-lg,
+.spta-collection-fullscreen .rounded-md,
+.spta-collection-fullscreen .m3-card,
+.spta-collection-fullscreen .m3-btn-primary,
+.spta-collection-fullscreen .m3-btn-tonal,
+.spta-collection-fullscreen .m3-btn-outlined,
+.spta-collection-fullscreen .m3-input,
+.spta-collection-fullscreen .floating-field__control input,
+.spta-collection-fullscreen .floating-field__control select,
+.spta-collection-fullscreen .floating-field__control textarea,
+.spta-collection-fullscreen table,
+.spta-collection-fullscreen button {
+  border-radius: var(--spta-radius-md) !important;
+}
+
+.spta-collection-fullscreen .collection-entry-fields .floating-field__control input {
+  min-height: 68px;
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.spta-collection-fullscreen .collection-entry-fields .floating-field__control span {
+  font-size: 14px;
+  font-weight: 700;
+}

@@ -20,7 +20,7 @@ export const VerificationPage = () => {
             setLoading(true);
             try {
                 // Fetch Config for Headers/Logo
-                const { data: configData } = await supabase.from('system_config').select('config').single();
+                const { data: configData } = await supabase.from('spta_system_config').select('config').single();
                 if (configData) setConfig(configData.config as SystemConfig);
 
                 if (isFinance) {
@@ -123,3 +123,4 @@ export const VerificationPage = () => {
         </div>
     );
 };
+

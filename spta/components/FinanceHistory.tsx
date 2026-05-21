@@ -5,6 +5,7 @@ import { FinancialTransaction, Learner, Section, TransactionType, SystemConfig, 
 import { supabase } from '../lib/supabaseClient';
 import { SPTA_FINANCIAL_TRANSACTIONS_TABLE } from '../lib/financeTransactionDb';
 import { UsisSearchableSelect } from '../../common/components/ui/UsisSearchableSelect';
+import { UsisDateTimePicker } from '../../common/components/ui/UsisDateTimePicker';
 import { UsisAlertModal } from '../../common/components/UsisAlertModal';
 
 interface FinanceHistoryProps {
@@ -34,6 +35,7 @@ export const FinanceHistory: React.FC<FinanceHistoryProps> = ({ transactions, se
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [viewingTx, setViewingTx] = useState<FinancialTransaction | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [expandedParticularRows, setExpandedParticularRows] = useState<Set<number>>(new Set());
 
   // Edit State
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -87,12 +89,27 @@ export const FinanceHistory: React.FC<FinanceHistoryProps> = ({ transactions, se
       });
   }, []);
 
+  useEffect(() => {
+      if (!isViewModalOpen) {
+          setExpandedParticularRows(new Set());
+      }
+  }, [isViewModalOpen]);
+
   const toggleDateExpansion = (date: string) => {
       setExpandedDates(prev => {
           const newSet = new Set(prev);
           if (newSet.has(date)) newSet.delete(date);
           else newSet.add(date);
           return newSet;
+      });
+  };
+
+  const toggleParticularRow = (index: number) => {
+      setExpandedParticularRows(prev => {
+          const next = new Set(prev);
+          if (next.has(index)) next.delete(index);
+          else next.add(index);
+          return next;
       });
   };
 
@@ -350,7 +367,7 @@ export const FinanceHistory: React.FC<FinanceHistoryProps> = ({ transactions, se
                     <div class="payer-box">
                         <div class="info-row"><span class="info-label">Received From</span><span class="info-val">${tx.learnerName}</span></div>
                         <div class="info-row"><span class="info-label">Grade / Section</span><span class="info-val">${tx.gradeSection}</span></div>
-                        <div class="info-row"><span class="info-label">Student LRN</span><span class="info-val">${learner?.lrn || '-'}</span></div>
+                        <div class="info-row"><span class="info-label">Learner LRN</span><span class="info-val">${learner?.lrn || '-'}</span></div>
                     </div>
                     <div class="portal-box">
                         <img src="${qrApiUrl}" class="qr-img" />
@@ -438,7 +455,7 @@ export const FinanceHistory: React.FC<FinanceHistoryProps> = ({ transactions, se
             <h2>Parent-Teacher Association Collection Report</h2>
         </div>
         <div class="meta-row"><span>Section: ${section.name} (${section.gradeLevel})</span><span>Date: ${new Date().toLocaleDateString()}</span></div>
-        <div class="meta-row"><span>Adviser: ${section.adviserName || 'N/A'}</span><span>Assessment per Student: ₱${totalAssessment.toLocaleString()}</span></div>
+        <div class="meta-row"><span>Adviser: ${section.adviserName || 'N/A'}</span><span>Assessment per Learner: ₱${totalAssessment.toLocaleString()}</span></div>
         <br/>
         <table><thead><tr><th style="width:30px">#</th><th>Learner Name</th><th class="text-right">Total Paid</th><th class="text-right">Balance</th><th class="text-center">Status</th></tr></thead><tbody>
       `);
@@ -602,6 +619,7 @@ export const FinanceHistory: React.FC<FinanceHistoryProps> = ({ transactions, se
                                         <tr>
                                             <th className="px-4 py-2 w-24">Ref No.</th>
                                             <th className="px-4 py-2">Entity</th>
+                                            <th className="px-4 py-2 w-36">Cashier</th>
                                             <th className="px-4 py-2 text-center w-24">Type</th>
                                             <th className="px-4 py-2 text-right w-32">Amount</th>
                                             <th className="px-4 py-2 text-center w-32">Actions</th>
@@ -615,6 +633,7 @@ export const FinanceHistory: React.FC<FinanceHistoryProps> = ({ transactions, se
                                                     <p className="font-bold text-gray-800 text-xs md:text-sm">{tx.type === TransactionType.COLLECTION ? tx.learnerName : tx.payee}</p>
                                                     {tx.gradeSection && <span className="text-[10px] text-gray-400">{tx.gradeSection}</span>}
                                                 </td>
+                                                <td className="px-4 py-3 text-xs md:text-sm text-gray-600">{tx.recordedBy || '-'}</td>
                                                 <td className="px-4 py-3 text-center">
                                                     <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${tx.type === TransactionType.COLLECTION ? 'bg-green-50 text-green-700 border-green-100' : tx.type === TransactionType.EXPENSE ? 'bg-red-50 text-red-700 border-red-100' : 'bg-gray-50 text-gray-700 border-gray-200'}`}>
                                                         {tx.type === TransactionType.COLLECTION ? 'In' : 'Out'}
@@ -668,7 +687,18 @@ export const FinanceHistory: React.FC<FinanceHistoryProps> = ({ transactions, se
                                 <tbody className="divide-y divide-gray-100">
                                     {parseParticulars(viewingTx.particulars).map((item, idx) => (
                                         <tr key={idx}>
-                                            <td className="p-3">{item.name}</td>
+                                            <td className="p-3">
+                                                <div className={expandedParticularRows.has(idx) ? '' : 'line-clamp-2'}>{item.name}</div>
+                                                {item.name.length > 90 && (
+                                                    <button
+                                                        type="button"
+                                                        className="mt-1 text-[11px] font-bold text-[var(--deped-blue)] hover:underline"
+                                                        onClick={() => toggleParticularRow(idx)}
+                                                    >
+                                                        {expandedParticularRows.has(idx) ? 'Show less' : 'Show more'}
+                                                    </button>
+                                                )}
+                                            </td>
                                             <td className="p-3 text-right font-medium">{item.paid}</td>
                                             <td className="p-3 text-right text-gray-500">{item.bal}</td>
                                         </tr>
@@ -847,31 +877,56 @@ export const FinanceHistory: React.FC<FinanceHistoryProps> = ({ transactions, se
         {/* Section Report Selection Modal (Reused) */}
         {isPrintModalOpen && (
             createPortal(
-                <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4">
-                    <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-xl animate-fade-in">
-                        <h3 className="text-xl font-bold mb-4 text-gray-800">Generate Report</h3>
-                        <div className="space-y-4">
-                            <label className="floating-field">
-                                <div className="floating-field__control">
-                                <select value={printGradeLevel} onChange={e => { setPrintGradeLevel(e.target.value); setPrintSectionId(''); }} data-has-value={printGradeLevel.length > 0}>
-                                    <option value="">Select Grade...</option>
-                                    {Object.values(GradeLevel).map(g => (<option key={g} value={g}>{g}</option>))}
-                                </select>
-                                <span>Grade Level</span>
-                                </div>
-                            </label>
-                            <label className="floating-field">
-                                <div className="floating-field__control">
-                                <select value={printSectionId} onChange={e => setPrintSectionId(e.target.value)} disabled={!printGradeLevel} data-has-value={printSectionId.length > 0}>
-                                    <option value="">{printGradeLevel ? 'Select Section...' : 'Select Grade First'}</option>
-                                    {sections.filter(s => s.gradeLevel === printGradeLevel).sort((a,b) => a.name.localeCompare(b.name)).map(s => (<option key={s.id} value={s.id}>{s.name} {s.strand ? `(${s.strand})` : ''}</option>))}
-                                </select>
-                                <span>Class Section</span>
-                                </div>
-                            </label>
-                            <div className="flex gap-2 justify-end">
-                                <button onClick={() => setIsPrintModalOpen(false)} className="m3-btn-tonal">Cancel</button>
-                                <button onClick={handlePrintSectionReport} className="m3-btn-primary" disabled={!printSectionId}>Print Report</button>
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[rgba(18,35,61,0.45)] p-4">
+                    <div className="w-full max-w-sm overflow-visible rounded-md border border-[var(--deped-line)] bg-[var(--deped-white)] shadow-2xl animate-fade-in">
+                        <div className="h-2 grid grid-cols-3">
+                            <span className="bg-[var(--deped-blue)]" />
+                            <span className="bg-[var(--deped-red)]" />
+                            <span className="bg-[var(--deped-yellow)]" />
+                        </div>
+                        <div className="border-b border-[var(--deped-line)] px-6 py-4">
+                            <h3 className="text-xl font-bold text-[var(--deped-ink)]">Generate Report</h3>
+                        </div>
+                        <div className="space-y-4 px-6 py-5">
+                            <UsisSearchableSelect
+                                ariaLabel="Select grade level for report"
+                                floatingLabel
+                                label="Grade Level"
+                                value={printGradeLevel}
+                                onChange={(value) => {
+                                    setPrintGradeLevel(value);
+                                    setPrintSectionId('');
+                                }}
+                                placeholder="Select Grade..."
+                                options={Object.values(GradeLevel).map(g => ({ label: g, value: g }))}
+                            />
+                            <UsisSearchableSelect
+                                ariaLabel="Select section for report"
+                                floatingLabel
+                                label="Class Section"
+                                value={printSectionId}
+                                onChange={setPrintSectionId}
+                                placeholder={printGradeLevel ? 'Select Section...' : 'Select Grade First'}
+                                options={sections
+                                    .filter(s => s.gradeLevel === printGradeLevel)
+                                    .sort((a, b) => a.name.localeCompare(b.name))
+                                    .map(s => ({ label: `${s.name}${s.strand ? ` (${s.strand})` : ''}`, value: s.id }))}
+                                disabled={!printGradeLevel}
+                            />
+                            <div className="flex justify-end gap-2 pt-1">
+                                <button
+                                    onClick={() => setIsPrintModalOpen(false)}
+                                    className="inline-flex items-center justify-center rounded-md border border-[var(--deped-line)] bg-[var(--deped-white)] px-5 py-2.5 text-sm font-bold text-[var(--deped-ink)] transition-colors hover:bg-[var(--deped-canvas)] hover:border-[var(--deped-line-strong)]"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handlePrintSectionReport}
+                                    className="inline-flex items-center justify-center rounded-md border border-[var(--deped-blue)] bg-[var(--deped-blue)] px-5 py-2.5 text-sm font-bold text-white transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                                    disabled={!printSectionId}
+                                >
+                                    Print Report
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -882,19 +937,37 @@ export const FinanceHistory: React.FC<FinanceHistoryProps> = ({ transactions, se
         {/* Daily Report Selection Modal (Reused) */}
         {isDailyReportOpen && (
             createPortal(
-                <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4">
-                    <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-xl animate-fade-in">
-                        <h3 className="text-xl font-bold mb-4 text-gray-800">Daily Closing Report</h3>
-                        <div className="space-y-4">
-                            <label className="floating-field">
-                                <div className="floating-field__control">
-                                <input type="date" value={dailyReportDate} onChange={e => setDailyReportDate(e.target.value)} placeholder=" " />
-                                <span>Select Date</span>
-                                </div>
-                            </label>
-                            <div className="flex gap-2 justify-end">
-                                <button onClick={() => setIsDailyReportOpen(false)} className="m3-btn-tonal">Cancel</button>
-                                <button onClick={handlePrintDailyReport} className="m3-btn-primary">Print Report</button>
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[rgba(18,35,61,0.45)] p-4">
+                    <div className="w-full max-w-sm overflow-visible rounded-md border border-[var(--deped-line)] bg-[var(--deped-white)] shadow-2xl animate-fade-in">
+                        <div className="h-2 grid grid-cols-3">
+                            <span className="bg-[var(--deped-blue)]" />
+                            <span className="bg-[var(--deped-red)]" />
+                            <span className="bg-[var(--deped-yellow)]" />
+                        </div>
+                        <div className="border-b border-[var(--deped-line)] px-6 py-4">
+                            <h3 className="text-xl font-bold text-[var(--deped-ink)]">Daily Closing Report</h3>
+                        </div>
+                        <div className="space-y-5 px-6 py-5">
+                            <UsisDateTimePicker
+                                ariaLabel="Select Date"
+                                label="Select Date"
+                                mode="date"
+                                value={dailyReportDate}
+                                onChange={setDailyReportDate}
+                            />
+                            <div className="flex justify-end gap-2">
+                                <button
+                                    onClick={() => setIsDailyReportOpen(false)}
+                                    className="inline-flex items-center justify-center rounded-md border border-[var(--deped-line)] bg-[var(--deped-white)] px-5 py-2.5 text-sm font-bold text-[var(--deped-ink)] transition-colors hover:bg-[var(--deped-canvas)] hover:border-[var(--deped-line-strong)]"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handlePrintDailyReport}
+                                    className="inline-flex items-center justify-center rounded-md border border-[var(--deped-blue)] bg-[var(--deped-blue)] px-5 py-2.5 text-sm font-bold text-white transition-colors hover:opacity-90"
+                                >
+                                    Print Report
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -911,4 +984,5 @@ export const FinanceHistory: React.FC<FinanceHistoryProps> = ({ transactions, se
     </div>
   );
 };
+
 

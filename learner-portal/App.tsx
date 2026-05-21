@@ -20,6 +20,7 @@ import { ProfilePage } from './features/portal/pages/ProfilePage';
 import { EnrollmentHistoryServicePage } from './features/portal/pages/services/EnrollmentHistoryServicePage';
 import { DocumentRequestsServicePage } from './features/portal/pages/services/DocumentRequestsServicePage';
 import { StudentSupportServicePage } from './features/portal/pages/services/StudentSupportServicePage';
+import { PtaFeeServicePage } from './features/portal/pages/services/PtaFeeServicePage';
 
 function LearnerPortalShell({
   session,
@@ -109,6 +110,7 @@ function LearnerPortalShell({
                 <Route path="/services/enrollment-history" element={<EnrollmentHistoryServicePage session={session} />} />
                 <Route path="/services/document-requests" element={<DocumentRequestsServicePage />} />
                 <Route path="/services/student-support" element={<StudentSupportServicePage />} />
+                <Route path="/services/pta-fee" element={<PtaFeeServicePage session={session} />} />
                 <Route path="/profile" element={<ProfilePage session={session} />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>

@@ -40,7 +40,7 @@ export const ParentPortal: React.FC<ParentPortalProps> = ({ config, learners, se
     if (found) {
         setCurrentLearner(found);
     } else {
-        setError('Student not found. Please check the LRN and try again.');
+        setError('Learner not found. Please check the LRN and try again.');
     }
     setIsLoading(false);
   };
@@ -385,3 +385,4 @@ export const ParentPortal: React.FC<ParentPortalProps> = ({ config, learners, se
     </div>
   );
 };
+

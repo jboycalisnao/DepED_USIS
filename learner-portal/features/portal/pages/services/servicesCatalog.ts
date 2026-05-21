@@ -24,4 +24,10 @@ export const learnerServicesCatalog: LearnerServiceItem[] = [
     path: '/services/student-support',
     actionLabel: 'Open Support',
   },
+  {
+    title: 'PTA Fee',
+    description: 'View your PTA transaction history, fee breakdown, and current balance.',
+    path: '/services/pta-fee',
+    actionLabel: 'Open PTA Fee',
+  },
 ];

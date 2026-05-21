@@ -81,6 +81,7 @@ function AppContent() {
           id: ls.id,
           name: lName,
           gradeLevel: lGrade,
+          schoolYearId: ls.school_year_id || ls.schoolYearId,
           adviserName: matchedAdmin?.adviserName || matchedAdmin?.adviser_name || ls.adviserName || ls.adviser_name,
           roomNumber: ls.roomNumber || ls.room_number,
           strand: ls.strand,
@@ -92,6 +93,7 @@ function AppContent() {
         id: as.id,
         name: as.name,
         gradeLevel: as.gradeLevel || as.grade_level,
+        schoolYearId: as.school_year_id || as.schoolYearId,
         adviserName: as.adviserName || as.adviser_name,
         roomNumber: as.roomNumber || as.room_number,
         strand: as.strand,
@@ -185,12 +187,32 @@ function AppContent() {
   }, []);
 
   const fetchConfig = useCallback(async () => {
-    const { data: configData } = await adminClient.from('system_config').select('config').single();
-    if (configData?.config) {
-      setConfig(applyUpdatedFinanceConfig(configData.config));
-    } else {
-      setConfig(DEFAULT_CONFIG);
+    const { data: configData } = await adminClient.from('spta_system_config').select('config').eq('id', 1).maybeSingle();
+    const mergedConfig = {
+      ...DEFAULT_CONFIG,
+      ...(configData?.config || {})
+    } as SystemConfig;
+    const baseConfig = applyUpdatedFinanceConfig(mergedConfig);
+
+    const schoolYear = baseConfig.schoolYear || `${new Date().getFullYear()}-${new Date().getFullYear() + 1}`;
+    const { data: quarterData } = await adminClient
+      .from('spta_quarter_configurations')
+      .select('*')
+      .eq('school_year', schoolYear)
+      .maybeSingle();
+
+    if (quarterData) {
+      const quarterSchedule = {
+        q1: { start: quarterData.q1_start || '', end: quarterData.q1_end || '' },
+        q2: { start: quarterData.q2_start || '', end: quarterData.q2_end || '' },
+        q3: { start: quarterData.q3_start || '', end: quarterData.q3_end || '' },
+        q4: { start: quarterData.q4_start || '', end: quarterData.q4_end || '' }
+      };
+      setConfig({ ...baseConfig, quarterSchedule });
+      return;
     }
+
+    setConfig(baseConfig);
   }, []);
 
   const fetchInitialLocalState = useCallback(async () => {

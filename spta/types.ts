@@ -77,6 +77,7 @@ export interface Section {
   id: string;
   name: string;
   gradeLevel: string;
+  schoolYearId?: string;
   adviserName?: string;
   roomNumber?: string;
   strand?: string;

@@ -1,9 +1,10 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { QRCodeCanvas } from 'qrcode.react';
 import { Learner, Section, GradeLevel, SystemConfig } from '../types';
 import { supabase, adminClient } from '../lib/supabaseClient';
 import { UsisAlertModal } from '../../common/components/UsisAlertModal';
+import { UsisSearchableSelect } from '../../common/components/ui/UsisSearchableSelect';
 
 interface LearnerProps {
   learners: Learner[];
@@ -15,7 +16,10 @@ interface LearnerProps {
   readOnly?: boolean;
 }
 
-export const Learners: React.FC<LearnerProps> = ({ learners, sections, setSections, readOnly, config }) => {
+export const Learners: React.FC<LearnerProps> = ({ learners, sections, setSections, readOnly, config, setConfig }) => {
+  const [schoolYears, setSchoolYears] = useState<Array<{ id: string; label: string; isActive: boolean }>>([]);
+  const [activeSchoolYearId, setActiveSchoolYearId] = useState('');
+  const [isSwitchingSchoolYear, setIsSwitchingSchoolYear] = useState(false);
   const [activeTab, setActiveTab] = useState<'sections' | 'families'>('sections');
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
@@ -24,6 +28,46 @@ export const Learners: React.FC<LearnerProps> = ({ learners, sections, setSectio
   const [isSectionModalOpen, setIsSectionModalOpen] = useState(false);
   const [expandedModalGrades, setExpandedModalGrades] = useState<Set<string>>(new Set());
   const [notice, setNotice] = useState<{ open: boolean; title: string; message: string; tone?: 'info' | 'success' | 'warning' | 'danger' }>({ open: false, title: '', message: '' });
+
+  useEffect(() => {
+    const loadSchoolYears = async () => {
+      const { data, error } = await adminClient
+        .from('registrar_school_years')
+        .select('id,label,is_active')
+        .order('label', { ascending: false });
+
+      if (error || !data) return;
+
+      const mapped = data.map((row: any) => ({
+        id: String(row.id),
+        label: String(row.label || ''),
+        isActive: Boolean(row.is_active),
+      }));
+      setSchoolYears(mapped);
+
+      const active = mapped.find((row) => row.isActive) || mapped.find((row) => row.label === config.schoolYear) || mapped[0];
+      if (active) setActiveSchoolYearId(active.id);
+    };
+
+    loadSchoolYears();
+  }, [config.schoolYear]);
+
+  const sectionsHaveSchoolYear = useMemo(
+    () => sections.some((section) => Boolean(section.schoolYearId)),
+    [sections],
+  );
+
+  const scopedSections = useMemo(() => {
+    if (!sectionsHaveSchoolYear || !activeSchoolYearId) return sections;
+    return sections.filter((section) => section.schoolYearId === activeSchoolYearId);
+  }, [sections, sectionsHaveSchoolYear, activeSchoolYearId]);
+
+  const activeSectionIds = useMemo(() => new Set(scopedSections.map((section) => section.id)), [scopedSections]);
+
+  const scopedLearners = useMemo(() => {
+    if (!sectionsHaveSchoolYear || !activeSchoolYearId) return learners;
+    return learners.filter((learner) => activeSectionIds.has(learner.sectionId));
+  }, [learners, sectionsHaveSchoolYear, activeSchoolYearId, activeSectionIds]);
 
   const toggleSection = (sectionId: string) => {
     const newSet = new Set(expandedSections);
@@ -41,18 +85,18 @@ export const Learners: React.FC<LearnerProps> = ({ learners, sections, setSectio
 
   // --- Filter Logic for Sections View ---
   const filteredLearners = useMemo(() => {
-      return learners.filter(l => 
+      return scopedLearners.filter(l => 
         l.lastName.toLowerCase().includes(searchTerm.toLowerCase()) || 
         l.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         l.lrn.includes(searchTerm)
       );
-  }, [learners, searchTerm]);
+  }, [scopedLearners, searchTerm]);
 
   // --- Grouping Logic for Family View ---
   const familyGroups = useMemo(() => {
       const groups: Record<string, Learner[]> = {};
       
-      learners.forEach(l => {
+      scopedLearners.forEach(l => {
           // Normalization: Key is Guardian Name (or Father/Mother if Guardian is missing)
           const rawKey = l.guardianName || l.fatherName || l.motherName || 'Unspecified';
           const key = rawKey.trim().toUpperCase();
@@ -90,11 +134,11 @@ export const Learners: React.FC<LearnerProps> = ({ learners, sections, setSectio
           // Then alphabetical
           return a[0].localeCompare(b[0]);
       });
-  }, [learners, searchTerm]);
+  }, [scopedLearners, searchTerm]);
 
   // Dynamic Grade Levels based on available sections
   const availableGradeLevels = useMemo(() => {
-      const grades = new Set(sections.map(s => s.gradeLevel));
+      const grades = new Set(scopedSections.map(s => s.gradeLevel));
       // Sort logic: prioritize Enum order, then alphanumeric
       const enumValues = Object.values(GradeLevel) as string[];
       
@@ -108,12 +152,48 @@ export const Learners: React.FC<LearnerProps> = ({ learners, sections, setSectio
           
           return a.localeCompare(b);
       });
-  }, [sections]);
+  }, [scopedSections]);
 
   // Helper to get section name
   const getSectionName = (secId: string) => {
-      const sec = sections.find(s => s.id === secId);
+      const sec = scopedSections.find(s => s.id === secId);
       return sec ? `${sec.gradeLevel} - ${sec.name}` : 'Unassigned';
+  };
+
+  const handleSchoolYearChange = async (schoolYearId: string) => {
+    if (!schoolYearId || schoolYearId === activeSchoolYearId || isSwitchingSchoolYear) return;
+    setIsSwitchingSchoolYear(true);
+    try {
+      await adminClient.from('registrar_school_years').update({ is_active: false }).neq('id', schoolYearId);
+      const { error: setActiveError } = await adminClient
+        .from('registrar_school_years')
+        .update({ is_active: true })
+        .eq('id', schoolYearId);
+      if (setActiveError) throw setActiveError;
+
+      const selected = schoolYears.find((row) => row.id === schoolYearId);
+      if (selected?.label) {
+        const { data: currentConfigRow } = await adminClient
+          .from('spta_system_config')
+          .select('config')
+          .eq('id', 1)
+          .maybeSingle();
+        const mergedConfig = {
+          ...(currentConfigRow?.config || {}),
+          schoolYear: selected.label
+        };
+        await adminClient.from('spta_system_config').upsert({ id: 1, config: mergedConfig }, { onConflict: 'id' });
+        setConfig((prev: SystemConfig) => ({ ...prev, schoolYear: selected.label }));
+      }
+
+      setActiveSchoolYearId(schoolYearId);
+      setSchoolYears((prev) => prev.map((row) => ({ ...row, isActive: row.id === schoolYearId })));
+      setNotice({ open: true, title: 'School Year Updated', message: 'Active school year was switched using registrar school years.', tone: 'success' });
+    } catch (error: any) {
+      setNotice({ open: true, title: 'Update Failed', message: error?.message || 'Unable to switch active school year.', tone: 'danger' });
+    } finally {
+      setIsSwitchingSchoolYear(false);
+    }
   };
 
   const isUUID = (str: string) => {
@@ -257,7 +337,7 @@ export const Learners: React.FC<LearnerProps> = ({ learners, sections, setSectio
                 <div class="col-qr">
                     <img src="${qrApiUrl}" class="qr-img" />
                     <div class="instr">
-                        Scan to access your class collection report and student list.
+                        Scan to access your class collection report and learner list.
                     </div>
                     <div class="url">Portal > Adviser Access</div>
                 </div>
@@ -272,7 +352,21 @@ export const Learners: React.FC<LearnerProps> = ({ learners, sections, setSectio
     <div className="space-y-6 animate-fade-in">
         <div className="flex justify-between items-center">
             <h2 className="text-2xl font-bold text-gray-800">Learner Registry</h2>
-            <div className="flex gap-3">
+            <div className="flex gap-3 items-center">
+                <div className="min-w-[240px]">
+                    <UsisSearchableSelect
+                        ariaLabel="Active School Year"
+                        floatingLabel
+                        label="Active School Year"
+                        value={activeSchoolYearId}
+                        onChange={handleSchoolYearChange}
+                        disabled={isSwitchingSchoolYear || schoolYears.length === 0}
+                        options={schoolYears.map((row) => ({
+                          label: `${row.label}${row.isActive ? ' (Active)' : ''}`,
+                          value: row.id
+                        }))}
+                    />
+                </div>
                 <button onClick={() => setIsSectionModalOpen(true)} className="m3-btn-tonal flex items-center gap-2">
                     <span className="material-symbols-outlined text-lg">vpn_key</span>
                     Manage Access Codes
@@ -324,7 +418,7 @@ export const Learners: React.FC<LearnerProps> = ({ learners, sections, setSectio
         {activeTab === 'sections' && (
             <div className="space-y-8 animate-fade-in">
                 {availableGradeLevels.map(grade => {
-                    const gradeSections = sections.filter(s => s.gradeLevel === grade);
+                    const gradeSections = scopedSections.filter(s => s.gradeLevel === grade);
                     if (gradeSections.length === 0) return null;
 
                     return (
@@ -367,7 +461,7 @@ export const Learners: React.FC<LearnerProps> = ({ learners, sections, setSectio
                                                         </span>
                                                     )}
                                                     <span className={`text-xs font-bold px-3 py-1 rounded-full ${students.length > 0 ? 'bg-blue-50 text-blue-700' : 'bg-gray-100 text-gray-400'}`}>
-                                                        {students.length} Student{students.length !== 1 ? 's' : ''}
+                                                        {students.length} Learner{students.length !== 1 ? 's' : ''}
                                                     </span>
                                                 </div>
                                             </div>
@@ -457,12 +551,12 @@ export const Learners: React.FC<LearnerProps> = ({ learners, sections, setSectio
                                     <div className="min-w-0">
                                         <h4 className="font-bold text-gray-800 text-sm truncate max-w-[180px]" title={guardian}>{guardian}</h4>
                                         <p className="text-xs text-gray-500 uppercase tracking-wide">
-                                            {isSiblings ? 'Multi-Student Family' : 'Parent / Guardian'}
+                                            {isSiblings ? 'Multi-Learner Family' : 'Parent / Guardian'}
                                         </p>
                                     </div>
                                 </div>
                                 <span className={`text-xs font-bold px-2 py-1 rounded-lg ${isSiblings ? 'bg-blue-100 text-blue-800' : 'bg-gray-200 text-gray-600'}`}>
-                                    {children.length} {children.length === 1 ? 'Student' : 'Students'}
+                                    {children.length} {children.length === 1 ? 'Learner' : 'Learners'}
                                 </span>
                             </div>
                             
@@ -515,7 +609,7 @@ export const Learners: React.FC<LearnerProps> = ({ learners, sections, setSectio
                     
                     <div className="flex-1 overflow-y-auto p-0 bg-gray-50">
                         {availableGradeLevels.map(grade => {
-                            const gradeSections = sections.filter(s => s.gradeLevel === grade);
+                            const gradeSections = scopedSections.filter(s => s.gradeLevel === grade);
                             if (gradeSections.length === 0) return null;
                             
                             const isExpanded = expandedModalGrades.has(grade);
@@ -582,10 +676,10 @@ export const Learners: React.FC<LearnerProps> = ({ learners, sections, setSectio
                                 </div>
                             );
                         })}
-                        {sections.length === 0 && (
+                        {scopedSections.length === 0 && (
                             <div className="p-12 text-center text-gray-400">
                                 <span className="material-symbols-outlined text-4xl mb-2 opacity-50">school</span>
-                                <p>No sections found in the database.</p>
+                                <p>No sections found for the active school year.</p>
                             </div>
                         )}
                     </div>
@@ -603,3 +697,5 @@ export const Learners: React.FC<LearnerProps> = ({ learners, sections, setSectio
     </div>
   );
 };
+
+

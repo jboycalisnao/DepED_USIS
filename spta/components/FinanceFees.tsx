@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom';
 import { SystemConfig, FeeItem } from '../types';
 import { supabase } from '../lib/supabaseClient';
 import { UsisAlertModal } from '../../common/components/UsisAlertModal';
+import { UsisSearchableSelect } from '../../common/components/ui/UsisSearchableSelect';
 
 interface FinanceFeesProps {
   config: SystemConfig;
@@ -11,6 +12,11 @@ interface FinanceFeesProps {
 }
 
 export const FinanceFees: React.FC<FinanceFeesProps> = ({ config, setConfig }) => {
+  const feeTypeOptions = [
+    { value: 'Base', label: 'All Learners (Base)' },
+    { value: 'SHS_Only', label: 'Senior High School Only' },
+    { value: 'STE_SPA_Only', label: 'Special Programs (STE/SPA) Only' }
+  ];
   const [isFeeModalOpen, setIsFeeModalOpen] = useState(false);
   const [feeForm, setFeeForm] = useState<Partial<FeeItem>>({ type: 'Base', amount: 0 });
   const [editingFeeIndex, setEditingFeeIndex] = useState<number | null>(null);
@@ -45,7 +51,7 @@ export const FinanceFees: React.FC<FinanceFeesProps> = ({ config, setConfig }) =
       };
 
       // 1. Update DB First (Await for reliability)
-      await supabase.from('system_config').upsert({ id: 1, config: updatedConfig });
+      await supabase.from('spta_system_config').upsert({ id: 1, config: updatedConfig });
 
       // 2. Update Local State
       setConfig(updatedConfig);
@@ -70,7 +76,7 @@ export const FinanceFees: React.FC<FinanceFeesProps> = ({ config, setConfig }) =
           feeSchedule: newSchedule,
           contributionCategories: updatedCategories
       };
-      await supabase.from('system_config').upsert({ id: 1, config: updatedConfig });
+      await supabase.from('spta_system_config').upsert({ id: 1, config: updatedConfig });
       setConfig(updatedConfig);
   };
 
@@ -126,26 +132,32 @@ export const FinanceFees: React.FC<FinanceFeesProps> = ({ config, setConfig }) =
         </div>
 
         {isFeeModalOpen && createPortal(
-            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                <div className="bg-white p-6 rounded-2xl w-full max-w-md shadow-2xl animate-fade-in">
-                    <h3 className="text-xl font-bold mb-4">{editingFeeIndex !== null ? 'Edit' : 'Add'} Fee Item</h3>
-                    <form onSubmit={handleSaveFee} className="space-y-4">
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(18,35,61,0.45)] p-4">
+                <div className="w-full max-w-md overflow-hidden rounded-md border border-[var(--deped-line)] bg-[var(--deped-white)] shadow-2xl animate-fade-in">
+                    <div className="h-2 grid grid-cols-3">
+                        <span className="bg-[var(--deped-blue)]" />
+                        <span className="bg-[var(--deped-red)]" />
+                        <span className="bg-[var(--deped-yellow)]" />
+                    </div>
+                    <div className="border-b border-[var(--deped-line)] px-6 py-4">
+                        <h3 className="text-xl font-bold text-[var(--deped-ink)]">{editingFeeIndex !== null ? 'Edit' : 'Add'} Fee Item</h3>
+                    </div>
+                    <form onSubmit={handleSaveFee} className="space-y-4 px-6 py-5">
                         <label className="floating-field">
                             <div className="floating-field__control">
                                 <input placeholder=" " required value={feeForm.name || ''} onChange={e => setFeeForm({...feeForm, name: e.target.value})} />
                                 <span>Fee Name</span>
                             </div>
                         </label>
-                        <label className="floating-field">
-                            <div className="floating-field__control">
-                                <select value={feeForm.type} onChange={e => setFeeForm({...feeForm, type: e.target.value as any})} data-has-value={(feeForm.type || '').length > 0}>
-                                <option value="Base">All Students (Base)</option>
-                                <option value="SHS_Only">Senior High School Only</option>
-                                <option value="STE_SPA_Only">Special Programs (STE/SPA) Only</option>
-                                </select>
-                                <span>Applicable To</span>
-                            </div>
-                        </label>
+                        <UsisSearchableSelect
+                            ariaLabel="Applicable To"
+                            floatingLabel
+                            label="Applicable To"
+                            options={feeTypeOptions}
+                            value={feeForm.type || 'Base'}
+                            onChange={(value) => setFeeForm({ ...feeForm, type: value })}
+                            emptyQueryMessage="No matching fee type"
+                        />
                         <label className="floating-field">
                             <div className="floating-field__control">
                                 <input type="number" step="0.01" placeholder=" " required value={feeForm.amount} onChange={e => setFeeForm({...feeForm, amount: parseFloat(e.target.value)})} />
@@ -158,9 +170,20 @@ export const FinanceFees: React.FC<FinanceFeesProps> = ({ config, setConfig }) =
                                 <span>Description (Optional)</span>
                             </div>
                         </label>
-                        <div className="flex justify-end gap-2 pt-4 border-t">
-                            <button type="button" onClick={() => setIsFeeModalOpen(false)} className="m3-btn-tonal">Cancel</button>
-                            <button type="submit" className="m3-btn-primary">Save Fee</button>
+                        <div className="flex justify-end gap-2 pt-4 border-t border-[var(--deped-line)]">
+                            <button
+                                type="button"
+                                onClick={() => setIsFeeModalOpen(false)}
+                                className="inline-flex items-center justify-center rounded-md border border-[var(--deped-line)] bg-[var(--deped-white)] px-5 py-2.5 text-sm font-bold text-[var(--deped-ink)] transition-colors hover:bg-[var(--deped-canvas)] hover:border-[var(--deped-line-strong)]"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                className="inline-flex items-center justify-center rounded-md border border-[var(--deped-blue)] bg-[var(--deped-blue)] px-5 py-2.5 text-sm font-bold text-white transition-colors hover:opacity-90"
+                            >
+                                Save Fee
+                            </button>
                         </div>
                     </form>
                 </div>
@@ -184,3 +207,5 @@ export const FinanceFees: React.FC<FinanceFeesProps> = ({ config, setConfig }) =
     </div>
   );
 };
+
+

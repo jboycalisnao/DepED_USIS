@@ -1,8 +1,12 @@
-import React, { useMemo } from 'react';
-import { FinancialTransaction, TransactionType, Activity, Learner, Section, SystemConfig, GradeLevel } from '../types';
+import React, { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { FinancialTransaction, TransactionType, Activity, Learner, Section, SystemConfig, GradeLevel, User } from '../types';
+import { FinanceCollection } from './FinanceCollection';
 
 interface DashboardProps {
+  currentUser?: User | null;
   transactions: FinancialTransaction[];
+  setTransactions: React.Dispatch<React.SetStateAction<FinancialTransaction[]>>;
   projects: Activity[];
   learners: Learner[];
   sections: Section[];
@@ -10,7 +14,34 @@ interface DashboardProps {
   lastFetchTime?: number;
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ transactions, projects, learners, sections, config, lastFetchTime }) => {
+type ParticularBreakdownRow = {
+  fee: string;
+  paid: number;
+  balance: number;
+};
+
+const parseParticulars = (particulars: string): ParticularBreakdownRow[] => {
+  if (!particulars) return [];
+  return particulars
+    .split(';')
+    .map((segment) => segment.trim())
+    .filter(Boolean)
+    .map((entry) => {
+      const match = entry.match(/^(.*?)\s*\(Paid:\s*([0-9,.]+)\s*,\s*Bal:\s*([0-9,.]+)\)/i);
+      if (!match) {
+        return { fee: entry, paid: 0, balance: 0 };
+      }
+      return {
+        fee: match[1].trim(),
+        paid: Number(String(match[2]).replace(/,/g, '')) || 0,
+        balance: Number(String(match[3]).replace(/,/g, '')) || 0,
+      };
+    });
+};
+
+export const Dashboard: React.FC<DashboardProps> = ({ currentUser, transactions, setTransactions, projects, learners, sections, config, lastFetchTime }) => {
+  const [isCollectionWindowOpen, setIsCollectionWindowOpen] = useState(false);
+  const [detailsTx, setDetailsTx] = useState<FinancialTransaction | null>(null);
   const learnersCount = learners.length;
 
   const totalCollections = transactions
@@ -28,12 +59,22 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions, projects, le
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
       .slice(0, 10);
   }, [transactions]);
+  const detailsRows = useMemo(() => parseParticulars(detailsTx?.particulars || ''), [detailsTx]);
 
   const collectionRate = totalCollections + totalExpenses > 0
     ? (totalCollections / (totalCollections + totalExpenses)) * 100
     : 0;
 
   const activeProjects = projects.filter(p => p.status === 'Ongoing').length;
+
+  useEffect(() => {
+    if (!isCollectionWindowOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isCollectionWindowOpen]);
 
   const handlePrintCollectionReport = () => {
     const gradeOrder = Object.values(GradeLevel);
@@ -122,7 +163,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions, projects, le
                   <tr>
                       <th>Grade / Section</th>
                       <th>Adviser</th>
-                      <th class="text-center">Students</th>
+                      <th class="text-center">Learners</th>
                       <th class="text-right">Expected</th>
                       <th class="text-right">Collected</th>
                       <th class="text-center">% Collection</th>
@@ -219,10 +260,20 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions, projects, le
       <div className="portal-panel">
         <div className="portal-panel__header flex items-center justify-between gap-3">
           <h2>Counter Summary</h2>
-          <button onClick={handlePrintCollectionReport} className="primary-button flex items-center gap-2">
-            <span className="material-symbols-outlined text-base">print</span>
-            Print Status Report
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setIsCollectionWindowOpen(true)}
+              className="primary-button flex items-center gap-2"
+            >
+              <span className="material-symbols-outlined text-base">point_of_sale</span>
+              Open Collection Window
+            </button>
+            <button onClick={handlePrintCollectionReport} className="primary-button flex items-center gap-2">
+              <span className="material-symbols-outlined text-base">print</span>
+              Print Status Report
+            </button>
+          </div>
         </div>
         <div className="portal-panel__body">
           <div className="section-grid">
@@ -266,7 +317,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions, projects, le
               <tr className="text-left text-xs font-bold text-slate-600">
                 <th className="px-6 py-4">Reference</th>
                 <th className="px-6 py-4">Payer / Payee</th>
-                <th className="px-6 py-4">Particulars</th>
+                <th className="px-6 py-4">Cashier</th>
+                <th className="px-6 py-4">Details</th>
                 <th className="px-6 py-4">Date</th>
                 <th className="px-6 py-4 text-right">Amount</th>
               </tr>
@@ -281,7 +333,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions, projects, le
                       {t.type === TransactionType.COLLECTION ? 'Collection' : 'Expense'}
                     </div>
                   </td>
-                  <td className="max-w-[360px] px-6 py-4 text-slate-600">{t.particulars}</td>
+                  <td className="px-6 py-4 text-slate-600">{t.recordedBy || '-'}</td>
+                  <td className="px-6 py-4 text-slate-600">
+                    <button
+                      type="button"
+                      onClick={() => setDetailsTx(t)}
+                      className="inline-flex items-center rounded-md border border-[var(--deped-line)] bg-[var(--deped-white)] px-3 py-1.5 text-[13px] font-bold text-[var(--deped-blue)] hover:bg-[var(--deped-canvas)]"
+                    >
+                      Details
+                    </button>
+                  </td>
                   <td className="px-6 py-4 text-slate-600">{t.date}</td>
                   <td className={`px-6 py-4 text-right text-base font-bold ${t.type === TransactionType.COLLECTION ? 'text-emerald-700' : 'text-rose-700'}`}>
                     {t.type === TransactionType.COLLECTION ? '+' : '-'}PHP {t.amount.toLocaleString()}
@@ -290,7 +351,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions, projects, le
               ))}
               {recentTransactions.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-6 py-14 text-center text-sm text-slate-500">
+                  <td colSpan={6} className="px-6 py-14 text-center text-sm text-slate-500">
                     No transaction history yet.
                   </td>
                 </tr>
@@ -299,6 +360,96 @@ export const Dashboard: React.FC<DashboardProps> = ({ transactions, projects, le
           </table>
         </div>
       </section>
+
+      {isCollectionWindowOpen &&
+        createPortal(
+          <div className="fixed inset-0 z-[999] bg-[var(--deped-canvas)]">
+            <div className="flex h-full w-full flex-col">
+              <div className="flex items-center justify-between border-b border-[var(--deped-line)] bg-[var(--deped-white)] px-5 py-4">
+                <div>
+                  <p className="text-[13px] font-semibold text-[var(--deped-muted)]">SPTA Collection</p>
+                  <h3 className="text-[24px] font-bold text-[var(--deped-ink)]">Collection Window</h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsCollectionWindowOpen(false)}
+                  className="inline-flex items-center gap-2 rounded-md border border-[var(--deped-line)] bg-[var(--deped-white)] px-4 py-2 text-[13px] font-bold text-[var(--deped-ink)] hover:bg-[var(--deped-canvas)]"
+                >
+                  <span className="material-symbols-outlined text-[18px]">close</span>
+                  Close
+                </button>
+              </div>
+              <div className="spta-collection-fullscreen min-h-0 flex-1 overflow-y-auto p-5 md:p-6">
+                <FinanceCollection
+                  transactions={transactions}
+                  setTransactions={setTransactions}
+                  learners={learners}
+                  sections={sections}
+                  config={config}
+                  cashierName={currentUser?.fullName || currentUser?.username || undefined}
+                />
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
+
+      {detailsTx &&
+        createPortal(
+          <div className="modal-overlay modal-overlay--high" role="presentation">
+            <div className="modal-backdrop" onClick={() => setDetailsTx(null)} />
+            <div className="modal-dialog modal-dialog--wide" role="dialog" aria-modal="true" aria-label="Transaction Details">
+              <div className="modal-dialog__header">
+                <div className="modal-dialog__title-group">
+                  <p className="modal-dialog__eyebrow">Cashiering Record</p>
+                  <h3>Transaction Particulars</h3>
+                </div>
+                <button type="button" className="modal-dialog__close" onClick={() => setDetailsTx(null)} aria-label="Close transaction details">
+                  <span aria-hidden="true">&times;</span>
+                </button>
+              </div>
+              <div className="modal-dialog__body">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-slate-200 text-sm">
+                    <thead className="bg-slate-100">
+                      <tr className="text-left text-xs font-bold text-slate-600">
+                        <th className="px-4 py-3">Fee / Particular</th>
+                        <th className="px-4 py-3 text-right">Paid</th>
+                        <th className="px-4 py-3 text-right">Balance</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200">
+                      {detailsRows.length > 0 ? (
+                        detailsRows.map((row, index) => (
+                          <tr key={`${row.fee}-${index}`}>
+                            <td className="px-4 py-3">{row.fee}</td>
+                            <td className="px-4 py-3 text-right font-semibold">PHP {row.paid.toLocaleString()}</td>
+                            <td className={`px-4 py-3 text-right font-semibold ${row.balance > 0 ? 'text-rose-700' : 'text-emerald-700'}`}>
+                              PHP {row.balance.toLocaleString()}
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={3} className="px-4 py-8 text-center text-slate-500">
+                            No particulars available.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div className="modal-dialog__actions">
+                <button type="button" className="modal-dialog__blue" onClick={() => setDetailsTx(null)}>
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
     </div>
   );
 };
+

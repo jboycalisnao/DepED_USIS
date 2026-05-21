@@ -1,5 +1,5 @@
 import React from 'react';
-import { FinancialTransaction, Learner, Section, SystemConfig } from '../types';
+import { FinancialTransaction, Learner, Section, SystemConfig, User } from '../types';
 import { FinanceCollection } from './FinanceCollection';
 import { FinanceHistory } from './FinanceHistory';
 import { FinanceFees } from './FinanceFees';
@@ -15,10 +15,11 @@ interface FinanceProps {
   config: SystemConfig;
   setConfig: React.Dispatch<React.SetStateAction<SystemConfig>>;
   section: FinanceSectionKey;
+  currentUser?: User | null;
 }
 
 export const Finance: React.FC<FinanceProps> = ({
-  transactions, setTransactions, learners, sections, config, setConfig, section
+  transactions, setTransactions, learners, sections, config, setConfig, section, currentUser
 }) => {
   return (
     <div className="space-y-6">
@@ -31,6 +32,7 @@ export const Finance: React.FC<FinanceProps> = ({
               learners={learners}
               sections={sections}
               config={config}
+              cashierName={currentUser?.fullName || currentUser?.username || undefined}
             />
           )}
 

@@ -11,7 +11,7 @@ export const PublicPortal: React.FC<PublicPortalProps> = ({ config }) => {
 
   const serviceCards = [
     {
-      title: 'Parent and Student Inquiry',
+      title: 'Parent and Learner Inquiry',
       desc: 'Check learner payment history, receipt references, and posted obligations from the public inquiry window.',
       action: 'Open Parent Portal',
       icon: 'person_search',
@@ -75,3 +75,4 @@ export const PublicPortal: React.FC<PublicPortalProps> = ({ config }) => {
     </div>
   );
 };
+

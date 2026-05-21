@@ -39,8 +39,8 @@ export const applyUpdatedFinanceConfig = (config: SystemConfig): SystemConfig =>
   ...config,
   schoolName: normalizeSchoolName(config.schoolName),
   schoolYear: config.schoolYear || '2025-2026',
-  feeSchedule: DEFAULT_FEE_SCHEDULE,
-  contributionCategories: UPDATED_CONTRIBUTION_CATEGORIES,
+  feeSchedule: config.feeSchedule || [],
+  contributionCategories: config.contributionCategories || [],
   defaultContributionAmount: 100
 });
 
@@ -53,8 +53,8 @@ export const DEFAULT_CONFIG: SystemConfig = {
   ptaPresidentName: 'PTA President',
   ptaTreasurerName: 'PTA Staff',
   schoolYear: '2025-2026',
-  feeSchedule: DEFAULT_FEE_SCHEDULE,
-  contributionCategories: UPDATED_CONTRIBUTION_CATEGORIES,
+  feeSchedule: [],
+  contributionCategories: [],
   defaultContributionAmount: 100,
   financeSettings: {
     voucher: {

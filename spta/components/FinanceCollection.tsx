@@ -6,6 +6,7 @@ import { supabase } from '../lib/supabaseClient';
 import { SPTA_FINANCIAL_TRANSACTIONS_TABLE, toDbFinancialTransaction } from '../lib/financeTransactionDb';
 import { createIdleKioskState, publishKioskState } from '../lib/kiosk';
 import { UsisSearchableSelect } from '../../common/components/ui/UsisSearchableSelect';
+import { UsisDateTimePicker } from '../../common/components/ui/UsisDateTimePicker';
 import { UsisAlertModal } from '../../common/components/UsisAlertModal';
 import { openStatementOfAccountPrintWindow } from '../features/finance/soa/utils/printStatementOfAccount';
 
@@ -15,6 +16,7 @@ interface FinanceCollectionProps {
   learners: Learner[];
   sections: Section[];
   config: SystemConfig;
+  cashierName?: string;
 }
 
 interface FeeBreakdown {
@@ -23,7 +25,8 @@ interface FeeBreakdown {
     bal: number;
 }
 
-export const FinanceCollection: React.FC<FinanceCollectionProps> = ({ transactions, setTransactions, learners, sections, config }) => {
+export const FinanceCollection: React.FC<FinanceCollectionProps> = ({ transactions, setTransactions, learners, sections, config, cashierName }) => {
+  const todayIso = new Date().toISOString().split('T')[0];
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [searchGrade, setSearchGrade] = useState<string>('All');
@@ -31,7 +34,7 @@ export const FinanceCollection: React.FC<FinanceCollectionProps> = ({ transactio
   
   // Collection Form State
   const [amount, setAmount] = useState<number>(0);
-  const [collectionDate, setCollectionDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [collectionDate, setCollectionDate] = useState<string>(todayIso);
   const [selectedFees, setSelectedFees] = useState<Set<string>>(new Set());
   const [manualEntryMode, setManualEntryMode] = useState(false);
   const [siblingDiscount, setSiblingDiscount] = useState<{isApplicable: boolean, payerName?: string, feesWaived: string[]}>({ isApplicable: false, feesWaived: [] });
@@ -442,7 +445,16 @@ export const FinanceCollection: React.FC<FinanceCollectionProps> = ({ transactio
       const particulars = breakdownStrings.join('; ');
 
       // Use the Custom Selected Date instead of Today
-      const txDate = collectionDate || new Date().toISOString().split('T')[0];
+      const txDate = collectionDate || todayIso;
+      if (txDate > todayIso) {
+          setNotice({
+              open: true,
+              title: 'Invalid Collection Date',
+              message: 'Collection date cannot be in the future.',
+              tone: 'warning'
+          });
+          return;
+      }
       
       const countToday = transactions.filter(t => t.date === txDate && t.type === TransactionType.COLLECTION).length + 1;
       const receiptNo = `${txDate.replace(/-/g, '')}-${String(countToday).padStart(3, '0')}`;
@@ -458,7 +470,7 @@ export const FinanceCollection: React.FC<FinanceCollectionProps> = ({ transactio
           learnerId: selectedLearner.id,
           learnerName: `${selectedLearner.lastName}, ${selectedLearner.firstName}`,
           gradeSection: sections.find(s => s.id === selectedLearner.sectionId)?.name || 'N/A',
-          recordedBy: 'Admin',
+          recordedBy: cashierName || 'Admin',
           referenceNo: receiptNo
       };
 
@@ -559,7 +571,7 @@ export const FinanceCollection: React.FC<FinanceCollectionProps> = ({ transactio
                         <span class="meta-val ref-no">${currentTx.referenceNo || currentTx.id.substring(0,8).toUpperCase()}</span>
                     </div>
                     <div class="payer-box">
-                        <div class="info-row"><span class="info-label">Student Name</span><span class="info-val">${currentTx.learnerName}</span></div>
+                        <div class="info-row"><span class="info-label">Learner Name</span><span class="info-val">${currentTx.learnerName}</span></div>
                         <div class="info-row"><span class="info-label">Grade & Section</span><span class="info-val">${currentTx.gradeSection}</span></div>
                         <div class="info-row"><span class="info-label">LRN</span><span class="info-val">${receiptLearner?.lrn || '-'}</span></div>
                     </div>
@@ -567,7 +579,7 @@ export const FinanceCollection: React.FC<FinanceCollectionProps> = ({ transactio
                     <div class="portal-box">
                         <img src="${qrApiUrl}" class="qr-img" />
                         <div>
-                            <div class="portal-head">Student Portal Access</div>
+                            <div class="portal-head">Learner Portal Access</div>
                             <div class="portal-url">${portalUrl}</div>
                             <div class="portal-creds">LRN: ${receiptLearner?.lrn || 'N/A'}</div>
                         </div>
@@ -633,18 +645,18 @@ export const FinanceCollection: React.FC<FinanceCollectionProps> = ({ transactio
                     <div className="w-24 h-24 bg-blue-50 rounded-full flex items-center justify-center mb-6">
                         <span className="material-symbols-outlined text-5xl text-blue-600">person_search</span>
                     </div>
-                    <h2 className="text-2xl font-bold text-gray-800 mb-2">No Student Selected</h2>
-                    <p className="text-gray-500 mb-8 max-w-sm">Search and select a student from the registry to begin processing a new payment collection.</p>
+                    <h2 className="text-2xl font-bold text-gray-800 mb-2">No Learner Selected</h2>
+                    <p className="text-gray-500 mb-8 max-w-sm">Search and select a learner from the registry to begin processing a new payment collection.</p>
                     <button 
                         onClick={() => setIsSearchModalOpen(true)}
-                        className="m3-btn-primary px-8 py-4 text-lg shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all"
+                        className="primary-button inline-flex items-center gap-2 px-8 py-4 text-[16px] font-bold"
                     >
-                        <span className="material-symbols-outlined mr-2">search</span> Find Student
+                        <span className="material-symbols-outlined">search</span> Find Learner
                     </button>
                 </div>
             ) : (
                 <div className="flex flex-col lg:flex-row gap-8 animate-fade-in">
-                    {/* Student Info Card */}
+                    {/* Learner Info Card */}
                     <div className="w-full lg:w-80 shrink-0">
                         <div className="rounded-2xl p-6 shadow-lg mb-6 relative overflow-hidden border border-[var(--deped-line)] bg-[var(--deped-white)]">
                             <div className="absolute top-0 right-0 p-4 opacity-10">
@@ -652,11 +664,11 @@ export const FinanceCollection: React.FC<FinanceCollectionProps> = ({ transactio
                             </div>
                             <div className="relative z-10">
                                 <div className="flex items-center gap-4 mb-4">
-                                    <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center text-2xl font-bold border-2 border-white/60 text-gray-900">
-                                        {selectedLearner.firstName.charAt(0)}
+                                    <div className="w-16 h-16 rounded-full flex items-center justify-center text-xl font-bold border-2 border-[var(--deped-line)] bg-[rgba(0,56,168,0.12)] text-[var(--deped-blue)] shadow-sm">
+                                        {`${selectedLearner.firstName?.trim().charAt(0) || ''}${selectedLearner.lastName?.trim().charAt(0) || ''}`.toUpperCase()}
                                     </div>
                                     <div>
-                                        <p className="text-xs uppercase font-bold text-gray-600 tracking-wider">Student</p>
+                                        <p className="text-xs uppercase font-bold text-gray-600 tracking-wider">Learner</p>
                                         <h3 className="font-bold text-xl leading-tight text-gray-900">{selectedLearner.firstName}</h3>
                                         <h3 className="font-bold text-xl leading-tight text-gray-900">{selectedLearner.lastName}</h3>
                                     </div>
@@ -672,7 +684,7 @@ export const FinanceCollection: React.FC<FinanceCollectionProps> = ({ transactio
                                     </div>
                                     <div className="flex justify-between border-b border-white/10 pb-1">
                                         <span>Parent/Guardian</span>
-                                        <span className="font-bold text-gray-900 text-right truncate max-w-[150px]" title={selectedLearner.guardianName}>{selectedLearner.guardianName || 'N/A'}</span>
+                                        <span className="font-bold text-gray-900 text-right break-words max-w-[210px]" title={selectedLearner.guardianName}>{selectedLearner.guardianName || 'N/A'}</span>
                                     </div>
                                     
                                     {/* Balance Rows */}
@@ -701,7 +713,7 @@ export const FinanceCollection: React.FC<FinanceCollectionProps> = ({ transactio
                                     <span className="material-symbols-outlined text-xl">check_circle</span>
                                     Account Fully Settled
                                 </div>
-                                <p className="opacity-90 text-xs">This student has completed all required payments.</p>
+                                <p className="opacity-90 text-xs">This learner has completed all required payments.</p>
                             </div>
                         )}
 
@@ -729,7 +741,7 @@ export const FinanceCollection: React.FC<FinanceCollectionProps> = ({ transactio
                             onClick={() => setIsSearchModalOpen(true)}
                             className="w-full py-3 bg-gray-100 text-gray-700 font-bold rounded-xl hover:bg-gray-200 transition-colors flex items-center justify-center gap-2"
                         >
-                            <span className="material-symbols-outlined">switch_account</span> Change Student
+                            <span className="material-symbols-outlined">switch_account</span> Change Learner
                         </button>
                         <button
                             type="button"
@@ -770,113 +782,132 @@ export const FinanceCollection: React.FC<FinanceCollectionProps> = ({ transactio
                                 </div>
                             </div>
 
-                            {/* Fee Checklist */}
+                                                        {/* Fee Checklist */}
                             <div className="bg-gray-50 rounded-xl border border-gray-200 overflow-hidden">
-                                <div className="grid grid-cols-[minmax(0,1fr)_170px] gap-3 p-3 bg-gray-100 text-xs font-bold text-gray-500 uppercase border-b border-gray-200">
-                                    <span>Fee Description</span>
-                                    <span className="text-right">Amount / Covered / Balance</span>
-                                </div>
                                 <div className="max-h-64 overflow-y-auto">
-                                    {learnerAssessment.fees.map((fee, idx) => {
-                                        const pastPaid = paymentHistory.breakdown[fee.name] || 0;
-                                        const remainingBalance = Math.max(0, fee.amount - pastPaid);
-                                        const coveredAmount = tenderedCoverage[fee.name] || 0;
-                                        const projectedBalance = Math.max(0, remainingBalance - coveredAmount);
-                                        const isWaived = siblingDiscount.feesWaived.includes(fee.name);
-                                        const isFullyPaid = remainingBalance <= 0;
-                                        
-                                        // Allow selection only if not waived and not fully paid
-                                        const canSelect = !isWaived && !isFullyPaid;
+                                    <table className="w-full table-fixed border-collapse">
+                                        <colgroup>
+                                            <col style={{ width: '52%' }} />
+                                            <col style={{ width: '16%' }} />
+                                            <col style={{ width: '16%' }} />
+                                            <col style={{ width: '16%' }} />
+                                        </colgroup>
+                                        <thead className="sticky top-0 z-10 bg-gray-100 border-b border-gray-200">
+                                            <tr>
+                                                <th className="px-3 py-2 text-left text-xs font-bold text-gray-500 uppercase">Fee Description</th>
+                                                <th className="px-3 py-2 text-right text-xs font-bold text-gray-500 uppercase">Amount</th>
+                                                <th className="px-3 py-2 text-right text-xs font-bold text-gray-500 uppercase">Covered</th>
+                                                <th className="px-3 py-2 text-right text-xs font-bold text-gray-500 uppercase">Balance</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {learnerAssessment.fees.map((fee, idx) => {
+                                                const pastPaid = paymentHistory.breakdown[fee.name] || 0;
+                                                const remainingBalance = Math.max(0, fee.amount - pastPaid);
+                                                const coveredAmount = tenderedCoverage[fee.name] || 0;
+                                                const projectedBalance = Math.max(0, remainingBalance - coveredAmount);
+                                                const isWaived = siblingDiscount.feesWaived.includes(fee.name);
+                                                const isFullyPaid = remainingBalance <= 0;
+                                                const canSelect = !isWaived && !isFullyPaid;
 
-                                        return (
-                                            <div 
-                                                key={idx} 
-                                                className={`grid grid-cols-[minmax(0,1fr)_170px] items-center gap-3 p-3 border-b border-gray-200 last:border-0 transition-colors ${
-                                                    !canSelect ? 'bg-gray-100/50 opacity-60 cursor-not-allowed' : 
-                                                    selectedFees.has(fee.name) ? 'bg-blue-50/30 hover:bg-blue-50 cursor-pointer' : 'hover:bg-white cursor-pointer'
-                                                }`}
-                                                onClick={() => canSelect && toggleFee(fee.name)}
-                                            >
-                                                <div className="flex items-center gap-3">
-                                                    <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all ${
-                                                        isWaived || isFullyPaid ? 'border-gray-300 bg-gray-200 text-gray-400' :
-                                                        selectedFees.has(fee.name) ? 'bg-blue-600 border-blue-600' : 'border-gray-400 bg-white'
-                                                    }`}>
-                                                        {isWaived ? <span className="material-symbols-outlined text-[14px]">remove</span> :
-                                                         isFullyPaid ? <span className="material-symbols-outlined text-[14px] text-gray-500">check</span> :
-                                                         selectedFees.has(fee.name) && <span className="material-symbols-outlined text-white text-[14px]">check</span>}
-                                                    </div>
-                                                    <div>
-                                                        <span className={`text-sm ${selectedFees.has(fee.name) ? 'text-gray-900 font-bold' : 'text-gray-600'} ${isWaived || isFullyPaid ? 'text-gray-400' : ''}`}>{fee.name}</span>
-                                                        {isWaived && <span className="ml-2 text-[10px] bg-orange-100 text-orange-700 px-1.5 rounded uppercase font-bold">Waived</span>}
-                                                        {isFullyPaid && !isWaived && <span className="ml-2 text-[10px] bg-green-100 text-green-700 px-1.5 rounded uppercase font-bold">Settled</span>}
-                                                    </div>
-                                                </div>
-                                                <span className={`text-sm ${selectedFees.has(fee.name) ? 'font-bold text-gray-900' : 'text-gray-500'} ${isWaived ? 'line-through' : ''}`}>
-                                                    {pastPaid > 0 && !isFullyPaid ? (
-                                                        <span>₱{fee.amount.toFixed(2)} <span className="text-xs text-orange-600 font-bold">(Bal: ₱{remainingBalance.toLocaleString()})</span></span>
-                                                    ) : (
-                                                        <span>₱{fee.amount.toFixed(2)}</span>
-                                                    )}
-                                                </span>
-                                                {!isWaived && coveredAmount > 0 && (
-                                                    <div className="text-right text-xs font-bold text-green-700">Covered: PHP {coveredAmount.toLocaleString()}</div>
-                                                )}
-                                                {!isWaived && (pastPaid > 0 || coveredAmount > 0 || !isFullyPaid) && (
-                                                    <div className="text-right text-xs font-bold text-orange-600">Projected Bal: PHP {projectedBalance.toLocaleString()}</div>
-                                                )}
-                                            </div>
-                                        );
-                                    })}
+                                                return (
+                                                    <tr
+                                                        key={idx}
+                                                        className={`border-b border-gray-200 last:border-b-0 transition-colors ${
+                                                            !canSelect
+                                                                ? 'bg-gray-100/50 opacity-60 cursor-not-allowed'
+                                                                : selectedFees.has(fee.name)
+                                                                  ? 'bg-blue-50/30 hover:bg-blue-50 cursor-pointer'
+                                                                  : 'hover:bg-white cursor-pointer'
+                                                        }`}
+                                                        onClick={() => canSelect && toggleFee(fee.name)}
+                                                    >
+                                                        <td className="px-3 py-3 align-middle">
+                                                            <div className="flex items-center gap-3">
+                                                                <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all ${
+                                                                    isWaived || isFullyPaid ? 'border-gray-300 bg-gray-200 text-gray-400' :
+                                                                    selectedFees.has(fee.name) ? 'bg-blue-600 border-blue-600' : 'border-gray-400 bg-white'
+                                                                }`}>
+                                                                    {isWaived ? <span className="material-symbols-outlined text-[14px]">remove</span> :
+                                                                     isFullyPaid ? <span className="material-symbols-outlined text-[14px] text-gray-500">check</span> :
+                                                                     selectedFees.has(fee.name) && <span className="material-symbols-outlined text-white text-[14px]">check</span>}
+                                                                </div>
+                                                                <div className="min-w-0">
+                                                                    <span className={`text-sm ${selectedFees.has(fee.name) ? 'text-gray-900 font-bold' : 'text-gray-600'} ${isWaived || isFullyPaid ? 'text-gray-400' : ''}`}>{fee.name}</span>
+                                                                    {isWaived && <span className="ml-2 text-[10px] bg-orange-100 text-orange-700 px-1.5 rounded uppercase font-bold">Waived</span>}
+                                                                    {isFullyPaid && !isWaived && <span className="ml-2 text-[10px] bg-green-100 text-green-700 px-1.5 rounded uppercase font-bold">Settled</span>}
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                        <td className={`px-3 py-3 align-middle text-right text-sm ${selectedFees.has(fee.name) ? 'font-bold text-gray-900' : 'text-gray-500'} ${isWaived ? 'line-through' : ''}`}>
+                                                            PHP {fee.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                        </td>
+                                                        <td className="px-3 py-3 align-middle text-right text-sm font-bold text-green-700">
+                                                            {!isWaived && coveredAmount > 0 ? `PHP ${coveredAmount.toLocaleString()}` : '-'}
+                                                        </td>
+                                                        <td className={`px-3 py-3 align-middle text-right text-sm font-bold ${
+                                                            !isWaived && (pastPaid > 0 || coveredAmount > 0 || !isFullyPaid)
+                                                                ? 'text-orange-600'
+                                                                : 'text-gray-400'
+                                                        }`}>
+                                                            {!isWaived && (pastPaid > 0 || coveredAmount > 0 || !isFullyPaid)
+                                                                ? `PHP ${projectedBalance.toLocaleString()}`
+                                                                : '-'}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
                                 </div>
                                 <div className="p-3 bg-white flex justify-between items-center border-t border-gray-200 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
                                     <span className="text-xs font-bold text-gray-500 uppercase">Selected Total</span>
-                                    <span className="font-bold text-blue-700 text-lg">₱{selectedTotal.toLocaleString()}</span>
+                                    <span className="font-bold text-blue-700 text-lg">PHP {selectedTotal.toLocaleString()}</span>
                                 </div>
                             </div>
 
-                            {/* Amount and Date Input */}
-                            <div className="grid grid-cols-2 gap-4">
+                                                        {/* Amount and Date Input */}
+                            <div className="collection-entry-fields grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Amount Received (PHP)</label>
-                                    <div className="relative">
-                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-xl">₱</span>
-                                        <input 
-                                            type="number" 
-                                            className="w-full pl-10 p-4 border border-gray-300 rounded-xl font-bold text-3xl text-green-700 focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all bg-white"
-                                            value={amount}
-                                            onChange={e => handleAmountChange(e.target.value)}
-                                            onFocus={() => setManualEntryMode(true)}
-                                            min={0}
-                                            max={financials.remainingBalance}
-                                            disabled={financials.isFullyPaid}
-                                        />
-                                    </div>
+                                    <label className="floating-field">
+                                        <div className="floating-field__control">
+                                            <input
+                                                type="number"
+                                                placeholder=" "
+                                                value={amount}
+                                                onChange={e => handleAmountChange(e.target.value)}
+                                                onFocus={() => setManualEntryMode(true)}
+                                                min={0}
+                                                max={financials.remainingBalance}
+                                                disabled={financials.isFullyPaid}
+                                            />
+                                            <span>Amount Received (PHP)</span>
+                                        </div>
+                                    </label>
                                     {Math.abs(amount - selectedTotal) > 0.01 && (
                                         <div className={`text-xs mt-2 font-bold flex items-center gap-1 ${amount > selectedTotal ? 'text-orange-600' : 'text-red-600'}`}>
                                             <span className="material-symbols-outlined text-sm">{amount > selectedTotal ? 'payments' : 'warning'}</span>
                                             {amount > selectedTotal 
-                                                ? `Unallocated Excess: ₱${(amount - selectedTotal).toLocaleString()}` 
-                                                : `Allocation Missing: ₱${(selectedTotal - amount).toLocaleString()}`
+                                                ? `Unallocated Excess: PHP ${(amount - selectedTotal).toLocaleString()}` 
+                                                : `Allocation Missing: PHP ${(selectedTotal - amount).toLocaleString()}`
                                             }
                                         </div>
                                     )}
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Collection Date</label>
-                                    <input 
-                                        type="date"
-                                        className="w-full p-4 border border-gray-300 rounded-xl font-bold text-gray-700 focus:outline-none focus:border-blue-500 transition-all bg-white h-[70px]"
+                                    <UsisDateTimePicker
+                                        ariaLabel="Collection Date"
+                                        label="Collection Date"
+                                        mode="date"
                                         value={collectionDate}
-                                        onChange={e => setCollectionDate(e.target.value)}
+                                        onChange={setCollectionDate}
+                                        max={todayIso}
                                         disabled={financials.isFullyPaid}
                                     />
                                 </div>
                             </div>
-
-                            <button 
-                                type="submit" 
-                                className="m3-btn-primary w-full py-4 text-lg flex items-center justify-center gap-2"
+                            <button type="submit" 
+                                className="primary-button w-full py-4 text-[16px] font-bold flex items-center justify-center gap-2"
                                 disabled={financials.isFullyPaid}
                             >
                                 <span className="material-symbols-outlined">check_circle</span>
@@ -888,9 +919,9 @@ export const FinanceCollection: React.FC<FinanceCollectionProps> = ({ transactio
             )}
         </div>
 
-        {/* FIND STUDENT MODAL */}
+        {/* FIND LEARNER MODAL */}
         {isSearchModalOpen && createPortal(
-            <div className="fixed inset-0 z-[200] flex items-center justify-center bg-[rgba(18,35,61,0.45)] p-4">
+            <div className="fixed inset-0 z-[1200] flex items-center justify-center bg-[rgba(18,35,61,0.45)] p-4">
                 <div className="w-full max-w-2xl max-h-[85vh] overflow-hidden rounded-xl border border-[var(--deped-line)] bg-[var(--deped-white)] shadow-2xl flex flex-col animate-fade-in">
                     <div className="h-2 grid grid-cols-3">
                         <span className="bg-[var(--deped-blue)]" />
@@ -898,11 +929,11 @@ export const FinanceCollection: React.FC<FinanceCollectionProps> = ({ transactio
                         <span className="bg-[var(--deped-yellow)]" />
                     </div>
                     <div className="p-6 border-b border-[var(--deped-line)] flex justify-between items-center bg-[var(--deped-white)]">
-                        <h3 className="text-[24px] font-bold text-[var(--deped-ink)]">Find Student</h3>
+                        <h3 className="text-[24px] font-bold text-[var(--deped-ink)]">Find Learner</h3>
                         <button
                             onClick={() => setIsSearchModalOpen(false)}
                             className="inline-flex h-10 w-10 items-center justify-center rounded-[4px] border border-[var(--deped-line)] bg-[var(--deped-white)] text-[var(--deped-muted)] transition-colors hover:border-[var(--deped-line-strong)] hover:text-[var(--deped-blue)]"
-                            aria-label="Close find student modal"
+                            aria-label="Close find learner modal"
                         >
                             <span className="material-symbols-outlined">close</span>
                         </button>
@@ -1014,7 +1045,7 @@ export const FinanceCollection: React.FC<FinanceCollectionProps> = ({ transactio
                         {/* Details */}
                         <div className="space-y-8">
                             <div>
-                                <p className="text-sm font-bold text-[var(--md-sys-color-outline)] uppercase tracking-wider mb-2">Student Information</p>
+                                <p className="text-sm font-bold text-[var(--md-sys-color-outline)] uppercase tracking-wider mb-2">Learner Information</p>
                                 <h3 className="text-4xl font-bold text-[var(--md-sys-color-on-surface)] mb-1">{currentTx.learnerName}</h3>
                                 <p className="text-xl text-[var(--md-sys-color-on-surface-variant)]">{currentTx.gradeSection}</p>
                                 {receiptLearner?.lrn && <p className="font-mono text-sm text-[var(--md-sys-color-primary)] mt-1 tracking-widest">{receiptLearner.lrn}</p>}
@@ -1060,5 +1091,8 @@ export const FinanceCollection: React.FC<FinanceCollectionProps> = ({ transactio
     </div>
   );
 };
+
+
+
 
 

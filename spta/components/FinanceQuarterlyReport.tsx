@@ -162,13 +162,13 @@ export const FinanceQuarterlyReport: React.FC<FinanceQuarterlyReportProps> = ({ 
             ${orgFeeTotal > 0 ? `
                 <div class="section-head" style="margin-top: 20px;">II. School Organizations Fund Allocation</div>
                 <div style="font-size: 10pt; margin-bottom: 10px;">
-                    Basis: ₱${orgFeeTotal.toLocaleString()} collected from "School Organizations" fee (Allocated based on ₱${ORG_TOTAL_FEE} per student).
+                    Basis: ₱${orgFeeTotal.toLocaleString()} collected from "School Organizations" fee (Allocated based on ₱${ORG_TOTAL_FEE} per learner).
                 </div>
                 <table>
                     <thead>
                         <tr>
                             <th>Organization</th>
-                            <th class="text-center">Allocation per Student</th>
+                            <th class="text-center">Allocation per Learner</th>
                             <th class="text-right">Total Allocation</th>
                         </tr>
                     </thead>
@@ -298,3 +298,4 @@ export const FinanceQuarterlyReport: React.FC<FinanceQuarterlyReportProps> = ({ 
     </div>
   );
 };
+
