@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../../../../../lib/supabase';
+import UsisPageLoader from '../../../../../../common/components/UsisPageLoader';
 import type { PublicEnrollmentSubmission } from '../../types';
 import { fetchPublicEnrollmentSubmissionById } from '../../services/publicEnrollmentSubmissions';
 
@@ -105,14 +106,7 @@ export default function PublicEnrollmentSubmissionDetailsPage() {
     return list.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }, [submission, learnerHistory]);
 
-  if (loading) {
-    return (
-      <section className="portal-panel registrar-public-enrollment-submissions">
-        <div className="portal-panel__header"><h2>Submission Details</h2></div>
-        <div className="portal-panel__body"><p>Loading submission details...</p></div>
-      </section>
-    );
-  }
+  if (loading) return <UsisPageLoader message="Loading submission details..." />;
 
   if (error || !submission) {
     return (

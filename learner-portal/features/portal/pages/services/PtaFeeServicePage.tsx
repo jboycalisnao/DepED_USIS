@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { LearnerPortalAccessRecord } from '../../../auth/services/learnerAccess';
 import { fetchLearnerPtaFeeSnapshot, type LearnerPtaFeeSnapshot } from '../../services/ptaFeeService';
+import { fetchEnrollmentSnapshot } from '../../services/enrollmentHistoryService';
 import { openSoaPrintWindow } from '../../../../../common/utils/statementOfAccountPrint';
+import { UsisSearchableSelect } from '../../../../../common/components/ui/UsisSearchableSelect';
 
 type PtaFeeServicePageProps = {
   session: LearnerPortalAccessRecord;
@@ -38,9 +40,36 @@ const parseParticulars = (particulars: string): ParticularRow[] => {
 
 export function PtaFeeServicePage({ session }: PtaFeeServicePageProps) {
   const [snapshot, setSnapshot] = useState<LearnerPtaFeeSnapshot | null>(null);
+  const [enrolledSchoolYears, setEnrolledSchoolYears] = useState<string[]>([]);
+  const [selectedSchoolYear, setSelectedSchoolYear] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedTransaction, setSelectedTransaction] = useState<LearnerPtaFeeSnapshot['transactions'][number] | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      try {
+        const enrollmentSnapshot = await fetchEnrollmentSnapshot({ learnerId: session.learnerId, lrn: session.lrn });
+        if (cancelled) return;
+        const years = Array.from(
+          new Set(
+            enrollmentSnapshot.history
+              .map((entry) => String(entry.schoolYear || '').trim())
+              .filter(Boolean)
+          )
+        ).sort((a, b) => b.localeCompare(a));
+        setEnrolledSchoolYears(years);
+        if (!selectedSchoolYear && years.length > 0) setSelectedSchoolYear(years[0]);
+      } catch {
+        if (!cancelled) setEnrolledSchoolYears([]);
+      }
+    };
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [session.learnerId, session.lrn]);
 
   useEffect(() => {
     let cancelled = false;
@@ -49,7 +78,11 @@ export function PtaFeeServicePage({ session }: PtaFeeServicePageProps) {
       setIsLoading(true);
       setError(null);
       try {
-        const next = await fetchLearnerPtaFeeSnapshot({ learnerId: session.learnerId, lrn: session.lrn });
+        const next = await fetchLearnerPtaFeeSnapshot({
+          learnerId: session.learnerId,
+          lrn: session.lrn,
+          schoolYear: selectedSchoolYear || undefined,
+        });
         if (!cancelled) setSnapshot(next);
       } catch (fetchError: any) {
         if (!cancelled) setError(fetchError?.message || 'Unable to load PTA fee records.');
@@ -62,7 +95,7 @@ export function PtaFeeServicePage({ session }: PtaFeeServicePageProps) {
     return () => {
       cancelled = true;
     };
-  }, [session.learnerId, session.lrn]);
+  }, [session.learnerId, session.lrn, selectedSchoolYear]);
 
   const settledCount = useMemo(() => snapshot?.breakdown.filter((row) => row.balance <= 0).length || 0, [snapshot]);
   const paymentProgress = useMemo(() => {
@@ -119,15 +152,30 @@ export function PtaFeeServicePage({ session }: PtaFeeServicePageProps) {
         <>
           <section className="learner-services-history pta-fee-summary" aria-label="PTA fee summary">
             <header className="learner-services-history__header pta-fee-summary__header">
-              <div>
+              <div className="pta-fee-summary__title-block">
                 <h3>PTA Financial Summary</h3>
                 <p>
                   School Year: <strong>{snapshot.schoolYear || 'N/A'}</strong>
                 </p>
               </div>
-              <button type="button" className="pta-fee-details-btn" onClick={handlePrintSoa}>
-                Print Statement of Account
-              </button>
+              <div className="pta-fee-summary__actions" role="group" aria-label="PTA summary actions">
+                {enrolledSchoolYears.length > 0 ? (
+                  <div className="pta-fee-summary__year-select">
+                    <UsisSearchableSelect
+                      allowTyping={false}
+                      ariaLabel="Select enrolled school year"
+                      floatingLabel
+                      label="School Year"
+                      value={selectedSchoolYear || snapshot.schoolYear || ''}
+                      onChange={setSelectedSchoolYear}
+                      options={enrolledSchoolYears.map((year) => ({ label: year, value: year }))}
+                    />
+                  </div>
+                ) : null}
+                <button type="button" className="pta-fee-details-btn pta-fee-details-btn--print" onClick={handlePrintSoa}>
+                  Print Statement of Account
+                </button>
+              </div>
             </header>
             <article className="pta-fee-identity-card">
               <p>

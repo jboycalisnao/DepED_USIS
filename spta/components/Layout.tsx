@@ -144,6 +144,10 @@ export const Layout: React.FC<LayoutProps> = ({
                   </div>
                   <div className="hidden items-center gap-3 md:flex">
                     <div className="rounded-md border border-slate-300 bg-white px-4 py-2 text-right">
+                      <p className="text-[13px] font-semibold text-slate-500">Active School Year</p>
+                      <p className="text-sm font-semibold text-slate-800">{config.schoolYear || 'Not Set'}</p>
+                    </div>
+                    <div className="rounded-md border border-slate-300 bg-white px-4 py-2 text-right">
                       <p className="text-[13px] font-semibold text-slate-500">Today</p>
                       <p className="text-sm font-semibold text-slate-800">{new Date().toLocaleDateString()}</p>
                     </div>

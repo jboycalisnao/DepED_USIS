@@ -6,6 +6,7 @@ export interface UsisSearchableSelectOption {
 }
 
 interface UsisSearchableSelectProps {
+  allowTyping?: boolean;
   ariaLabel: string;
   className?: string;
   disabled?: boolean;
@@ -24,6 +25,7 @@ interface UsisSearchableSelectProps {
 }
 
 export function UsisSearchableSelect({
+  allowTyping = true,
   ariaLabel,
   className = '',
   disabled = false,
@@ -47,6 +49,7 @@ export function UsisSearchableSelect({
   const selected = options.find((option) => option.value === value) || null;
 
   const filtered = useMemo(() => {
+    if (!allowTyping) return options;
     const normalizedQuery = query.trim().toLowerCase();
     if (requireQueryBeforeOptions && normalizedQuery.length < minQueryLength) {
       return [];
@@ -75,7 +78,7 @@ export function UsisSearchableSelect({
   const hasValue = Boolean(value?.trim()) || Boolean(selected) || (isOpen && query.trim().length > 0);
 
   return (
-    <div className={`searchable-select ${className}`.trim()} ref={rootRef}>
+    <div className={`searchable-select ${!allowTyping ? 'searchable-select--readonly' : ''} ${className}`.trim()} ref={rootRef}>
       {showLabel && !floatingLabel ? <span className="searchable-select__label">{label || ariaLabel}</span> : null}
       <div className={floatingLabel ? 'floating-field searchable-select--floating' : undefined}>
         <div className={floatingLabel ? 'floating-field__control' : 'searchable-select__field'}>
@@ -84,6 +87,7 @@ export function UsisSearchableSelect({
             data-has-value={hasValue ? 'true' : 'false'}
             disabled={disabled}
             onChange={(event) => {
+              if (!allowTyping) return;
               const nextQuery = event.target.value;
               setQuery(nextQuery);
               onQueryChange?.(nextQuery);
@@ -93,6 +97,7 @@ export function UsisSearchableSelect({
               if (!disabled) setIsOpen(true);
             }}
             placeholder={floatingLabel ? ' ' : selected?.label || placeholder || label || ariaLabel}
+            readOnly={!allowTyping}
             type="text"
             value={isOpen ? query : selected?.label || ''}
           />

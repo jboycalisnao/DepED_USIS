@@ -1,8 +1,9 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { SystemConfig, SignatoryProfile, FinanceSettings, QuarterSchedule } from '../types';
 import { supabase } from '../lib/supabaseClient';
 import { UsisAlertModal } from '../../common/components/UsisAlertModal';
+import { UsisSearchableSelect } from '../../common/components/ui/UsisSearchableSelect';
 
 interface SettingsProps {
   config: SystemConfig;
@@ -40,6 +41,8 @@ const SignatoryInput = ({ label, signatory, onChange }: { label: string; signato
 export const Settings: React.FC<SettingsProps> = ({ config, setConfig, embedded = false }) => {
   const [activeTab, setActiveTab] = useState<'general' | 'signatories'>('general');
   const logoInputRef = useRef<HTMLInputElement>(null);
+  const [schoolYears, setSchoolYears] = useState<Array<{ id: string; label: string; isActive: boolean }>>([]);
+  const [selectedSchoolYearId, setSelectedSchoolYearId] = useState('');
   const [isQuarterScheduleModalOpen, setIsQuarterScheduleModalOpen] = useState(false);
   const [notice, setNotice] = useState<{ open: boolean; title: string; message: string; tone?: 'info' | 'success' | 'warning' | 'danger' }>({
     open: false,
@@ -52,6 +55,25 @@ export const Settings: React.FC<SettingsProps> = ({ config, setConfig, embedded 
     q3: { start: '', end: '' },
     q4: { start: '', end: '' },
   });
+
+  useEffect(() => {
+    const loadSchoolYears = async () => {
+      const { data, error } = await supabase
+        .from('registrar_school_years')
+        .select('id,label,is_active')
+        .order('label', { ascending: false });
+      if (error || !data) return;
+      const mapped = data.map((row: any) => ({
+        id: String(row.id),
+        label: String(row.label || ''),
+        isActive: Boolean(row.is_active),
+      }));
+      setSchoolYears(mapped);
+      const preferred = mapped.find((entry) => entry.label === config.schoolYear) || mapped.find((entry) => entry.isActive) || mapped[0];
+      if (preferred) setSelectedSchoolYearId(preferred.id);
+    };
+    loadSchoolYears();
+  }, [config.schoolYear]);
 
   const handleConfigChange = (key: keyof SystemConfig, value: any) => {
     setConfig((prev) => ({ ...prev, [key]: value }));
@@ -81,6 +103,50 @@ export const Settings: React.FC<SettingsProps> = ({ config, setConfig, embedded 
     } else {
       setNotice({ open: true, title: 'Saved', message: 'Settings saved successfully.', tone: 'success' });
     }
+  };
+
+  const handleSchoolYearChange = async (schoolYearId: string) => {
+    if (!schoolYearId || schoolYearId === selectedSchoolYearId) return;
+    const selected = schoolYears.find((entry) => entry.id === schoolYearId);
+    if (!selected) return;
+
+    await supabase.from('registrar_school_years').update({ is_active: false }).neq('id', schoolYearId);
+    const { error: activeError } = await supabase
+      .from('registrar_school_years')
+      .update({ is_active: true })
+      .eq('id', schoolYearId);
+    if (activeError) {
+      setNotice({ open: true, title: 'Update Failed', message: `Unable to set active school year: ${activeError.message}`, tone: 'danger' });
+      return;
+    }
+
+    const { data: feeData } = await supabase
+      .from('spta_fee_configurations')
+      .select('fee_schedule,contribution_categories')
+      .eq('school_year', selected.label)
+      .maybeSingle();
+
+    const nextConfig: SystemConfig = {
+      ...config,
+      schoolYear: selected.label,
+      feeSchedule: (feeData?.fee_schedule as any[]) || [],
+      contributionCategories: (feeData?.contribution_categories as string[]) || []
+    };
+
+    setConfig(nextConfig);
+    setSelectedSchoolYearId(schoolYearId);
+    setSchoolYears((prev) => prev.map((entry) => ({ ...entry, isActive: entry.id === schoolYearId })));
+
+    await supabase.from('spta_system_config').upsert({ id: 1, config: nextConfig });
+    await supabase.from('spta_fee_configurations').upsert({
+      school_year: selected.label,
+      registrar_school_year_id: schoolYearId,
+      fee_schedule: nextConfig.feeSchedule || [],
+      contribution_categories: nextConfig.contributionCategories || [],
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'school_year' });
+
+    setNotice({ open: true, title: 'School Year Updated', message: `Switched to ${selected.label}. Fee schedule is now year-based.`, tone: 'success' });
   };
 
   const openQuarterScheduleModal = async () => {
@@ -190,7 +256,19 @@ export const Settings: React.FC<SettingsProps> = ({ config, setConfig, embedded 
               <InputGroup label="School Name" value={config.schoolName || ''} onChange={(v) => handleConfigChange('schoolName', v)} />
               <InputGroup label="PTA President" value={config.ptaPresidentName || ''} onChange={(v) => handleConfigChange('ptaPresidentName', v)} />
               <InputGroup label="PTA Staff" value={config.ptaTreasurerName || ''} onChange={(v) => handleConfigChange('ptaTreasurerName', v)} />
-              <InputGroup label="School Year" value={config.schoolYear || ''} onChange={(v) => handleConfigChange('schoolYear', v)} />
+              <div className="mb-3">
+                <UsisSearchableSelect
+                  ariaLabel="School Year"
+                  floatingLabel
+                  label="School Year"
+                  value={selectedSchoolYearId}
+                  onChange={(value) => { void handleSchoolYearChange(value); }}
+                  options={schoolYears.map((entry) => ({
+                    label: `${entry.label}${entry.isActive ? ' (Active)' : ''}`,
+                    value: entry.id
+                  }))}
+                />
+              </div>
             </div>
 
             <div>

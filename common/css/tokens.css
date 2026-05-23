@@ -1,3 +1,36 @@
+@font-face {
+  font-family: "SegoeUI";
+  src:
+    local("Segoe UI"),
+    url("https://c.s-microsoft.com/static/fonts/segoe-ui/west-european/normal/latest.woff2") format("woff2"),
+    url("https://c.s-microsoft.com/static/fonts/segoe-ui/west-european/normal/latest.woff") format("woff");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "SegoeUI";
+  src:
+    local("Segoe UI Semibold"),
+    url("https://c.s-microsoft.com/static/fonts/segoe-ui/west-european/semibold/latest.woff2") format("woff2"),
+    url("https://c.s-microsoft.com/static/fonts/segoe-ui/west-european/semibold/latest.woff") format("woff");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "SegoeUI";
+  src:
+    local("Segoe UI Bold"),
+    url("https://c.s-microsoft.com/static/fonts/segoe-ui/west-european/bold/latest.woff2") format("woff2"),
+    url("https://c.s-microsoft.com/static/fonts/segoe-ui/west-european/bold/latest.woff") format("woff");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   --deped-blue: #0038a8;
   --deped-red: #ce1126;
@@ -9,7 +42,7 @@
   --deped-line: rgba(18, 35, 61, 0.12);
   --deped-line-strong: rgba(0, 56, 168, 0.24);
   --deped-shadow: 0 24px 56px rgba(13, 30, 68, 0.12);
-  --deped-font: "Segoe UI", sans-serif;
+  --deped-font: "SegoeUI", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
   --page-inset: 28px;
   --heading-stack-gap: 8px;
   --usis-radius-surface: 12px;

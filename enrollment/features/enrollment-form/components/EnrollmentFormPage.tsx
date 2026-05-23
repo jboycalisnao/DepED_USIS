@@ -38,6 +38,7 @@ import {
   validateCommonFields,
 } from '../utils/enrollmentFormUtils';
 import { DateField, SelectField, TextField } from './form/FormFields';
+import UsisPageLoader from '../../../../common/components/UsisPageLoader';
 
 const gradeLevelOrder = gradeLevelOptions.map((level) => ({ label: level, value: Number(level.replace(/\D/g, '')) }));
 const SHS_GRADES = new Set(['Grade 11', 'Grade 12']);
@@ -578,20 +579,7 @@ export function EnrollmentFormPage() {
   };
 
   if (isFormAvailabilityLoading) {
-    return (
-      <main className="page-frame enrollment-public-enrollment">
-        <div className="content-width">
-          <section className="section-shell">
-            <div className="portal-panel">
-              <header className="portal-panel__header">
-                <h2>Basic Education Enrollment Form</h2>
-                <p>Loading enrollment form availability.</p>
-              </header>
-            </div>
-          </section>
-        </div>
-      </main>
-    );
+    return <UsisPageLoader message="Loading public enrollment form..." />;
   }
 
   if (!isFormEnabled) {

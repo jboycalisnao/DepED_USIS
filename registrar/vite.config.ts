@@ -4,7 +4,7 @@ import react from '@vitejs/plugin-react';
 import { createClient } from '@supabase/supabase-js';
 
 export default defineConfig(({ mode }) => {
-    const env = loadEnv(mode, '.', '');
+    const env = loadEnv(mode, '..', '');
 
     const microsoftUserApiPlugin = {
       name: 'registrar-microsoft-user-api',
@@ -302,6 +302,7 @@ export default defineConfig(({ mode }) => {
     };
 
     return {
+      envDir: '..',
       server: {
         port: 3000,
         host: '0.0.0.0',

@@ -1,0 +1,115 @@
+@import "../../common/css/index.css";
+
+:root {
+  --usis-module-label: "USIS - Data Privacy Compliance";
+  --usis-module-kicker: "School";
+  --usis-module-title: "DATA PRIVACY PORTAL";
+}
+
+body {
+  margin: 0;
+  background: var(--deped-canvas);
+  color: var(--deped-ink);
+  font-family: var(--deped-font);
+  font-weight: 400;
+}
+
+.privacy-app {
+  min-height: 100vh;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+}
+
+.privacy-main {
+  padding-bottom: 14px;
+}
+
+.privacy-hero h1 {
+  margin: 0 0 10px;
+  color: var(--deped-blue);
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.privacy-hero p {
+  margin: 0;
+  color: var(--deped-muted);
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.45;
+}
+
+.section-shell h2 {
+  margin: 0 0 12px;
+  color: var(--deped-blue);
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.privacy-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.privacy-grid--three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.privacy-card {
+  border: 1px solid var(--deped-line);
+  border-radius: 0.75rem;
+  background: #fcfdff;
+  padding: 12px;
+}
+
+.privacy-card h3 {
+  margin: 0 0 6px;
+  color: #123b8f;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.privacy-card p,
+.privacy-card li,
+.privacy-card blockquote {
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.45;
+}
+
+.privacy-card p {
+  margin: 0 0 8px;
+  color: #344054;
+}
+
+.privacy-subtitle {
+  margin: 0 0 8px;
+  color: #667085;
+  font-size: 13px;
+}
+
+.privacy-card ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.privacy-card li + li {
+  margin-top: 4px;
+}
+
+.privacy-card blockquote {
+  margin: 0;
+  border-left: 4px solid #bfd0ef;
+  padding: 10px 12px;
+  border-radius: 0.375rem;
+  background: #f4f8ff;
+  color: #1f2937;
+}
+
+@media (max-width: 960px) {
+  .privacy-grid,
+  .privacy-grid--three {
+    grid-template-columns: 1fr;
+  }
+}

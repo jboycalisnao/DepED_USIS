@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { usePublicEnrollmentSubmissions } from '../../hooks/usePublicEnrollmentSubmissions';
 import { useStore } from '../../../../../store';
 import { supabase } from '../../../../../lib/supabase';
+import UsisPageLoader from '../../../../../../common/components/UsisPageLoader';
 import { SearchableSelect } from '../../../../../components/ui/SearchableSelect';
 import ConfirmationModal from '../../../../../components/ConfirmationModal';
 import TopCenterAlert from '../../../../../components/TopCenterAlert';
@@ -12,6 +13,7 @@ import {
   deletePublicEnrollmentSubmissionRecord,
   updatePublicEnrollmentSubmissionRecord,
 } from '../../services/publicEnrollmentSubmissions';
+import { publishEnrollmentKioskState, type EnrollmentKioskSelectedLearner } from '../../kiosk/enrollmentKioskSync';
 import { validatePublicEnrollmentDraft } from '../../utils/validation';
 import {
   deviceOptions,
@@ -27,11 +29,26 @@ import '../../../../../styles/publicEnrollment.css';
 const SAME_SCHOOL_LABEL = 'Same School';
 const SHS_GRADES = new Set(['Grade 11', 'Grade 12']);
 const gradeLevelOrder = gradeLevelOptions.map((level) => ({ label: level, value: Number(level.replace(/\D/g, '')) }));
+
+function normalizeLearnerType(value: string) {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (!normalized) return '';
+  if (normalized === 'new student' || normalized === 'new learner') return 'New Learner';
+  if (normalized === 'continuing student' || normalized === 'continuing learner') return 'Continuing Learner';
+  if (normalized === 'transferee student' || normalized === 'transferee learner') return 'Transferee Learner';
+  return value;
+}
 type SubmissionAuditEntry = {
   id: string;
   action: string;
   at: string;
   detail: string;
+};
+
+type PriorYearLearner = EnrollmentKioskSelectedLearner;
+type PriorLearnerEditorRecord = {
+  id: string;
+  schoolId: string;
 };
 
 function formatDate(value: string) {
@@ -140,6 +157,12 @@ export default function PublicEnrollmentSubmissionsPage() {
   const [pendingDeleteSubmissionId, setPendingDeleteSubmissionId] = useState<string | null>(null);
   const [isDeletingSubmission, setIsDeletingSubmission] = useState(false);
   const [draftEditor, setDraftEditor] = useState<EnrollmentDraft>(() => emptyDraft(schoolId));
+  const [activeSchoolYearLabel, setActiveSchoolYearLabel] = useState('');
+  const [priorYearLearners, setPriorYearLearners] = useState<PriorYearLearner[]>([]);
+  const [priorLearnerLookup, setPriorLearnerLookup] = useState('');
+  const [selectedPriorLearnerId, setSelectedPriorLearnerId] = useState('');
+  const [editorMode, setEditorMode] = useState<'submission' | 'priorLearner'>('submission');
+  const [editingPriorLearner, setEditingPriorLearner] = useState<PriorLearnerEditorRecord | null>(null);
   const isEditorSeniorHighTargetGrade = SHS_GRADES.has(draftEditor.gradeToEnroll);
 
   const filtered = useMemo(() => {
@@ -209,6 +232,137 @@ export default function PublicEnrollmentSubmissionsPage() {
     setTopAlert({ title: 'Enrollment Issue', message: enrollError });
   }, [enrollError]);
 
+  useEffect(() => {
+    const loadActiveSchoolYear = async () => {
+      const { data: activeYearRow } = await supabase
+        .from('registrar_school_years')
+        .select('label')
+        .eq('is_active', true)
+        .limit(1)
+        .maybeSingle();
+      setActiveSchoolYearLabel(String((activeYearRow as any)?.label || '').trim());
+    };
+    loadActiveSchoolYear();
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      const lookup = priorLearnerLookup.trim();
+      if (lookup.length < 1) {
+        if (!cancelled) setPriorYearLearners([]);
+        return;
+      }
+      let queryBuilder = supabase
+        .from('registrar_learners')
+        .select('id,lrn,first_name,middle_name,last_name,enrollment_history,section_id')
+        .order('last_name', { ascending: true })
+        .limit(80)
+        .or(`lrn.ilike.%${lookup}%,first_name.ilike.%${lookup}%,last_name.ilike.%${lookup}%,middle_name.ilike.%${lookup}%`);
+
+      const { data, error } = await queryBuilder;
+      if (cancelled || error || !data) return;
+
+      const sectionIds = Array.from(
+        new Set(
+          (data as any[])
+            .map((row) => String(row.section_id || '').trim())
+            .filter(Boolean),
+        ),
+      );
+
+      const sectionMap = new Map<string, { name: string; gradeLevel: string; schoolYearId: string }>();
+      const schoolYearMap = new Map<string, string>();
+
+      if (sectionIds.length > 0) {
+        const { data: sectionRows } = await supabase
+          .from('registrar_sections')
+          .select('id,name,grade_level,school_year_id')
+          .in('id', sectionIds);
+
+        const schoolYearIds = Array.from(
+          new Set(
+            (sectionRows || [])
+              .map((row: any) => String(row.school_year_id || '').trim())
+              .filter(Boolean),
+          ),
+        );
+
+        if (schoolYearIds.length > 0) {
+          const { data: schoolYearRows } = await supabase
+            .from('registrar_school_years')
+            .select('id,label')
+            .in('id', schoolYearIds);
+
+          for (const row of schoolYearRows || []) {
+            schoolYearMap.set(String((row as any).id || ''), String((row as any).label || '').trim());
+          }
+        }
+
+        for (const row of sectionRows || []) {
+          sectionMap.set(String((row as any).id || ''), {
+            name: String((row as any).name || '').trim(),
+            gradeLevel: String((row as any).grade_level || '').trim(),
+            schoolYearId: String((row as any).school_year_id || '').trim(),
+          });
+        }
+      }
+
+      const mapped: PriorYearLearner[] = [];
+      for (const row of data as any[]) {
+        const history = Array.isArray(row.enrollment_history) ? row.enrollment_history : [];
+        const allYearEntries = history.filter((entry: any) => {
+          const sy = String(entry?.schoolYear || '').trim();
+          return Boolean(sy);
+        });
+
+        const linkedSection = sectionMap.get(String(row.section_id || '').trim());
+        const linkedSchoolYearLabel = linkedSection ? schoolYearMap.get(linkedSection.schoolYearId) || '' : '';
+        if (!allYearEntries.length && !linkedSchoolYearLabel) continue;
+
+        const latestEntry =
+          allYearEntries[allYearEntries.length - 1] ||
+          {
+            schoolYear: linkedSchoolYearLabel,
+            gradeLevel: linkedSection?.gradeLevel || '',
+            section: linkedSection?.name || '',
+          };
+        const fullName = [row.last_name, row.first_name, row.middle_name].filter(Boolean).join(', ').replace(/\s+,/g, ',');
+        mapped.push({
+          id: String(row.id || ''),
+          lrn: String(row.lrn || '').trim(),
+          fullName: fullName || '--',
+          latestSchoolYear: String(latestEntry.schoolYear || '').trim(),
+          latestGradeLevel: String(latestEntry.gradeLevel || '').trim(),
+          latestSection: String(latestEntry.section || '').trim(),
+        });
+      }
+      if (!cancelled) setPriorYearLearners(mapped);
+    };
+
+    const timer = window.setTimeout(run, 250);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [priorLearnerLookup, activeSchoolYearLabel]);
+
+  const selectedPriorLearner = useMemo(
+    () => priorYearLearners.find((learner) => learner.id === selectedPriorLearnerId) || null,
+    [priorYearLearners, selectedPriorLearnerId],
+  );
+
+  useEffect(() => {
+    publishEnrollmentKioskState({ selectedLearner: selectedPriorLearner });
+  }, [selectedPriorLearner]);
+
+  useEffect(() => {
+    publishEnrollmentKioskState({
+      isEditing: isEditorOpen,
+      draft: isEditorOpen ? draftEditor : null,
+    });
+  }, [isEditorOpen, draftEditor]);
+
   const groupedByGrade = useMemo(() => {
     const groups = new Map<string, PublicEnrollmentSubmission[]>();
     filtered.forEach((row) => {
@@ -229,36 +383,117 @@ export default function PublicEnrollmentSubmissionsPage() {
     });
   }, [groupedByGrade]);
 
+  if (isLoading) {
+    return <UsisPageLoader message="Loading enrollment submissions..." />;
+  }
+
   const openCreate = () => {
     setActionError(null);
+    setEditorMode('submission');
+    setEditingPriorLearner(null);
     setEditingSubmission(null);
     setDraftEditor(emptyDraft(schoolId));
     setIsEditorOpen(true);
   };
 
+  const openKioskWindow = () => {
+    const popupWidth = 1400;
+    const popupHeight = 900;
+    const screenLeft = typeof window.screenLeft === 'number' ? window.screenLeft : 0;
+    const screenTop = typeof window.screenTop === 'number' ? window.screenTop : 0;
+    const outerWidth = typeof window.outerWidth === 'number' ? window.outerWidth : popupWidth;
+    const outerHeight = typeof window.outerHeight === 'number' ? window.outerHeight : popupHeight;
+    const left = Math.max(0, screenLeft + Math.round((outerWidth - popupWidth) / 2));
+    const top = Math.max(0, screenTop + Math.round((outerHeight - popupHeight) / 2));
+
+    const kioskWindow = window.open(
+      '/enroll/kiosk',
+      'registrarEnrollmentKiosk',
+      `popup=yes,width=${popupWidth},height=${popupHeight},left=${left},top=${top},resizable=yes,scrollbars=yes`,
+    );
+    kioskWindow?.focus();
+  };
+
+  const priorYearLearnerOptions = useMemo(() => {
+    return priorYearLearners.map((row) => ({
+      value: row.id,
+      label: `${row.fullName} | ${row.lrn || 'No LRN'} | ${row.latestSchoolYear || '--'} ${row.latestGradeLevel ? `| ${row.latestGradeLevel}` : ''}`,
+    }));
+  }, [priorYearLearners]);
+
   const openEdit = (row: PublicEnrollmentSubmission) => {
+    navigate(`/enroll/${row.id}/edit`);
+  };
+
+  const openPriorLearnerEditor = async (learnerId: string) => {
+    if (!learnerId) return;
     setActionError(null);
-    setEditingSubmission(row);
-    setDraftEditor({
-      ...emptyDraft(row.school_id || schoolId),
-      ...row.payload,
-      schoolId: row.school_id || row.payload?.schoolId || schoolId,
-      schoolYear: row.school_year || row.payload?.schoolYear || '',
-      lrn: row.lrn || row.payload?.lrn || '',
-      email: row.payload?.email || '',
-      firstName: row.first_name || row.payload?.firstName || '',
-      middleName: row.middle_name || row.payload?.middleName || '',
-      lastName: row.last_name || row.payload?.lastName || '',
-      gradeToEnroll: row.grade_to_enroll || row.payload?.gradeToEnroll || '',
-      guardianContact: row.guardian_contact || row.payload?.guardianContact || '',
-      learnerContact: row.payload?.learnerContact || '',
-    });
-    setIsEditorOpen(true);
+    setIsSaving(true);
+    try {
+      const { data, error } = await supabase
+        .from('registrar_learners')
+        .select('id,school_id,lrn,first_name,middle_name,last_name,birth_date,gender,address,contact_number,guardian_name,father_name,mother_name,email,enrollment_history')
+        .eq('id', learnerId)
+        .maybeSingle();
+      if (error || !data) throw new Error('Learner record not found.');
+
+      const history = Array.isArray((data as any).enrollment_history) ? (data as any).enrollment_history : [];
+      const priorEntries = history.filter((entry: any) => {
+        const sy = String(entry?.schoolYear || '').trim();
+        if (!sy) return false;
+        return !activeSchoolYearLabel || normalizeSchoolYear(sy) !== normalizeSchoolYear(activeSchoolYearLabel);
+      });
+      const latestPriorEntry = priorEntries[priorEntries.length - 1] || {};
+      const sourcePayload = (latestPriorEntry as any).submissionPayload || {};
+      const sourceSchoolToEnroll = String(sourcePayload.schoolToEnroll || '').trim();
+      const sourcePreviousSchool = String(sourcePayload.previousSchool || '').trim();
+
+      setEditorMode('priorLearner');
+      setEditingSubmission(null);
+      setEditingPriorLearner({
+        id: String((data as any).id || learnerId),
+        schoolId: String((data as any).school_id || schoolId),
+      });
+      setDraftEditor({
+        ...emptyDraft(String((data as any).school_id || schoolId)),
+        ...sourcePayload,
+        studentType: normalizeLearnerType(String(sourcePayload.studentType || 'Continuing Learner')) || 'Continuing Learner',
+        learnerCategory: SAME_SCHOOL_LABEL,
+        schoolId: String((data as any).school_id || schoolId),
+        schoolYear: String((latestPriorEntry as any).schoolYear || ''),
+        schoolToEnroll: sourceSchoolToEnroll,
+        previousSchool: sourcePreviousSchool || sourceSchoolToEnroll,
+        lrn: String((data as any).lrn || ''),
+        email: String((data as any).email || sourcePayload.email || ''),
+        lastName: String((data as any).last_name || sourcePayload.lastName || ''),
+        firstName: String((data as any).first_name || sourcePayload.firstName || ''),
+        middleName: String((data as any).middle_name || sourcePayload.middleName || ''),
+        birthDate: String((data as any).birth_date || sourcePayload.birthDate || ''),
+        gender: String((data as any).gender || sourcePayload.gender || 'Male'),
+        currentAddress: String((data as any).address || sourcePayload.currentAddress || ''),
+        permanentAddress: String(sourcePayload.permanentAddress || ''),
+        learnerContact: String((data as any).contact_number || sourcePayload.learnerContact || ''),
+        guardianName: String((data as any).guardian_name || sourcePayload.guardianName || ''),
+        guardianContact: String(sourcePayload.guardianContact || ''),
+        fatherName: String((data as any).father_name || sourcePayload.fatherName || ''),
+        fatherContact: String(sourcePayload.fatherContact || ''),
+        motherName: String((data as any).mother_name || sourcePayload.motherName || ''),
+        motherContact: String(sourcePayload.motherContact || ''),
+        gradeToEnroll: String((latestPriorEntry as any).gradeLevel || sourcePayload.gradeToEnroll || ''),
+      });
+      setIsEditorOpen(true);
+    } catch (error: any) {
+      setActionError(error?.message || 'Unable to open learner edit modal.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const closeEditor = () => {
     setIsEditorOpen(false);
     setEditingSubmission(null);
+    setEditingPriorLearner(null);
+    setEditorMode('submission');
     setActionError(null);
   };
 
@@ -351,6 +586,72 @@ export default function PublicEnrollmentSubmissionsPage() {
       setIsSaving(false);
     }
   };
+
+  const savePriorLearner = async () => {
+    if (!editingPriorLearner?.id) return;
+    setIsSaving(true);
+    setActionError(null);
+    try {
+      const { data: existingLearner, error: findError } = await supabase
+        .from('registrar_learners')
+        .select('enrollment_history')
+        .eq('id', editingPriorLearner.id)
+        .maybeSingle();
+      if (findError) throw findError;
+
+      const nextHistory = [
+        ...(Array.isArray((existingLearner as any)?.enrollment_history) ? (existingLearner as any).enrollment_history : []),
+        {
+          id: crypto.randomUUID(),
+          schoolYear: draftEditor.schoolYear || '',
+          gradeLevel: draftEditor.gradeToEnroll || '',
+          section: '',
+          enrollmentDate: new Date().toISOString(),
+          status: 'Information Updated',
+          submissionPayload: draftEditor,
+        },
+      ];
+
+      const updatePayload: Record<string, any> = {
+        school_id: editingPriorLearner.schoolId || schoolId,
+        lrn: draftEditor.lrn.trim() || null,
+        first_name: draftEditor.firstName.trim() || null,
+        middle_name: draftEditor.middleName.trim() || null,
+        last_name: draftEditor.lastName.trim() || null,
+        birth_date: draftEditor.birthDate.trim() || null,
+        gender: draftEditor.gender.trim() || null,
+        address: (draftEditor.currentAddress || draftEditor.permanentAddress).trim() || null,
+        contact_number: draftEditor.learnerContact.trim() || null,
+        guardian_name: draftEditor.guardianName.trim() || null,
+        father_name: draftEditor.fatherName.trim() || null,
+        mother_name: draftEditor.motherName.trim() || null,
+        email: draftEditor.email.trim() || null,
+        enrollment_history: nextHistory,
+      };
+
+      const { error: updateError } = await supabase
+        .from('registrar_learners')
+        .update(updatePayload)
+        .eq('id', editingPriorLearner.id);
+      if (updateError) throw updateError;
+
+      setTopAlert({
+        title: 'Learner Updated',
+        message: 'Learner information was updated from previous-year record editor.',
+      });
+      await refreshData(true);
+      closeEditor();
+    } catch (error: any) {
+      setActionError(error?.message || 'Unable to update learner information.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedPriorLearnerId) return;
+    navigate(`/enroll/prior-learner/${selectedPriorLearnerId}/edit`);
+  }, [selectedPriorLearnerId, navigate]);
 
   const removeSubmission = async (id: string) => {
     setActionError(null);
@@ -591,15 +892,38 @@ export default function PublicEnrollmentSubmissionsPage() {
       </header>
 
       <div className="portal-panel__body" style={{ display: 'grid', gap: 16 }}>
-        <div className="form-grid" style={{ gridTemplateColumns: 'minmax(240px, 1fr) auto auto', alignItems: 'stretch' }}>
+        <div className="form-grid" style={{ gridTemplateColumns: 'minmax(240px, 1fr) auto auto auto', alignItems: 'stretch' }}>
           <label className="floating-field">
             <div className="floating-field__control">
               <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder=" " />
               <span>Search name / LRN / grade</span>
             </div>
           </label>
+          <button type="button" className="secondary-button" style={{ minHeight: 56 }} onClick={openKioskWindow}>
+            Open Enrollment Kiosk
+          </button>
           <button type="button" className="secondary-button" style={{ minHeight: 56 }} onClick={() => refresh()} disabled={isLoading}>Refresh</button>
           <div className="status-badge status-badge--open" style={{ minHeight: 56, display: 'flex', alignItems: 'center' }} aria-label="Submission count">{filtered.length} shown</div>
+        </div>
+        <div className="form-grid" style={{ gridTemplateColumns: 'minmax(420px, 1fr) minmax(220px, auto)', alignItems: 'stretch' }}>
+          <SearchableSelect
+            label="Search Learner Records (All School Years)"
+            placeholder="Type learner name / LRN"
+            floatingLabel
+            showLabel={false}
+            value={selectedPriorLearnerId}
+            onChange={setSelectedPriorLearnerId}
+            onQueryChange={setPriorLearnerLookup}
+            options={priorYearLearnerOptions}
+            requireQueryBeforeOptions
+            minQueryLength={1}
+            emptyQueryMessage="No previous-year learner matched."
+          />
+          <div className="status-badge" style={{ minHeight: 56, display: 'flex', alignItems: 'center' }}>
+            {selectedPriorLearner
+              ? `Kiosk learner: ${selectedPriorLearner.fullName}`
+              : `Learner records found: ${priorYearLearners.length}`}
+          </div>
         </div>
 
         {isLoading ? (
@@ -737,7 +1061,13 @@ export default function PublicEnrollmentSubmissionsPage() {
           <div className="modal-dialog modal-dialog--wide" role="dialog" aria-modal="true" aria-labelledby="public-enrollment-editor-title">
             <div className="modal-dialog__header">
               <div className="modal-dialog__title-group">
-                <h3 id="public-enrollment-editor-title">{editingSubmission ? 'Edit Submission' : 'Create Submission'}</h3>
+                <h3 id="public-enrollment-editor-title">
+                  {editorMode === 'priorLearner'
+                    ? 'Edit Previous-Year Learner Record'
+                    : editingSubmission
+                      ? 'Edit Submission'
+                      : 'Create Submission'}
+                </h3>
               </div>
               <button type="button" className="modal-dialog__close" onClick={closeEditor} aria-label="Close edit submission">
                 <CloseIcon />
@@ -751,7 +1081,7 @@ export default function PublicEnrollmentSubmissionsPage() {
                 <div className="floating-field-grid">
                 <InputField label="School ID" value={draftEditor.schoolId} onChange={(value) => updateDraftField('schoolId', value)} readOnly />
                 <InputField label="School Year" value={draftEditor.schoolYear} onChange={(value) => updateDraftField('schoolYear', value)} />
-                <SelectField label="Student Type" value={draftEditor.studentType} onChange={(value) => updateDraftField('studentType', value)} options={studentTypeOptions as unknown as string[]} />
+                <SelectField label="Learner Type" value={draftEditor.studentType} onChange={(value) => updateDraftField('studentType', value)} options={studentTypeOptions as unknown as string[]} />
                 <SelectField label="Learner Category" value={draftEditor.learnerCategory} onChange={(value) => updateDraftField('learnerCategory', value)} options={learnerCategoryOptions as unknown as string[]} />
                 <InputField label="School to Enroll" value={draftEditor.schoolToEnroll} onChange={(value) => updateDraftField('schoolToEnroll', value)} />
                 <InputField label="Previous School Attended" value={draftEditor.previousSchool} onChange={(value) => updateDraftField('previousSchool', value)} />
@@ -839,8 +1169,13 @@ export default function PublicEnrollmentSubmissionsPage() {
 
             <div className="modal-dialog__actions">
               <button type="button" className="modal-dialog__primary" onClick={closeEditor} disabled={isSaving}>Cancel</button>
-              <button type="button" className="modal-dialog__blue" onClick={saveSubmission} disabled={isSaving}>
-                {isSaving ? 'Saving...' : 'Save Submission'}
+              <button
+                type="button"
+                className="modal-dialog__blue"
+                onClick={editorMode === 'priorLearner' ? savePriorLearner : saveSubmission}
+                disabled={isSaving}
+              >
+                {isSaving ? 'Saving...' : editorMode === 'priorLearner' ? 'Save Learner Information' : 'Save Submission'}
               </button>
             </div>
           </div>

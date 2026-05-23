@@ -27,7 +27,9 @@ export const toDbFinancialTransaction = (tx: Partial<FinancialTransaction>): DbT
   to_category: tx.toCategory ?? null,
   source: tx.source ?? null,
   recorded_by: tx.recordedBy ?? null,
-  grade_section: tx.gradeSection ?? null
+  grade_section: tx.gradeSection ?? null,
+  school_year: tx.schoolYear ?? null,
+  registrar_school_year_id: tx.registrarSchoolYearId ?? null
 });
 
 export const fromDbFinancialTransaction = (row: DbTransactionRow): FinancialTransaction => ({
@@ -53,6 +55,7 @@ export const fromDbFinancialTransaction = (row: DbTransactionRow): FinancialTran
   toCategory: row.to_category ?? row.toCategory ?? undefined,
   source: row.source ?? undefined,
   recordedBy: row.recorded_by ?? row.recordedBy ?? undefined,
-  gradeSection: row.grade_section ?? row.gradeSection ?? undefined
+  gradeSection: row.grade_section ?? row.gradeSection ?? undefined,
+  schoolYear: row.school_year ?? row.schoolYear ?? undefined,
+  registrarSchoolYearId: row.registrar_school_year_id ?? row.registrarSchoolYearId ?? undefined
 });
-

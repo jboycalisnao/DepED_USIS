@@ -18,6 +18,7 @@ The repository currently contains these active modules:
 - `attendance/` - attendance monitoring and RFID logging subsystem
 - `coordinator/` - coordinator-facing USIS operations portal
 - `deped-web-kit/` - DepEd web branding and UI reference kit
+- `data-privacy/` - data privacy and legal compliance reference subsystem for SIS policy pages
 - `enrollment/` - school enrollment management portal
 - `learner-portal/` - learner self-service access portal
 - `merch/` - school merchandise hub for merchandise catalog, orders, and inventory workflows
@@ -71,6 +72,7 @@ The intended end state is a unified school platform with multiple modules under 
 - `registrar/`
 - `sp-portal/`
 - `deped-web-kit/`
+- `data-privacy/`
 - `enrollment/`
 - `merch/`
 - `support/`

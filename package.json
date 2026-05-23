@@ -6,6 +6,7 @@
     "attendance",
     "coordinator",
     "deped-web-kit",
+    "data-privacy",
     "enrollment",
     "learner-portal",
     "merch",
@@ -20,6 +21,8 @@
     "dev:attendance": "npm run dev --workspace ./attendance",
     "dev:coordinator": "npm run dev --workspace ./coordinator",
     "dev:deped-web-kit": "npm run dev --workspace ./deped-web-kit",
+    "dev:data-privacy": "npm run dev --workspace ./data-privacy",
+    "dev:privacy": "npm run dev --workspace ./data-privacy",
     "dev:enrollment": "npm run dev --workspace ./enrollment",
     "dev:learner-portal": "npm run dev --workspace ./learner-portal",
     "dev:merch": "npm run dev --workspace ./merch",
@@ -31,6 +34,7 @@
     "build:attendance": "npm run build --workspace ./attendance",
     "build:coordinator": "npm run build --workspace ./coordinator",
     "build:deped-web-kit": "npm run build --workspace ./deped-web-kit",
+    "build:data-privacy": "npm run build --workspace ./data-privacy",
     "build:enrollment": "npm run build --workspace ./enrollment",
     "build:learner-portal": "npm run build --workspace ./learner-portal",
     "build:merch": "npm run build --workspace ./merch",
@@ -39,7 +43,7 @@
     "build:spta": "npm run build --workspace ./spta",
     "build:registrar": "npm run build --workspace ./registrar",
     "build:support": "npm run build --workspace ./support",
-    "build": "npm run build:attendance && npm run build:coordinator && npm run build:deped-web-kit && npm run build:enrollment && npm run build:learner-portal && npm run build:merch && npm run build:election && npm run build:sp-portal && npm run build:spta && npm run build:registrar && npm run build:support"
+    "build": "npm run build:attendance && npm run build:coordinator && npm run build:deped-web-kit && npm run build:data-privacy && npm run build:enrollment && npm run build:learner-portal && npm run build:merch && npm run build:election && npm run build:sp-portal && npm run build:spta && npm run build:registrar && npm run build:support"
   },
   "engines": {
     "node": ">=20"

@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { BrowserRouter, NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { UsisUnifiedHeader } from '../common/header/UsisUnifiedHeader';
 import { UsisGlobalFooter } from '../common/footer/UsisGlobalFooter';
-import { UsisLoginModal } from '../common/components/UsisLoginModal';
 import {
   clearStoredLearnerAccess,
   getStoredLearnerAccess,
@@ -21,6 +20,8 @@ import { EnrollmentHistoryServicePage } from './features/portal/pages/services/E
 import { DocumentRequestsServicePage } from './features/portal/pages/services/DocumentRequestsServicePage';
 import { StudentSupportServicePage } from './features/portal/pages/services/StudentSupportServicePage';
 import { PtaFeeServicePage } from './features/portal/pages/services/PtaFeeServicePage';
+import { LearnerLoginPage } from './features/auth/pages/LearnerLoginPage';
+import { LearnerCredentialPage } from './features/auth/pages/LearnerCredentialPage';
 
 function LearnerPortalShell({
   session,
@@ -165,29 +166,91 @@ export default function App() {
         </header>
 
         {!session ? (
-          <main className="page-frame learner-portal-main">
-            <div className="content-width">
-              <section className="section-shell">
-                <UsisLoginModal
-                  title="Learner's Portal"
-                  username={username}
-                  password={password}
-                  isSubmitting={isSubmitting}
-                  submitLabel="Login"
-                  noticeTitle="Login Failed"
-                  noticeMessage={loginError}
-                  onDismissNotice={() => setLoginError(null)}
-                  onUsernameChange={setUsername}
-                  onPasswordChange={setPassword}
-                  onSubmit={handleSubmit}
-                />
-              </section>
-            </div>
-          </main>
+          <LearnerPublicAccess
+            username={username}
+            password={password}
+            isSubmitting={isSubmitting}
+            loginError={loginError}
+            onDismissNotice={() => setLoginError(null)}
+            onUsernameChange={setUsername}
+            onPasswordChange={setPassword}
+            onSubmit={handleSubmit}
+            onPrefillLogin={(nextUsername, nextPassword) => {
+              setUsername(nextUsername);
+              setPassword(nextPassword);
+              setLoginError(null);
+            }}
+          />
         ) : (
           <LearnerPortalShell session={session} onLogout={handleLogout} />
         )}
       </div>
     </BrowserRouter>
+  );
+}
+
+const publicNavItems = [
+  { label: 'Login', path: '/login' },
+  { label: 'Get Credential', path: '/get-credential' },
+];
+
+function LearnerPublicAccess({
+  username,
+  password,
+  isSubmitting,
+  loginError,
+  onDismissNotice,
+  onUsernameChange,
+  onPasswordChange,
+  onSubmit,
+  onPrefillLogin,
+}: {
+  username: string;
+  password: string;
+  isSubmitting: boolean;
+  loginError: string | null;
+  onDismissNotice: () => void;
+  onUsernameChange: (value: string) => void;
+  onPasswordChange: (value: string) => void;
+  onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
+  onPrefillLogin: (username: string, password: string) => void;
+}) {
+  return (
+    <main className="page-frame learner-portal-main">
+      <div className="content-width">
+        <nav className="kit-nav" aria-label="Learner access navigation">
+          <div className="kit-nav__grid">
+            {publicNavItems.map((item) => (
+              <NavLink
+                key={item.path}
+                to={item.path}
+                className={({ isActive }) => `kit-nav__link ${isActive ? 'kit-nav__link--active' : ''}`}
+              >
+                {item.label}
+              </NavLink>
+            ))}
+          </div>
+        </nav>
+        <Routes>
+          <Route
+            path="/login"
+            element={
+              <LearnerLoginPage
+                username={username}
+                password={password}
+                isSubmitting={isSubmitting}
+                loginError={loginError}
+                onDismissNotice={onDismissNotice}
+                onUsernameChange={onUsernameChange}
+                onPasswordChange={onPasswordChange}
+                onSubmit={onSubmit}
+              />
+            }
+          />
+          <Route path="/get-credential" element={<LearnerCredentialPage onPrefillLogin={onPrefillLogin} />} />
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </div>
+    </main>
   );
 }

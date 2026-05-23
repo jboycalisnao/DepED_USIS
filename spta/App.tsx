@@ -195,6 +195,18 @@ function AppContent() {
     const baseConfig = applyUpdatedFinanceConfig(mergedConfig);
 
     const schoolYear = baseConfig.schoolYear || `${new Date().getFullYear()}-${new Date().getFullYear() + 1}`;
+    const { data: feeConfigData } = await adminClient
+      .from('spta_fee_configurations')
+      .select('fee_schedule,contribution_categories')
+      .eq('school_year', schoolYear)
+      .maybeSingle();
+
+    const yearAwareConfig: SystemConfig = {
+      ...baseConfig,
+      feeSchedule: (feeConfigData?.fee_schedule as any[]) || baseConfig.feeSchedule || [],
+      contributionCategories: (feeConfigData?.contribution_categories as string[]) || baseConfig.contributionCategories || []
+    };
+
     const { data: quarterData } = await adminClient
       .from('spta_quarter_configurations')
       .select('*')
@@ -208,11 +220,11 @@ function AppContent() {
         q3: { start: quarterData.q3_start || '', end: quarterData.q3_end || '' },
         q4: { start: quarterData.q4_start || '', end: quarterData.q4_end || '' }
       };
-      setConfig({ ...baseConfig, quarterSchedule });
+      setConfig({ ...yearAwareConfig, quarterSchedule });
       return;
     }
 
-    setConfig(baseConfig);
+    setConfig(yearAwareConfig);
   }, []);
 
   const fetchInitialLocalState = useCallback(async () => {

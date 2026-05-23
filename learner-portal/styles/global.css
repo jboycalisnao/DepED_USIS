@@ -47,6 +47,92 @@ body {
   font-size: 15px;
 }
 
+.learner-public-form__subtitle {
+  margin: 0;
+  color: var(--deped-muted);
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.learner-public-form__verify {
+  margin-top: 8px;
+  border-top: 1px solid var(--deped-line);
+  padding-top: 12px;
+}
+
+.learner-public-form__result {
+  margin-top: 10px;
+  border: 1px solid #bfd0ef;
+  border-radius: var(--learner-radius-md);
+  background: #f5f9ff;
+  padding: 12px;
+}
+
+.learner-public-form__result h3 {
+  margin: 0 0 8px;
+  color: var(--deped-blue);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.learner-public-form__result p {
+  margin: 0 0 6px;
+  color: #1f2937;
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.learner-public-form__result p:last-child {
+  margin-bottom: 0;
+}
+
+.learner-public-form__copy-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.learner-public-form__copy-row:last-child {
+  margin-bottom: 0;
+}
+
+.learner-public-form__copy-btn {
+  border: 1px solid #bfd0ef;
+  border-radius: var(--learner-radius-md);
+  background: #ffffff;
+  color: var(--deped-blue);
+  font-size: 13px;
+  font-weight: 700;
+  min-height: 30px;
+  padding: 0 12px;
+  cursor: pointer;
+}
+
+.learner-public-form__continue-btn {
+  margin-top: 10px;
+  width: 100%;
+  font-size: 16px;
+}
+
+.learner-public-form__error {
+  margin: 10px 0 0;
+  color: #b42318;
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.learner-public-form__button {
+  font-size: 16px;
+}
+
+.learner-public-form__verified-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .learner-layout {
   display: grid;
   grid-template-columns: 220px minmax(0, 1fr);
@@ -730,9 +816,24 @@ body {
 .pta-fee-summary__header {
   margin-bottom: 12px;
   display: flex;
-  align-items: flex-start;
+  align-items: flex-end;
   justify-content: space-between;
-  gap: 10px;
+  gap: 14px;
+}
+
+.pta-fee-summary__title-block {
+  min-width: 0;
+}
+
+.pta-fee-summary__actions {
+  display: grid;
+  gap: 8px;
+  justify-items: end;
+}
+
+.pta-fee-summary__year-select {
+  width: 300px;
+  max-width: 100%;
 }
 
 .pta-fee-identity-card {
@@ -995,20 +1096,25 @@ body {
 }
 
 .pta-fee-details-btn {
-  min-height: 28px;
+  min-height: 32px;
   border: 1px solid #bfd0ef;
   border-radius: var(--learner-radius-md);
   background: #f5f9ff;
   color: #1d4fa8;
   font-size: 13px;
   font-weight: 700;
-  padding: 0 10px;
+  padding: 0 12px;
   cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
 }
 
 .pta-fee-details-btn:hover {
   background: #eaf2ff;
   border-color: #9db8e6;
+}
+
+.pta-fee-details-btn--print {
+  width: 100%;
 }
 
 .pta-payment-modal .modal-dialog__body {
@@ -1082,6 +1188,15 @@ body {
   .pta-fee-summary__header {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .pta-fee-summary__actions {
+    width: 100%;
+    justify-items: stretch;
+  }
+
+  .pta-fee-summary__year-select {
+    width: 100%;
   }
 
   .pta-payment-modal__summary-grid {

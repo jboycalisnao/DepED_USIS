@@ -2,9 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { QRCodeCanvas } from 'qrcode.react';
 import { Learner, Section, GradeLevel, SystemConfig } from '../types';
-import { supabase, adminClient } from '../lib/supabaseClient';
+import { adminClient } from '../lib/supabaseClient';
 import { UsisAlertModal } from '../../common/components/UsisAlertModal';
-import { UsisSearchableSelect } from '../../common/components/ui/UsisSearchableSelect';
 
 interface LearnerProps {
   learners: Learner[];
@@ -16,12 +15,11 @@ interface LearnerProps {
   readOnly?: boolean;
 }
 
-export const Learners: React.FC<LearnerProps> = ({ learners, sections, setSections, readOnly, config, setConfig }) => {
-  const [schoolYears, setSchoolYears] = useState<Array<{ id: string; label: string; isActive: boolean }>>([]);
+export const Learners: React.FC<LearnerProps> = ({ learners, sections, setSections, config }) => {
   const [activeSchoolYearId, setActiveSchoolYearId] = useState('');
-  const [isSwitchingSchoolYear, setIsSwitchingSchoolYear] = useState(false);
   const [activeTab, setActiveTab] = useState<'sections' | 'families'>('sections');
   const [searchTerm, setSearchTerm] = useState('');
+  const [expandedGrades, setExpandedGrades] = useState<Set<string>>(new Set());
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
   
   // Section Management Modal State
@@ -43,8 +41,6 @@ export const Learners: React.FC<LearnerProps> = ({ learners, sections, setSectio
         label: String(row.label || ''),
         isActive: Boolean(row.is_active),
       }));
-      setSchoolYears(mapped);
-
       const active = mapped.find((row) => row.isActive) || mapped.find((row) => row.label === config.schoolYear) || mapped[0];
       if (active) setActiveSchoolYearId(active.id);
     };
@@ -74,6 +70,13 @@ export const Learners: React.FC<LearnerProps> = ({ learners, sections, setSectio
     if (newSet.has(sectionId)) newSet.delete(sectionId);
     else newSet.add(sectionId);
     setExpandedSections(newSet);
+  };
+
+  const toggleGrade = (grade: string) => {
+    const next = new Set(expandedGrades);
+    if (next.has(grade)) next.delete(grade);
+    else next.add(grade);
+    setExpandedGrades(next);
   };
 
   const toggleModalGrade = (grade: string) => {
@@ -158,42 +161,6 @@ export const Learners: React.FC<LearnerProps> = ({ learners, sections, setSectio
   const getSectionName = (secId: string) => {
       const sec = scopedSections.find(s => s.id === secId);
       return sec ? `${sec.gradeLevel} - ${sec.name}` : 'Unassigned';
-  };
-
-  const handleSchoolYearChange = async (schoolYearId: string) => {
-    if (!schoolYearId || schoolYearId === activeSchoolYearId || isSwitchingSchoolYear) return;
-    setIsSwitchingSchoolYear(true);
-    try {
-      await adminClient.from('registrar_school_years').update({ is_active: false }).neq('id', schoolYearId);
-      const { error: setActiveError } = await adminClient
-        .from('registrar_school_years')
-        .update({ is_active: true })
-        .eq('id', schoolYearId);
-      if (setActiveError) throw setActiveError;
-
-      const selected = schoolYears.find((row) => row.id === schoolYearId);
-      if (selected?.label) {
-        const { data: currentConfigRow } = await adminClient
-          .from('spta_system_config')
-          .select('config')
-          .eq('id', 1)
-          .maybeSingle();
-        const mergedConfig = {
-          ...(currentConfigRow?.config || {}),
-          schoolYear: selected.label
-        };
-        await adminClient.from('spta_system_config').upsert({ id: 1, config: mergedConfig }, { onConflict: 'id' });
-        setConfig((prev: SystemConfig) => ({ ...prev, schoolYear: selected.label }));
-      }
-
-      setActiveSchoolYearId(schoolYearId);
-      setSchoolYears((prev) => prev.map((row) => ({ ...row, isActive: row.id === schoolYearId })));
-      setNotice({ open: true, title: 'School Year Updated', message: 'Active school year was switched using registrar school years.', tone: 'success' });
-    } catch (error: any) {
-      setNotice({ open: true, title: 'Update Failed', message: error?.message || 'Unable to switch active school year.', tone: 'danger' });
-    } finally {
-      setIsSwitchingSchoolYear(false);
-    }
   };
 
   const isUUID = (str: string) => {
@@ -353,20 +320,6 @@ export const Learners: React.FC<LearnerProps> = ({ learners, sections, setSectio
         <div className="flex justify-between items-center">
             <h2 className="text-2xl font-bold text-gray-800">Learner Registry</h2>
             <div className="flex gap-3 items-center">
-                <div className="min-w-[240px]">
-                    <UsisSearchableSelect
-                        ariaLabel="Active School Year"
-                        floatingLabel
-                        label="Active School Year"
-                        value={activeSchoolYearId}
-                        onChange={handleSchoolYearChange}
-                        disabled={isSwitchingSchoolYear || schoolYears.length === 0}
-                        options={schoolYears.map((row) => ({
-                          label: `${row.label}${row.isActive ? ' (Active)' : ''}`,
-                          value: row.id
-                        }))}
-                    />
-                </div>
                 <button onClick={() => setIsSectionModalOpen(true)} className="m3-btn-tonal flex items-center gap-2">
                     <span className="material-symbols-outlined text-lg">vpn_key</span>
                     Manage Access Codes
@@ -419,16 +372,36 @@ export const Learners: React.FC<LearnerProps> = ({ learners, sections, setSectio
             <div className="space-y-8 animate-fade-in">
                 {availableGradeLevels.map(grade => {
                     const gradeSections = scopedSections.filter(s => s.gradeLevel === grade);
-                    if (gradeSections.length === 0) return null;
+                    const sectionsWithLearners = gradeSections.filter(section =>
+                      filteredLearners.some(learner => learner.sectionId === section.id)
+                    );
+                    if (sectionsWithLearners.length === 0) return null;
+
+                    const isGradeExpanded = expandedGrades.has(grade) || searchTerm.length > 0;
+                    const learnerCountInGrade = sectionsWithLearners.reduce(
+                      (count, section) => count + filteredLearners.filter(learner => learner.sectionId === section.id).length,
+                      0,
+                    );
 
                     return (
                         <div key={grade} className="space-y-3">
-                            <h3 className="text-lg font-bold text-gray-800 border-b border-gray-200 pb-2 flex items-center gap-2">
-                                <span className="material-symbols-outlined text-gray-400">school</span>
-                                {grade}
-                            </h3>
+                            <button
+                                type="button"
+                                onClick={() => toggleGrade(grade)}
+                                className="w-full text-left text-lg font-bold text-gray-800 border border-gray-200 rounded-xl px-4 py-3 bg-white hover:bg-gray-50 transition-colors flex items-center justify-between"
+                            >
+                                <span className="flex items-center gap-2">
+                                    <span className={`material-symbols-outlined text-gray-500 transition-transform ${isGradeExpanded ? 'rotate-180' : ''}`}>expand_more</span>
+                                    <span className="material-symbols-outlined text-gray-400">school</span>
+                                    {grade}
+                                </span>
+                                <span className="text-xs font-bold px-3 py-1 rounded-full bg-blue-50 text-blue-700">
+                                    {learnerCountInGrade} Learner{learnerCountInGrade !== 1 ? 's' : ''}
+                                </span>
+                            </button>
+                            {isGradeExpanded && (
                             <div className="grid grid-cols-1 gap-3">
-                                {gradeSections.map(section => {
+                                {sectionsWithLearners.map(section => {
                                     const students = filteredLearners.filter(l => l.sectionId === section.id);
                                     const isExpanded = expandedSections.has(section.id);
                                     const autoExpand = searchTerm.length > 0 && students.length > 0;
@@ -514,6 +487,7 @@ export const Learners: React.FC<LearnerProps> = ({ learners, sections, setSectio
                                     );
                                 })}
                             </div>
+                            )}
                         </div>
                     );
                 })}

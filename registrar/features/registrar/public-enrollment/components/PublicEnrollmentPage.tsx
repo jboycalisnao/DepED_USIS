@@ -4,6 +4,7 @@ import { RegistrarHeader } from '../../../../components/shell/RegistrarHeader';
 import { RegistrarFooter } from '../../../../components/shell/RegistrarFooter';
 import { SearchableSelect } from '../../../../components/ui/SearchableSelect';
 import { supabase } from '../../../../lib/supabase';
+import UsisPageLoader from '../../../../../common/components/UsisPageLoader';
 import {
   deviceOptions,
   gradeLevelOptions,
@@ -35,7 +36,7 @@ const initialDraft: EnrollmentDraft = {
   schoolId: LEON_NHS_ID,
   schoolYear: '2026-2027',
   schoolToEnroll: LEON_NHS_NAME,
-  studentType: 'New Student',
+  studentType: 'New Learner',
   learnerCategory: SAME_SCHOOL_LABEL,
   previousSchool: '',
   previousSchoolYear: '',
@@ -135,6 +136,7 @@ const buildAddressLine = (selection: AddressSelection, regions: PsgcLocation[], 
 
 export default function PublicEnrollmentPage() {
   const [draft, setDraft] = useState<EnrollmentDraft>(initialDraft);
+  const [isPageLoading, setIsPageLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [modalNotice, setModalNotice] = useState<{ type: 'success' | 'error' | 'info'; title: string; message: string } | null>(null);
   const [previousSchoolOptions, setPreviousSchoolOptions] = useState<SchoolDirectoryEntry[]>([]);
@@ -153,50 +155,53 @@ export default function PublicEnrollmentPage() {
   const isSeniorHighTargetGrade = SHS_GRADES.has(draft.gradeToEnroll);
 
   useEffect(() => {
-    const loadActiveSchoolYear = async () => {
-      const { data, error } = await supabase.from('registrar_school_years').select('label').eq('is_active', true).limit(1).maybeSingle();
-      if (!error && data?.label) {
-        setDraft((current) => ({ ...current, schoolYear: String(data.label), schoolId: LEON_NHS_ID, schoolToEnroll: LEON_NHS_NAME }));
-      }
-    };
-    loadActiveSchoolYear();
-  }, []);
+    let isMounted = true;
 
-  useEffect(() => {
-    const loadPsgc = async () => {
+    const loadPageSetup = async () => {
+      setIsPageLoading(true);
       try {
-        const [regionRows, provinceRows, cityRows] = await Promise.all([
+        const [activeYearResult, strandsResult, regionRows, provinceRows, cityRows] = await Promise.all([
+          supabase.from('registrar_school_years').select('label').eq('is_active', true).limit(1).maybeSingle(),
+          supabase.from('registrar_strands').select('acronym, full_name').order('acronym', { ascending: true }),
           fetchPsgcRegions(),
           fetchPsgcProvinces(),
           fetchPsgcCitiesAndMunicipalities(),
         ]);
+
+        if (!isMounted) return;
+
+        if (!activeYearResult.error && activeYearResult.data?.label) {
+          setDraft((current) => ({ ...current, schoolYear: String(activeYearResult.data.label), schoolId: LEON_NHS_ID, schoolToEnroll: LEON_NHS_NAME }));
+        }
+
+        if (!strandsResult.error && strandsResult.data?.length) {
+          setStrandOptions(
+            strandsResult.data.map((row) => ({
+              value: String(row.acronym || '').trim(),
+              label: String(row.full_name || row.acronym || '').trim(),
+            }))
+          );
+        }
+
         setRegions(regionRows);
         setProvinces(provinceRows);
         setCities(cityRows);
       } catch (error: any) {
+        if (!isMounted) return;
         setModalNotice({
           type: 'error',
-          title: 'PSGC API Notice',
-          message: error?.message || 'Unable to load PSGC locations right now.',
+          title: 'Setup Notice',
+          message: error?.message || 'Unable to load enrollment setup data right now.',
         });
+      } finally {
+        if (isMounted) setIsPageLoading(false);
       }
     };
-    loadPsgc();
-  }, []);
 
-  useEffect(() => {
-    const loadStrands = async () => {
-      const { data, error } = await supabase.from('registrar_strands').select('acronym, full_name').order('acronym', { ascending: true });
-      if (!error && data?.length) {
-        setStrandOptions(
-          data.map((row) => ({
-            value: String(row.acronym || '').trim(),
-            label: String(row.full_name || row.acronym || '').trim(),
-          }))
-        );
-      }
+    loadPageSetup();
+    return () => {
+      isMounted = false;
     };
-    loadStrands();
   }, []);
 
   useEffect(() => {
@@ -355,6 +360,10 @@ export default function PublicEnrollmentPage() {
     }
   };
 
+  if (isPageLoading) {
+    return <UsisPageLoader message="Loading public enrollment form..." />;
+  }
+
   return (
     <>
       <RegistrarHeader />
@@ -379,7 +388,7 @@ export default function PublicEnrollmentPage() {
                   <h3>1. Enrollment Context</h3>
                   <div className="floating-field-grid">
                     <TextField label="School Year (Active Registrar Year)" value={draft.schoolYear} onChange={() => {}} disabled />
-                    <SelectField label="Student Type" value={draft.studentType} onChange={(value) => updateField('studentType', value)} options={studentTypeOptions as unknown as string[]} />
+                    <SelectField label="Learner Type" value={draft.studentType} onChange={(value) => updateField('studentType', value)} options={studentTypeOptions as unknown as string[]} />
                     <SelectField label="Learner Category" value={draft.learnerCategory} onChange={(value) => updateField('learnerCategory', value)} options={learnerCategoryOptions as unknown as string[]} />
                     <SearchableSelect
                       label="Previous School Attended"

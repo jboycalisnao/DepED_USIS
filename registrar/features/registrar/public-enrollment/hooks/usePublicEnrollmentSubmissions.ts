@@ -26,7 +26,7 @@ const writeCache = (scopeKey: string, rows: PublicEnrollmentSubmission[]) => {
 
 export function usePublicEnrollmentSubmissions(scopeKey = 'default') {
   const [submissions, setSubmissions] = useState<PublicEnrollmentSubmission[]>(() => readCache(scopeKey));
-  const [isLoading, setIsLoading] = useState(() => readCache(scopeKey).length === 0);
+  const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const refresh = useCallback(async (options?: { silent?: boolean }) => {
@@ -46,12 +46,11 @@ export function usePublicEnrollmentSubmissions(scopeKey = 'default') {
   useEffect(() => {
     const cachedRows = readCache(scopeKey);
     setSubmissions(cachedRows);
-    setIsLoading(cachedRows.length === 0);
+    setIsLoading(true);
   }, [scopeKey]);
 
   useEffect(() => {
-    const hasCachedRows = readCache(scopeKey).length > 0;
-    void refresh(hasCachedRows ? { silent: true } : undefined);
+    void refresh();
   }, [scopeKey, refresh]);
 
   useEffect(() => {

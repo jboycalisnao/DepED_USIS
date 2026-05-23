@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Layout from './components/Layout';
 import Dashboard from './views/Dashboard';
 import LearnerList from './views/LearnerList';
@@ -11,7 +11,54 @@ import Credentials from './views/Credentials';
 import Landing from './views/Landing';
 import PublicEnrollmentSubmissionsPage from './features/registrar/public-enrollment/admin/components/PublicEnrollmentSubmissionsPage';
 import PublicEnrollmentSubmissionDetailsPage from './features/registrar/public-enrollment/admin/components/PublicEnrollmentSubmissionDetailsPage';
+import PublicEnrollmentSubmissionEditPage from './features/registrar/public-enrollment/admin/components/PublicEnrollmentSubmissionEditPage';
+import PublicEnrollmentPriorLearnerEditPage from './features/registrar/public-enrollment/admin/components/PublicEnrollmentPriorLearnerEditPage';
+import EnrollmentKioskPage from './features/registrar/public-enrollment/kiosk/EnrollmentKioskPage';
+import PublicEnrollmentPage from './features/registrar/public-enrollment/components/PublicEnrollmentPage';
 import { useStore } from './store';
+
+const AuthenticatedRouter: React.FC = () => {
+  const location = useLocation();
+  const isKioskRoute = location.pathname === '/enroll/kiosk';
+  const isPublicEnrollmentRoute = location.pathname === '/public-enrollment';
+
+  if (isKioskRoute) {
+    return (
+      <Routes>
+        <Route path="/enroll/kiosk" element={<EnrollmentKioskPage />} />
+        <Route path="*" element={<Navigate to="/enroll/kiosk" replace />} />
+      </Routes>
+    );
+  }
+
+  if (isPublicEnrollmentRoute) {
+    return (
+      <Routes>
+        <Route path="/public-enrollment" element={<PublicEnrollmentPage />} />
+        <Route path="*" element={<Navigate to="/public-enrollment" replace />} />
+      </Routes>
+    );
+  }
+
+  return (
+    <Layout>
+      <Routes>
+        <Route path="/" element={<Dashboard />} />
+        <Route path="/learners" element={<LearnerList />} />
+        <Route path="/public-enrollment" element={<PublicEnrollmentPage />} />
+        <Route path="/enroll" element={<PublicEnrollmentSubmissionsPage />} />
+        <Route path="/enroll/:id" element={<PublicEnrollmentSubmissionDetailsPage />} />
+        <Route path="/enroll/:id/edit" element={<PublicEnrollmentSubmissionEditPage />} />
+        <Route path="/enroll/prior-learner/:learnerId/edit" element={<PublicEnrollmentPriorLearnerEditPage />} />
+        <Route path="/sections" element={<SectionManagement />} />
+        <Route path="/import" element={<BulkImport />} />
+        <Route path="/settings" element={<Settings />} />
+        <Route path="/credentials" element={<Credentials />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Layout>
+  );
+};
 
 const App: React.FC = () => {
   const { isAuthenticated } = useStore();
@@ -21,6 +68,7 @@ const App: React.FC = () => {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Landing />} />
+          <Route path="/public-enrollment" element={<PublicEnrollmentPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
@@ -29,19 +77,7 @@ const App: React.FC = () => {
 
   return (
     <BrowserRouter>
-      <Layout>
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/learners" element={<LearnerList />} />
-          <Route path="/enroll" element={<PublicEnrollmentSubmissionsPage />} />
-          <Route path="/enroll/:id" element={<PublicEnrollmentSubmissionDetailsPage />} />
-          <Route path="/sections" element={<SectionManagement />} />
-          <Route path="/import" element={<BulkImport />} />
-          <Route path="/settings" element={<Settings />} />
-          <Route path="/credentials" element={<Credentials />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </Layout>
+      <AuthenticatedRouter />
     </BrowserRouter>
   );
 };

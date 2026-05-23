@@ -9,6 +9,7 @@ DepED USIS is planned as a **monorepo-style school systems repository** that con
 ## Current Module Inventory
 
 - `deped-web-kit/` - DepEd web branding and interface reference app
+- `data-privacy/` - data privacy and legal compliance reference subsystem
 - `attendance/` - attendance monitoring and RFID logging system
 - `coordinator/` - coordinator operations and credential management portal
 - `enrollment/` - school enrollment management portal

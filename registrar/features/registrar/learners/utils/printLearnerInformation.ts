@@ -180,7 +180,7 @@ const buildPrintHtml = ({ learners, schoolYearLabel, sections }: PrintLearnerInf
             <h3>2. Enrollment Context</h3>
             <div class="grid two">
               <p><strong>School to Enroll:</strong> ${escapeHtml(toOptionalText(`${schoolToEnroll}${schoolId ? ` (${schoolId})` : ''}`.trim()))}</p>
-              <p><strong>Student Type:</strong> ${escapeHtml(toOptionalText(studentType))}</p>
+              <p><strong>Learner Type:</strong> ${escapeHtml(toOptionalText(studentType))}</p>
               <p><strong>Learner Category:</strong> ${escapeHtml(toOptionalText(learnerCategory))}</p>
               <p><strong>Previous School:</strong> ${escapeHtml(toOptionalText(previousSchool))}</p>
               <p><strong>Last School Year Attended:</strong> ${escapeHtml(toOptionalText(previousSchoolYear))}</p>

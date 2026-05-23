@@ -84,7 +84,7 @@
 
 .registrar-public-enrollment .searchable-select--floating .floating-field__control input {
   border-right: 0;
-  border-radius: 12px 0 0 12px;
+  border-radius: var(--usis-radius-control) 0 0 var(--usis-radius-control);
   padding-right: 16px;
 }
 
@@ -101,7 +101,7 @@
   transform: none;
   border: 1px solid rgba(18, 35, 61, 0.14);
   border-left: 0;
-  border-radius: 0 12px 12px 0;
+  border-radius: 0 var(--usis-radius-control) var(--usis-radius-control) 0;
   background: #fbfcff;
   color: var(--deped-blue);
   cursor: pointer;
@@ -154,8 +154,26 @@
   z-index: 30;
 }
 
+.registrar-public-enrollment-submissions .floating-field,
+.registrar-public-enrollment-submissions .searchable-select {
+  position: relative;
+  z-index: 1;
+}
+
+.registrar-public-enrollment-submissions .floating-field:focus-within,
+.registrar-public-enrollment-submissions .searchable-select:focus-within {
+  z-index: 2600;
+}
+
 .registrar-public-enrollment-submissions .searchable-select__menu {
-  z-index: 1200;
+  z-index: 2200;
+  max-height: 260px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.registrar-public-enrollment-submissions .floating-field-grid {
+  overflow: visible;
 }
 
 @media (max-width: 720px) {
@@ -187,7 +205,7 @@
 .registrar-public-enrollment-submissions .searchable-select--floating .floating-field__control input,
 .registrar-learners-page .searchable-select--floating .floating-field__control input {
   border-right: 0;
-  border-radius: 12px 0 0 12px;
+  border-radius: var(--usis-radius-control) 0 0 var(--usis-radius-control);
   padding-right: 16px;
 }
 
@@ -205,7 +223,238 @@
   transform: none;
   border: 1px solid rgba(18, 35, 61, 0.14);
   border-left: 0;
-  border-radius: 0 12px 12px 0;
+  border-radius: 0 var(--usis-radius-control) var(--usis-radius-control) 0;
   background: #fbfcff;
   color: var(--deped-blue);
+}
+
+.registrar-kiosk-page {
+  height: 100vh;
+  width: 100%;
+  background: #eef3f9;
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+  grid-template-rows: auto 1fr;
+  overflow: hidden;
+}
+
+.registrar-kiosk-page__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid #b7c7df;
+  border-radius: var(--usis-radius-surface);
+  background: #ffffff;
+  padding: 10px 12px;
+  box-shadow: 0 1px 2px rgba(16, 43, 84, 0.06);
+  border-top: 4px solid #0f4aa8;
+}
+
+.registrar-kiosk-page__eyebrow {
+  margin: 0;
+  font-size: 13px;
+  color: #4e6588;
+  font-weight: 600;
+}
+
+.registrar-kiosk-page__header h1 {
+  margin: 2px 0;
+  font-size: 24px;
+  color: var(--deped-blue);
+}
+
+.registrar-kiosk-page__meta {
+  margin: 0;
+  font-size: 13px;
+  color: var(--deped-muted);
+}
+
+.registrar-kiosk-board {
+  display: grid;
+  grid-template-columns: minmax(240px, 0.78fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+  min-height: 0;
+  align-content: start;
+}
+
+.registrar-kiosk-column {
+  display: grid;
+  gap: 10px;
+  min-height: 0;
+}
+
+.registrar-kiosk-card {
+  border: 1px solid #b7c7df;
+  border-radius: var(--usis-radius-surface);
+  background: #ffffff;
+  padding: 10px;
+  min-height: 0;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(16, 43, 84, 0.06);
+  position: relative;
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+}
+
+.registrar-kiosk-card h2 {
+  margin: 0;
+  font-size: 14px;
+  color: var(--deped-blue);
+}
+
+.registrar-kiosk-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: -10px -10px 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid #c7d4e7;
+  background: #f5f8fe;
+}
+
+.registrar-kiosk-card__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid #a9c0e6;
+  background: #ebf2ff;
+  color: #0f4aa8;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.registrar-kiosk-fields {
+  display: grid;
+  gap: 6px;
+}
+
+.registrar-kiosk-fields--two-col {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.registrar-kiosk-field {
+  border: 1px solid #cfdaeb;
+  border-radius: var(--usis-radius-control);
+  background: #fbfdff;
+  padding: 6px 8px;
+  display: grid;
+  gap: 2px;
+  border-left: 3px solid #0f4aa8;
+}
+
+.registrar-kiosk-field span {
+  font-size: 11px;
+  color: #5b7193;
+}
+
+.registrar-kiosk-field strong {
+  font-size: 13px;
+  color: var(--deped-ink);
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.registrar-kiosk-list {
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.registrar-kiosk-list div {
+  display: grid;
+  gap: 3px;
+  padding: 6px 8px;
+  border: 1px solid #cfdaeb;
+  border-radius: var(--usis-radius-control);
+  background: #fbfdff;
+  border-left: 3px solid #0f4aa8;
+}
+
+.registrar-kiosk-list dt {
+  font-size: 12px;
+  color: var(--deped-muted);
+}
+
+.registrar-kiosk-list dd {
+  margin: 0;
+  font-size: 14px;
+  color: var(--deped-ink);
+  font-weight: 700;
+}
+
+.registrar-kiosk-status {
+  margin: 0 0 10px;
+  font-size: 13px;
+}
+
+.registrar-kiosk-empty {
+  margin: 0;
+  font-size: 13px;
+  color: var(--deped-muted);
+}
+
+.registrar-kiosk-focus-indicator {
+  display: none;
+}
+
+.registrar-kiosk-card--focused {
+  z-index: 10;
+  transform: scale(1.03);
+  border-color: #0f4aa8;
+  box-shadow: 0 10px 24px rgba(15, 74, 168, 0.22);
+}
+
+.registrar-kiosk-card--dimmed {
+  filter: blur(1.6px);
+  opacity: 0.4;
+  transform: scale(0.985);
+}
+
+.registrar-kiosk-card--focused .registrar-kiosk-focus-indicator {
+  display: block;
+  position: absolute;
+  inset: 0;
+  border: 2px solid rgba(15, 74, 168, 0.45);
+  border-radius: var(--usis-radius-surface);
+  pointer-events: none;
+}
+
+.registrar-kiosk-status-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  border: 1px solid #b4c7e5;
+  background: #eef3fb;
+  color: #2e4f7b;
+}
+
+.registrar-kiosk-status-chip--active {
+  border-color: #7eb891;
+  background: #e9f8ee;
+  color: #1b6a36;
+}
+
+@media (max-width: 980px) {
+  .registrar-kiosk-page {
+    height: auto;
+    min-height: 100vh;
+    overflow: auto;
+  }
+
+  .registrar-kiosk-board {
+    grid-template-columns: 1fr;
+  }
+
+  .registrar-kiosk-fields--two-col {
+    grid-template-columns: 1fr;
+  }
 }

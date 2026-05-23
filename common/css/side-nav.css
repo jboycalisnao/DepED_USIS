@@ -29,6 +29,8 @@
 
 .usis-side-nav__mobile-toggle .material-symbols-outlined {
   font-size: 22px;
+  display: block;
+  line-height: 1;
 }
 
 .usis-side-nav__mobile-toggle--inline {

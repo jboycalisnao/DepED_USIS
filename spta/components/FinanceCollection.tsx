@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { QRCodeCanvas } from 'qrcode.react';
 import { FinancialTransaction, Learner, Section, TransactionType, SystemConfig, GradeLevel } from '../types';
-import { supabase } from '../lib/supabaseClient';
+import { supabase, adminClient } from '../lib/supabaseClient';
 import { SPTA_FINANCIAL_TRANSACTIONS_TABLE, toDbFinancialTransaction } from '../lib/financeTransactionDb';
 import { createIdleKioskState, publishKioskState } from '../lib/kiosk';
 import { UsisSearchableSelect } from '../../common/components/ui/UsisSearchableSelect';
@@ -39,6 +39,7 @@ export const FinanceCollection: React.FC<FinanceCollectionProps> = ({ transactio
   const [manualEntryMode, setManualEntryMode] = useState(false);
   const [siblingDiscount, setSiblingDiscount] = useState<{isApplicable: boolean, payerName?: string, feesWaived: string[]}>({ isApplicable: false, feesWaived: [] });
   const [detectedSiblings, setDetectedSiblings] = useState<Learner[]>([]);
+  const [activeRegistrarSchoolYearId, setActiveRegistrarSchoolYearId] = useState<string>('');
 
   // Summary State
   const [isSummaryOpen, setIsSummaryOpen] = useState(false);
@@ -275,6 +276,21 @@ export const FinanceCollection: React.FC<FinanceCollectionProps> = ({ transactio
       publishKioskState(kioskState);
   }, [kioskState]);
 
+  useEffect(() => {
+      const loadActiveSchoolYearId = async () => {
+          const { data } = await adminClient
+              .from('registrar_school_years')
+              .select('id,label')
+              .eq('is_active', true)
+              .limit(1)
+              .maybeSingle();
+          if (data?.id) {
+              setActiveRegistrarSchoolYearId(String(data.id));
+          }
+      };
+      loadActiveSchoolYearId();
+  }, []);
+
   // Search Logic
   const filteredLearners = useMemo(() => {
       if (!searchTerm && searchGrade === 'All') return [];
@@ -471,7 +487,9 @@ export const FinanceCollection: React.FC<FinanceCollectionProps> = ({ transactio
           learnerName: `${selectedLearner.lastName}, ${selectedLearner.firstName}`,
           gradeSection: sections.find(s => s.id === selectedLearner.sectionId)?.name || 'N/A',
           recordedBy: cashierName || 'Admin',
-          referenceNo: receiptNo
+          referenceNo: receiptNo,
+          schoolYear: config.schoolYear,
+          registrarSchoolYearId: activeRegistrarSchoolYearId || undefined
       };
 
       // --- SAVE TO DATABASE ---

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useStore } from '../store';
 import { RegistrarHeader } from './shell/RegistrarHeader';
@@ -14,6 +14,7 @@ interface LayoutProps {
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const { logout, registrarAccess } = useStore();
   const location = useLocation();
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const isPathActive = (itemPath: string) =>
     itemPath === '/' ? location.pathname === '/' : location.pathname === itemPath || location.pathname.startsWith(`${itemPath}/`);
 
@@ -31,9 +32,29 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             profileName={registrarAccess?.coordinatorName || null}
             profileRole={registrarAccess?.coordinatorRole || 'School Coordinator'}
             onLogout={logout}
+            leftActions={
+              <button
+                type="button"
+                className="usis-side-nav__mobile-toggle usis-side-nav__mobile-toggle--inline"
+                aria-label={isMobileNavOpen ? 'Close navigation menu' : 'Open navigation menu'}
+                aria-expanded={isMobileNavOpen}
+                onClick={() => setIsMobileNavOpen((current) => !current)}
+              >
+                <span className="material-symbols-outlined" aria-hidden="true">
+                  menu
+                </span>
+              </button>
+            }
           />
           <div className="registrar-layout">
-            <UsisSideNav items={registrarNavItems} onLogout={logout} ariaLabel="Registrar sections" />
+            <UsisSideNav
+              items={registrarNavItems}
+              onLogout={logout}
+              ariaLabel="Registrar sections"
+              isMobileOpen={isMobileNavOpen}
+              onMobileOpenChange={setIsMobileNavOpen}
+              hideInternalMobileToggle
+            />
             <div className="registrar-content">{children}</div>
           </div>
         </div>

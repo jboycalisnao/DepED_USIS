@@ -11,6 +11,7 @@ import {
   semesterOptions,
   studentTypeOptions,
 } from '../../features/registrar/public-enrollment/data/enrollmentOptions';
+import { normalizeLearnerType } from '../../features/registrar/public-enrollment/shared/learnerType';
 
 type LearnerModalDraft = {
   schoolId: string;
@@ -78,7 +79,7 @@ const buildDraft = (student: Student, activeSchoolYearLabel: string): LearnerMod
     schoolId: firstNonEmpty(payload.schoolId, '302522'),
     schoolYear: firstNonEmpty(payload.schoolYear, activeSchoolYearLabel),
     schoolToEnroll: firstNonEmpty(payload.schoolToEnroll),
-    studentType: firstNonEmpty(payload.studentType, studentTypeOptions[0]),
+    studentType: normalizeLearnerType(firstNonEmpty(payload.studentType, payload.student_type, payload.learnerType, payload.learner_type)) || studentTypeOptions[0],
     learnerCategory: firstNonEmpty(payload.learnerCategory, learnerCategoryOptions[0]),
     previousSchool: firstNonEmpty(payload.previousSchool),
     previousSchoolYear: firstNonEmpty(payload.previousSchoolYear),
@@ -194,7 +195,7 @@ export default function LearnerEditModal({ student, activeSchoolYearLabel, stran
               <div className="floating-field-grid">
                 <InputField label="School ID" value={draft.schoolId} onChange={(value) => setDraft((current) => (current ? { ...current, schoolId: value } : current))} readOnly />
                 <InputField label="School Year" value={draft.schoolYear} onChange={(value) => setDraft((current) => (current ? { ...current, schoolYear: value } : current))} />
-                <SelectField label="Student Type" value={draft.studentType} onChange={(value) => setDraft((current) => (current ? { ...current, studentType: value } : current))} options={studentTypeOptions as unknown as string[]} />
+                <SelectField label="Learner Type" value={draft.studentType} onChange={(value) => setDraft((current) => (current ? { ...current, studentType: value } : current))} options={studentTypeOptions as unknown as string[]} />
                 <SelectField label="Learner Category" value={draft.learnerCategory} onChange={(value) => setDraft((current) => (current ? { ...current, learnerCategory: value } : current))} options={learnerCategoryOptions as unknown as string[]} />
                 <InputField label="School to Enroll" value={draft.schoolToEnroll} onChange={(value) => setDraft((current) => (current ? { ...current, schoolToEnroll: value } : current))} />
                 <InputField label="Previous School Attended" value={draft.previousSchool} onChange={(value) => setDraft((current) => (current ? { ...current, previousSchool: value } : current))} />

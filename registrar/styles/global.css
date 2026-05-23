@@ -4,6 +4,8 @@
   --usis-module-label: "USIS - Registrar and Learner Information System";
   --usis-module-kicker: "School";
   --usis-module-title: "REGISTRAR PORTAL";
+  --usis-radius-surface: 0.375rem;
+  --usis-radius-control: 0.375rem;
 }
 
 .registrar-header__actions {
@@ -70,7 +72,7 @@
   z-index: 40;
   min-width: 250px;
   border: 1px solid var(--deped-line);
-  border-radius: 12px;
+  border-radius: var(--usis-radius-surface);
   background: #f9fafb;
   box-shadow: 0 14px 30px rgba(15, 23, 42, 0.18);
   padding: 14px 14px 10px;
@@ -121,7 +123,7 @@
   align-items: center;
   gap: 8px;
   padding: 7px 6px;
-  border-radius: 8px;
+  border-radius: var(--usis-radius-control);
   cursor: pointer;
 }
 
@@ -329,7 +331,7 @@
   align-items: center;
   gap: 10px;
   border: 1px solid transparent;
-  border-radius: 10px;
+  border-radius: var(--usis-radius-control);
   padding: 10px 10px;
   color: #1f2937;
   font-size: 16px;
@@ -369,7 +371,7 @@
   width: 100%;
   min-height: 40px;
   border: 1px solid transparent;
-  border-radius: 10px;
+  border-radius: var(--usis-radius-control);
   background: transparent;
   color: var(--deped-red);
   font-size: 16px;
@@ -422,6 +424,11 @@
 .registrar-content .bg-white,
 .registrar-content .rounded-2xl,
 .registrar-content .rounded-3xl,
+.registrar-content .rounded-xl,
+.registrar-content .rounded-lg,
+.registrar-content .rounded-md,
+.registrar-content .rounded-sm,
+.registrar-content .rounded,
 .registrar-content .rounded-\[40px\],
 .registrar-content .rounded-\[32px\],
 .registrar-content .rounded-\[28px\],
@@ -431,6 +438,23 @@
 .registrar-content .shadow-lg {
   border-radius: var(--usis-radius-surface);
   box-shadow: none;
+}
+
+.registrar-shell :where(
+  .portal-panel,
+  .table-card,
+  .notice-box,
+  .floating-field__control input,
+  .floating-field__control select,
+  .floating-field__control textarea,
+  .searchable-select__field input,
+  .searchable-select__field button,
+  .searchable-select__menu,
+  .secondary-button,
+  .primary-button,
+  .button
+) {
+  border-radius: var(--usis-radius-control);
 }
 
 .registrar-content .bg-white {

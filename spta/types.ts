@@ -108,6 +108,8 @@ export interface FinancialTransaction {
   source?: string;
   recordedBy?: string;
   gradeSection?: string;
+  schoolYear?: string;
+  registrarSchoolYearId?: string;
 }
 
 export interface Activity {
