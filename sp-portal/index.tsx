@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import App from './App';
 import './styles/global.css';
 import { applyDocumentBranding } from '../common/config/usisBranding';
+import { UsisAppLoaderGate } from '../common/components/UsisAppLoaderGate';
 
 applyDocumentBranding({ moduleTitle: 'SP Portal' });
 
@@ -14,6 +15,8 @@ if (!rootElement) {
 
 createRoot(rootElement).render(
   <React.StrictMode>
-    <App />
+    <UsisAppLoaderGate label="Loading special programs portal">
+      <App />
+    </UsisAppLoaderGate>
   </React.StrictMode>,
 );

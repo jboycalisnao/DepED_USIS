@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client';
 import App from './App';
 import './styles/index.css';
 import { applyDocumentBranding } from '../common/config/usisBranding';
+import { UsisAppLoaderGate } from '../common/components/UsisAppLoaderGate';
 
 applyDocumentBranding({ moduleTitle: 'Learner Government Elections' });
 
@@ -15,6 +16,8 @@ if (!rootElement) {
 const root = createRoot(rootElement);
 root.render(
   <React.StrictMode>
-    <App />
+    <UsisAppLoaderGate label="Loading election subsystem">
+      <App />
+    </UsisAppLoaderGate>
   </React.StrictMode>
 );

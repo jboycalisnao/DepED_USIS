@@ -6,6 +6,7 @@ import './styles/tailwind.css';
 import './styles/global.css';
 import './styles/adminPanel.css';
 import { applyDocumentBranding } from '../common/config/usisBranding';
+import { UsisAppLoaderGate } from '../common/components/UsisAppLoaderGate';
 
 applyDocumentBranding({ moduleTitle: "Registrar's Office" });
 
@@ -17,6 +18,8 @@ if (!rootElement) {
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
-    <App />
+    <UsisAppLoaderGate label="Loading registrar subsystem">
+      <App />
+    </UsisAppLoaderGate>
   </React.StrictMode>
 );
