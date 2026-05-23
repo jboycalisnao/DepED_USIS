@@ -233,9 +233,10 @@ export function UsisDateTimePicker({
                       <div className="usis-calendar-popover__months-grid">
                         {monthShort.map((month, monthIndex) => {
                           const monthDate = new Date(year, monthIndex, 1);
-                          const blocked =
+                          const blocked = Boolean(
                             (minMonthStart && monthEnd(monthDate) < minMonthStart) ||
-                            (maxMonthEnd && monthStart(monthDate) > monthStart(maxMonthEnd));
+                              (maxMonthEnd && monthStart(monthDate) > monthStart(maxMonthEnd))
+                          );
                           const selectedMonth =
                             viewDate.getFullYear() === year && viewDate.getMonth() === monthIndex;
                           return (

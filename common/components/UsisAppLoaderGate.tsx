@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import '../css/fullscreen-loader.css';
+import UsisPageLoader from './UsisPageLoader';
+import '../css/page-loader.css';
 
 type UsisAppLoaderGateProps = {
   children: ReactNode;
@@ -22,12 +23,7 @@ export function UsisAppLoaderGate({
   return (
     <>
       {children}
-      <div className={`usis-loader-overlay ${isVisible ? 'is-visible' : 'is-hidden'}`} aria-hidden={!isVisible}>
-        <div className="usis-loader-card" role="status" aria-live="polite" aria-label={label}>
-          <div className="usis-loader-spinner" />
-          <p className="usis-loader-label">{label}</p>
-        </div>
-      </div>
+      {isVisible ? <UsisPageLoader message={label} /> : null}
     </>
   );
 }
