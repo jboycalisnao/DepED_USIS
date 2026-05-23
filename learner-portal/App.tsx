@@ -23,6 +23,14 @@ import { PtaFeeServicePage } from './features/portal/pages/services/PtaFeeServic
 import { LearnerLoginPage } from './features/auth/pages/LearnerLoginPage';
 import { LearnerCredentialPage } from './features/auth/pages/LearnerCredentialPage';
 
+const LEARNER_PORTAL_BASENAME = '/learner-portal';
+
+function resolveLearnerPortalBasename(pathname: string): string {
+  return pathname === LEARNER_PORTAL_BASENAME || pathname.startsWith(`${LEARNER_PORTAL_BASENAME}/`)
+    ? LEARNER_PORTAL_BASENAME
+    : '';
+}
+
 function LearnerPortalShell({
   session,
   onLogout,
@@ -125,6 +133,7 @@ function LearnerPortalShell({
 }
 
 export default function App() {
+  const basename = resolveLearnerPortalBasename(window.location.pathname);
   const [session, setSession] = useState<LearnerPortalAccessRecord | null>(() => getStoredLearnerAccess());
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -157,7 +166,7 @@ export default function App() {
   };
 
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={basename}>
       <div className="learner-portal-app">
         <header className="site-chrome learner-portal-chrome">
           <div className="content-width">

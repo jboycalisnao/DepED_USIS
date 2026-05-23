@@ -9,6 +9,13 @@ import { SubmissionStatusPage } from './features/portal/components/SubmissionSta
 import type { SubmissionStatusAccessRecord } from './features/enrollment-form/services/submissionStatusAuth';
 
 const SUBMISSION_STATUS_SESSION_KEY = 'usis_enrollment_submission_status_session';
+const ENROLLMENT_BASENAME = '/enrollment';
+
+function resolveEnrollmentBasename(pathname: string): string {
+  return pathname === ENROLLMENT_BASENAME || pathname.startsWith(`${ENROLLMENT_BASENAME}/`)
+    ? ENROLLMENT_BASENAME
+    : '';
+}
 
 const navItems: Array<{ path: string; label: string; matchPrefix?: string }> = [
   { path: '/enrollment-form', label: 'Enrollment Form' },
@@ -107,8 +114,10 @@ function EnrollmentShell() {
 }
 
 export default function App() {
+  const basename = resolveEnrollmentBasename(window.location.pathname);
+
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={basename}>
       <EnrollmentShell />
     </BrowserRouter>
   );
