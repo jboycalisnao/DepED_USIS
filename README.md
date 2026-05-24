@@ -21,6 +21,7 @@ The repository currently contains these active modules:
 - `data-privacy/` - data privacy and legal compliance reference subsystem for SIS policy pages
 - `enrollment/` - school enrollment management portal
 - `learner-portal/` - learner self-service access portal
+- `integrated-admin/` - integrated admin configuration portal for cross-subsystem controls
 - `merch/` - school merchandise hub for merchandise catalog, orders, and inventory workflows
 - `election/` - DepED school election system
 - `sp-portal/` - Special Program admissions portal for school-specific application bulletins
@@ -75,6 +76,7 @@ The intended end state is a unified school platform with multiple modules under 
 - `data-privacy/`
 - `enrollment/`
 - `merch/`
+- `integrated-admin/`
 - `support/`
 - future modules like `guidance/`, `library/`, `clinic/`, `finance/`, `hr/`, or `student-portal/`
 

@@ -1,6 +1,6 @@
 {
-  "name": "Web Serial Monitor",
-  "description": "A clean, modern web-based Serial Monitor for Arduino and other microcontrollers using the Web Serial API.",
+  "name": "Attendance Kiosk",
+  "description": "Leon NHS Attendance Kiosk",
   "requestFramePermissions": [
     "serial"
   ]

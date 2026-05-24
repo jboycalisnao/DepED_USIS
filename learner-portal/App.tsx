@@ -225,41 +225,44 @@ function LearnerPublicAccess({
   onPrefillLogin: (username: string, password: string) => void;
 }) {
   return (
-    <main className="page-frame learner-portal-main">
-      <div className="content-width">
-        <nav className="kit-nav" aria-label="Learner access navigation">
-          <div className="kit-nav__grid">
-            {publicNavItems.map((item) => (
-              <NavLink
-                key={item.path}
-                to={item.path}
-                className={({ isActive }) => `kit-nav__link ${isActive ? 'kit-nav__link--active' : ''}`}
-              >
-                {item.label}
-              </NavLink>
-            ))}
-          </div>
-        </nav>
-        <Routes>
-          <Route
-            path="/login"
-            element={
-              <LearnerLoginPage
-                username={username}
-                password={password}
-                isSubmitting={isSubmitting}
-                loginError={loginError}
-                onDismissNotice={onDismissNotice}
-                onUsernameChange={onUsernameChange}
-                onPasswordChange={onPasswordChange}
-                onSubmit={onSubmit}
-              />
-            }
-          />
-          <Route path="/get-credential" element={<LearnerCredentialPage onPrefillLogin={onPrefillLogin} />} />
-          <Route path="*" element={<Navigate to="/login" replace />} />
-        </Routes>
-      </div>
-    </main>
+    <>
+      <main className="page-frame learner-portal-main">
+        <div className="content-width">
+          <nav className="kit-nav" aria-label="Learner access navigation">
+            <div className="kit-nav__grid">
+              {publicNavItems.map((item) => (
+                <NavLink
+                  key={item.path}
+                  to={item.path}
+                  className={({ isActive }) => `kit-nav__link ${isActive ? 'kit-nav__link--active' : ''}`}
+                >
+                  {item.label}
+                </NavLink>
+              ))}
+            </div>
+          </nav>
+          <Routes>
+            <Route
+              path="/login"
+              element={
+                <LearnerLoginPage
+                  username={username}
+                  password={password}
+                  isSubmitting={isSubmitting}
+                  loginError={loginError}
+                  onDismissNotice={onDismissNotice}
+                  onUsernameChange={onUsernameChange}
+                  onPasswordChange={onPasswordChange}
+                  onSubmit={onSubmit}
+                />
+              }
+            />
+            <Route path="/get-credential" element={<LearnerCredentialPage onPrefillLogin={onPrefillLogin} />} />
+            <Route path="*" element={<Navigate to="/login" replace />} />
+          </Routes>
+        </div>
+      </main>
+      <UsisGlobalFooter />
+    </>
   );
 }

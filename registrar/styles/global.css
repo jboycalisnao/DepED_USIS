@@ -1,7 +1,7 @@
 @import "../../common/css/index.css";
 
 :root {
-  --usis-module-label: "USIS - Registrar and Learner Information System";
+  --usis-module-label: "Registrar and Learner Information System";
   --usis-module-kicker: "School";
   --usis-module-title: "REGISTRAR PORTAL";
   --usis-radius-surface: 0.375rem;
@@ -266,6 +266,7 @@
 
 .registrar-chrome .kit-nav__link {
   font-size: 15px;
+  font-weight: 700;
 }
 
 .registrar-page-intro p {

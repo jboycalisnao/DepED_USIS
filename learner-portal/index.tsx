@@ -5,7 +5,7 @@ import './styles/global.css';
 import { applyDocumentBranding } from '../common/config/usisBranding';
 import { UsisAppLoaderGate } from '../common/components/UsisAppLoaderGate';
 
-applyDocumentBranding({ moduleTitle: 'USIS Learner Portal' });
+applyDocumentBranding({ moduleTitle: 'Learner Portal' });
 
 const rootElement = document.getElementById('root');
 

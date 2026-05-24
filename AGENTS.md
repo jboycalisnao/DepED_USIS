@@ -14,6 +14,7 @@ DepED USIS is planned as a **monorepo-style school systems repository** that con
 - `coordinator/` - coordinator operations and credential management portal
 - `enrollment/` - school enrollment management portal
 - `learner-portal/` - learner self-service access portal
+- `integrated-admin/` - integrated admin subsystem for cross-module configuration and controls
 - `merch/` - school merchandise hub for school merchandise operations
 - `election/` - election management system
 - `sp-portal/` - special program admissions and application portal

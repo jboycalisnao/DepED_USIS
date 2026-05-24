@@ -8,6 +8,7 @@ export const USIS_SCHOOL_NAME = envSchoolName || DEFAULT_SCHOOL_NAME;
 export const USIS_SCHOOL_ID = envSchoolId || DEFAULT_SCHOOL_ID;
 export const USIS_FAVICON_PATH = new URL('../assets/USIS_Icon.png', import.meta.url).href;
 export const USIS_HEADER_IMAGE_PATH = new URL('../assets/Leon-NHS_USIS-Header-Image.png', import.meta.url).href;
+const USIS_TAB_SUFFIX = 'Leon NHS USIS';
 
 type ApplyDocumentBrandingOptions = {
   moduleTitle: string;
@@ -26,6 +27,6 @@ function upsertFavicon(rel: (typeof faviconRelList)[number], href: string) {
 }
 
 export function applyDocumentBranding({ moduleTitle }: ApplyDocumentBrandingOptions) {
-  document.title = `${moduleTitle} | ${USIS_SCHOOL_NAME}`;
+  document.title = `${moduleTitle} | ${USIS_TAB_SUFFIX}`;
   faviconRelList.forEach((rel) => upsertFavicon(rel, USIS_FAVICON_PATH));
 }

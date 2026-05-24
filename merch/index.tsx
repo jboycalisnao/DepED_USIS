@@ -5,7 +5,7 @@ import './styles/global.css';
 import { applyDocumentBranding } from '../common/config/usisBranding';
 import { UsisAppLoaderGate } from '../common/components/UsisAppLoaderGate';
 
-applyDocumentBranding({ moduleTitle: 'USIS School Merchandise Hub' });
+applyDocumentBranding({ moduleTitle: 'Merchandise Portal' });
 
 const rootElement = document.getElementById('root');
 

@@ -1,5 +1,5 @@
 {
-  "name": "DepEd School Voting System (E-Boto)",
-  "description": "A comprehensive, secure, and modern digital voting platform for school elections, featuring DepEd branding and real-time analytics.",
+  "name": "Election Portal",
+  "description": "Election Portal for Leon National High School",
   "requestFramePermissions": []
 }

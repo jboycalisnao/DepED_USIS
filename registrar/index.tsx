@@ -8,7 +8,7 @@ import './styles/adminPanel.css';
 import { applyDocumentBranding } from '../common/config/usisBranding';
 import { UsisAppLoaderGate } from '../common/components/UsisAppLoaderGate';
 
-applyDocumentBranding({ moduleTitle: "Registrar's Office" });
+applyDocumentBranding({ moduleTitle: 'Registrar Portal' });
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {

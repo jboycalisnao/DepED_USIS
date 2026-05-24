@@ -2,7 +2,7 @@
 @import "./enrollmentForm.css";
 
 :root {
-  --usis-module-label: "USIS - School Enrollment Portal";
+  --usis-module-label: "School Enrollment Portal";
   --usis-module-kicker: "School";
   --usis-module-title: "ENROLLMENT PORTAL";
 }

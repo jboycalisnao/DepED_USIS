@@ -6,7 +6,7 @@ import './styles/index.css';
 import { applyDocumentBranding } from '../common/config/usisBranding';
 import { UsisAppLoaderGate } from '../common/components/UsisAppLoaderGate';
 
-applyDocumentBranding({ moduleTitle: 'Learner Government Elections' });
+applyDocumentBranding({ moduleTitle: 'Election Portal' });
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
