@@ -16,6 +16,7 @@ type UsisLoginModalProps = {
   submitLabel?: string;
   noticeMessage?: string | null;
   noticeTitle?: string;
+  helperContent?: React.ReactNode;
   onDismissNotice?: () => void;
   onUsernameChange: (value: string) => void;
   onPasswordChange: (value: string) => void;
@@ -35,6 +36,7 @@ export function UsisLoginModal({
   isSubmitting = false,
   noticeMessage = null,
   noticeTitle = 'Login Notice',
+  helperContent,
   onDismissNotice,
   onUsernameChange,
   onPasswordChange,
@@ -115,6 +117,7 @@ export function UsisLoginModal({
           <button type="submit" className="primary-button usis-login-modal__submit" disabled={isSubmitting}>
             {isSubmitting ? 'Logging In...' : 'Login'}
           </button>
+          {helperContent ? <div className="usis-login-modal__helper">{helperContent}</div> : null}
         </form>
       </div>
 

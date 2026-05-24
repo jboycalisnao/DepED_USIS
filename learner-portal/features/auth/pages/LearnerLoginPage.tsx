@@ -1,4 +1,5 @@
 import { UsisLoginModal } from '../../../../common/components/UsisLoginModal';
+import { Link } from 'react-router-dom';
 
 type LearnerLoginPageProps = {
   username: string;
@@ -35,6 +36,9 @@ export function LearnerLoginPage({
         onUsernameChange={onUsernameChange}
         onPasswordChange={onPasswordChange}
         onSubmit={onSubmit}
+        helperContent={
+          <Link to="/get-credential">Don&apos;t know your credentials? Get them here.</Link>
+        }
       />
     </section>
   );

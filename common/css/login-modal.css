@@ -105,6 +105,19 @@
   letter-spacing: 0;
 }
 
+.usis-login-modal__helper {
+  text-align: center;
+  font-size: 12px;
+  line-height: 1.35;
+  margin-top: -2px;
+}
+
+.usis-login-modal__helper a {
+  color: var(--deped-blue);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .usis-login-modal__notice {
   border-radius: 0.375rem;
 }
