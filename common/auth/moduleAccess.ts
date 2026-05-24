@@ -1,5 +1,6 @@
 export type UsisModuleKey =
   | 'coordinator'
+  | 'ia'
   | 'registrar'
   | 'attendance'
   | 'election'

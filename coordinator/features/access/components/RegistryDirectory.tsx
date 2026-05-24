@@ -104,6 +104,9 @@ export function RegistryDirectory({
       .join(' ');
 
   const formatModuleLabel = (value: string) =>
+    value === 'ia'
+      ? 'Integrated Admin (IA)'
+      :
     value
       .split('_')
       .map((part) => part.charAt(0).toUpperCase() + part.slice(1))

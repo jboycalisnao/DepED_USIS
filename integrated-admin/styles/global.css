@@ -27,3 +27,8 @@ body {
   min-height: clamp(440px, 62vh, 720px);
   padding: 16px 0 24px;
 }
+
+.integrated-admin-workspace {
+  display: block;
+  padding: 16px 0 24px;
+}

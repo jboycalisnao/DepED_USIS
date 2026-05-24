@@ -8,6 +8,7 @@ export type { UsisModuleKey };
 
 export const moduleOptions: Array<{ key: UsisModuleKey; label: string }> = [
   { key: 'coordinator', label: 'Coordinator Portal' },
+  { key: 'ia', label: 'Integrated Admin (IA)' },
   { key: 'registrar', label: 'Registrar' },
   { key: 'attendance', label: 'Attendance' },
   { key: 'election', label: 'Election' },
