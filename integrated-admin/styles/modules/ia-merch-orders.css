@@ -1,0 +1,502 @@
+﻿.integrated-admin-merch-order-manual {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+  border: 1px solid var(--deped-line);
+  border-radius: 8px;
+  background: #f9fbff;
+  padding: 12px;
+}
+
+.integrated-admin-merch-order-manual-trigger {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 10px;
+}
+
+.integrated-admin-merch-orders-search {
+  min-width: 0;
+  flex: 1;
+}
+
+.integrated-admin-merch-orders-toolbar {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.integrated-admin-merch-orders-toolbar .integrated-admin-merch-order-manual-trigger {
+  margin-bottom: 0;
+}
+
+.integrated-admin-merch-orders-toolbar .integrated-admin-merch-order-manual__submit {
+  min-height: 58px;
+  height: 58px;
+}
+
+.integrated-admin-order-payment-toolbar {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.integrated-admin-order-payment-toolbar__search {
+  flex: 1;
+  min-width: 0;
+}
+
+.integrated-admin-order-payment-toolbar__add-btn {
+  min-height: 58px;
+  height: 58px;
+}
+
+.integrated-admin-order-payment-table-wrap {
+  margin-top: 12px;
+}
+
+.integrated-admin-order-counts-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 10px;
+}
+
+.integrated-admin-order-counts-toolbar__period {
+  width: min(320px, 100%);
+}
+
+.integrated-admin-order-counts-grid {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.integrated-admin-order-counts-card {
+  border: 1px solid var(--deped-line);
+  border-radius: 6px;
+  background: #fcfdff;
+  padding: 10px;
+}
+
+.integrated-admin-order-counts-card h3 {
+  margin: 0 0 8px;
+  color: var(--deped-blue);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.integrated-admin-order-counts-card p {
+  margin: 0;
+  color: var(--deped-muted);
+  font-size: 13px;
+}
+
+.integrated-admin-order-payment-summary {
+  border: 1px solid var(--deped-line);
+  border-radius: 6px;
+  background: #f8fafc;
+  padding: 10px 12px;
+  display: grid;
+  gap: 4px;
+}
+
+.integrated-admin-order-payment-summary strong {
+  color: var(--deped-blue);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.integrated-admin-order-payment-summary span {
+  color: var(--deped-muted);
+  font-size: 13px;
+}
+
+.integrated-admin-order-source-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.integrated-admin-order-source-tag__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.integrated-admin-order-source-tag--integrated_admin {
+  border: 1px solid #95b8ee;
+  background: #e9f2ff;
+  color: #18498f;
+}
+
+.integrated-admin-order-source-tag--learner_portal {
+  border: 1px solid #8fd9ab;
+  background: #e8faef;
+  color: #0c6b3d;
+}
+
+.integrated-admin-order-source-tag--unknown {
+  border: 1px solid #d0d5dd;
+  background: #f2f4f7;
+  color: #344054;
+}
+
+.integrated-admin-order-status-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid #b7e4c7;
+  background: #ecfdf3;
+  color: #027a48;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.integrated-admin-order-status-tag--approved {
+  border-color: #b7e4c7;
+  background: #ecfdf3;
+  color: #027a48;
+}
+
+.integrated-admin-order-payment-summary--metrics {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  background: #f5f8ff;
+}
+
+.integrated-admin-order-payment-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.integrated-admin-order-payment-divider {
+  border-top: 1px solid var(--deped-line);
+  margin: 6px 0 2px;
+}
+
+.integrated-admin-order-payment-summary__metric {
+  border: 1px solid rgba(0, 56, 168, 0.22);
+  border-radius: 6px;
+  border-top: 3px solid var(--deped-blue);
+  background: #f7faff;
+  padding: 9px 10px;
+  display: grid;
+  gap: 4px;
+}
+
+.integrated-admin-order-payment-summary__metric small {
+  color: var(--deped-muted);
+  font-size: 13px;
+}
+
+.integrated-admin-order-payment-summary__metric strong {
+  color: var(--deped-blue);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.integrated-admin-payment-form {
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--deped-line);
+  border-radius: 6px;
+  background: #fcfdff;
+}
+
+.integrated-admin-payment-form__title {
+  color: var(--deped-blue);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.integrated-admin-payment-form__intro {
+  border: 1px solid rgba(0, 56, 168, 0.18);
+  border-radius: 6px;
+  border-left: 4px solid var(--deped-blue);
+  background: #f3f8ff;
+  padding: 9px 12px;
+  display: grid;
+  gap: 1px;
+  margin: 0;
+}
+
+.integrated-admin-payment-form__intro strong {
+  color: var(--deped-blue);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.integrated-admin-payment-form__intro span {
+  color: var(--deped-muted);
+  font-size: 13px;
+}
+
+.integrated-admin-payment-form__error {
+  display: block;
+  margin-top: 6px;
+  color: #b42318;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.integrated-admin-order-payment-glance {
+  margin: 0 0 8px;
+  padding: 10px 12px;
+  border: 1px solid rgba(0, 56, 168, 0.16);
+  border-radius: 6px;
+  background: #f7faff;
+  display: grid;
+  gap: 10px;
+}
+
+.integrated-admin-order-payment-glance p {
+  margin: 0;
+  color: var(--deped-muted);
+  font-size: 13px;
+}
+
+.integrated-admin-order-payment-glance p strong {
+  color: var(--deped-blue);
+  font-weight: 700;
+}
+
+.integrated-admin-order-payment-glance__identity {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 12px;
+  align-items: start;
+}
+
+.integrated-admin-order-payment-glance__metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px 12px;
+}
+
+.integrated-admin-order-payment-glance__metrics article {
+  display: grid;
+  gap: 2px;
+}
+
+.integrated-admin-order-payment-glance__metrics span {
+  color: var(--deped-muted);
+  font-size: 13px;
+}
+
+.integrated-admin-order-payment-glance__metrics strong {
+  color: var(--deped-blue);
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.integrated-admin-order-payment-glance__metrics small {
+  color: var(--deped-blue);
+  font-size: 13px;
+}
+
+.integrated-admin-order-detail-status-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+  align-items: stretch;
+  width: 100%;
+  margin-top: 8px;
+}
+
+.integrated-admin-order-detail-status-select {
+  min-width: 0;
+  max-width: none;
+}
+
+.integrated-admin-order-detail-status-title {
+  color: var(--deped-ink);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.integrated-admin-order-detail-status-select .floating-field__control input {
+  border-top-right-radius: 6px;
+  border-bottom-right-radius: 6px;
+}
+
+.integrated-admin-order-detail-status-save {
+  min-height: 0;
+  height: auto;
+  padding: 0 14px;
+  white-space: nowrap;
+  border-top-left-radius: 6px;
+  border-bottom-left-radius: 6px;
+  align-self: stretch;
+}
+
+@media (max-width: 760px) {
+  .integrated-admin-order-payment-glance__identity {
+    grid-template-columns: 1fr;
+  }
+
+  .integrated-admin-order-payment-glance__metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .integrated-admin-order-detail-status-row {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .integrated-admin-order-detail-status-select {
+    min-width: 0;
+    max-width: 100%;
+  }
+}
+
+.integrated-admin-merch-modal .integrated-admin-merch-order-manual {
+  margin-bottom: 0;
+}
+
+.integrated-admin-merch-order-manual h3 {
+  margin: 0;
+  color: var(--deped-blue);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.integrated-admin-merch-order-manual__grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.integrated-admin-merch-order-manual__field {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.integrated-admin-merch-order-manual__field--span-2 {
+  grid-column: span 2;
+}
+
+.integrated-admin-merch-order-manual__label {
+  color: #1e2f4b;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.integrated-admin-merch-order-manual__select .searchable-select__field {
+  width: 100%;
+}
+
+.integrated-admin-merch-order-manual__select .searchable-select__menu {
+  max-height: 260px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.integrated-admin-merch-order-manual .integrated-admin-merch-textarea {
+  min-height: 90px;
+}
+
+.integrated-admin-merch-order-manual__modal-actions {
+  margin-top: 12px;
+  padding-top: 14px;
+}
+
+.integrated-admin-merch-order-manual__actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.integrated-admin-merch-order-manual__submit {
+  min-width: 210px;
+  min-height: 48px;
+}
+
+.integrated-admin-merch-orders-empty {
+  margin: 0;
+  border: 1px solid var(--deped-line);
+  border-radius: 8px;
+  background: #fbfcff;
+  padding: 12px;
+  color: var(--deped-muted);
+  font-size: 13px;
+}
+
+.integrated-admin-merch-groups {
+  display: grid;
+  gap: 8px;
+}
+
+.integrated-admin-merch-group {
+  border: 1px solid var(--deped-line);
+  border-radius: 8px;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.integrated-admin-merch-group__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  list-style: none;
+  cursor: pointer;
+  padding: 10px 12px;
+  border-bottom: 1px solid transparent;
+  background: #f7faff;
+}
+
+.integrated-admin-merch-group__summary::-webkit-details-marker {
+  display: none;
+}
+
+.integrated-admin-merch-group[open] .integrated-admin-merch-group__summary {
+  border-bottom-color: var(--deped-line);
+}
+
+.integrated-admin-merch-group__title {
+  color: var(--deped-blue);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.integrated-admin-merch-group__count {
+  color: #475467;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.integrated-admin-merch-group__table {
+  border-top: 0;
+}
+
+.integrated-admin-merch-order-row {
+  cursor: pointer;
+}
+
+.integrated-admin-merch-order-row:hover td {
+  background: #eaf2ff;
+}
+
+.integrated-admin-merch-order-row:hover td:first-child {
+  box-shadow: inset 3px 0 0 #1d4fa8;
+}
+

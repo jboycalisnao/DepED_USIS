@@ -30,4 +30,10 @@ export const learnerServicesCatalog: LearnerServiceItem[] = [
     path: '/services/pta-fee',
     actionLabel: 'Open PTA Fee',
   },
+  {
+    title: 'Merch',
+    description: 'Browse school merchandise and place your order request.',
+    path: '/services/merch',
+    actionLabel: 'Open Merch',
+  },
 ];

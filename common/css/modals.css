@@ -121,7 +121,8 @@
   flex-wrap: wrap;
   gap: 12px;
   justify-content: flex-end;
-  padding-top: 0;
+  border-top: 1px solid rgba(18, 35, 61, 0.08);
+  padding-top: 14px;
   padding-bottom: 18px;
 }
 

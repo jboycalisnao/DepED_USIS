@@ -22,3 +22,10 @@
 - Preserve compatibility with both incoming formats:
   - 7-byte RC522 hex strings
   - 10-digit USB reader decimal strings
+
+## Component Refactor Rule
+
+- All component files must be refactored into subdomains by function and relevance to make maintenance easier.
+- Group related feature UI into focused folders such as `modals/`, `tables/`, `cards/`, `forms/`, `custom-components/`, and `hooks/` when applicable.
+- Do not keep multiple unrelated interaction surfaces inside one large page file when they can be extracted into separate component files.
+- For features that contain table/list views, modal flows, and detail surfaces, place each surface in its own component file under the same feature subdomain.

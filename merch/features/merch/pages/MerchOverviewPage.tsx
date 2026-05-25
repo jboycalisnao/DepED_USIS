@@ -1,53 +1,110 @@
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { loadPublishedMerchCatalog, type MerchCatalogItem } from '../services/merchCatalog';
+
 export function MerchOverviewPage() {
-  const featuredItems = [
-    { id: 'merch-001', name: 'School ID Lace', category: 'ID Accessories', price: 'PHP 45', stock: 120 },
-    { id: 'merch-002', name: 'PE Shirt', category: 'Uniform', price: 'PHP 280', stock: 64 },
-    { id: 'merch-003', name: 'Department Shirt', category: 'Uniform', price: 'PHP 350', stock: 38 },
-    { id: 'merch-004', name: 'School Patch Set', category: 'Uniform Accessories', price: 'PHP 90', stock: 85 },
-  ];
+  const [featuredItems, setFeaturedItems] = useState<MerchCatalogItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const load = async () => {
+      setIsLoading(true);
+      setError('');
+      try {
+        const items = await loadPublishedMerchCatalog();
+        if (!isMounted) return;
+        setFeaturedItems(items);
+      } catch (loadError) {
+        if (!isMounted) return;
+        setError(loadError instanceof Error ? loadError.message : 'Unable to load merchandise catalog.');
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    };
+
+    void load();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   return (
     <section className="merch-page">
-      <header className="merch-page__header">
-        <h2>School Merchandise Store</h2>
-        <p>
-          Browse available school merchandise, check stock levels, and prepare order intake for
-          learner and school community purchases.
-        </p>
-      </header>
+      <section className="merch-hero">
+        <div className="merch-hero__content">
+          <p className="merch-hero__brand">School MERCH</p>
+          <h2>Show Your Pride. Wear Leon NHS.</h2>
+          <p>
+            Explore official Leon National High School merchandise.
+            Quality items. School spirit. Community pride.
+          </p>
+          <a href="#merch-catalog" className="primary-button merch-hero__cta">
+            Browse All Merchandise
+          </a>
+        </div>
+        <div className="merch-hero__visual" aria-hidden="true" />
+      </section>
 
-      <div className="merch-store-layout">
+      <section className="merch-categories">
+        <h3>Shop by Category</h3>
+        <div className="merch-categories__grid">
+          <article className="merch-category-card"><strong>Apparel</strong><span>T-shirts, Hoodies, Jackets</span></article>
+          <article className="merch-category-card"><strong>Headwear</strong><span>Caps, Hats, Beanies</span></article>
+          <article className="merch-category-card"><strong>Bags & Accessories</strong><span>Totes, Backpacks, More</span></article>
+          <article className="merch-category-card"><strong>Drinkware</strong><span>Tumblers, Bottles, Mugs</span></article>
+          <article className="merch-category-card"><strong>School Essentials</strong><span>Notebooks, Pens, More</span></article>
+          <article className="merch-category-card"><strong>Gift Items</strong><span>Souvenirs, Keepsakes</span></article>
+        </div>
+      </section>
+
+      <section className="merch-update-banner" aria-label="Merchandise update notice">
+        <strong>Stay Updated!</strong>
+        <span>New merchandise and limited editions are added regularly. Check back often.</span>
+      </section>
+
+      <div className="merch-store-layout" id="merch-catalog">
         <section className="merch-store-catalog">
           <h3>Featured Merchandise</h3>
+          {isLoading ? <p>Loading merchandise catalog...</p> : null}
+          {!isLoading && error ? <p className="login-card__error">{error}</p> : null}
+          {!isLoading && !error && featuredItems.length === 0 ? (
+            <p>No published merchandise is available yet.</p>
+          ) : null}
           <div className="merch-product-grid">
             {featuredItems.map((item) => (
-              <article key={item.id} className="merch-product-card">
-                <span className="merch-product-card__category">{item.category}</span>
-                <h4>{item.name}</h4>
-                <p className="merch-product-card__price">{item.price}</p>
-                <p className="merch-product-card__stock">Stock Available: {item.stock}</p>
-                <button type="button" className="primary-button">
-                  Add to Cart
-                </button>
-              </article>
+              <Link
+                key={item.id}
+                to={`/product/${item.slug}`}
+                className="merch-product-card merch-product-card--link"
+                aria-label={`Open ${item.name} product page`}
+              >
+                <article>
+                  <div className="merch-product-card__image-wrap">
+                    {item.primaryImageUrl ? (
+                      <img
+                        src={item.primaryImageUrl}
+                        alt={`${item.name} product image`}
+                        className="merch-product-card__image"
+                      />
+                    ) : (
+                      <div className="merch-product-card__image-placeholder" aria-hidden="true">
+                        No Image
+                      </div>
+                    )}
+                  </div>
+                  <span className="merch-product-card__category">{item.category}</span>
+                  <h4>{item.name}</h4>
+                  <p className="merch-product-card__price">PHP {item.price.toFixed(2)}</p>
+                  <p className="merch-product-card__stock">Stock Available: {item.stockQty}</p>
+                  <span className="merch-product-card__cta">View Product</span>
+                </article>
+              </Link>
             ))}
           </div>
         </section>
-
-        <aside className="merch-store-summary">
-          <h3>Current Cart</h3>
-          <article className="merch-note-box">
-            <strong>Items selected</strong>
-            <span>0 item(s) currently in cart.</span>
-          </article>
-          <article className="merch-note-box">
-            <strong>Order total</strong>
-            <span>PHP 0.00</span>
-          </article>
-          <button type="button" className="primary-button" disabled>
-            Proceed to Checkout
-          </button>
-        </aside>
       </div>
     </section>
   );

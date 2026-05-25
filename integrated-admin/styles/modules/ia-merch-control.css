@@ -1,0 +1,328 @@
+﻿.integrated-admin-merch-control__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.integrated-admin-merch-control__stats {
+  display: inline-grid;
+  grid-template-columns: repeat(2, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.integrated-admin-merch-control__stat {
+  border: 1px solid var(--deped-line);
+  border-radius: 6px;
+  background: #f8fafc;
+  padding: 8px 10px;
+  display: grid;
+  gap: 2px;
+}
+
+.integrated-admin-merch-control__stat span {
+  font-size: 13px;
+  color: var(--deped-muted);
+}
+
+.integrated-admin-merch-control__stat strong {
+  font-size: 16px;
+  color: var(--deped-blue);
+}
+
+.integrated-admin-merch-control__create-btn {
+  width: auto;
+  min-width: 170px;
+  min-height: 44px;
+  height: 44px;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.integrated-admin-merch-control__actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.integrated-admin-merch-control__arrangement {
+  margin: 8px 0 6px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.integrated-admin-merch-control__arrangement p {
+  margin: 0;
+  color: var(--deped-blue);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.integrated-admin-merch-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.integrated-admin-merch-preview-card {
+  border: 1px solid var(--deped-line);
+  border-radius: 6px;
+  background: #f8fafc;
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.integrated-admin-merch-preview-card--draggable {
+  cursor: grab;
+  transition: border-color 120ms ease, background-color 120ms ease, transform 120ms ease;
+}
+
+.integrated-admin-merch-preview-card--draggable:active {
+  cursor: grabbing;
+}
+
+.integrated-admin-merch-preview-card--draggable.is-dragging {
+  opacity: 0.7;
+  transform: scale(0.99);
+}
+
+.integrated-admin-merch-preview-card--draggable.is-drag-over {
+  border-color: #1d4fa8;
+  background: #eef4ff;
+}
+
+.integrated-admin-merch-preview-card__head {
+  display: grid;
+  gap: 2px;
+}
+
+.integrated-admin-merch-preview-card__head strong {
+  color: #1e2f4b;
+  font-size: 13px;
+}
+
+.integrated-admin-merch-preview-card__head span {
+  color: var(--deped-muted);
+  font-size: 12px;
+}
+
+.integrated-admin-merch-preview-card__actions {
+  display: flex;
+  gap: 6px;
+}
+
+.integrated-admin-merch-modal .modal-dialog__body {
+  display: grid;
+  gap: 10px;
+  overflow: visible;
+}
+
+.integrated-admin-merch-modal {
+  overflow: visible;
+}
+
+.integrated-admin-merch-modal .registry-radio-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--deped-line);
+  border-radius: 6px;
+  background: #f8fafc;
+  padding: 10px 12px;
+  min-height: 44px;
+}
+
+.integrated-admin-merch-modal .registry-radio-option input[type="checkbox"] {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border: 1px solid #9aa8bf;
+  border-radius: 4px;
+  background: #ffffff;
+  display: inline-grid;
+  place-content: center;
+  margin: 0;
+  cursor: pointer;
+}
+
+.integrated-admin-merch-modal .registry-radio-option input[type="checkbox"]::before {
+  content: "";
+  width: 10px;
+  height: 10px;
+  transform: scale(0);
+  transition: transform 120ms ease;
+  background: #1d4fa8;
+  border-radius: 2px;
+}
+
+.integrated-admin-merch-modal .registry-radio-option input[type="checkbox"]:checked {
+  border-color: #1d4fa8;
+}
+
+.integrated-admin-merch-modal .registry-radio-option input[type="checkbox"]:checked::before {
+  transform: scale(1);
+}
+
+.integrated-admin-merch-modal .registry-radio-option span {
+  color: #1e2f4b;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.integrated-admin-merch-modal .registry-radio-option--toggle {
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.integrated-admin-merch-modal .registry-radio-option--toggle input[type="checkbox"] {
+  appearance: none;
+  width: 44px;
+  height: 24px;
+  border: 1px solid #b8c4d8;
+  border-radius: 999px;
+  background: #d6dfed;
+  position: relative;
+  margin: 0;
+  cursor: pointer;
+  transition: background-color 140ms ease, border-color 140ms ease;
+}
+
+.integrated-admin-merch-modal .registry-radio-option--toggle input[type="checkbox"]::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: #ffffff;
+  transform: none;
+  transition: transform 140ms ease;
+  box-shadow: 0 1px 2px rgba(18, 35, 61, 0.24);
+}
+
+.integrated-admin-merch-modal .registry-radio-option--toggle input[type="checkbox"]:checked {
+  border-color: #1d4fa8;
+  background: #1d4fa8;
+}
+
+.integrated-admin-merch-modal .registry-radio-option--toggle input[type="checkbox"]:checked::before {
+  transform: translateX(20px);
+}
+
+.integrated-admin-order-period-modal__header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.integrated-admin-order-period-modal__header-actions .secondary-button {
+  min-height: 36px;
+  padding: 0 12px;
+}
+
+.integrated-admin-order-period-list {
+  display: grid;
+  gap: 8px;
+}
+
+.integrated-admin-order-period-list__empty {
+  margin: 0;
+  border: 1px solid var(--deped-line);
+  border-radius: 6px;
+  background: #f8fafc;
+  padding: 10px 12px;
+  color: var(--deped-muted);
+  font-size: 13px;
+}
+
+.integrated-admin-order-period-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid var(--deped-line);
+  border-radius: 6px;
+  background: #f8fafc;
+  padding: 10px 12px;
+}
+
+.integrated-admin-order-period-item__meta {
+  display: grid;
+  gap: 3px;
+}
+
+.integrated-admin-order-period-item__meta strong {
+  color: var(--deped-ink);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.integrated-admin-order-period-item__meta span {
+  color: var(--deped-muted);
+  font-size: 13px;
+}
+
+.integrated-admin-order-period-item__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.integrated-admin-merch-modal .integrated-admin-order-period-item__toggle {
+  min-height: 36px;
+  padding: 6px 10px;
+}
+
+.integrated-admin-order-period-item__actions .secondary-button {
+  min-height: 36px;
+  padding: 0 12px;
+}
+
+.integrated-admin-order-period-item__edit {
+  width: 100%;
+  display: grid;
+  gap: 8px;
+}
+
+.integrated-admin-order-period-item__edit .registry-form__split {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.integrated-admin-merch-control .registry-icon-btn {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  min-width: 0;
+  width: auto;
+  height: auto;
+  padding: 4px;
+}
+
+.integrated-admin-merch-control .registry-icon-btn:hover {
+  background: transparent;
+  border: 0;
+}
+
+.integrated-admin-merch-control .registry-icon-btn .material-symbols-outlined {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.integrated-admin-merch-control .registry-icon-btn--primary {
+  color: #0b3a8f;
+}
+
+.integrated-admin-merch-control .registry-icon-btn--danger {
+  color: var(--deped-red);
+}
+

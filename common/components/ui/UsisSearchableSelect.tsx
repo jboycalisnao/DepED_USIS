@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 export interface UsisSearchableSelectOption {
   label: string;
@@ -22,6 +23,8 @@ interface UsisSearchableSelectProps {
   serverSearch?: boolean;
   showLabel?: boolean;
   value: string;
+  forceInlineMenu?: boolean;
+  forcePortalMenu?: boolean;
 }
 
 export function UsisSearchableSelect({
@@ -41,10 +44,21 @@ export function UsisSearchableSelect({
   serverSearch = false,
   showLabel = false,
   value,
+  forceInlineMenu = false,
+  forcePortalMenu = false,
 }: UsisSearchableSelectProps) {
   const rootRef = useRef<HTMLDivElement>(null);
+  const fieldRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const [menuPosition, setMenuPosition] = useState<{ left: number; top: number; width: number }>({
+    left: 0,
+    top: 0,
+    width: 0,
+  });
+  const [portalHost, setPortalHost] = useState<HTMLElement | null>(null);
+  const [renderInlineInModal, setRenderInlineInModal] = useState(false);
 
   const selected = options.find((option) => option.value === value) || null;
 
@@ -60,7 +74,12 @@ export function UsisSearchableSelect({
 
   useEffect(() => {
     const handlePointerDown = (event: MouseEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) {
+      const target = event.target as Node;
+      const path = (event.composedPath?.() || []) as EventTarget[];
+      const clickedInsideRoot = !!rootRef.current && (rootRef.current.contains(target) || path.includes(rootRef.current));
+      const clickedInsideMenu = !!menuRef.current && (menuRef.current.contains(target) || path.includes(menuRef.current));
+      if (clickedInsideRoot || clickedInsideMenu) return;
+      if (!clickedInsideRoot) {
         setIsOpen(false);
         setQuery('');
       }
@@ -69,6 +88,55 @@ export function UsisSearchableSelect({
     return () => window.removeEventListener('mousedown', handlePointerDown);
   }, []);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    if (forceInlineMenu) {
+      setRenderInlineInModal(true);
+      setPortalHost(null);
+      return;
+    }
+    if (forcePortalMenu) {
+      setRenderInlineInModal(false);
+      setPortalHost(document.body);
+      const updatePosition = () => {
+        const fieldRect = fieldRef.current?.getBoundingClientRect();
+        if (!fieldRect) return;
+        setMenuPosition({
+          left: fieldRect.left,
+          top: fieldRect.bottom + 8,
+          width: fieldRect.width,
+        });
+      };
+      updatePosition();
+      window.addEventListener('resize', updatePosition);
+      window.addEventListener('scroll', updatePosition, true);
+      return () => {
+        window.removeEventListener('resize', updatePosition);
+        window.removeEventListener('scroll', updatePosition, true);
+      };
+    }
+    const modalDialogHost = rootRef.current?.closest('.modal-dialog') as HTMLElement | null;
+    const shouldRenderInline = Boolean(modalDialogHost);
+    setRenderInlineInModal(shouldRenderInline);
+    setPortalHost(shouldRenderInline ? null : document.body);
+    const updatePosition = () => {
+      const fieldRect = fieldRef.current?.getBoundingClientRect();
+      if (!fieldRect) return;
+      setMenuPosition({
+        left: fieldRect.left,
+        top: fieldRect.bottom + 8,
+        width: fieldRect.width,
+      });
+    };
+    updatePosition();
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
+    return () => {
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+    };
+  }, [forceInlineMenu, isOpen]);
+
   const selectValue = (nextValue: string) => {
     onChange(nextValue);
     setIsOpen(false);
@@ -76,12 +144,55 @@ export function UsisSearchableSelect({
   };
 
   const hasValue = Boolean(value?.trim()) || Boolean(selected) || (isOpen && query.trim().length > 0);
+  const menuBody = (
+    <div
+      className={`searchable-select__menu${renderInlineInModal ? ' searchable-select__menu--inline' : ''}`}
+      ref={menuRef}
+      role="listbox"
+      onWheel={(event) => {
+        event.stopPropagation();
+      }}
+      onTouchMove={(event) => {
+        event.stopPropagation();
+      }}
+      style={
+        renderInlineInModal
+          ? undefined
+          : { left: `${menuPosition.left}px`, top: `${menuPosition.top}px`, width: `${menuPosition.width}px` }
+      }
+    >
+      {filtered.length > 0 ? (
+        filtered.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            aria-selected={option.value === value}
+            onMouseDown={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              selectValue(option.value);
+            }}
+            onClick={() => selectValue(option.value)}
+            className="searchable-select__option"
+          >
+            {option.label}
+          </button>
+        ))
+      ) : (
+        <div className="searchable-select__empty">
+          {requireQueryBeforeOptions && query.trim().length < minQueryLength
+            ? 'Type at least 1 character to search options'
+            : emptyQueryMessage}
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <div className={`searchable-select ${!allowTyping ? 'searchable-select--readonly' : ''} ${className}`.trim()} ref={rootRef}>
       {showLabel && !floatingLabel ? <span className="searchable-select__label">{label || ariaLabel}</span> : null}
       <div className={floatingLabel ? 'floating-field searchable-select--floating' : undefined}>
-        <div className={floatingLabel ? 'floating-field__control' : 'searchable-select__field'}>
+        <div className={floatingLabel ? 'floating-field__control' : 'searchable-select__field'} ref={fieldRef}>
           <input
             aria-label={ariaLabel}
             data-has-value={hasValue ? 'true' : 'false'}
@@ -127,29 +238,10 @@ export function UsisSearchableSelect({
         </div>
       </div>
 
-      {isOpen ? (
-        <div className="searchable-select__menu" role="listbox">
-          {filtered.length > 0 ? (
-            filtered.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                aria-selected={option.value === value}
-                onClick={() => selectValue(option.value)}
-                className="searchable-select__option"
-              >
-                {option.label}
-              </button>
-            ))
-          ) : (
-            <div className="searchable-select__empty">
-              {requireQueryBeforeOptions && query.trim().length < minQueryLength
-                ? 'Type at least 1 character to search options'
-                : emptyQueryMessage}
-            </div>
-          )}
-        </div>
-      ) : null}
+      {isOpen && renderInlineInModal ? menuBody : null}
+      {isOpen && !renderInlineInModal && typeof document !== 'undefined' && portalHost
+        ? createPortal(menuBody, portalHost)
+        : null}
     </div>
   );
 }

@@ -218,16 +218,26 @@
 }
 
 .searchable-select__menu {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 0;
-  right: 0;
-  z-index: 20;
-  overflow: hidden;
+  position: fixed;
+  z-index: 2147483646;
+  height: 240px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
   border: 1px solid rgba(18, 35, 61, 0.14);
   border-radius: 0.375rem;
   background: var(--deped-white);
   box-shadow: 0 18px 32px rgba(18, 35, 61, 0.12);
+}
+
+.searchable-select__menu--inline {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  z-index: 50;
 }
 
 .searchable-select__option,
@@ -271,6 +281,38 @@
 
 .usis-date-time-picker__control input {
   padding-right: 52px;
+}
+
+.usis-date-time-picker__control input[type='date'] {
+  color: transparent;
+  caret-color: transparent;
+}
+
+.usis-date-time-picker__control input[type='date']::-webkit-datetime-edit,
+.usis-date-time-picker__control input[type='date']::-webkit-datetime-edit-text,
+.usis-date-time-picker__control input[type='date']::-webkit-datetime-edit-month-field,
+.usis-date-time-picker__control input[type='date']::-webkit-datetime-edit-day-field,
+.usis-date-time-picker__control input[type='date']::-webkit-datetime-edit-year-field {
+  color: transparent;
+}
+
+.usis-date-time-picker__control input[type='date']:focus,
+.usis-date-time-picker__control input[type='date'][data-has-value="true"] {
+  color: var(--deped-ink);
+  caret-color: var(--deped-ink);
+}
+
+.usis-date-time-picker__control input[type='date']:focus::-webkit-datetime-edit,
+.usis-date-time-picker__control input[type='date'][data-has-value="true"]::-webkit-datetime-edit,
+.usis-date-time-picker__control input[type='date']:focus::-webkit-datetime-edit-text,
+.usis-date-time-picker__control input[type='date'][data-has-value="true"]::-webkit-datetime-edit-text,
+.usis-date-time-picker__control input[type='date']:focus::-webkit-datetime-edit-month-field,
+.usis-date-time-picker__control input[type='date'][data-has-value="true"]::-webkit-datetime-edit-month-field,
+.usis-date-time-picker__control input[type='date']:focus::-webkit-datetime-edit-day-field,
+.usis-date-time-picker__control input[type='date'][data-has-value="true"]::-webkit-datetime-edit-day-field,
+.usis-date-time-picker__control input[type='date']:focus::-webkit-datetime-edit-year-field,
+.usis-date-time-picker__control input[type='date'][data-has-value="true"]::-webkit-datetime-edit-year-field {
+  color: var(--deped-ink);
 }
 
 .usis-date-time-picker__control input[type='date']::-webkit-calendar-picker-indicator,
@@ -345,17 +387,28 @@
   padding: 10px;
 }
 
-.usis-calendar-popover span {
-  position: static;
-  inset: auto;
-  transform: none;
-  font-size: inherit;
-  color: inherit;
-  pointer-events: auto;
+.usis-calendar-popover--portal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: auto;
+  z-index: 2147483647;
 }
 
 .usis-calendar-popover button {
   text-transform: none;
+}
+
+.usis-calendar-popover__day,
+.usis-calendar-popover__nav,
+.usis-calendar-popover__month-toggle,
+.usis-calendar-popover__month-chip,
+.usis-calendar-popover__actions button {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: none;
+  text-shadow: none;
+  font-family: var(--deped-font);
 }
 
 .usis-calendar-popover__header {
@@ -427,12 +480,22 @@
 }
 
 .usis-calendar-popover__day {
+  display: grid;
+  place-items: center;
   height: 30px;
+  padding: 0;
   border: 0;
   border-radius: 0.375rem;
   background: transparent;
   color: var(--deped-ink);
   font-size: 13px;
+  line-height: 1;
+  overflow: hidden;
+}
+
+.usis-calendar-popover__day::before,
+.usis-calendar-popover__day::after {
+  content: none !important;
 }
 
 .usis-calendar-popover__day:hover {

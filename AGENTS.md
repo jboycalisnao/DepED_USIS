@@ -172,6 +172,13 @@ Refactor expectation:
 - if a component file becomes large, split it into sub-components, hooks, and helpers under a focused folder
 - if multiple files work together for one business feature, keep them together in a dedicated subfolder instead of scattering them by technical type only
 
+Subdomain grouping requirement:
+
+- in each subsystem/module, component files must be organized into subdomains based on function and relevance
+- when applicable, use focused folders such as `modals/`, `tables/`, `cards/`, `forms/`, `custom-components/`, and `hooks/` under the feature domain
+- avoid keeping unrelated UI pieces inside one large page file when they can be extracted into dedicated component files
+- if a feature includes multiple interaction surfaces (for example list/table + modal + detail drawer), each surface should live in its own component file within the same feature subdomain folder
+
 ## Unified Header Rule
 
 - all USIS modules must use one shared header structure and markup from shared/common UI
@@ -246,3 +253,11 @@ When updating this repository:
 - shared backend changes may affect more than one module
 - new modules should be designed for interoperability, not isolation
 - avoid copy-pasting shared platform logic when a reusable shared solution is possible
+
+## Merch Snippet-to-Schema Sync Rule
+
+For `merch/` and IA merchandise CMS work:
+
+- any generated code snippet that introduces, removes, or changes merchandise data fields, table structure, view shape, or query contract must include the matching schema update in `integrated-admin/schema.sql` within the same change set
+- when providing SQL patch snippets for merchandise changes, also update `integrated-admin/schema.sql` so repository schema reference stays aligned with implementation
+- do not ship merchandise code-only schema assumptions without the corresponding schema-file update

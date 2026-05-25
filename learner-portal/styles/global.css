@@ -142,16 +142,15 @@ body {
 }
 
 .learner-page-intro {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
   margin-top: 12px;
-  padding: 0 var(--page-inset) 6px;
-  border-bottom: 1px solid var(--deped-line);
+  padding: 0;
+  border: 0;
 }
 
-.learner-page-intro p {
-  margin: 0;
+.learner-page-intro .usis-breadcrumb-bar {
+  margin-top: 0;
+  padding-left: var(--page-inset);
+  padding-right: var(--page-inset);
 }
 
 .learner-breadcrumb {
@@ -1330,6 +1329,387 @@ body {
   font-size: 16px;
   font-weight: 400;
   line-height: 1.45;
+}
+
+.learner-merch-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 260px));
+  gap: 12px;
+  justify-content: center;
+}
+
+.learner-merch-card {
+  border: 1px solid var(--deped-line);
+  border-radius: var(--learner-radius-md);
+  background: #ffffff;
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.learner-merch-card--disabled {
+  opacity: 0.58;
+  filter: grayscale(0.2);
+}
+
+.learner-merch-card__image-wrap {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border: 1px solid var(--deped-line);
+  border-radius: var(--learner-radius-md);
+  background: #f3f4f6;
+  overflow: hidden;
+}
+
+.learner-merch-card__image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.learner-merch-card__image-placeholder {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  color: var(--deped-muted);
+  font-size: 13px;
+}
+
+.learner-merch-card__body {
+  display: grid;
+  gap: 6px;
+}
+
+.learner-merch-card__category {
+  color: var(--deped-muted);
+  font-size: 13px;
+}
+
+.learner-merch-card__preorder {
+  width: fit-content;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid #f1b7b7;
+  background: #ffe9e9;
+  color: #8d1b1b;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.learner-merch-card h3 {
+  margin: 0;
+  color: var(--deped-blue);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.learner-merch-card__price {
+  margin: 0;
+  color: var(--deped-ink);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.learner-merch-card__stock {
+  margin: 0;
+  color: var(--deped-muted);
+  font-size: 13px;
+}
+
+.learner-merch-order-modal .modal-dialog__body {
+  display: grid;
+  gap: 10px;
+}
+
+.learner-merch-order-modal__row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.learner-merch-order-modal__notes {
+  min-height: 96px;
+}
+
+.learner-merch-orders {
+  margin-top: 12px;
+}
+
+.learner-merch-orders-periods {
+  margin-top: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.learner-merch-orders-period {
+  border: 1px solid var(--deped-line);
+  border-radius: 0.375rem;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.learner-merch-orders-period__summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  background: #f7faff;
+  border-bottom: 1px solid transparent;
+}
+
+.learner-merch-orders-period__meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.learner-merch-orders-period__chevron {
+  color: var(--deped-blue);
+  font-size: 18px;
+  line-height: 1;
+  transition: transform 120ms ease;
+}
+
+.learner-merch-orders-period[open] .learner-merch-orders-period__chevron {
+  transform: rotate(180deg);
+}
+
+.learner-merch-orders-period__summary::-webkit-details-marker {
+  display: none;
+}
+
+.learner-merch-orders-period[open] .learner-merch-orders-period__summary {
+  border-bottom-color: var(--deped-line);
+}
+
+.learner-merch-orders-period__title {
+  color: var(--deped-blue);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.learner-merch-orders-period__count {
+  color: var(--deped-muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.learner-merch-orders-table-wrap {
+  margin-top: 0;
+  width: 100%;
+  overflow-x: auto;
+  border: 0;
+  border-radius: 0.375rem;
+  background: #fbfcff;
+}
+
+.learner-merch-orders-table {
+  width: 100%;
+  min-width: 900px;
+  border-collapse: collapse;
+}
+
+.learner-merch-orders-table th,
+.learner-merch-orders-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--deped-line);
+  text-align: left;
+  font-size: 13px;
+  font-weight: 400;
+  color: #1f2937;
+  vertical-align: middle;
+}
+
+.learner-merch-orders-table th {
+  background: #f5f8ff;
+  color: var(--deped-muted);
+}
+
+.learner-merch-orders-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.learner-merch-orders-table__edit-btn {
+  border: 1px solid rgba(0, 56, 168, 0.24);
+  background: #eef4ff;
+  color: var(--deped-blue);
+  font-size: 13px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 0.375rem;
+  cursor: pointer;
+}
+
+.learner-merch-orders-table__edit-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.learner-merch-orders-table__actions {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.learner-merch-orders-table__delete-btn {
+  border: 1px solid #f4c7c3;
+  background: #fef3f2;
+  color: #b42318;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 0.375rem;
+  cursor: pointer;
+}
+
+.learner-merch-orders-table__delete-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.learner-merch-order-source {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1;
+}
+
+.learner-merch-order-source--integrated_admin {
+  border: 1px solid #95b8ee;
+  background: #e9f2ff;
+  color: #18498f;
+}
+
+.learner-merch-order-source--learner_portal {
+  border: 1px solid #8fd9ab;
+  background: #e8faef;
+  color: #0c6b3d;
+}
+
+.learner-merch-order-source--unknown {
+  border: 1px solid #d0d5dd;
+  background: #f2f4f7;
+  color: #344054;
+}
+
+@media (max-width: 720px) {
+  .learner-merch-order-modal__row {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 900px) {
+  .learner-services-history {
+    padding: 10px;
+  }
+
+  .learner-page-intro {
+    margin-top: 8px;
+  }
+
+  .learner-merch-orders-table-wrap,
+  .pta-fee-table-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .pta-fee-table--fees {
+    min-width: 820px;
+  }
+
+  .pta-fee-table--txn {
+    min-width: 760px;
+  }
+
+  .pta-fee-table--particulars {
+    min-width: 620px;
+  }
+
+  .learner-merch-grid {
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    justify-content: stretch;
+  }
+}
+
+@media (max-width: 640px) {
+  .learner-page-intro .usis-breadcrumb-bar {
+    width: 100%;
+    padding-left: var(--page-inset);
+    padding-right: var(--page-inset);
+  }
+
+  .learner-merch-orders-table {
+    min-width: 0;
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+
+  .learner-merch-orders-table thead {
+    display: none;
+  }
+
+  .learner-merch-orders-table tbody {
+    display: grid;
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .learner-merch-orders-table tbody tr {
+    display: grid;
+    gap: 6px;
+    border: 1px solid var(--deped-line);
+    border-radius: 8px;
+    background: #fbfcff;
+    padding: 10px;
+  }
+
+  .learner-merch-orders-table td {
+    display: grid;
+    grid-template-columns: 108px minmax(0, 1fr);
+    gap: 8px;
+    border: 0;
+    padding: 0;
+    font-size: 13px;
+    word-break: break-word;
+  }
+
+  .learner-merch-orders-table td::before {
+    content: "";
+    color: var(--deped-muted);
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .learner-merch-orders-table td:nth-child(1)::before { content: "Reference No."; }
+  .learner-merch-orders-table td:nth-child(2)::before { content: "Product"; }
+  .learner-merch-orders-table td:nth-child(3)::before { content: "Qty / Size"; }
+  .learner-merch-orders-table td:nth-child(4)::before { content: "Status"; }
+  .learner-merch-orders-table td:nth-child(5)::before { content: "Placed Via"; }
+  .learner-merch-orders-table td:nth-child(6)::before { content: "Date"; }
+  .learner-merch-orders-table td:nth-child(7)::before { content: "Notes"; }
+  .learner-merch-orders-table td:nth-child(8)::before { content: "Action"; }
+
+  .learner-merch-orders-table__actions {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .learner-merch-grid {
+    grid-template-columns: 1fr;
+    justify-content: stretch;
+  }
 }
 
 /* Tailwind rounded-md alignment for learner portal surfaces */

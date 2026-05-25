@@ -1,0 +1,111 @@
+.usis-grade-section-list {
+  --usis-grade-section-list-radius: 0.375rem;
+  display: grid;
+  gap: 14px;
+}
+
+.usis-grade-section-list__empty {
+  margin: 0;
+  border: 1px solid var(--deped-line);
+  border-radius: var(--usis-grade-section-list-radius);
+  background: var(--deped-white);
+  color: var(--deped-muted);
+  font-size: var(--usis-helper-size);
+  padding: 12px;
+}
+
+.usis-grade-section-list__grade {
+  border: 1px solid var(--deped-line);
+  border-radius: var(--usis-grade-section-list-radius);
+  background: var(--deped-white);
+  overflow: hidden;
+}
+
+.usis-grade-section-list__grade-toggle {
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid var(--deped-line);
+  background: #f7f9fc;
+  padding: 16px 18px;
+  text-align: left;
+}
+
+.usis-grade-section-list__grade-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.usis-grade-section-list__grade-icon {
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--usis-grade-section-list-radius);
+  background: var(--deped-blue);
+  color: var(--deped-white);
+}
+
+.usis-grade-section-list__grade-name {
+  display: block;
+  margin: 0;
+  color: var(--deped-blue);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.usis-grade-section-list__grade-count {
+  display: block;
+  margin-top: 2px;
+  color: var(--deped-muted);
+  font-size: var(--usis-helper-size);
+  font-weight: 400;
+}
+
+.usis-grade-section-list__sections {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  background: var(--deped-canvas);
+}
+
+.usis-grade-section-list__section {
+  border: 1px solid var(--deped-line);
+  border-radius: var(--usis-grade-section-list-radius);
+  background: var(--deped-white);
+  overflow: hidden;
+}
+
+.usis-grade-section-list__section-toggle {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  padding: 12px 14px;
+  text-align: left;
+}
+
+.usis-grade-section-list__section-head {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.usis-grade-section-list__section-icon .material-symbols-outlined.is-open {
+  transform: rotate(90deg);
+}
+
+.usis-grade-section-list__section-name {
+  color: var(--deped-blue);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.usis-grade-section-list__section-count {
+  color: var(--deped-muted);
+  font-size: var(--usis-helper-size);
+}
+
+.usis-grade-section-list__section-content {
+  border-top: 1px solid var(--deped-line);
+}

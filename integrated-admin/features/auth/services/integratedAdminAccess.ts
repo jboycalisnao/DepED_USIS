@@ -1,7 +1,9 @@
 import { hasCoordinatorModuleAccess } from '../../../../common/auth/moduleAccess';
 import { supabase } from '../../../../packages/shared-supabase/src';
+import type { CoordinatorAccessRecord } from '../../../../coordinator/features/auth/utils/coordinatorAccess';
 
 export interface IntegratedAdminAccessRecord {
+  coordinatorAccess: CoordinatorAccessRecord;
   coordinatorName: string;
   role: string;
   schoolName: string;
@@ -48,22 +50,7 @@ export const resolveIntegratedAdminAccess = async (username: string, password: s
 
   const { data, error } = await supabase
     .from('usis_core_coordinators')
-    .select(
-      `
-        id,
-        username,
-        role,
-        first_name,
-        middle_name,
-        last_name,
-        password_hash,
-        password_plain,
-        is_active,
-        usis_schools!inner (
-          school_name
-        )
-      `,
-    )
+    .select('*')
     .eq('username', normalizedUsername)
     .eq('is_active', true)
     .limit(1)
@@ -83,7 +70,10 @@ export const resolveIntegratedAdminAccess = async (username: string, password: s
     };
   }
 
-  const validPassword = password === data.password_hash || password === data.password_plain;
+  const dataRecord = data as Record<string, unknown>;
+  const passwordHash = typeof dataRecord.password_hash === 'string' ? dataRecord.password_hash : '';
+  const passwordPlain = typeof dataRecord.password_plain === 'string' ? dataRecord.password_plain : '';
+  const validPassword = password === passwordHash || (passwordPlain ? password === passwordPlain : false);
   if (!validPassword) {
     return {
       error: 'No active coordinator account matches the supplied username and password.',
@@ -91,8 +81,9 @@ export const resolveIntegratedAdminAccess = async (username: string, password: s
     };
   }
 
-  const hasIaAccess = hasCoordinatorModuleAccess(data.id, 'ia');
-  const isSystemAdmin = data.role === 'system_admin';
+  const hasIaAccess = hasCoordinatorModuleAccess(String(dataRecord.id || ''), 'ia');
+  const roleValue = typeof dataRecord.role === 'string' ? dataRecord.role : '';
+  const isSystemAdmin = roleValue === 'system_admin';
   if (!hasIaAccess && !isSystemAdmin) {
     return {
       error: 'This account is not allowed to access Integrated Admin. Request IA access in Coordinator Portal.',
@@ -100,14 +91,66 @@ export const resolveIntegratedAdminAccess = async (username: string, password: s
     };
   }
 
-  const school = Array.isArray(data.usis_schools) ? data.usis_schools[0] : data.usis_schools;
+  let schoolName = 'USIS School';
+  let division = 'Schools Division';
+  let divisionCode = '';
+  let region = 'Region';
+  let regionCode = '';
+  let schoolCode = '';
+  let schoolAddress = '';
+  let schoolUuid = '';
+  const schoolId = typeof dataRecord.school_id === 'string' ? dataRecord.school_id : '';
+  if (schoolId) {
+    const schoolResponse = await supabase
+      .from('usis_schools')
+      .select('id, school_code, school_name, address_line, municipality_city, province, division, region, division_code, region_code')
+      .eq('id', schoolId)
+      .limit(1)
+      .maybeSingle();
+    const school = schoolResponse.data;
+    if (school?.school_name) {
+      schoolName = school.school_name;
+      division = school.division || division;
+      divisionCode = school.division_code || school.division || '';
+      region = school.region || region;
+      regionCode = school.region_code || school.region || '';
+      schoolCode = school.school_code || '';
+      schoolUuid = school.id || '';
+      schoolAddress = [school.address_line, school.municipality_city, school.province].filter(Boolean).join(', ');
+    }
+  }
+
+  const coordinatorName =
+    [dataRecord.first_name, dataRecord.middle_name, dataRecord.last_name]
+      .filter((value): value is string => typeof value === 'string' && Boolean(value.trim()))
+      .join(' ') ||
+    toTitleCase(normalizedUsername);
+  const userId = String(dataRecord.id || '');
+  const coordinatorAccess: CoordinatorAccessRecord = {
+    accountSource: 'usis_core_coordinators',
+    accessLevel: 'school',
+    coordinatorName,
+    coordinatorRole: roleValue || 'school_usis_coordinator',
+    division,
+    divisionCode: divisionCode || 'SDI',
+    isSuperAdmin: isSystemAdmin,
+    region,
+    regionCode: regionCode || 'R6',
+    schoolAddress: schoolAddress || 'School address not yet configured in coordinator registry.',
+    schoolId: schoolCode,
+    schoolName,
+    schoolUuid,
+    userId,
+    lastLoginAt: typeof dataRecord.last_login_at === 'string' ? dataRecord.last_login_at : null,
+    mustResetPassword: !dataRecord.last_login_at,
+  };
+
   const record: IntegratedAdminAccessRecord = {
-    coordinatorName:
-      [data.first_name, data.middle_name, data.last_name].filter(Boolean).join(' ') ||
-      toTitleCase(normalizedUsername),
-    role: data.role || 'school_usis_coordinator',
-    schoolName: school?.school_name || 'USIS School',
-    userId: data.id,
+    coordinatorAccess,
+    coordinatorName,
+    role: roleValue || 'school_usis_coordinator',
+    schoolName,
+    userId,
   };
 
   return {

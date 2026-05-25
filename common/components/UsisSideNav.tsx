@@ -6,6 +6,7 @@ export type UsisSideNavItem = {
   iconType?: 'material' | 'fa';
   label: string;
   path: string;
+  children?: UsisSideNavItem[];
 };
 
 type UsisSideNavProps = {
@@ -46,6 +47,12 @@ export function UsisSideNav({
     setIsMobileOpen(false);
   };
 
+  const isPathActive = (itemPath: string) =>
+    (activePath || '') === itemPath ||
+    (activePath || '').startsWith(`${itemPath}/`) ||
+    (typeof window !== 'undefined' &&
+      (window.location.pathname === itemPath || window.location.pathname.startsWith(`${itemPath}/`)));
+
   return (
     <>
       {!hideInternalMobileToggle ? (
@@ -75,6 +82,52 @@ export function UsisSideNav({
       >
         <nav className="usis-side-nav__menu">
           {items.map((item) => {
+            if (item.children?.length) {
+              const hasActiveChild = item.children.some((child) => isPathActive(child.path));
+              return (
+                <details
+                  key={item.path}
+                  className={`usis-side-nav__group ${hasActiveChild ? 'usis-side-nav__group--active' : ''}`}
+                  open={hasActiveChild ? true : undefined}
+                >
+                  <summary className="usis-side-nav__group-summary">
+                    {item.iconType === 'fa' ? (
+                      <i className={`fa-solid ${item.icon} usis-side-nav__icon`} aria-hidden="true" />
+                    ) : (
+                      <span className="material-symbols-outlined usis-side-nav__icon" aria-hidden="true">
+                        {item.icon}
+                      </span>
+                    )}
+                    <span>{item.label}</span>
+                    <span className="material-symbols-outlined usis-side-nav__group-chevron" aria-hidden="true">
+                      expand_more
+                    </span>
+                  </summary>
+                  <div className="usis-side-nav__group-items">
+                    {item.children.map((child) => (
+                      <NavLink
+                        key={child.path}
+                        to={child.path}
+                        className={({ isActive }) =>
+                          `usis-side-nav__link usis-side-nav__link--nested ${isActive ? 'usis-side-nav__link--active' : ''}`
+                        }
+                        onClick={() => setIsMobileOpen(false)}
+                      >
+                        {child.iconType === 'fa' ? (
+                          <i className={`fa-solid ${child.icon} usis-side-nav__icon`} aria-hidden="true" />
+                        ) : (
+                          <span className="material-symbols-outlined usis-side-nav__icon" aria-hidden="true">
+                            {child.icon}
+                          </span>
+                        )}
+                        {child.label}
+                      </NavLink>
+                    ))}
+                  </div>
+                </details>
+              );
+            }
+
             if (isButtonMode) {
               const isActive = (activePath || '') === item.path;
               return (

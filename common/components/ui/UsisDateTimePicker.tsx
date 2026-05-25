@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 interface UsisDateTimePickerProps {
   ariaLabel: string;
@@ -24,6 +25,15 @@ const formatDateValue = (date: Date) => {
   return `${year}-${month}-${day}`;
 };
 
+const formatDateDisplay = (value: string) => {
+  const parsed = parseDateValue(value);
+  if (!parsed) return '';
+  const month = `${parsed.getMonth() + 1}`.padStart(2, '0');
+  const day = `${parsed.getDate()}`.padStart(2, '0');
+  const year = parsed.getFullYear();
+  return `${month}/${day}/${year}`;
+};
+
 const parseDateValue = (value: string) => {
   if (!value) return null;
   const [year, month, day] = value.split('-').map(Number);
@@ -46,15 +56,18 @@ export function UsisDateTimePicker({
 }: UsisDateTimePickerProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const controlRef = useRef<HTMLDivElement>(null);
   const monthYearPanelRef = useRef<HTMLDivElement>(null);
   const hasValue = Boolean(value?.trim());
   const fieldLabel = label || ariaLabel;
-  const iconName = mode === 'time' ? 'schedule' : 'calendar_today';
   const useCustomCalendar = mode === 'date';
   const [isOpen, setIsOpen] = useState(false);
   const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
+  const [popoverPosition, setPopoverPosition] = useState<{ left: number; top: number }>({ left: 0, top: 0 });
 
   const selectedDate = useMemo(() => parseDateValue(value), [value]);
+  const displayValue = useMemo(() => (useCustomCalendar ? formatDateDisplay(value) : value), [useCustomCalendar, value]);
   const [viewDate, setViewDate] = useState(() => selectedDate || new Date());
 
   useEffect(() => {
@@ -63,7 +76,11 @@ export function UsisDateTimePicker({
 
   useEffect(() => {
     const onPointerDown = (event: MouseEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) {
+      const target = event.target as Node;
+      const path = (event.composedPath?.() || []) as EventTarget[];
+      const insideRoot = !!rootRef.current && (rootRef.current.contains(target) || path.includes(rootRef.current));
+      const insidePopover = !!popoverRef.current && (popoverRef.current.contains(target) || path.includes(popoverRef.current));
+      if (!insideRoot && !insidePopover) {
         setIsOpen(false);
       }
     };
@@ -121,6 +138,10 @@ export function UsisDateTimePicker({
     return items;
   }, [viewDate]);
 
+  const today = new Date();
+  const todayValue = formatDateValue(today);
+  const activeMonthLabel = `${MONTHS[viewDate.getMonth()]} ${viewDate.getFullYear()}`;
+
   const openPicker = () => {
     if (disabled) return;
     if (useCustomCalendar) {
@@ -136,15 +157,33 @@ export function UsisDateTimePicker({
     if (typeof input.showPicker === 'function') input.showPicker();
   };
 
+  useEffect(() => {
+    if (!useCustomCalendar || !isOpen) return;
+    const updatePosition = () => {
+      const controlRect = controlRef.current?.getBoundingClientRect();
+      if (!controlRect) return;
+      const popoverWidth = 292;
+      const viewportPadding = 8;
+      const maxLeft = Math.max(viewportPadding, window.innerWidth - popoverWidth - viewportPadding);
+      const desiredLeft = Math.min(controlRect.right - popoverWidth, maxLeft);
+      const left = Math.max(viewportPadding, desiredLeft);
+      const top = controlRect.bottom + 8;
+      setPopoverPosition({ left, top });
+    };
+    updatePosition();
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
+    return () => {
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+    };
+  }, [isOpen, useCustomCalendar]);
+
   const selectDate = (date: Date) => {
     if (isDisabledDate(date)) return;
     onChange(formatDateValue(date));
     setIsOpen(false);
   };
-
-  const today = new Date();
-  const todayValue = formatDateValue(today);
-  const activeMonthLabel = `${MONTHS[viewDate.getMonth()]} ${viewDate.getFullYear()}`;
 
   useEffect(() => {
     if (!isMonthPickerOpen) return;
@@ -159,14 +198,17 @@ export function UsisDateTimePicker({
     <div className={`usis-date-time-picker ${className}`.trim()} ref={rootRef}>
       {showLabel ? <span className="usis-date-time-picker__label">{fieldLabel}</span> : null}
       <label className="floating-field">
-        <div className="floating-field__control usis-date-time-picker__control">
+        <div className="floating-field__control usis-date-time-picker__control" ref={controlRef}>
           <input
             aria-label={ariaLabel}
             data-has-value={hasValue ? 'true' : 'false'}
             disabled={disabled}
             max={max}
             min={min}
-            onChange={(event) => onChange(event.target.value)}
+            onChange={(event) => {
+              if (useCustomCalendar) return;
+              onChange(event.target.value);
+            }}
             onFocus={() => {
               if (useCustomCalendar && !disabled) {
                 const baseline = selectedDate || today;
@@ -174,11 +216,15 @@ export function UsisDateTimePicker({
                 setIsOpen(true);
               }
             }}
+            onClick={() => {
+              if (useCustomCalendar && !disabled) openPicker();
+            }}
             placeholder=" "
             ref={inputRef}
+            readOnly={useCustomCalendar}
             step={step}
-            type={mode}
-            value={value}
+            type={useCustomCalendar ? 'text' : mode}
+            value={displayValue}
           />
           <label className="usis-date-time-picker__floating-label">{fieldLabel}</label>
           <button
@@ -189,12 +235,19 @@ export function UsisDateTimePicker({
             disabled={disabled}
           >
             <i className="material-symbols-outlined usis-date-time-picker__icon" aria-hidden="true">
-              {iconName}
+              {mode === 'time' ? 'schedule' : 'calendar_today'}
             </i>
           </button>
 
-          {useCustomCalendar && isOpen ? (
-            <div className="usis-calendar-popover" role="dialog" aria-label={`${fieldLabel} calendar`}>
+          {useCustomCalendar && isOpen && typeof document !== 'undefined'
+            ? createPortal(
+            <div
+              ref={popoverRef}
+              className="usis-calendar-popover usis-calendar-popover--portal"
+              role="dialog"
+              aria-label={`${fieldLabel} calendar`}
+              style={{ left: `${popoverPosition.left}px`, top: `${popoverPosition.top}px` }}
+            >
               <div className="usis-calendar-popover__header">
                 <button
                   type="button"
@@ -203,7 +256,9 @@ export function UsisDateTimePicker({
                   aria-label="Previous month"
                   disabled={!canGoPrev}
                 >
-                  <span className="material-symbols-outlined">chevron_left</span>
+                  <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                    <path d="M15 6l-6 6 6 6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
                 </button>
                 <button
                   type="button"
@@ -211,9 +266,13 @@ export function UsisDateTimePicker({
                   onClick={() => setIsMonthPickerOpen((prev) => !prev)}
                 >
                   {activeMonthLabel}
-                  <span className="material-symbols-outlined">
-                    {isMonthPickerOpen ? 'arrow_drop_up' : 'arrow_drop_down'}
-                  </span>
+                  <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                    {isMonthPickerOpen ? (
+                      <path d="M7 14l5-5 5 5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    ) : (
+                      <path d="M7 10l5 5 5-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    )}
+                  </svg>
                 </button>
                 <button
                   type="button"
@@ -222,7 +281,9 @@ export function UsisDateTimePicker({
                   aria-label="Next month"
                   disabled={!canGoNext}
                 >
-                  <span className="material-symbols-outlined">chevron_right</span>
+                  <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                    <path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
                 </button>
               </div>
               {isMonthPickerOpen ? (
@@ -308,7 +369,8 @@ export function UsisDateTimePicker({
                   Today
                 </button>
               </div>
-            </div>
+            </div>,
+            document.body,
           ) : null}
         </div>
       </label>
