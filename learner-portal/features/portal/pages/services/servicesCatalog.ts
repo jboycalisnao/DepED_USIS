@@ -5,7 +5,7 @@ export type LearnerServiceItem = {
   actionLabel: string;
 };
 
-export const learnerServicesCatalog: LearnerServiceItem[] = [
+const BASE_SERVICES: LearnerServiceItem[] = [
   {
     title: 'Enrollment History',
     description: 'View your yearly enrollment records, class sections, and latest enrollment status.',
@@ -37,3 +37,14 @@ export const learnerServicesCatalog: LearnerServiceItem[] = [
     actionLabel: 'Open Merch',
   },
 ];
+
+const MERCH_CONTROL_SERVICE: LearnerServiceItem = {
+  title: 'Merch Control',
+  description: 'Manage class-section merchandise visibility and view learner order details.',
+  path: '/services/merch-control',
+  actionLabel: 'Open Merch Control',
+};
+
+export const buildLearnerServicesCatalog = (hasMerchControl: boolean): LearnerServiceItem[] => (
+  hasMerchControl ? [...BASE_SERVICES, MERCH_CONTROL_SERVICE] : BASE_SERVICES
+);

@@ -1,47 +1,69 @@
 import { useEffect, useMemo, useState } from 'react';
 import { UsisGradeSectionList, type UsisGradeSectionListGrade } from '../../../../../common/components/ui/UsisGradeSectionList';
 import { UsisAlertModal } from '../../../../../common/components/UsisAlertModal';
-import { UsisSearchableSelect } from '../../../../../common/components/ui/UsisSearchableSelect';
+import UsisPageLoader from '../../../../../common/components/UsisPageLoader';
 import { GrantLearnerAccessModal } from './components/GrantLearnerAccessModal';
+import { GradeRepresentativeModal } from './components/GradeRepresentativeModal';
+import { SectionCredentialContent } from './components/SectionCredentialContent';
 import { CLASS_OFFICER_POSITIONS, LEARNER_OPERATION_OPTIONS } from './constants';
 import {
-  loadGrantedLearnerAccessBySections,
+  grantGradeLevelMerchControlAccess,
   grantLearnerOperationAccess,
   loadActiveSectionsDirectory,
+  loadGradeLevelRepresentatives,
+  loadGrantedLearnerAccessBySections,
+  searchLearnersByGradeLevel,
   searchLearnersBySection,
+  deleteGradeLevelRepresentativeAccess,
   updateLearnerOperationAccess,
   type GrantedLearnerAccessRecord,
   type LearnerSearchRecord,
   type SectionDirectoryRecord,
 } from './services/learnerBasedCredentialService';
 
+const GRADE_LEVELS = ['Grade 7', 'Grade 8', 'Grade 9', 'Grade 10', 'Grade 11', 'Grade 12'];
+const OPERATION_LABEL_BY_KEY: Record<string, string> = {
+  class_section_merch_control: 'Merch Control',
+};
+
 export function LearnerBasedCredentialsPage() {
-  const GRADE_LEVELS = ['Grade 7', 'Grade 8', 'Grade 9', 'Grade 10', 'Grade 11', 'Grade 12'];
   const [sections, setSections] = useState<SectionDirectoryRecord[]>([]);
   const [searchBySection, setSearchBySection] = useState<Record<string, string>>({});
   const [resultsBySection, setResultsBySection] = useState<Record<string, LearnerSearchRecord[]>>({});
   const [loadingBySection, setLoadingBySection] = useState<Record<string, boolean>>({});
   const [selectedLearnerBySection, setSelectedLearnerBySection] = useState<Record<string, string>>({});
   const [grantedBySection, setGrantedBySection] = useState<Record<string, GrantedLearnerAccessRecord[]>>({});
+  const [gradeRepresentatives, setGradeRepresentatives] = useState<GrantedLearnerAccessRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [directoryQuery, setDirectoryQuery] = useState('');
+
   const [selectedLearner, setSelectedLearner] = useState<LearnerSearchRecord | null>(null);
   const [editingCredential, setEditingCredential] = useState<GrantedLearnerAccessRecord | null>(null);
   const [positionValue, setPositionValue] = useState('');
   const [operationValue, setOperationValue] = useState(LEARNER_OPERATION_OPTIONS[0]?.value || '');
   const [isSubmittingGrant, setIsSubmittingGrant] = useState(false);
-  const [alert, setAlert] = useState<{ message: string; title: string; tone: 'success' | 'danger' | 'warning' } | null>(null);
   const [confirmGrantOpen, setConfirmGrantOpen] = useState(false);
-  const [directoryQuery, setDirectoryQuery] = useState('');
+
+  const [gradeRepModalOpen, setGradeRepModalOpen] = useState(false);
+  const [gradeRepResults, setGradeRepResults] = useState<LearnerSearchRecord[]>([]);
+  const [isSearchingGradeReps, setIsSearchingGradeReps] = useState(false);
+  const [isSubmittingGradeRep, setIsSubmittingGradeRep] = useState(false);
+
+  const [alert, setAlert] = useState<{ message: string; title: string; tone: 'success' | 'danger' | 'warning' } | null>(null);
 
   const refreshGrantedAccess = async (rows: SectionDirectoryRecord[]) => {
     const sectionIds = rows.map((row) => row.sectionId);
-    const granted = await loadGrantedLearnerAccessBySections(sectionIds);
+    const [granted, reps] = await Promise.all([
+      loadGrantedLearnerAccessBySections(sectionIds),
+      loadGradeLevelRepresentatives(),
+    ]);
     const groupedMap: Record<string, GrantedLearnerAccessRecord[]> = {};
     granted.forEach((row) => {
       if (!groupedMap[row.sectionId]) groupedMap[row.sectionId] = [];
       groupedMap[row.sectionId].push(row);
     });
     setGrantedBySection(groupedMap);
+    setGradeRepresentatives(reps);
   };
 
   useEffect(() => {
@@ -50,10 +72,9 @@ export function LearnerBasedCredentialsPage() {
       setIsLoading(true);
       try {
         const rows = await loadActiveSectionsDirectory();
-        if (!cancelled) {
-          setSections(rows);
-          await refreshGrantedAccess(rows);
-        }
+        if (cancelled) return;
+        setSections(rows);
+        await refreshGrantedAccess(rows);
       } catch (nextError: any) {
         if (!cancelled) {
           setAlert({
@@ -95,124 +116,77 @@ export function LearnerBasedCredentialsPage() {
           row.operationKey.toLowerCase().includes(normalizedDirectoryQuery),
         );
       });
+
       const sectionsForGrade =
         filteredEntries.length > 0
           ? filteredEntries.map((section) => {
-        const query = searchBySection[section.sectionId] || '';
-        const isLoadingSection = Boolean(loadingBySection[section.sectionId]);
-        const grantedRows = grantedBySection[section.sectionId] || [];
-        return {
-          content: (
-            <div className="ia-learner-credentials__section-body">
-              <UsisSearchableSelect
-                ariaLabel={`Search learner in ${section.sectionName}`}
-                className="ia-learner-credentials__search-select"
-                floatingLabel
-                forcePortalMenu
-                label={`Search Learner in ${section.sectionName}`}
-                minQueryLength={2}
-                onChange={(value) => {
-                  setSelectedLearnerBySection((current) => ({ ...current, [section.sectionId]: value }));
-                  const selected = (resultsBySection[section.sectionId] || []).find((row) => row.learnerId === value);
-                  if (!selected) return;
-                  setEditingCredential(null);
-                  setSelectedLearner(selected);
-                  setPositionValue(CLASS_OFFICER_POSITIONS[0] || '');
-                  setOperationValue(LEARNER_OPERATION_OPTIONS[0]?.value || '');
-                }}
-                onQueryChange={async (nextQuery) => {
-                  setSearchBySection((current) => ({ ...current, [section.sectionId]: nextQuery }));
-                  const trimmed = nextQuery.trim();
-                  if (trimmed.length < 2) {
-                    setResultsBySection((current) => ({ ...current, [section.sectionId]: [] }));
-                    return;
-                  }
-                  setLoadingBySection((current) => ({ ...current, [section.sectionId]: true }));
-                  try {
-                    const rows = await searchLearnersBySection({ query: trimmed, sectionId: section.sectionId });
-                    setResultsBySection((current) => ({ ...current, [section.sectionId]: rows }));
-                  } catch (nextError: any) {
-                    setAlert({
-                      message: nextError?.message || 'Unable to search learners.',
-                      title: 'Search Failed',
-                      tone: 'danger',
-                    });
-                  } finally {
-                    setLoadingBySection((current) => ({ ...current, [section.sectionId]: false }));
-                  }
-                }}
-                options={(resultsBySection[section.sectionId] || []).map((learner) => ({
-                  label: `${learner.fullName} (${learner.lrn || '-'})`,
-                  value: learner.learnerId,
-                }))}
-                requireQueryBeforeOptions
-                serverSearch
-                value={selectedLearnerBySection[section.sectionId] || ''}
-              />
-              {isLoadingSection ? <p className="registry-copy">Searching learners...</p> : null}
-              <div className="ia-learner-credentials__granted-table-wrap">
-                <table className="ia-learner-credentials__granted-table">
-                  <thead>
-                    <tr>
-                      <th>Learner</th>
-                      <th>LRN</th>
-                      <th>Position</th>
-                      <th>Operation</th>
-                      <th>Granted By</th>
-                      <th aria-label="Actions" />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {grantedRows.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="ia-learner-credentials__empty-cell">No granted learner access in this section.</td>
-                      </tr>
-                    ) : grantedRows.map((row) => (
-                      <tr key={row.credentialId}>
-                        <td>{row.fullName}</td>
-                        <td>{row.learnerLrn || '-'}</td>
-                        <td>{row.positionTitle}</td>
-                        <td>{row.operationKey}</td>
-                        <td>{row.grantedBy}</td>
-                        <td>
-                          <button
-                            type="button"
-                            className="registry-action-button"
-                            onClick={() => {
-                              setEditingCredential(row);
-                              setSelectedLearner({
-                                fullName: row.fullName,
-                                learnerId: row.learnerId,
-                                lrn: row.learnerLrn,
-                                sectionId: row.sectionId,
-                              });
-                              setPositionValue(row.positionTitle);
-                              setOperationValue(row.operationKey);
-                            }}
-                          >
-                            Edit
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          ),
-          count: 0,
-          key: section.sectionId,
-          label: section.sectionName,
-        };
-      })
-          : [
-              {
-                content: <p className="registry-copy">{normalizedDirectoryQuery ? 'No matching sections for this grade level.' : 'No active sections for this grade level.'}</p>,
+              const grantedRows = grantedBySection[section.sectionId] || [];
+              return {
+                content: (
+                  <SectionCredentialContent
+                    operationLabelByKey={OPERATION_LABEL_BY_KEY}
+                    section={section}
+                    grantedRows={grantedRows}
+                    isLoadingSection={Boolean(loadingBySection[section.sectionId])}
+                    searchResults={resultsBySection[section.sectionId] || []}
+                    selectedLearnerId={selectedLearnerBySection[section.sectionId] || ''}
+                    onSelectLearner={(value) => {
+                      setSelectedLearnerBySection((current) => ({ ...current, [section.sectionId]: value }));
+                      const selected = (resultsBySection[section.sectionId] || []).find((row) => row.learnerId === value);
+                      if (!selected) return;
+                      setEditingCredential(null);
+                      setSelectedLearner(selected);
+                      setPositionValue(CLASS_OFFICER_POSITIONS[0] || '');
+                      setOperationValue(LEARNER_OPERATION_OPTIONS[0]?.value || '');
+                    }}
+                    onSearchQueryChange={async (nextQuery) => {
+                      setSearchBySection((current) => ({ ...current, [section.sectionId]: nextQuery }));
+                      const trimmed = nextQuery.trim();
+                      if (trimmed.length < 2) {
+                        setResultsBySection((current) => ({ ...current, [section.sectionId]: [] }));
+                        return;
+                      }
+                      setLoadingBySection((current) => ({ ...current, [section.sectionId]: true }));
+                      try {
+                        const rows = await searchLearnersBySection({ query: trimmed, sectionId: section.sectionId });
+                        setResultsBySection((current) => ({ ...current, [section.sectionId]: rows }));
+                      } catch (nextError: any) {
+                        setAlert({ message: nextError?.message || 'Unable to search learners.', title: 'Search Failed', tone: 'danger' });
+                      } finally {
+                        setLoadingBySection((current) => ({ ...current, [section.sectionId]: false }));
+                      }
+                    }}
+                    onEdit={(row) => {
+                      setEditingCredential(row);
+                      setSelectedLearner({
+                        fullName: row.fullName,
+                        learnerId: row.learnerId,
+                        lrn: row.learnerLrn,
+                        sectionId: row.sectionId,
+                      });
+                      setPositionValue(row.positionTitle);
+                      setOperationValue(row.operationKey);
+                    }}
+                  />
+                ),
                 count: 0,
-                key: `${gradeLevel}-${normalizedDirectoryQuery ? 'filtered-empty' : 'empty'}`,
-                label: normalizedDirectoryQuery ? 'No matching sections' : 'No active sections',
-              },
-            ];
+                key: section.sectionId,
+                label: (
+                  <span className="ia-learner-credentials__section-label">
+                    <span>{section.sectionName}</span>
+                    {grantedRows.length > 0 ? (
+                      <span className="ia-learner-credentials__granted-indicator">Has Granted Access - {grantedRows.length}</span>
+                    ) : null}
+                  </span>
+                ),
+              };
+            })
+          : [{
+              content: <p className="registry-copy">{normalizedDirectoryQuery ? 'No matching sections for this grade level.' : 'No active sections for this grade level.'}</p>,
+              count: 0,
+              key: `${gradeLevel}-${normalizedDirectoryQuery ? 'filtered-empty' : 'empty'}`,
+              label: normalizedDirectoryQuery ? 'No matching sections' : 'No active sections',
+            }];
 
       return {
         countLabel: `${filteredEntries.length} Active Sections`,
@@ -221,7 +195,7 @@ export function LearnerBasedCredentialsPage() {
         sections: sectionsForGrade,
       };
     }).filter((grade) => !normalizedDirectoryQuery || grade.countLabel !== '0 Active Sections');
-  }, [directoryQuery, grantedBySection, loadingBySection, resultsBySection, searchBySection, sections]);
+  }, [directoryQuery, grantedBySection, loadingBySection, resultsBySection, sections, selectedLearnerBySection]);
 
   return (
     <section className="section-shell integrated-admin-function">
@@ -229,21 +203,26 @@ export function LearnerBasedCredentialsPage() {
         <h2>Learner-based Credentials</h2>
       </div>
       <article className="ia-learner-credentials__panel">
-        <label className="floating-field ia-learner-credentials__directory-search">
-          <div className="floating-field__control">
-            <input
-              id="ia-learner-credentials-directory-search"
-              type="search"
-              value={directoryQuery}
-              onChange={(event) => setDirectoryQuery(event.target.value)}
-              placeholder=" "
-              data-has-value={directoryQuery.trim().length > 0 ? 'true' : 'false'}
-              aria-label="Search granted learners or sections"
-            />
-            <span>Search granted learners or sections</span>
-          </div>
-        </label>
-        {isLoading ? <p className="registry-copy">Loading active school year sections...</p> : (
+        <div className="ia-learner-credentials__toolbar">
+          <label className="floating-field ia-learner-credentials__directory-search">
+            <div className="floating-field__control">
+              <input
+                id="ia-learner-credentials-directory-search"
+                type="search"
+                value={directoryQuery}
+                onChange={(event) => setDirectoryQuery(event.target.value)}
+                placeholder=" "
+                data-has-value={directoryQuery.trim().length > 0 ? 'true' : 'false'}
+                aria-label="Search granted learners or sections"
+              />
+              <span>Search granted learners or sections</span>
+            </div>
+          </label>
+          <button type="button" className="registry-action-button ia-learner-credentials__grade-rep-button" onClick={() => setGradeRepModalOpen(true)}>
+            Grade Representatives
+          </button>
+        </div>
+        {isLoading ? <UsisPageLoader message="Loading learner-based credentials..." /> : (
           <UsisGradeSectionList
             className="ia-learner-credentials"
             emptyMessage={directoryQuery.trim() ? 'No matching learners or sections found.' : 'No active sections available.'}
@@ -251,6 +230,57 @@ export function LearnerBasedCredentialsPage() {
           />
         )}
       </article>
+
+      <GradeRepresentativeModal
+        gradeLevels={GRADE_LEVELS}
+        isOpen={gradeRepModalOpen}
+        isSearching={isSearchingGradeReps}
+        isSubmitting={isSubmittingGradeRep}
+        searchResults={gradeRepResults}
+        representatives={gradeRepresentatives}
+        onClose={() => setGradeRepModalOpen(false)}
+        onSearchLearners={async ({ gradeLevel, query }) => {
+          setIsSearchingGradeReps(true);
+          try {
+            const rows = await searchLearnersByGradeLevel({ gradeLevel, query });
+            setGradeRepResults(rows);
+          } catch (nextError: any) {
+            setAlert({ title: 'Search Failed', message: nextError?.message || 'Unable to search grade-level learners.', tone: 'danger' });
+          } finally {
+            setIsSearchingGradeReps(false);
+          }
+        }}
+        onAssign={async ({ gradeLevel, learner, positionTitle }) => {
+          setIsSubmittingGradeRep(true);
+          try {
+            await grantGradeLevelMerchControlAccess({
+              gradeLevel,
+              learnerId: learner.learnerId,
+              learnerLrn: learner.lrn,
+              positionTitle,
+            });
+            setAlert({ title: 'Success', message: `${learner.fullName} now has Merch Control access for ${gradeLevel}.`, tone: 'success' });
+            await refreshGrantedAccess(sections);
+            setGradeRepModalOpen(false);
+          } catch (nextError: any) {
+            setAlert({ title: 'Assignment Failed', message: nextError?.message || 'Unable to assign grade-level representative.', tone: 'danger' });
+          } finally {
+            setIsSubmittingGradeRep(false);
+          }
+        }}
+        onDeleteRepresentative={async ({ credentialId }) => {
+          setIsSubmittingGradeRep(true);
+          try {
+            await deleteGradeLevelRepresentativeAccess({ credentialId });
+            setAlert({ title: 'Success', message: 'Grade-level representative removed successfully.', tone: 'success' });
+            await refreshGrantedAccess(sections);
+          } catch (nextError: any) {
+            setAlert({ title: 'Delete Failed', message: nextError?.message || 'Unable to delete representative.', tone: 'danger' });
+          } finally {
+            setIsSubmittingGradeRep(false);
+          }
+        }}
+      />
 
       <GrantLearnerAccessModal
         isEditing={Boolean(editingCredential)}

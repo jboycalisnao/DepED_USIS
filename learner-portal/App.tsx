@@ -22,6 +22,7 @@ import { DocumentRequestsServicePage } from './features/portal/pages/services/Do
 import { StudentSupportServicePage } from './features/portal/pages/services/StudentSupportServicePage';
 import { PtaFeeServicePage } from './features/portal/pages/services/PtaFeeServicePage';
 import { MerchServicePage } from './features/portal/pages/services/MerchServicePage';
+import { MerchControlServicePage } from './features/portal/pages/services/MerchControlServicePage';
 import { LearnerLoginPage } from './features/auth/pages/LearnerLoginPage';
 import { LearnerCredentialPage } from './features/auth/pages/LearnerCredentialPage';
 
@@ -97,12 +98,13 @@ function LearnerPortalShell({
               <Routes>
                 <Route path="/" element={<DashboardPage session={session} />} />
                 <Route path="/grades" element={<GradesPage />} />
-                <Route path="/services" element={<ServicesPage />} />
+                <Route path="/services" element={<ServicesPage session={session} />} />
                 <Route path="/services/enrollment-history" element={<EnrollmentHistoryServicePage session={session} />} />
                 <Route path="/services/document-requests" element={<DocumentRequestsServicePage />} />
                 <Route path="/services/student-support" element={<StudentSupportServicePage />} />
                 <Route path="/services/pta-fee" element={<PtaFeeServicePage session={session} />} />
                 <Route path="/services/merch" element={<MerchServicePage session={session} />} />
+                <Route path="/services/merch-control" element={<MerchControlServicePage session={session} />} />
                 <Route path="/profile" element={<ProfilePage session={session} />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>

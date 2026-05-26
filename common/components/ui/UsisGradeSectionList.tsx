@@ -4,13 +4,13 @@ export type UsisGradeSectionListSection = {
   content: ReactNode;
   count: number;
   key: string;
-  label: string;
+  label: ReactNode;
 };
 
 export type UsisGradeSectionListGrade = {
   countLabel?: string;
   key: string;
-  label: string;
+  label: ReactNode;
   sections: UsisGradeSectionListSection[];
 };
 

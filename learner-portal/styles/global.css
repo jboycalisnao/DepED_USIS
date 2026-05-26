@@ -1603,6 +1603,104 @@ body {
   color: #344054;
 }
 
+.learner-merch-control-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid rgba(18, 35, 61, 0.12);
+  border-radius: 0.375rem;
+  background: #ffffff;
+}
+
+.learner-merch-control-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 760px;
+}
+
+.learner-merch-control-table th,
+.learner-merch-control-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(18, 35, 61, 0.08);
+  text-align: left;
+  font-size: 13px;
+}
+
+.learner-merch-control-table th {
+  background: #f8faff;
+  color: #0038a8;
+  font-weight: 700;
+}
+
+.learner-merch-control-table__row {
+  cursor: pointer;
+}
+
+.learner-merch-control-table__row:hover {
+  background: #f8fbff;
+}
+
+.learner-merch-control-table__row:focus-visible {
+  outline: 2px solid rgba(0, 56, 168, 0.46);
+  outline-offset: -2px;
+}
+
+.learner-merch-control-detail-modal .modal-dialog__body {
+  max-height: min(70vh, 700px);
+  overflow: auto;
+}
+
+.learner-merch-control__search {
+  margin-bottom: 12px;
+}
+
+.learner-merch-control__search .floating-field__control input {
+  min-height: 48px;
+  font-size: 16px;
+}
+
+.learner-merch-control__sections {
+  display: grid;
+  gap: 10px;
+}
+
+.learner-merch-control__section {
+  border: 1px solid rgba(18, 35, 61, 0.12);
+  border-radius: 0.375rem;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.learner-merch-control__section-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  cursor: pointer;
+  color: #0038a8;
+  font-size: 13px;
+  font-weight: 700;
+  background: #f8faff;
+}
+
+.learner-merch-control__section-summary-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.learner-merch-control__section-chevron {
+  transition: transform 140ms ease;
+}
+
+.learner-merch-control__section[open] .learner-merch-control__section-chevron {
+  transform: rotate(90deg);
+}
+
+.learner-merch-control__section-summary::-webkit-details-marker {
+  display: none;
+}
+
 @media (max-width: 720px) {
   .learner-merch-order-modal__row {
     grid-template-columns: 1fr;
