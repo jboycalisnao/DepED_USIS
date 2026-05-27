@@ -88,8 +88,9 @@ const resolveSectionId = async (input: { gradeLevel: string; sectionId: string; 
   return toText((data as any)?.id);
 };
 
-const loadPublishedQuarterGradeMap = async (learnerId: string, lrn: string) => {
+const loadPublishedQuarterGradeMap = async (input: { learnerId: string; lrn: string; sectionId: string }) => {
   const tableCandidates = [
+    'registrar_section_subject_grades',
     'registrar_learner_subject_grades',
     'registrar_subject_grades',
     'registrar_grades',
@@ -98,8 +99,9 @@ const loadPublishedQuarterGradeMap = async (learnerId: string, lrn: string) => {
 
   for (const table of tableCandidates) {
     let query = supabase.from(table).select('*').limit(500);
-    if (learnerId) query = query.eq('learner_id', learnerId);
-    if (!learnerId && lrn) query = query.eq('learner_lrn', lrn);
+    if (input.learnerId) query = query.eq('learner_id', input.learnerId);
+    if (!input.learnerId && input.lrn) query = query.eq('learner_lrn', input.lrn);
+    if (table === 'registrar_section_subject_grades' && input.sectionId) query = query.eq('section_id', input.sectionId);
 
     const { data, error } = await query;
     if (error) {
@@ -125,7 +127,6 @@ export async function fetchLearnerGradesSnapshot(input: { learnerId?: string; lr
   const lrn = toText(input.lrn);
   const cacheKey = resolveLearnerCacheKey({ learnerId, lrn });
   const cached = getCachedLearnerData<LearnerGradesSnapshot>('learner-grades', cacheKey);
-  if (cached && cached.gradeLevel && cached.sectionName) return cached;
 
   let learnerQuery = supabase
     .from('registrar_learners')
@@ -158,7 +159,11 @@ export async function fetchLearnerGradesSnapshot(input: { learnerId?: string; lr
       .select('subject_code,subject_title,is_core')
       .eq('section_id', sectionId)
       .order('subject_code', { ascending: true }),
-    loadPublishedQuarterGradeMap(toText((learnerData as any).id), toText((learnerData as any).lrn)),
+    loadPublishedQuarterGradeMap({
+      learnerId: toText((learnerData as any).id),
+      lrn: toText((learnerData as any).lrn),
+      sectionId,
+    }),
   ]);
 
   if (subjectsResult.error) throw new Error(subjectsResult.error.message || 'Unable to load section subjects.');
@@ -204,6 +209,16 @@ export async function fetchLearnerGradesSnapshot(input: { learnerId?: string; lr
     rows,
     sectionName: resolvedSectionName,
   };
+
+  if (cached) {
+    const hasVisibleGrade = snapshot.rows.some((row) =>
+      [row.firstQuarter, row.secondQuarter, row.thirdQuarter, row.fourthQuarter].some((value) => value !== '--' && value !== ''),
+    );
+    if (!hasVisibleGrade && cached.rows?.length) {
+      return cached;
+    }
+  }
+
   setCachedLearnerData('learner-grades', cacheKey, snapshot);
   return snapshot;
 }

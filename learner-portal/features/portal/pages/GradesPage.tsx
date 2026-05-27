@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { LearnerPortalAccessRecord } from '../../auth/services/learnerAccess';
 import { fetchLearnerGradesSnapshot, type LearnerGradesSnapshot } from '../services/learnerGradesService';
+import UsisPageLoader from '../../../../common/components/UsisPageLoader';
 
 export function GradesPage({ session }: { session: LearnerPortalAccessRecord }) {
   const [isLoading, setIsLoading] = useState(true);
@@ -38,7 +39,7 @@ export function GradesPage({ session }: { session: LearnerPortalAccessRecord }) 
           <span><strong>Grade Level:</strong> {snapshot.gradeLevel || 'N/A'}</span>
           <span><strong>Section:</strong> {snapshot.sectionName || 'N/A'}</span>
         </div>
-        {isLoading ? <p className="learner-services-history__state">Loading grades...</p> : null}
+        {isLoading ? <UsisPageLoader message="Loading grades..." /> : null}
         {error ? <p className="learner-services-history__state">{error}</p> : null}
         {!isLoading && !error ? (
           <div className="learner-grades-table-wrap">
