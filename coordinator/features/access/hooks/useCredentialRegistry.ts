@@ -12,7 +12,7 @@ import {
   updateElectionCoordinatorCredential,
   type CredentialRegistrySnapshot,
 } from '../utils/credentialRegistry';
-import { setCoordinatorAccountModuleAccess } from '../../../../common/auth/moduleAccess';
+import { saveCoordinatorAccountModuleAccessToSupabase } from '../../../../common/auth/moduleAccess';
 
 const REGISTRY_CACHE_TTL_MS = 1000 * 60 * 5;
 const buildRegistryCacheKey = (userId: string, schoolId: string) =>
@@ -116,7 +116,7 @@ export function useCredentialRegistry() {
       try {
         const createdId = await createCoreCoordinatorCredential(payload);
         if (payload.allowedModules?.length) {
-          setCoordinatorAccountModuleAccess(createdId, payload.allowedModules);
+          await saveCoordinatorAccountModuleAccessToSupabase(createdId, payload.allowedModules);
         }
         setNotice('Core USIS access created.');
         await refresh();

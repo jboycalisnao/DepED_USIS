@@ -71,6 +71,28 @@ body {
   white-space: nowrap;
 }
 
+.integrated-admin-app .ia-registry-table--enhanced thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.integrated-admin-app .ia-registry-table--enhanced tbody tr:nth-child(even) {
+  background: #fcfdff;
+}
+
+.integrated-admin-app .ia-registry-table--enhanced tbody td {
+  line-height: 1.4;
+}
+
+.integrated-admin-app .ia-registry-table--enhanced tbody td:nth-child(6) {
+  max-width: 320px;
+}
+
+.integrated-admin-app .ia-registry-table--enhanced .registry-table__actions {
+  justify-content: flex-start;
+}
+
 .integrated-admin-app .registry-icon-btn {
   display: inline-flex;
   align-items: center;

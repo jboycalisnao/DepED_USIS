@@ -18,13 +18,17 @@ import {
   storeCoordinatorAccess,
 } from '../coordinator/features/auth/utils/coordinatorAccess';
 import { CoordinatorFunctionPage } from './features/functions/coordinator/CoordinatorFunctionPage';
-import { CoordinatorCredentialsPage } from './features/functions/coordinator/pages/CoordinatorCredentialsPage';
-import { CoordinatorRegistryPage } from './features/functions/coordinator/pages/CoordinatorRegistryPage';
+import { DepartmentsPage } from './features/functions/coordinator/departments/pages/DepartmentsPage';
 import { LearnerBasedCredentialsPage } from './features/functions/coordinator/learner-credentials/LearnerBasedCredentialsPage';
+import { TeachingNonTeachingCredentialsPage } from './features/functions/coordinator/pages/TeachingNonTeachingCredentialsPage';
+import { SubjectsManagementPage } from './features/functions/grades-subjects/pages/SubjectsManagementPage';
+import { SubjectManagementPage } from './features/functions/grades-subjects/subject-management/pages/SubjectManagementPage';
+import { TimeSlotsPage } from './features/functions/grades-subjects/time-slots/pages/TimeSlotsPage';
 import { MerchandiseControlPage } from './features/functions/merchandise/MerchandiseControlPage';
 import { MerchOrderControlPage } from './features/functions/merchandise/MerchOrderControlPage';
 import { MerchOrderPaymentPage } from './features/functions/merchandise/MerchOrderPaymentPage';
 import { MerchOrderCountsPage } from './features/functions/merchandise/MerchOrderCountsPage';
+import { resolveCoordinatorDepartmentAccess } from '../common/auth/coordinatorDepartmentAccess';
 
 function IntegratedAdminOverview({
   session,
@@ -64,8 +68,8 @@ const iaNavItems: UsisSideNavItem[] = [
     label: 'Coordinator',
     icon: 'admin_panel_settings',
     children: [
-      { path: '/functions/coordinator/credentials', label: 'Coordinator Credentials', icon: 'badge' },
-      { path: '/functions/coordinator/registry', label: 'Coordinator Registry', icon: 'group' },
+      { path: '/functions/coordinator/departments', label: 'Departments', icon: 'apartment' },
+      { path: '/functions/coordinator/teaching-non-teaching', label: 'Teaching & Non-Teaching', icon: 'groups' },
       { path: '/functions/coordinator/learner-credentials', label: 'Learner-based Credentials', icon: 'school' },
     ],
   },
@@ -78,6 +82,16 @@ const iaNavItems: UsisSideNavItem[] = [
       { path: '/functions/merch-control', label: 'Orders', icon: 'shopping_bag' },
       { path: '/functions/order-payment', label: 'Payment', icon: 'payments' },
       { path: '/functions/order-counts', label: 'Order Counts', icon: 'monitoring' },
+    ],
+  },
+  {
+    path: '/functions/grades-subjects',
+    label: 'Grades and Subjects',
+    icon: 'menu_book',
+    children: [
+      { path: '/functions/grades-subjects/subjects', label: 'Subjects', icon: 'library_books' },
+      { path: '/functions/grades-subjects/subject-management', label: 'Subject Management', icon: 'fact_check' },
+      { path: '/functions/grades-subjects/time-slots', label: 'Time Slots', icon: 'schedule' },
     ],
   },
 ];
@@ -130,6 +144,33 @@ function IntegratedAdminShell() {
   }, [session]);
 
   useEffect(() => {
+    let cancelled = false;
+    const syncDepartment = async () => {
+      if (!session?.userId) return;
+      const resolved = await resolveCoordinatorDepartmentAccess(session.userId);
+      const nextDepartment = String(resolved.departmentName || '').trim();
+      if (!nextDepartment || nextDepartment === (session.departmentName || '').trim()) return;
+      const nextSession = {
+        ...session,
+        departmentName: nextDepartment,
+        coordinatorAccess: {
+          ...session.coordinatorAccess,
+          departmentName: nextDepartment,
+        },
+      };
+      if (!cancelled) {
+        setSession(nextSession);
+        storeIntegratedAdminAccess(nextSession);
+        storeCoordinatorAccess(nextSession.coordinatorAccess);
+      }
+    };
+    void syncDepartment();
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.userId, session?.departmentName]);
+
+  useEffect(() => {
     if (!session) return;
     setIsRouteLoading(true);
     const timer = window.setTimeout(() => setIsRouteLoading(false), 320);
@@ -174,7 +215,7 @@ function IntegratedAdminShell() {
                 currentLabel={currentSectionLabel}
                 profileName={session.coordinatorName}
                 profileRole="School Integrated Admin"
-                profileSubtitle={session.schoolName}
+                profileSubtitle={`Department: ${session.departmentName?.trim() ? session.departmentName : 'Not Assigned'}`}
                 onLogout={handleLogout}
                 leftActions={
                   <button
@@ -206,15 +247,20 @@ function IntegratedAdminShell() {
                     <Routes>
                       <Route path="/" element={<IntegratedAdminOverview session={session} />} />
                       <Route path="/functions/coordinator" element={<CoordinatorFunctionPage />}>
-                        <Route index element={<Navigate to="credentials" replace />} />
-                        <Route path="credentials" element={<CoordinatorCredentialsPage />} />
-                        <Route path="registry" element={<CoordinatorRegistryPage />} />
+                        <Route index element={<Navigate to="teaching-non-teaching" replace />} />
+                        <Route path="credentials" element={<Navigate to="../teaching-non-teaching" replace />} />
+                        <Route path="registry" element={<Navigate to="../teaching-non-teaching" replace />} />
+                        <Route path="departments" element={<DepartmentsPage />} />
+                        <Route path="teaching-non-teaching" element={<TeachingNonTeachingCredentialsPage />} />
                         <Route path="learner-credentials" element={<LearnerBasedCredentialsPage />} />
                       </Route>
                       <Route path="/functions/merchandise-control" element={<MerchandiseControlPage />} />
                       <Route path="/functions/merch-control" element={<MerchOrderControlPage />} />
                       <Route path="/functions/order-payment" element={<MerchOrderPaymentPage />} />
                       <Route path="/functions/order-counts" element={<MerchOrderCountsPage />} />
+                      <Route path="/functions/grades-subjects/subjects" element={<SubjectsManagementPage />} />
+                      <Route path="/functions/grades-subjects/subject-management" element={<SubjectManagementPage />} />
+                      <Route path="/functions/grades-subjects/time-slots" element={<TimeSlotsPage />} />
                       <Route path="*" element={<Navigate to="/" replace />} />
                     </Routes>
                   )}

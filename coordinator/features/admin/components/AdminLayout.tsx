@@ -3,14 +3,16 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   clearStoredCoordinatorAccess,
   getStoredCoordinatorAccess,
+  storeCoordinatorAccess,
 } from '@/features/auth/utils/coordinatorAccess';
+import { resolveCoordinatorDepartmentAccess } from '../../../../common/auth/coordinatorDepartmentAccess';
 import { CoordinatorSideNav } from '../layout/CoordinatorSideNav';
 import { coordinatorNavItems } from '../layout/nav/coordinatorNavItems';
 
 export function AdminLayout() {
   const navigate = useNavigate();
   const location = useLocation();
-  const access = getStoredCoordinatorAccess();
+  const [access, setAccess] = useState(getStoredCoordinatorAccess());
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
 
@@ -24,6 +26,25 @@ export function AdminLayout() {
     const tokens = sourceName.split(/\s+/).slice(0, 2);
     return tokens.map((token) => token.charAt(0).toUpperCase()).join('');
   }, [access?.coordinatorName]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const syncDepartment = async () => {
+      if (!access?.userId) return;
+      const resolved = await resolveCoordinatorDepartmentAccess(access.userId);
+      const nextDepartment = String(resolved.departmentName || '').trim();
+      if (!nextDepartment || nextDepartment === (access.departmentName || '').trim()) return;
+      const nextAccess = { ...access, departmentName: nextDepartment };
+      if (!cancelled) {
+        setAccess(nextAccess);
+        storeCoordinatorAccess(nextAccess);
+      }
+    };
+    void syncDepartment();
+    return () => {
+      cancelled = true;
+    };
+  }, [access?.userId, access?.departmentName]);
 
   useEffect(() => {
     if (!isProfileOpen) return;
@@ -70,6 +91,9 @@ export function AdminLayout() {
               </div>
               <p className="coordinator-profile-popover__name">{access?.coordinatorName || 'Coordinator'}</p>
               <p className="coordinator-profile-popover__meta">{access?.coordinatorRole || 'School USIS Coordinator'}</p>
+              <p className="coordinator-profile-popover__meta">
+                Department: {access?.departmentName?.trim() ? access.departmentName : 'Not Assigned'}
+              </p>
               <p className="coordinator-profile-popover__meta">{access?.schoolId || 'N/A'} • {access?.schoolName || 'USIS School'}</p>
               <div className="coordinator-profile-popover__divider" />
               <button type="button" className="coordinator-profile-popover__logout" onClick={handleLogout}>

@@ -1,3 +1,5 @@
+import { supabase } from '../../packages/shared-supabase/src';
+
 export type UsisModuleKey =
   | 'coordinator'
   | 'ia'
@@ -13,6 +15,8 @@ const STORAGE_KEY = 'usis_coordinator_module_access_map';
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 30;
 
 type ModuleAccessMap = Record<string, UsisModuleKey[]>;
+const MODULE_ACCESS_TABLE = 'coordinator_module_access';
+const MODULE_KEYS: UsisModuleKey[] = ['coordinator', 'ia', 'registrar', 'attendance', 'election', 'sp_portal', 'spta', 'learner_portal', 'support'];
 
 const parseModuleAccessMap = (raw: string | null): ModuleAccessMap => {
   if (!raw) return {};
@@ -61,6 +65,70 @@ export const setCoordinatorAccountModuleAccess = (accountId: string, modules: Us
   const current = getCoordinatorModuleAccessMap();
   current[accountId] = Array.from(new Set(modules));
   setCoordinatorModuleAccessMap(current);
+};
+
+const sanitizeModules = (value: unknown): UsisModuleKey[] => {
+  if (!Array.isArray(value)) return [];
+  return Array.from(
+    new Set(
+      value
+        .filter((entry): entry is string => typeof entry === 'string')
+        .map((entry) => entry.trim())
+        .filter((entry): entry is UsisModuleKey => MODULE_KEYS.includes(entry as UsisModuleKey)),
+    ),
+  );
+};
+
+export const loadCoordinatorModuleAccessMapFromSupabase = async (accountIds?: string[]) => {
+  let query = supabase.from(MODULE_ACCESS_TABLE).select('account_id, modules');
+  if (accountIds?.length) {
+    query = query.in('account_id', accountIds);
+  }
+  const { data, error } = await query;
+  if (error) {
+    throw new Error(error.message || 'Unable to load module access.');
+  }
+  const map: ModuleAccessMap = {};
+  (data || []).forEach((row: any) => {
+    const accountId = typeof row.account_id === 'string' ? row.account_id : '';
+    if (!accountId) return;
+    map[accountId] = sanitizeModules(row.modules);
+  });
+  setCoordinatorModuleAccessMap({
+    ...getCoordinatorModuleAccessMap(),
+    ...map,
+  });
+  return map;
+};
+
+export const saveCoordinatorAccountModuleAccessToSupabase = async (accountId: string, modules: UsisModuleKey[]) => {
+  const sanitized = sanitizeModules(modules);
+  const { error } = await supabase
+    .from(MODULE_ACCESS_TABLE)
+    .upsert(
+      [{ account_id: accountId, modules: sanitized }],
+      { onConflict: 'account_id' },
+    );
+  if (error) {
+    throw new Error(error.message || 'Unable to save module access.');
+  }
+  setCoordinatorAccountModuleAccess(accountId, sanitized);
+};
+
+export const hasCoordinatorModuleAccessInSupabase = async (accountId: string | null | undefined, moduleKey: UsisModuleKey) => {
+  if (!accountId) return false;
+  const { data, error } = await supabase
+    .from(MODULE_ACCESS_TABLE)
+    .select('modules')
+    .eq('account_id', accountId)
+    .limit(1)
+    .maybeSingle();
+  if (error || !data) {
+    return hasCoordinatorModuleAccess(accountId, moduleKey);
+  }
+  const modules = sanitizeModules((data as any).modules);
+  setCoordinatorAccountModuleAccess(accountId, modules);
+  return modules.includes(moduleKey);
 };
 
 export const hasCoordinatorModuleAccess = (accountId: string | null | undefined, moduleKey: UsisModuleKey) => {

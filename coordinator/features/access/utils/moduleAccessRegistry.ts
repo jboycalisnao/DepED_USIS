@@ -1,5 +1,7 @@
 import {
   getCoordinatorModuleAccessMap,
+  loadCoordinatorModuleAccessMapFromSupabase,
+  saveCoordinatorAccountModuleAccessToSupabase,
   setCoordinatorAccountModuleAccess,
 } from '../../../../common/auth/moduleAccess';
 import type { UsisModuleKey } from '../../../../common/auth/moduleAccess';
@@ -27,3 +29,4 @@ export const setAccountModuleAccess = (accountId: string, modules: UsisModuleKey
 };
 
 export const getAccountModuleAccess = (accountId: string) => getModuleAccessMap()[accountId] || [];
+export { loadCoordinatorModuleAccessMapFromSupabase, saveCoordinatorAccountModuleAccessToSupabase };

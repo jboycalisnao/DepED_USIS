@@ -1,11 +1,13 @@
 import { supabase } from '../../lib/supabase';
 import { getCoordinatorModuleAccessMap, hasCoordinatorModuleAccess } from '../../../common/auth/moduleAccess';
+import { resolveCoordinatorDepartmentAccess } from '../../../common/auth/coordinatorDepartmentAccess';
 
 export interface RegistrarCoordinatorAccess {
   accountSource: 'usis_core_coordinators';
   userId: string;
   coordinatorName: string;
   coordinatorRole: string;
+  departmentName: string;
   schoolId: string;
   schoolName: string;
   schoolUuid: string;
@@ -50,6 +52,18 @@ const toTitleCase = (value: string) =>
     .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
     .join(' ');
+
+const toMiddleInitial = (value: unknown) => {
+  const text = String(value || '').trim();
+  return text ? `${text.charAt(0).toUpperCase()}.` : '';
+};
+
+const formatCoordinatorDisplayName = (firstName: unknown, middleName: unknown, lastName: unknown) => {
+  const first = String(firstName || '').trim();
+  const middleInitial = toMiddleInitial(middleName);
+  const last = String(lastName || '').trim();
+  return [first, middleInitial, last].filter(Boolean).join(' ').trim();
+};
 
 const hasExplicitRegistrarDeny = (accountId: string) => {
   const accessMap = getCoordinatorModuleAccessMap();
@@ -126,6 +140,16 @@ export const resolveRegistrarCoordinatorAccess = async (
     debug.matchedSource = candidate.source;
     debug.matchedRole = candidate.data.role || null;
 
+    const departmentAccess = await resolveCoordinatorDepartmentAccess(String(candidate.data.id || ''));
+    if (!departmentAccess.allowed) {
+      debug.outcome = 'access_denied';
+      return {
+        error: `This account is assigned to an inactive department (${departmentAccess.departmentName || 'Unknown'}). Contact Integrated Admin.`,
+        record: null,
+        debug,
+      };
+    }
+
     // Coordinator module map can be stale across deployments/domains.
     // Registrar role from DB is treated as authoritative for access.
     if (candidate.source === 'usis_core_coordinators' && hasExplicitRegistrarDeny(candidate.data.id)) {
@@ -141,11 +165,13 @@ export const resolveRegistrarCoordinatorAccess = async (
       record: {
         accountSource: candidate.source,
         userId: candidate.data.id,
-        coordinatorName:
-          [candidate.data.first_name, candidate.data.middle_name, candidate.data.last_name]
-            .filter(Boolean)
-            .join(' ') || toTitleCase(normalizedUsername),
+        coordinatorName: formatCoordinatorDisplayName(
+          candidate.data.first_name,
+          candidate.data.middle_name,
+          candidate.data.last_name,
+        ) || toTitleCase(normalizedUsername),
         coordinatorRole: candidate.data.role || 'School USIS Coordinator',
+        departmentName: String(departmentAccess.departmentName || '').trim(),
         schoolId: school?.school_code || '',
         schoolName: school?.school_name || 'USIS School',
         schoolUuid: school?.id || '',

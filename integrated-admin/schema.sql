@@ -215,6 +215,131 @@ create index if not exists idx_coord_learner_ops_operation on coordinator_learne
 create index if not exists idx_coord_learner_ops_active on coordinator_learner_operation_credentials(is_active);
 create index if not exists idx_coord_learner_ops_learner_id on coordinator_learner_operation_credentials(learner_id);
 
+-- =========================================================
+-- Coordinator Module Access (DB-backed)
+-- =========================================================
+create table if not exists coordinator_module_access (
+  account_id uuid primary key references usis_core_coordinators(id) on update cascade on delete cascade,
+  modules text[] not null default '{}'::text[],
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_coordinator_module_access_modules
+  on coordinator_module_access using gin (modules);
+
+-- =========================================================
+-- Coordinator Departments
+-- =========================================================
+create table if not exists coordinator_departments (
+  id uuid primary key default gen_random_uuid(),
+  name text not null unique,
+  is_active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_coordinator_departments_active on coordinator_departments(is_active);
+
+create table if not exists coordinator_account_departments (
+  account_id uuid primary key references usis_core_coordinators(id) on update cascade on delete cascade,
+  department_id uuid not null references coordinator_departments(id) on update cascade on delete restrict,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_coordinator_account_departments_department on coordinator_account_departments(department_id);
+
+-- =========================================================
+-- Registrar Section Subjects (managed in IA)
+-- =========================================================
+create table if not exists registrar_section_subjects (
+  id uuid primary key default gen_random_uuid(),
+  section_id text not null references registrar_sections(id) on update cascade on delete cascade,
+  subject_code text not null,
+  subject_title text not null,
+  is_core boolean not null default true,
+  program_scope text not null default 'regular',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (section_id, subject_code)
+);
+
+create index if not exists idx_registrar_section_subjects_section on registrar_section_subjects(section_id);
+create index if not exists idx_registrar_section_subjects_scope on registrar_section_subjects(program_scope);
+
+-- =========================================================
+-- Registrar Subject Schedule Presets (program-based templates managed in IA)
+-- =========================================================
+create table if not exists registrar_subject_schedule_presets (
+  id uuid primary key default gen_random_uuid(),
+  grade_level text not null,
+  program_scope text not null default 'regular' check (program_scope in ('regular', 'special_program_ste', 'senior_high_school')),
+  program_name text,
+  strand text,
+  slot_label text not null,
+  day_of_week text not null,
+  start_time text not null,
+  end_time text not null,
+  room text,
+  is_active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+alter table registrar_subject_schedule_presets
+  add column if not exists program_name text;
+
+create index if not exists idx_registrar_subject_schedule_presets_scope
+  on registrar_subject_schedule_presets(program_scope, grade_level);
+create index if not exists idx_registrar_subject_schedule_presets_strand
+  on registrar_subject_schedule_presets(strand);
+create unique index if not exists uq_registrar_subject_schedule_presets_unique
+  on registrar_subject_schedule_presets(grade_level, program_scope, coalesce(strand, ''), day_of_week, start_time, end_time, slot_label);
+
+-- =========================================================
+-- Registrar Section Subject Schedules (managed in IA)
+-- =========================================================
+create table if not exists registrar_section_subject_schedules (
+  id uuid primary key default gen_random_uuid(),
+  section_id text not null references registrar_sections(id) on update cascade on delete cascade,
+  preset_id uuid references registrar_subject_schedule_presets(id) on update cascade on delete set null,
+  section_name text not null,
+  subject_code text not null,
+  subject_title text not null,
+  day_of_week text not null,
+  start_time text not null,
+  end_time text not null,
+  room text,
+  is_active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (section_id, subject_code, day_of_week, start_time, end_time)
+);
+
+create index if not exists idx_registrar_section_subject_schedules_section on registrar_section_subject_schedules(section_id);
+create index if not exists idx_registrar_section_subject_schedules_day on registrar_section_subject_schedules(day_of_week);
+
+-- =========================================================
+-- Registrar Subject Management (grade-level catalog managed in IA)
+-- =========================================================
+create table if not exists registrar_subject_management (
+  id uuid primary key default gen_random_uuid(),
+  grade_level text not null,
+  program_scope text not null default 'regular' check (program_scope in ('regular', 'special_program_ste', 'senior_high_school')),
+  strand text,
+  subject_code text not null,
+  subject_title text not null,
+  subject_type text not null default 'core' check (subject_type in ('core', 'elective')),
+  is_active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_registrar_subject_management_scope on registrar_subject_management(program_scope, grade_level);
+create index if not exists idx_registrar_subject_management_strand on registrar_subject_management(strand);
+create unique index if not exists uq_registrar_subject_management_unique
+  on registrar_subject_management(grade_level, program_scope, coalesce(strand, ''), subject_code);
+
 -- normalize legacy learner_id text values and enforce FK to registrar_learners
 alter table coordinator_learner_operation_credentials
   alter column learner_id type uuid
@@ -273,6 +398,41 @@ for each row execute function set_updated_at();
 drop trigger if exists trg_coordinator_learner_operation_credentials_updated_at on coordinator_learner_operation_credentials;
 create trigger trg_coordinator_learner_operation_credentials_updated_at
 before update on coordinator_learner_operation_credentials
+for each row execute function set_updated_at();
+
+drop trigger if exists trg_coordinator_module_access_updated_at on coordinator_module_access;
+create trigger trg_coordinator_module_access_updated_at
+before update on coordinator_module_access
+for each row execute function set_updated_at();
+
+drop trigger if exists trg_coordinator_departments_updated_at on coordinator_departments;
+create trigger trg_coordinator_departments_updated_at
+before update on coordinator_departments
+for each row execute function set_updated_at();
+
+drop trigger if exists trg_coordinator_account_departments_updated_at on coordinator_account_departments;
+create trigger trg_coordinator_account_departments_updated_at
+before update on coordinator_account_departments
+for each row execute function set_updated_at();
+
+drop trigger if exists trg_registrar_section_subjects_updated_at on registrar_section_subjects;
+create trigger trg_registrar_section_subjects_updated_at
+before update on registrar_section_subjects
+for each row execute function set_updated_at();
+
+drop trigger if exists trg_registrar_section_subject_schedules_updated_at on registrar_section_subject_schedules;
+create trigger trg_registrar_section_subject_schedules_updated_at
+before update on registrar_section_subject_schedules
+for each row execute function set_updated_at();
+
+drop trigger if exists trg_registrar_subject_schedule_presets_updated_at on registrar_subject_schedule_presets;
+create trigger trg_registrar_subject_schedule_presets_updated_at
+before update on registrar_subject_schedule_presets
+for each row execute function set_updated_at();
+
+drop trigger if exists trg_registrar_subject_management_updated_at on registrar_subject_management;
+create trigger trg_registrar_subject_management_updated_at
+before update on registrar_subject_management
 for each row execute function set_updated_at();
 
 -- =========================================================

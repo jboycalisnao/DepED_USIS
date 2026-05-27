@@ -114,6 +114,17 @@
   transform: translateY(0);
 }
 
+.floating-field__control input[required] + span::after,
+.floating-field__control input[required] ~ span::after,
+.floating-field__control select[required] + span::after,
+.floating-field__control select[required] ~ span::after,
+.floating-field__control textarea[required] + span::after,
+.floating-field__control textarea[required] ~ span::after {
+  content: " *";
+  color: #b42318;
+  font-weight: 700;
+}
+
 .searchable-select {
   position: relative;
   display: grid;
@@ -220,7 +231,8 @@
 .searchable-select__menu {
   position: fixed;
   z-index: 2147483646;
-  height: 240px;
+  height: auto;
+  max-height: 240px;
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;

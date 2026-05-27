@@ -1,10 +1,12 @@
 import { supabase } from '../../../../packages/shared-supabase/src';
+import { resolveCoordinatorDepartmentAccess } from '../../../../common/auth/coordinatorDepartmentAccess';
 
 export interface CoordinatorAccessRecord {
   accountSource: 'election_coordinators' | 'sp_portal_coordinators' | 'usis_core_coordinators';
   accessLevel: string;
   coordinatorName: string;
   coordinatorRole: string;
+  departmentName: string;
   division: string;
   divisionCode: string;
   isSuperAdmin: boolean;
@@ -50,6 +52,18 @@ const toTitleCase = (value: string) =>
 
 const isMissingRelationError = (error: { code?: string; message?: string } | null) =>
   error?.code === '42P01' || error?.message?.includes('sp_portal_coordinators');
+
+const toMiddleInitial = (value: unknown) => {
+  const text = String(value || '').trim();
+  return text ? `${text.charAt(0).toUpperCase()}.` : '';
+};
+
+const formatCoordinatorDisplayName = (firstName: unknown, middleName: unknown, lastName: unknown) => {
+  const first = String(firstName || '').trim();
+  const middleInitial = toMiddleInitial(middleName);
+  const last = String(lastName || '').trim();
+  return [first, middleInitial, last].filter(Boolean).join(' ').trim();
+};
 
 export const resolveCoordinatorAccess = async (
   username: string,
@@ -111,10 +125,10 @@ export const resolveCoordinatorAccess = async (
     };
   }
 
-  const resolveRecord = (
+  const resolveRecord = async (
     coordinatorRecord: any,
     accountSource: CoordinatorAccessRecord['accountSource'],
-  ): CoordinatorAccessRecord | null => {
+  ): Promise<CoordinatorAccessRecord | null> => {
     if (!coordinatorRecord) {
       return null;
     }
@@ -138,12 +152,23 @@ export const resolveCoordinatorAccess = async (
       .filter(Boolean)
       .join(', ');
 
+    const departmentAccess =
+      accountSource === 'usis_core_coordinators'
+        ? await resolveCoordinatorDepartmentAccess(String(coordinatorRecord.id || ''))
+        : { allowed: true, departmentName: '' };
+
+    if (accountSource === 'usis_core_coordinators' && !departmentAccess.allowed) {
+      return null;
+    }
+
     return {
       accountSource,
       coordinatorName:
-        [coordinatorRecord.first_name, coordinatorRecord.middle_name, coordinatorRecord.last_name]
-          .filter(Boolean)
-          .join(' ') || toTitleCase(normalizedUsername),
+        formatCoordinatorDisplayName(
+          coordinatorRecord.first_name,
+          coordinatorRecord.middle_name,
+          coordinatorRecord.last_name,
+        ) || toTitleCase(normalizedUsername),
       coordinatorRole:
         coordinatorRecord.role ||
         (accountSource === 'usis_core_coordinators'
@@ -154,6 +179,7 @@ export const resolveCoordinatorAccess = async (
       accessLevel: 'school',
       division: schoolRecord?.division || 'Schools Division of Iloilo',
       divisionCode: schoolRecord?.division_code || schoolRecord?.division || 'SDI',
+      departmentName: String((departmentAccess as { departmentName?: string }).departmentName || '').trim(),
       isSuperAdmin: Boolean(coordinatorRecord.is_super_admin) || coordinatorRecord.role === 'system_admin',
       region: schoolRecord?.region || 'Region VI - Western Visayas',
       regionCode: schoolRecord?.region_code || schoolRecord?.region || 'R6',
@@ -168,9 +194,9 @@ export const resolveCoordinatorAccess = async (
   };
 
   const resolvedRecord =
-    resolveRecord(coreResponse.data, 'usis_core_coordinators') ||
-    resolveRecord(spPortalResponse.data, 'sp_portal_coordinators') ||
-    resolveRecord(electionResponse.data, 'election_coordinators');
+    (await resolveRecord(coreResponse.data, 'usis_core_coordinators')) ||
+    (await resolveRecord(spPortalResponse.data, 'sp_portal_coordinators')) ||
+    (await resolveRecord(electionResponse.data, 'election_coordinators'));
 
   if (!resolvedRecord) {
     return {

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { CoreCredentialEditor } from '../components/CoreCredentialEditor';
 import { ElectionCredentialEditor } from '../components/ElectionCredentialEditor';
 import { RegistryDirectory } from '../components/RegistryDirectory';
@@ -6,8 +6,9 @@ import type { RegistryUserRecord } from '../utils/credentialRegistry';
 import { useCredentialRegistry } from '../hooks/useCredentialRegistry';
 import {
   getModuleAccessMap,
+  loadCoordinatorModuleAccessMapFromSupabase,
   moduleOptions,
-  setAccountModuleAccess,
+  saveCoordinatorAccountModuleAccessToSupabase,
   type UsisModuleKey,
 } from '../utils/moduleAccessRegistry';
 
@@ -58,10 +59,10 @@ export function RegistryPage() {
     );
   };
 
-  const saveModuleAccess = () => {
+  const saveModuleAccess = async () => {
     if (!selectedModuleRecord) return;
     const next = { ...moduleAccessByRecordId, [selectedModuleRecord.id]: pendingModules };
-    setAccountModuleAccess(selectedModuleRecord.id, pendingModules);
+    await saveCoordinatorAccountModuleAccessToSupabase(selectedModuleRecord.id, pendingModules);
     setModuleAccessByRecordId(next);
     setSelectedModuleRecord(null);
     setPendingModules([]);
@@ -77,6 +78,17 @@ export function RegistryPage() {
     ];
     return Array.from(new Map(all.map((record) => [record.id, record])).values());
   }, [snapshot]);
+
+  useEffect(() => {
+    const hydrate = async () => {
+      if (!unifiedRecords.length) return;
+      try {
+        const map = await loadCoordinatorModuleAccessMapFromSupabase(unifiedRecords.map((record) => record.id));
+        setModuleAccessByRecordId((current) => ({ ...current, ...map }));
+      } catch {}
+    };
+    void hydrate();
+  }, [unifiedRecords]);
 
   const handleEditRecord = (record: RegistryUserRecord) => {
     if (record.role === 'sp_portal_coordinator') {

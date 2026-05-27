@@ -1,10 +1,12 @@
-import { hasCoordinatorModuleAccess } from '../../../../common/auth/moduleAccess';
+import { hasCoordinatorModuleAccessInSupabase } from '../../../../common/auth/moduleAccess';
+import { resolveCoordinatorDepartmentAccess } from '../../../../common/auth/coordinatorDepartmentAccess';
 import { supabase } from '../../../../packages/shared-supabase/src';
 import type { CoordinatorAccessRecord } from '../../../../coordinator/features/auth/utils/coordinatorAccess';
 
 export interface IntegratedAdminAccessRecord {
   coordinatorAccess: CoordinatorAccessRecord;
   coordinatorName: string;
+  departmentName: string;
   role: string;
   schoolName: string;
   userId: string;
@@ -19,6 +21,18 @@ const toTitleCase = (value: string) =>
     .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
     .join(' ');
+
+const toMiddleInitial = (value: unknown) => {
+  const text = String(value || '').trim();
+  return text ? `${text.charAt(0).toUpperCase()}.` : '';
+};
+
+const formatCoordinatorDisplayName = (firstName: unknown, middleName: unknown, lastName: unknown) => {
+  const first = String(firstName || '').trim();
+  const middleInitial = toMiddleInitial(middleName);
+  const last = String(lastName || '').trim();
+  return [first, middleInitial, last].filter(Boolean).join(' ').trim();
+};
 
 export const getStoredIntegratedAdminAccess = (): IntegratedAdminAccessRecord | null => {
   const raw = sessionStorage.getItem(STORAGE_KEY);
@@ -71,6 +85,14 @@ export const resolveIntegratedAdminAccess = async (username: string, password: s
   }
 
   const dataRecord = data as Record<string, unknown>;
+  const accountId = String(dataRecord.id || '');
+  const departmentAccess = await resolveCoordinatorDepartmentAccess(accountId);
+  if (!departmentAccess.allowed) {
+    return {
+      error: `This account is assigned to an inactive department (${departmentAccess.departmentName || 'Unknown'}). Contact Integrated Admin.`,
+      record: null,
+    };
+  }
   const passwordHash = typeof dataRecord.password_hash === 'string' ? dataRecord.password_hash : '';
   const passwordPlain = typeof dataRecord.password_plain === 'string' ? dataRecord.password_plain : '';
   const validPassword = password === passwordHash || (passwordPlain ? password === passwordPlain : false);
@@ -81,10 +103,14 @@ export const resolveIntegratedAdminAccess = async (username: string, password: s
     };
   }
 
-  const hasIaAccess = hasCoordinatorModuleAccess(String(dataRecord.id || ''), 'ia');
   const roleValue = typeof dataRecord.role === 'string' ? dataRecord.role : '';
+  const hasIaAccess = await hasCoordinatorModuleAccessInSupabase(accountId, 'ia');
+  const isSchoolCoordinatorRole =
+    roleValue === 'school_usis_coordinator' ||
+    roleValue === 'registrar_coordinator' ||
+    roleValue === 'attendance_coordinator';
   const isSystemAdmin = roleValue === 'system_admin';
-  if (!hasIaAccess && !isSystemAdmin) {
+  if (!hasIaAccess && !isSystemAdmin && !isSchoolCoordinatorRole) {
     return {
       error: 'This account is not allowed to access Integrated Admin. Request IA access in Coordinator Portal.',
       record: null,
@@ -121,16 +147,16 @@ export const resolveIntegratedAdminAccess = async (username: string, password: s
   }
 
   const coordinatorName =
-    [dataRecord.first_name, dataRecord.middle_name, dataRecord.last_name]
-      .filter((value): value is string => typeof value === 'string' && Boolean(value.trim()))
-      .join(' ') ||
+    formatCoordinatorDisplayName(dataRecord.first_name, dataRecord.middle_name, dataRecord.last_name) ||
     toTitleCase(normalizedUsername);
+  const departmentName = String(departmentAccess.departmentName || '').trim();
   const userId = String(dataRecord.id || '');
   const coordinatorAccess: CoordinatorAccessRecord = {
     accountSource: 'usis_core_coordinators',
     accessLevel: 'school',
     coordinatorName,
     coordinatorRole: roleValue || 'school_usis_coordinator',
+    departmentName,
     division,
     divisionCode: divisionCode || 'SDI',
     isSuperAdmin: isSystemAdmin,
@@ -148,6 +174,7 @@ export const resolveIntegratedAdminAccess = async (username: string, password: s
   const record: IntegratedAdminAccessRecord = {
     coordinatorAccess,
     coordinatorName,
+    departmentName,
     role: roleValue || 'school_usis_coordinator',
     schoolName,
     userId,

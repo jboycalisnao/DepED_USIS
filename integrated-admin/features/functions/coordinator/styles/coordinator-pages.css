@@ -314,6 +314,39 @@
   gap: 10px;
 }
 
+.ia-teaching-credential-modal .searchable-select__menu {
+  height: auto;
+  max-height: min(320px, 50vh);
+}
+
+.ia-teaching-credential-modal .floating-field__control input,
+.ia-teaching-credential-modal .floating-field__control textarea,
+.ia-teaching-credential-modal .searchable-select__field input,
+.ia-teaching-credential-modal .searchable-select--floating .floating-field__control input {
+  font-size: 16px;
+}
+
+.ia-teaching-credential-modal .ia-teaching-credential-form-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.ia-teaching-credential-modal .ia-field-tag {
+  color: var(--deped-muted);
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.ia-teaching-credential-modal .ia-field-tag--required {
+  color: var(--deped-blue);
+}
+
+@media (max-width: 760px) {
+  .ia-teaching-credential-modal .ia-teaching-credential-form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .ia-learner-credentials__directory-search .floating-field__control input {
   min-height: var(--ia-learner-credentials-toolbar-height);
   height: var(--ia-learner-credentials-toolbar-height);
@@ -427,6 +460,244 @@
   font-weight: 700;
   line-height: 1;
   white-space: nowrap;
+}
+
+.ia-subjects-track-filter {
+  margin: 0 0 16px;
+  gap: 10px;
+}
+
+.ia-subjects-track-filter .modal-record__chip {
+  border: 1px solid #b9ccef;
+  background: #e9eef8;
+  color: #0f3f9f;
+  cursor: pointer;
+}
+
+.ia-subjects-track-filter .modal-record__chip.is-active {
+  background: #0f3f9f;
+  color: #ffffff;
+}
+
+.ia-subjects-page__header {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.ia-subjects-page__header h3 {
+  margin: 0;
+}
+
+.ia-subjects-page__toolbar {
+  margin-top: 0;
+  margin-bottom: 12px;
+  grid-template-columns: minmax(320px, 1fr) auto;
+  align-items: stretch;
+}
+
+.ia-subjects-page__toolbar .floating-field__control input {
+  min-height: 52px;
+}
+
+.ia-subjects-page__toolbar .registry-action-button {
+  min-height: 52px;
+  height: 52px;
+  white-space: nowrap;
+}
+
+.ia-subject-management-group {
+  margin-top: 16px;
+}
+
+.ia-subject-management-group__title {
+  color: #1f365d;
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.ia-subjects-modal .modal-dialog__header {
+  align-items: flex-start;
+}
+
+.ia-subjects-modal .modal-dialog__body {
+  display: grid;
+  gap: 14px;
+}
+
+.ia-subjects-modal__form {
+  margin-top: 4px;
+  gap: 12px;
+}
+
+.ia-subjects-modal__actions {
+  margin-top: 4px;
+}
+
+.ia-time-slots-page__actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+}
+
+.ia-time-slots-editor-modal {
+  width: min(100%, 1260px);
+}
+
+.ia-time-slots-editor-modal .modal-dialog__body {
+  padding-top: 16px;
+  padding-bottom: 0;
+}
+
+.ia-time-slots-editor-modal__grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px 14px;
+}
+
+.ia-time-slots-editor-modal .floating-field__control span,
+.ia-time-slots-editor-modal .searchable-select--floating .floating-field__control span {
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.ia-time-slots-editor-modal .floating-field__control input:focus + span,
+.ia-time-slots-editor-modal .floating-field__control select:focus + span,
+.ia-time-slots-editor-modal .floating-field__control textarea:focus + span,
+.ia-time-slots-editor-modal .floating-field__control input:not(:placeholder-shown) + span,
+.ia-time-slots-editor-modal .floating-field__control textarea:not(:placeholder-shown) + span,
+.ia-time-slots-editor-modal .floating-field__control select[data-has-value="true"] + span,
+.ia-time-slots-editor-modal .floating-field__control input[data-has-value="true"] ~ span {
+  top: 11px;
+  transform: translateY(0);
+}
+
+.ia-time-slots-editor-modal__actions {
+  margin-top: 14px;
+}
+
+@media (max-width: 1180px) {
+  .ia-time-slots-editor-modal__grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 860px) {
+  .ia-time-slots-editor-modal__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 620px) {
+  .ia-time-slots-editor-modal__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ia-subjects-grade-list .usis-grade-section-list__section-content {
+  padding: 10px 12px;
+}
+
+.ia-subjects-section-card {
+  display: grid;
+  gap: 8px;
+  align-items: start;
+}
+
+.ia-subjects-section-card p {
+  margin: 0;
+}
+
+.ia-subjects-section-card .registry-action-button {
+  justify-self: start;
+}
+
+.ia-subjects-section-view {
+  display: grid;
+  gap: 10px;
+}
+
+.ia-subjects-section-view__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ia-subjects-section-view__meta {
+  display: grid;
+  gap: 4px;
+}
+
+.ia-subjects-section-view__meta p {
+  margin: 0;
+}
+
+.ia-departments-table th:nth-child(1),
+.ia-departments-table td:nth-child(1) {
+  width: 40%;
+}
+
+.ia-departments-table th:nth-child(2),
+.ia-departments-table td:nth-child(2) {
+  width: 18%;
+}
+
+.ia-departments-table th:nth-child(3),
+.ia-departments-table td:nth-child(3) {
+  width: 18%;
+}
+
+.ia-departments-table th:nth-child(4),
+.ia-departments-table td:nth-child(4) {
+  width: 1%;
+  white-space: nowrap;
+}
+
+.ia-departments-table td {
+  padding-top: 14px;
+  padding-bottom: 14px;
+  vertical-align: middle;
+}
+
+.ia-departments-table .registry-table__actions {
+  justify-content: flex-end;
+}
+
+.ia-departments-table__actions {
+  gap: 8px;
+  flex-wrap: nowrap;
+}
+
+.ia-departments-table__actions-col {
+  text-align: right !important;
+  padding-right: 14px;
+}
+
+.ia-departments-actions {
+  margin-bottom: 18px;
+  border-top: 0;
+  padding-top: 0;
+}
+
+.ia-departments-table__state-btn {
+  min-width: 96px;
+  height: 38px;
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 0.375rem;
+}
+
+.ia-departments-table__state-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+@media (max-width: 760px) {
+  .ia-subjects-page__toolbar {
+    grid-template-columns: 1fr;
+  }
 }
 
 .ia-learner-credentials__section-label {
