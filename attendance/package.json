@@ -10,6 +10,7 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
+    "@deped-usis/shared-supabase": "file:../packages/shared-supabase",
     "@supabase/supabase-js": "2.48.1",
     "motion": "^12.36.0",
     "react": "19.2.5",

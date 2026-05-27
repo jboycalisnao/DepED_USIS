@@ -1,4 +1,4 @@
-import { supabase } from '../../packages/shared-supabase/src';
+import { supabase } from '@deped-usis/shared-supabase';
 
 export type UsisModuleKey =
   | 'coordinator'
@@ -250,3 +250,4 @@ export const loadIaPageCatalogFromSupabase = async (): Promise<Array<{ group: st
     label: String(row.page_label || '').trim(),
   })).filter((row) => row.key && row.label);
 };
+

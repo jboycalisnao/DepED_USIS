@@ -1,4 +1,4 @@
-import { supabase } from '../../packages/shared-supabase/src';
+import { supabase } from '@deped-usis/shared-supabase';
 
 export const resolveCoordinatorDepartmentAccess = async (accountId: string) => {
   const normalized = String(accountId || '').trim();
@@ -29,3 +29,4 @@ export const resolveCoordinatorDepartmentAccess = async (accountId: string) => {
     departmentName,
   };
 };
+

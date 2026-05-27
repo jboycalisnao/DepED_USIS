@@ -59,6 +59,8 @@ export type SectionSubjectScheduleRecord = {
   startTime: string;
   subjectCode: string;
   subjectTitle: string;
+  teacherAccountId: string;
+  teacherName: string;
 };
 
 export type SubjectSchedulePresetRecord = {
@@ -100,6 +102,7 @@ const parseGradeNumber = (gradeLevel: string) => {
 };
 
 const normalizeSubjectType = (value: string): 'core' | 'elective' => (value === 'elective' ? 'elective' : 'core');
+const hasMissingColumnError = (error: any, column: string) => String(error?.message || '').toLowerCase().includes(String(column || '').toLowerCase());
 const parseGradeNo = (value: string) => {
   const match = String(value || '').match(/\b(7|8|9|10|11|12)\b/);
   return match ? Number(match[1]) : null;
@@ -204,10 +207,19 @@ export const loadManagedSections = async (): Promise<ManagedSection[]> => {
   const subjectRowsMap = new Map<string, SectionSubjectRecord[]>();
 
   if (sectionIds.length && (await hasSectionSubjectsTable())) {
-    const { data: subjects } = await supabase
+    let { data: subjects, error } = await supabase
       .from('registrar_section_subjects')
       .select('id,section_id,subject_code,subject_title,is_core,program_scope,department_id,teacher_account_id,teacher_name')
       .in('section_id', sectionIds);
+    if (error && (hasMissingColumnError(error, 'teacher_account_id') || hasMissingColumnError(error, 'department_id'))) {
+      const retry = await supabase
+        .from('registrar_section_subjects')
+        .select('id,section_id,subject_code,subject_title,is_core,program_scope')
+        .in('section_id', sectionIds);
+      subjects = retry.data;
+      error = retry.error;
+    }
+    if (error) throw new Error(error.message || 'Unable to load section subjects.');
     (subjects || []).forEach((row: any) => {
       const key = toText(row.section_id);
       subjectCountMap.set(key, (subjectCountMap.get(key) || 0) + 1);
@@ -248,11 +260,20 @@ export const loadManagedSections = async (): Promise<ManagedSection[]> => {
 
 export const loadSectionSubjects = async (sectionId: string): Promise<SectionSubjectRecord[]> => {
   if (!(await hasSectionSubjectsTable())) return [];
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from('registrar_section_subjects')
     .select('id,section_id,subject_code,subject_title,is_core,program_scope,department_id,teacher_account_id,teacher_name')
     .eq('section_id', sectionId)
     .order('subject_code');
+  if (error && (hasMissingColumnError(error, 'teacher_account_id') || hasMissingColumnError(error, 'department_id'))) {
+    const retry = await supabase
+      .from('registrar_section_subjects')
+      .select('id,section_id,subject_code,subject_title,is_core,program_scope')
+      .eq('section_id', sectionId)
+      .order('subject_code');
+    data = retry.data;
+    error = retry.error;
+  }
   if (error) throw new Error(error.message || 'Unable to load section subjects.');
   return (data || []).map((row: any) => ({
     id: toText(row.id),
@@ -292,13 +313,22 @@ export const saveSectionSubject = async (payload: {
     teacher_name: toText(payload.teacherName) || null,
   };
   if (payload.id) {
-    const { error } = await supabase.from('registrar_section_subjects').update(record).eq('id', payload.id);
+    let { error } = await supabase.from('registrar_section_subjects').update(record).eq('id', payload.id);
+    if (error && (hasMissingColumnError(error, 'teacher_account_id') || hasMissingColumnError(error, 'department_id'))) {
+      const { teacher_account_id: _omitTeacherAccount, teacher_name: _omitTeacherName, department_id: _omitDepartmentId, ...fallbackRecord } = record as any;
+      const retry = await supabase.from('registrar_section_subjects').update(fallbackRecord).eq('id', payload.id);
+      error = retry.error;
+    }
     if (error) throw new Error(error.message || 'Unable to update subject.');
     return payload.id;
   }
-  const { data, error } = await supabase.from('registrar_section_subjects').insert([record]).select('id').single();
-  if (error || !data?.id) throw new Error(error?.message || 'Unable to save subject.');
-  return String(data.id);
+  let create = await supabase.from('registrar_section_subjects').insert([record]).select('id').single();
+  if (create.error && (hasMissingColumnError(create.error, 'teacher_account_id') || hasMissingColumnError(create.error, 'department_id'))) {
+    const { teacher_account_id: _omitTeacherAccount, teacher_name: _omitTeacherName, department_id: _omitDepartmentId, ...fallbackRecord } = record as any;
+    create = await supabase.from('registrar_section_subjects').insert([fallbackRecord]).select('id').single();
+  }
+  if (create.error || !create.data?.id) throw new Error(create.error?.message || 'Unable to save subject.');
+  return String(create.data.id);
 };
 
 export const deleteSectionSubject = async (id: string) => {
@@ -409,14 +439,22 @@ export const loadCoordinatorTeacherAccountOptions = async (): Promise<Coordinato
   let accounts: any[] = [];
   if (!primary.error) {
     accounts = (primary.data || []) as any[];
-  } else if (String(primary.error.message || '').toLowerCase().includes('personnel_type')) {
+  } else if (hasMissingColumnError(primary.error, 'personnel_type') || hasMissingColumnError(primary.error, 'middle_name')) {
     const fallback = await supabase
       .from('usis_core_coordinators')
-      .select('id,username,first_name,middle_name,last_name,is_active,role')
+      .select('id,username,first_name,last_name,is_active,role')
       .eq('is_active', true)
       .order('last_name', { ascending: true });
-    if (fallback.error) throw new Error(fallback.error.message || 'Unable to load teacher accounts.');
-    accounts = (fallback.data || []) as any[];
+    if (!fallback.error) {
+      accounts = (fallback.data || []) as any[];
+    } else {
+      const minimal = await supabase
+        .from('usis_core_coordinators')
+        .select('id,username,is_active')
+        .eq('is_active', true);
+      if (minimal.error) throw new Error(minimal.error.message || 'Unable to load teacher accounts.');
+      accounts = (minimal.data || []) as any[];
+    }
   } else {
     throw new Error(primary.error.message || 'Unable to load teacher accounts.');
   }
@@ -464,7 +502,14 @@ export const loadCoordinatorTeacherAccountOptions = async (): Promise<Coordinato
 
 export const loadSectionSubjectSchedules = async (sectionIds?: string[]): Promise<SectionSubjectScheduleRecord[]> => {
   if (!(await hasSectionSubjectSchedulesTable())) return [];
-  let query = supabase
+  let primary = supabase
+    .from('registrar_section_subject_schedules')
+    .select('id,section_id,preset_id,section_name,subject_code,subject_title,day_of_week,start_time,end_time,room,is_active,teacher_account_id,teacher_name')
+    .order('section_name', { ascending: true })
+    .order('subject_code', { ascending: true })
+    .order('day_of_week', { ascending: true })
+    .order('start_time', { ascending: true });
+  let fallback = supabase
     .from('registrar_section_subject_schedules')
     .select('id,section_id,preset_id,section_name,subject_code,subject_title,day_of_week,start_time,end_time,room,is_active')
     .order('section_name', { ascending: true })
@@ -472,9 +517,15 @@ export const loadSectionSubjectSchedules = async (sectionIds?: string[]): Promis
     .order('day_of_week', { ascending: true })
     .order('start_time', { ascending: true });
   if (sectionIds?.length) {
-    query = query.in('section_id', sectionIds);
+    primary = primary.in('section_id', sectionIds);
+    fallback = fallback.in('section_id', sectionIds);
   }
-  const { data, error } = await query;
+  let { data, error } = await primary;
+  if (error && String(error.message || '').toLowerCase().includes('teacher_account_id')) {
+    const retry = await fallback;
+    data = retry.data;
+    error = retry.error;
+  }
   if (error) throw new Error(error.message || 'Unable to load subject schedules.');
   return (data || []).map((row: any) => ({
     dayOfWeek: toText(row.day_of_week),
@@ -488,6 +539,8 @@ export const loadSectionSubjectSchedules = async (sectionIds?: string[]): Promis
     startTime: toText(row.start_time),
     subjectCode: toText(row.subject_code),
     subjectTitle: toText(row.subject_title),
+    teacherAccountId: toText(row.teacher_account_id),
+    teacherName: toText(row.teacher_name),
   }));
 };
 
@@ -503,6 +556,8 @@ export const saveSectionSubjectSchedule = async (payload: {
   startTime: string;
   subjectCode: string;
   subjectTitle: string;
+  teacherAccountId?: string;
+  teacherName?: string;
 }) => {
   if (!(await hasSectionSubjectSchedulesTable())) {
     throw new Error('Section subject schedules table is not yet available. Run the latest IA schema SQL first.');
@@ -518,15 +573,35 @@ export const saveSectionSubjectSchedule = async (payload: {
     start_time: toText(payload.startTime),
     subject_code: toText(payload.subjectCode).toUpperCase(),
     subject_title: toText(payload.subjectTitle),
+    teacher_account_id: toText(payload.teacherAccountId) || null,
+    teacher_name: toText(payload.teacherName) || null,
   };
   if (payload.id) {
     const { error } = await supabase.from('registrar_section_subject_schedules').update(record).eq('id', payload.id);
+    if (error && String(error.message || '').toLowerCase().includes('teacher_account_id')) {
+      const { teacher_account_id: _omitTeacherAccount, teacher_name: _omitTeacherName, ...fallbackRecord } = record as any;
+      const retry = await supabase.from('registrar_section_subject_schedules').update(fallbackRecord).eq('id', payload.id);
+      if (retry.error) throw new Error(retry.error.message || 'Unable to update subject schedule.');
+      return payload.id;
+    }
     if (error) throw new Error(error.message || 'Unable to update subject schedule.');
     return payload.id;
   }
-  const { data, error } = await supabase.from('registrar_section_subject_schedules').insert([record]).select('id').single();
-  if (error || !data?.id) throw new Error(error?.message || 'Unable to create subject schedule.');
-  return String(data.id);
+  let create = await supabase
+    .from('registrar_section_subject_schedules')
+    .upsert([record], { onConflict: 'section_id,subject_code,day_of_week,start_time,end_time' })
+    .select('id')
+    .single();
+  if (create.error && String(create.error.message || '').toLowerCase().includes('teacher_account_id')) {
+    const { teacher_account_id: _omitTeacherAccount, teacher_name: _omitTeacherName, ...fallbackRecord } = record as any;
+    create = await supabase
+      .from('registrar_section_subject_schedules')
+      .upsert([fallbackRecord], { onConflict: 'section_id,subject_code,day_of_week,start_time,end_time' })
+      .select('id')
+      .single();
+  }
+  if (create.error || !create.data?.id) throw new Error(create.error?.message || 'Unable to create subject schedule.');
+  return String(create.data.id);
 };
 
 export const deleteSectionSubjectSchedule = async (id: string) => {

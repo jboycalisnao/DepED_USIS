@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { UsisAlertModal } from '../../../../../common/components/UsisAlertModal';
 import { UsisSearchableSelect } from '../../../../../common/components/ui/UsisSearchableSelect';
 import type { CoordinatorTeacherOption, ManagedSection, SectionSubjectRecord, SectionSubjectScheduleRecord, SubjectCatalogRecord, SubjectSchedulePresetRecord } from '../services/subjectsManagementService';
-import { assignCatalogSubjectToSection, isSectionSubjectsTableAvailable, loadApplicableSchedulePresetsForSection, loadAssignableSubjectsForSection, loadCoordinatorTeacherAccountOptions, loadSectionSubjectSchedules, loadSectionSubjects, loadSubjectSchedulePresets, saveSectionSubject, saveSectionSubjectSchedule } from '../services/subjectsManagementService';
+import { assignCatalogSubjectToSection, deleteSectionSubjectSchedule, isSectionSubjectsTableAvailable, loadApplicableSchedulePresetsForSection, loadAssignableSubjectsForSection, loadCoordinatorTeacherAccountOptions, loadSectionSubjectSchedules, loadSectionSubjects, saveSectionSubject, saveSectionSubjectSchedule } from '../services/subjectsManagementService';
 
 type Props = {
   initialPresetId?: string;
@@ -31,6 +31,7 @@ export function SectionSubjectsModal({ initialPresetId = '', onClose, onSaved, s
   });
   const [isTableReady, setIsTableReady] = useState(true);
   const isPresetLockedFromContext = Boolean(initialPresetId);
+  const hasHydratedFromCell = useRef(false);
 
   const reload = async () => {
     setIsLoading(true);
@@ -62,6 +63,50 @@ export function SectionSubjectsModal({ initialPresetId = '', onClose, onSaved, s
     }
   }, [initialPresetId, editingSubjectId]);
 
+  useEffect(() => {
+    hasHydratedFromCell.current = false;
+  }, [section.id, initialPresetId]);
+
+  useEffect(() => {
+    if (hasHydratedFromCell.current) return;
+    if (!initialPresetId) return;
+    if (isLoading) return;
+
+    const selectedPresetRow = schedulePresets.find((row) => row.id === initialPresetId) || null;
+    if (!selectedPresetRow) {
+      hasHydratedFromCell.current = true;
+      return;
+    }
+
+    const matchingSchedules = sectionSchedules.filter((row) => {
+      const byPresetId = row.presetId && row.presetId === initialPresetId;
+      const byTimeWindow = row.dayOfWeek === selectedPresetRow.dayOfWeek
+        && row.startTime === selectedPresetRow.startTime
+        && row.endTime === selectedPresetRow.endTime;
+      return byPresetId || byTimeWindow;
+    });
+
+    if (matchingSchedules.length === 0) {
+      hasHydratedFromCell.current = true;
+      return;
+    }
+
+    const targetSchedule = matchingSchedules[0];
+    const code = String(targetSchedule.subjectCode || '').trim().toUpperCase();
+    const matchedCatalog = catalogSubjects.find((row) => String(row.subjectCode || '').trim().toUpperCase() === code) || null;
+    const matchedSectionSubject = subjects.find((row) => String(row.subjectCode || '').trim().toUpperCase() === code) || null;
+    const matchedTeacherId = String(targetSchedule.teacherAccountId || '').trim() || String(matchedSectionSubject?.teacherAccountId || '').trim();
+
+    if (matchedCatalog) {
+      setSelectedCatalogId(matchedCatalog.id);
+    }
+    if (matchedTeacherId) {
+      setSelectedTeacherId(matchedTeacherId);
+    }
+    setSelectedPresetId(initialPresetId);
+    hasHydratedFromCell.current = true;
+  }, [initialPresetId, isLoading, schedulePresets, sectionSchedules, catalogSubjects, subjects]);
+
   const clearForm = () => {
     setSelectedCatalogId('');
     setSelectedTeacherId('');
@@ -74,6 +119,7 @@ export function SectionSubjectsModal({ initialPresetId = '', onClose, onSaved, s
   const selectedCatalogSubject = availableCatalogSubjects.find((row) => row.id === selectedCatalogId) || null;
   const selectedTeacher = teacherOptions.find((row) => row.value === selectedTeacherId) || null;
   const selectedPreset = schedulePresets.find((row) => row.id === selectedPresetId) || null;
+  const isCellScopedMode = Boolean(initialPresetId);
   const matchingDepartmentTeachers = selectedCatalogSubject
     ? teacherOptions.filter((row) => row.departmentId && row.departmentId === selectedCatalogSubject.departmentId)
     : [];
@@ -139,6 +185,8 @@ export function SectionSubjectsModal({ initialPresetId = '', onClose, onSaved, s
                 const existingRow = subjects.find((row) => row.subjectCode.toUpperCase() === selectedCatalogSubject.subjectCode.toUpperCase()) || null;
 
                 if (editingSubjectId || existingRow) {
+                  const preservedTeacherId = existingRow?.teacherAccountId || '';
+                  const preservedTeacherName = existingRow?.teacherName || '';
                   await saveSectionSubject({
                     departmentId: selectedCatalogSubject.departmentId,
                     id: (editingSubjectId || existingRow?.id) as string,
@@ -147,29 +195,32 @@ export function SectionSubjectsModal({ initialPresetId = '', onClose, onSaved, s
                     sectionId: section.id,
                     subjectCode: selectedCatalogSubject.subjectCode,
                     subjectTitle: selectedCatalogSubject.subjectTitle,
-                    teacherAccountId: selectedTeacher.value,
-                    teacherName: selectedTeacher.label,
+                    teacherAccountId: isCellScopedMode && existingRow ? preservedTeacherId : selectedTeacher.value,
+                    teacherName: isCellScopedMode && existingRow ? preservedTeacherName : selectedTeacher.label,
                   });
                   if (selectedPreset) {
-                    const allPresets = await loadSubjectSchedulePresets();
-                    const selectedProgramName = String(selectedPreset.programName || '').trim().toLowerCase();
-                    const selectedStrand = String(selectedPreset.strand || '').trim().toLowerCase();
-                    const scheduleBundle = allPresets
-                      .filter((row) => row.isActive)
-                      .filter((row) => String(row.gradeLevel || '').trim() === String(selectedPreset.gradeLevel || '').trim())
-                      .filter((row) => row.programScope === selectedPreset.programScope)
-                      .filter((row) => String(row.label || '').trim().toLowerCase() === String(selectedPreset.label || '').trim().toLowerCase())
-                      .filter((row) => {
-                        if (selectedPreset.programScope === 'senior_high_school') {
-                          return String(row.strand || '').trim().toLowerCase() === selectedStrand;
-                        }
-                        if (selectedPreset.programScope === 'special_program_ste') {
-                          return String(row.programName || '').trim().toLowerCase() === selectedProgramName;
-                        }
-                        return true;
-                      });
+                    const rowsToApply = isCellScopedMode
+                      ? [selectedPreset]
+                      : (() => {
+                          const selectedProgramName = String(selectedPreset.programName || '').trim().toLowerCase();
+                          const selectedStrand = String(selectedPreset.strand || '').trim().toLowerCase();
+                          return schedulePresets
+                            .filter((row) => row.isActive)
+                            .filter((row) => String(row.gradeLevel || '').trim() === String(selectedPreset.gradeLevel || '').trim())
+                            .filter((row) => row.programScope === selectedPreset.programScope)
+                            .filter((row) => String(row.label || '').trim().toLowerCase() === String(selectedPreset.label || '').trim().toLowerCase())
+                            .filter((row) => {
+                              if (selectedPreset.programScope === 'senior_high_school') {
+                                return String(row.strand || '').trim().toLowerCase() === selectedStrand;
+                              }
+                              if (selectedPreset.programScope === 'special_program_ste') {
+                                return String(row.programName || '').trim().toLowerCase() === selectedProgramName;
+                              }
+                              return true;
+                            });
+                        })();
 
-                    for (const row of (scheduleBundle.length ? scheduleBundle : [selectedPreset])) {
+                    for (const row of (rowsToApply.length ? rowsToApply : [selectedPreset])) {
                       try {
                         await saveSectionSubjectSchedule({
                           dayOfWeek: row.dayOfWeek,
@@ -181,6 +232,8 @@ export function SectionSubjectsModal({ initialPresetId = '', onClose, onSaved, s
                           startTime: row.startTime,
                           subjectCode: selectedCatalogSubject.subjectCode,
                           subjectTitle: selectedCatalogSubject.subjectTitle,
+                          teacherAccountId: selectedTeacher.value,
+                          teacherName: selectedTeacher.label,
                         });
                       } catch (error: any) {
                         const message = String(error?.message || '').toLowerCase();
@@ -189,13 +242,39 @@ export function SectionSubjectsModal({ initialPresetId = '', onClose, onSaved, s
                     }
                   }
                 } else {
-                  await assignCatalogSubjectToSection({
-                    preset: selectedPreset,
-                    section,
-                    subject: selectedCatalogSubject,
-                    teacherAccountId: selectedTeacher.value,
-                    teacherName: selectedTeacher.label,
-                  });
+                  if (isCellScopedMode && selectedPreset) {
+                    await saveSectionSubject({
+                      departmentId: selectedCatalogSubject.departmentId,
+                      isCore: selectedCatalogSubject.subjectType === 'core',
+                      programScope: section.track,
+                      sectionId: section.id,
+                      subjectCode: selectedCatalogSubject.subjectCode,
+                      subjectTitle: selectedCatalogSubject.subjectTitle,
+                      teacherAccountId: selectedTeacher.value,
+                      teacherName: selectedTeacher.label,
+                    });
+                    await saveSectionSubjectSchedule({
+                      dayOfWeek: selectedPreset.dayOfWeek,
+                      endTime: selectedPreset.endTime,
+                      presetId: selectedPreset.id,
+                      room: selectedPreset.room,
+                      sectionId: section.id,
+                      sectionName: section.name,
+                      startTime: selectedPreset.startTime,
+                      subjectCode: selectedCatalogSubject.subjectCode,
+                      subjectTitle: selectedCatalogSubject.subjectTitle,
+                      teacherAccountId: selectedTeacher.value,
+                      teacherName: selectedTeacher.label,
+                    });
+                  } else {
+                    await assignCatalogSubjectToSection({
+                      preset: selectedPreset,
+                      section,
+                      subject: selectedCatalogSubject,
+                      teacherAccountId: selectedTeacher.value,
+                      teacherName: selectedTeacher.label,
+                    });
+                  }
                 }
                 await onSaved();
                 onClose();
@@ -252,6 +331,33 @@ export function SectionSubjectsModal({ initialPresetId = '', onClose, onSaved, s
             />
             <div className="modal-dialog__actions ia-section-subjects-modal__actions">
               <button type="button" onClick={clearForm} disabled={isSubmitting || !isTableReady}>Clear</button>
+              <button type="button" disabled={isSubmitting || !isTableReady || !selectedPresetId || !selectedCatalogSubject} onClick={() => {
+                void (async () => {
+                  if (!selectedPreset || !selectedCatalogSubject) return;
+                  setIsSubmitting(true);
+                  try {
+                    const normalizedCode = String(selectedCatalogSubject.subjectCode || '').trim().toUpperCase();
+                    const rowsToDelete = sectionSchedules.filter((row) => {
+                      const byPresetId = row.presetId && row.presetId === selectedPreset.id;
+                      const byTimeWindow = row.dayOfWeek === selectedPreset.dayOfWeek
+                        && row.startTime === selectedPreset.startTime
+                        && row.endTime === selectedPreset.endTime;
+                      return (byPresetId || byTimeWindow) && String(row.subjectCode || '').trim().toUpperCase() === normalizedCode;
+                    });
+                    for (const row of rowsToDelete) {
+                      await deleteSectionSubjectSchedule(row.id);
+                    }
+                    await onSaved();
+                    onClose();
+                  } catch (error: any) {
+                    setAlert({ title: 'Delete Failed', message: error?.message || 'Unable to delete cell subject assignment.', tone: 'danger' });
+                  } finally {
+                    setIsSubmitting(false);
+                  }
+                })();
+              }}>
+                Delete Cell Subject
+              </button>
               <button type="submit" className="modal-dialog__blue" disabled={isSubmitting || !isTableReady || availableCatalogSubjects.length === 0}>
                 {isSubmitting ? 'Saving...' : editingSubjectId ? 'Update Subject' : 'Assign Subject'}
               </button>

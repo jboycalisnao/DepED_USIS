@@ -338,6 +338,8 @@ create table if not exists registrar_section_subject_schedules (
   start_time text not null,
   end_time text not null,
   room text,
+  teacher_account_id uuid references usis_core_coordinators(id) on update cascade on delete set null,
+  teacher_name text,
   is_active boolean not null default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
@@ -346,6 +348,20 @@ create table if not exists registrar_section_subject_schedules (
 
 create index if not exists idx_registrar_section_subject_schedules_section on registrar_section_subject_schedules(section_id);
 create index if not exists idx_registrar_section_subject_schedules_day on registrar_section_subject_schedules(day_of_week);
+create index if not exists idx_registrar_section_subject_schedules_teacher on registrar_section_subject_schedules(teacher_account_id);
+
+alter table registrar_section_subject_schedules
+  add column if not exists teacher_account_id uuid;
+
+alter table registrar_section_subject_schedules
+  add column if not exists teacher_name text;
+
+alter table registrar_section_subject_schedules
+  drop constraint if exists registrar_section_subject_schedules_teacher_account_id_fkey;
+
+alter table registrar_section_subject_schedules
+  add constraint registrar_section_subject_schedules_teacher_account_id_fkey
+  foreign key (teacher_account_id) references usis_core_coordinators(id) on update cascade on delete set null;
 
 -- =========================================================
 -- Registrar Subject Management (grade-level catalog managed in IA)

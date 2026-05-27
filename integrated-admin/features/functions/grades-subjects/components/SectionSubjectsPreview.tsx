@@ -127,7 +127,9 @@ export function SectionSubjectsPreview({ onManage, section }: Props) {
                           <small>
                             {assigned
                               .map((row) => {
-                                const teacherName = teacherBySubjectCode.get(String(row.subjectCode || '').trim().toUpperCase()) || '';
+                                const teacherName = String(row.teacherName || '').trim()
+                                  || teacherBySubjectCode.get(String(row.subjectCode || '').trim().toUpperCase())
+                                  || '';
                                 return teacherName ? `${row.subjectTitle} - ${teacherName}` : row.subjectTitle;
                               })
                               .join(', ')}
