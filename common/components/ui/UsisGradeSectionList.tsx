@@ -15,6 +15,8 @@ export type UsisGradeSectionListGrade = {
 };
 
 type UsisGradeSectionListProps = {
+  autoExpandGradeKey?: string;
+  autoExpandSectionKey?: string;
   className?: string;
   emptyMessage?: string;
   expandAll?: boolean;
@@ -22,6 +24,8 @@ type UsisGradeSectionListProps = {
 };
 
 export function UsisGradeSectionList({
+  autoExpandGradeKey,
+  autoExpandSectionKey,
   className = '',
   emptyMessage = 'No records found.',
   expandAll = false,
@@ -45,6 +49,24 @@ export function UsisGradeSectionList({
     setExpandedGrades(nextGrades);
     setExpandedSections(nextSections);
   }, [expandAll, normalizedGrades]);
+
+  useEffect(() => {
+    if (!autoExpandGradeKey) return;
+    setExpandedGrades((prev) => {
+      const next = new Set(prev);
+      next.add(autoExpandGradeKey);
+      return next;
+    });
+  }, [autoExpandGradeKey]);
+
+  useEffect(() => {
+    if (!autoExpandGradeKey || !autoExpandSectionKey) return;
+    setExpandedSections((prev) => {
+      const next = new Set(prev);
+      next.add(`${autoExpandGradeKey}::${autoExpandSectionKey}`);
+      return next;
+    });
+  }, [autoExpandGradeKey, autoExpandSectionKey]);
 
   const toggleGrade = (gradeKey: string) => {
     setExpandedGrades((prev) => {

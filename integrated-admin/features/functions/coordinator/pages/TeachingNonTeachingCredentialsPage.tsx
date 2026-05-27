@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
+  getCoordinatorIaPageAccessMap,
   getCoordinatorModuleAccessMap,
+  loadCoordinatorIaPageAccessMapFromSupabase,
+  loadIaPageCatalogFromSupabase,
+  saveCoordinatorAccountIaPageAccessToSupabase,
   loadCoordinatorModuleAccessMapFromSupabase,
   saveCoordinatorAccountModuleAccessToSupabase,
   type UsisModuleKey,
@@ -49,7 +53,10 @@ export function TeachingNonTeachingCredentialsPage() {
   const [editingRecord, setEditingRecord] = useState<TeachingNonTeachingCredentialRecord | null>(null);
   const [moduleRecord, setModuleRecord] = useState<TeachingNonTeachingCredentialRecord | null>(null);
   const [moduleSelections, setModuleSelections] = useState<UsisModuleKey[]>([]);
+  const [iaPageSelections, setIaPageSelections] = useState<string[]>([]);
   const [moduleAccessMap, setModuleAccessMap] = useState<Record<string, UsisModuleKey[]>>({});
+  const [iaPageAccessMap, setIaPageAccessMap] = useState<Record<string, string[]>>({});
+  const [iaPageOptions, setIaPageOptions] = useState<Array<{ group: string; key: string; label: string }>>([]);
   const [isSavingModules, setIsSavingModules] = useState(false);
   const [actionLoadingMessage, setActionLoadingMessage] = useState('');
   const [successAlert, setSuccessAlert] = useState<{ title: string; message: string } | null>(null);
@@ -69,8 +76,15 @@ export function TeachingNonTeachingCredentialsPage() {
       ]);
       setRows(data);
       setDepartments(departmentRows);
-      const accessMap = await loadCoordinatorModuleAccessMapFromSupabase(data.map((row) => row.id));
+      const accountIds = data.map((row) => row.id);
+      const [accessMap, pageAccessMap, pageCatalog] = await Promise.all([
+        loadCoordinatorModuleAccessMapFromSupabase(accountIds),
+        loadCoordinatorIaPageAccessMapFromSupabase(accountIds),
+        loadIaPageCatalogFromSupabase(),
+      ]);
       setModuleAccessMap(accessMap);
+      setIaPageAccessMap(pageAccessMap);
+      setIaPageOptions(pageCatalog);
       setError('');
     } catch (nextError: any) {
       setError(nextError?.message || 'Unable to load teaching and non-teaching credentials.');
@@ -86,7 +100,8 @@ export function TeachingNonTeachingCredentialsPage() {
   useEffect(() => {
     if (!moduleRecord) return;
     setModuleSelections(moduleAccessMap[moduleRecord.id] || getCoordinatorModuleAccessMap()[moduleRecord.id] || []);
-  }, [moduleRecord]);
+    setIaPageSelections(iaPageAccessMap[moduleRecord.id] || getCoordinatorIaPageAccessMap()[moduleRecord.id] || []);
+  }, [iaPageAccessMap, moduleAccessMap, moduleRecord]);
 
   const filteredRows = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -273,6 +288,8 @@ export function TeachingNonTeachingCredentialsPage() {
 
       {moduleRecord ? (
         <TeachingNonTeachingModuleAccessModal
+          iaPageOptions={iaPageOptions}
+          iaPageSelections={iaPageSelections}
           isSubmitting={isSavingModules}
           modules={moduleSelections}
           name={moduleRecord.name}
@@ -285,13 +302,20 @@ export function TeachingNonTeachingCredentialsPage() {
             setActionLoadingMessage('Saving module access...');
             try {
               await saveCoordinatorAccountModuleAccessToSupabase(moduleRecord.id, moduleSelections);
+              const nextPageSelections = moduleSelections.includes('ia') ? iaPageSelections : [];
+              await saveCoordinatorAccountIaPageAccessToSupabase(moduleRecord.id, nextPageSelections);
               setModuleAccessMap((current) => ({
                 ...current,
                 [moduleRecord.id]: [...moduleSelections],
               }));
+              setIaPageAccessMap((current) => ({
+                ...current,
+                [moduleRecord.id]: [...nextPageSelections],
+              }));
               setNotice('Module access saved.');
               setModuleRecord(null);
               setModuleSelections([]);
+              setIaPageSelections([]);
               setStatusAlert({ title: 'Module Access Saved', message: 'Module permissions updated successfully.', tone: 'success' });
             } finally {
               setActionLoadingMessage('');
@@ -302,6 +326,11 @@ export function TeachingNonTeachingCredentialsPage() {
             setModuleSelections((current) => {
               return current.includes(key) ? current.filter((item) => item !== key) : [...current, key];
             });
+          }}
+          onToggleIaPage={(key) => {
+            setIaPageSelections((current) => (
+              current.includes(key) ? current.filter((item) => item !== key) : [...current, key]
+            ));
           }}
         />
       ) : null}

@@ -16,15 +16,19 @@ export type ManagedSection = {
 };
 
 export type SectionSubjectRecord = {
+  departmentId: string;
   id: string;
   isCore: boolean;
   programScope: string;
   sectionId: string;
   subjectCode: string;
   subjectTitle: string;
+  teacherAccountId: string;
+  teacherName: string;
 };
 
 export type SubjectCatalogRecord = {
+  departmentId: string;
   gradeLevel: string;
   id: string;
   isActive: boolean;
@@ -35,11 +39,20 @@ export type SubjectCatalogRecord = {
   subjectType: 'core' | 'elective';
 };
 
+export type CoordinatorTeacherOption = {
+  departmentId: string;
+  departmentName: string;
+  label: string;
+  personnelType: string;
+  value: string;
+};
+
 export type SectionSubjectScheduleRecord = {
   dayOfWeek: string;
   endTime: string;
   id: string;
   isActive: boolean;
+  presetId: string;
   room: string;
   sectionId: string;
   sectionName: string;
@@ -193,7 +206,7 @@ export const loadManagedSections = async (): Promise<ManagedSection[]> => {
   if (sectionIds.length && (await hasSectionSubjectsTable())) {
     const { data: subjects } = await supabase
       .from('registrar_section_subjects')
-      .select('id,section_id,subject_code,subject_title,is_core,program_scope')
+      .select('id,section_id,subject_code,subject_title,is_core,program_scope,department_id,teacher_account_id,teacher_name')
       .in('section_id', sectionIds);
     (subjects || []).forEach((row: any) => {
       const key = toText(row.section_id);
@@ -201,11 +214,14 @@ export const loadManagedSections = async (): Promise<ManagedSection[]> => {
       const current = subjectRowsMap.get(key) || [];
       current.push({
         id: toText(row.id),
+        departmentId: toText(row.department_id),
         isCore: Boolean(row.is_core),
         programScope: toText(row.program_scope),
         sectionId: key,
         subjectCode: toText(row.subject_code),
         subjectTitle: toText(row.subject_title),
+        teacherAccountId: toText(row.teacher_account_id),
+        teacherName: toText(row.teacher_name),
       });
       subjectRowsMap.set(key, current);
     });
@@ -234,37 +250,46 @@ export const loadSectionSubjects = async (sectionId: string): Promise<SectionSub
   if (!(await hasSectionSubjectsTable())) return [];
   const { data, error } = await supabase
     .from('registrar_section_subjects')
-    .select('id,section_id,subject_code,subject_title,is_core,program_scope')
+    .select('id,section_id,subject_code,subject_title,is_core,program_scope,department_id,teacher_account_id,teacher_name')
     .eq('section_id', sectionId)
     .order('subject_code');
   if (error) throw new Error(error.message || 'Unable to load section subjects.');
   return (data || []).map((row: any) => ({
     id: toText(row.id),
+    departmentId: toText(row.department_id),
     isCore: Boolean(row.is_core),
     programScope: toText(row.program_scope),
     sectionId: toText(row.section_id),
     subjectCode: toText(row.subject_code),
     subjectTitle: toText(row.subject_title),
+    teacherAccountId: toText(row.teacher_account_id),
+    teacherName: toText(row.teacher_name),
   }));
 };
 
 export const saveSectionSubject = async (payload: {
+  departmentId: string;
   id?: string;
   isCore: boolean;
   programScope: string;
   sectionId: string;
   subjectCode: string;
   subjectTitle: string;
+  teacherAccountId: string;
+  teacherName: string;
 }) => {
   if (!(await hasSectionSubjectsTable())) {
     throw new Error("Section subjects table is not yet available. Run the latest IA schema SQL first.");
   }
   const record = {
+    department_id: toText(payload.departmentId) || null,
     is_core: payload.isCore,
     program_scope: toText(payload.programScope) || 'regular',
     section_id: payload.sectionId,
     subject_code: toText(payload.subjectCode).toUpperCase(),
     subject_title: toText(payload.subjectTitle),
+    teacher_account_id: toText(payload.teacherAccountId) || null,
+    teacher_name: toText(payload.teacherName) || null,
   };
   if (payload.id) {
     const { error } = await supabase.from('registrar_section_subjects').update(record).eq('id', payload.id);
@@ -292,7 +317,7 @@ export const loadAssignableSubjectsForSection = async (section: ManagedSection):
 
   let query = supabase
     .from('registrar_subject_management')
-    .select('id,grade_level,program_scope,strand,subject_code,subject_title,subject_type,is_active')
+    .select('id,department_id,grade_level,program_scope,strand,subject_code,subject_title,subject_type,is_active')
     .eq('grade_level', gradeLevel)
     .eq('program_scope', scope)
     .eq('is_active', true)
@@ -307,6 +332,7 @@ export const loadAssignableSubjectsForSection = async (section: ManagedSection):
 
   return (data || []).map((row: any) => ({
     gradeLevel: toText(row.grade_level),
+    departmentId: toText(row.department_id),
     id: toText(row.id),
     isActive: Boolean(row.is_active),
     programScope: toText(row.program_scope) as SectionTrack,
@@ -321,35 +347,126 @@ export const assignCatalogSubjectToSection = async (payload: {
   preset?: SubjectSchedulePresetRecord | null;
   section: ManagedSection;
   subject: SubjectCatalogRecord;
+  teacherAccountId: string;
+  teacherName: string;
 }) => {
   const savedId = await saveSectionSubject({
+    departmentId: payload.subject.departmentId,
     isCore: payload.subject.subjectType === 'core',
     programScope: payload.section.track,
     sectionId: payload.section.id,
     subjectCode: payload.subject.subjectCode,
     subjectTitle: payload.subject.subjectTitle,
+    teacherAccountId: payload.teacherAccountId,
+    teacherName: payload.teacherName,
   });
   if (payload.preset) {
-    await saveSectionSubjectSchedule({
-      dayOfWeek: payload.preset.dayOfWeek,
-      endTime: payload.preset.endTime,
-      presetId: payload.preset.id,
-      room: payload.preset.room,
-      sectionId: payload.section.id,
-      sectionName: payload.section.name,
-      startTime: payload.preset.startTime,
-      subjectCode: payload.subject.subjectCode,
-      subjectTitle: payload.subject.subjectTitle,
-    });
+    const allPresets = await loadSubjectSchedulePresets();
+    const selected = payload.preset;
+    const selectedProgramName = toText(selected.programName).toLowerCase();
+    const selectedStrand = toText(selected.strand).toLowerCase();
+    const scheduleBundle = allPresets
+      .filter((row) => row.isActive)
+      .filter((row) => toText(row.gradeLevel) === toText(selected.gradeLevel))
+      .filter((row) => row.programScope === selected.programScope)
+      .filter((row) => toText(row.label).toLowerCase() === toText(selected.label).toLowerCase())
+      .filter((row) => {
+        if (selected.programScope === 'senior_high_school') {
+          return toText(row.strand).toLowerCase() === selectedStrand;
+        }
+        if (selected.programScope === 'special_program_ste') {
+          return toText(row.programName).toLowerCase() === selectedProgramName;
+        }
+        return true;
+      })
+      .sort((a, b) => a.dayOfWeek.localeCompare(b.dayOfWeek) || a.startTime.localeCompare(b.startTime));
+
+    const rowsToApply = scheduleBundle.length > 0 ? scheduleBundle : [selected];
+
+    for (const row of rowsToApply) {
+      await saveSectionSubjectSchedule({
+        dayOfWeek: row.dayOfWeek,
+        endTime: row.endTime,
+        presetId: row.id || selected.id,
+        room: row.room,
+        sectionId: payload.section.id,
+        sectionName: payload.section.name,
+        startTime: row.startTime,
+        subjectCode: payload.subject.subjectCode,
+        subjectTitle: payload.subject.subjectTitle,
+      });
+    }
   }
   return savedId;
+};
+
+export const loadCoordinatorTeacherAccountOptions = async (): Promise<CoordinatorTeacherOption[]> => {
+  const primary = await supabase
+    .from('usis_core_coordinators')
+    .select('id,username,first_name,middle_name,last_name,is_active,role,personnel_type')
+    .eq('is_active', true)
+    .order('last_name', { ascending: true });
+  let accounts: any[] = [];
+  if (!primary.error) {
+    accounts = (primary.data || []) as any[];
+  } else if (String(primary.error.message || '').toLowerCase().includes('personnel_type')) {
+    const fallback = await supabase
+      .from('usis_core_coordinators')
+      .select('id,username,first_name,middle_name,last_name,is_active,role')
+      .eq('is_active', true)
+      .order('last_name', { ascending: true });
+    if (fallback.error) throw new Error(fallback.error.message || 'Unable to load teacher accounts.');
+    accounts = (fallback.data || []) as any[];
+  } else {
+    throw new Error(primary.error.message || 'Unable to load teacher accounts.');
+  }
+
+  const accountIds = (accounts || []).map((row: any) => toText(row.id)).filter(Boolean);
+  const { data: assignments, error: assignmentError } = accountIds.length
+    ? await supabase
+        .from('coordinator_account_departments')
+        .select('account_id,department_id,coordinator_departments(name)')
+        .in('account_id', accountIds)
+    : { data: [] as any[], error: null };
+  if (assignmentError) throw new Error(assignmentError.message || 'Unable to load teacher department assignments.');
+
+  const assignmentMap = new Map<string, { departmentId: string; departmentName: string }>();
+  (assignments || []).forEach((row: any) => {
+    const accountId = toText(row.account_id);
+    if (!accountId) return;
+    const department = Array.isArray(row.coordinator_departments) ? row.coordinator_departments[0] : row.coordinator_departments;
+    assignmentMap.set(accountId, {
+      departmentId: toText(row.department_id),
+      departmentName: toText(department?.name) || 'No Department',
+    });
+  });
+
+  const normalized = (accounts || []).map((row: any) => {
+    const id = toText(row.id);
+    const first = toText(row.first_name);
+    const middle = toText(row.middle_name);
+    const last = toText(row.last_name);
+    const displayName = [last, first, middle].filter(Boolean).join(', ') || toText(row.username);
+    const assignment = assignmentMap.get(id);
+    const departmentName = assignment?.departmentName || 'No Department';
+    return {
+      departmentId: assignment?.departmentId || '',
+      departmentName,
+      label: `${displayName} (${departmentName})`,
+      personnelType: toText(row.personnel_type).toLowerCase(),
+      value: id,
+    };
+  });
+
+  const withTeachingFlag = normalized.filter((row) => !row.personnelType || row.personnelType === 'teaching');
+  return withTeachingFlag;
 };
 
 export const loadSectionSubjectSchedules = async (sectionIds?: string[]): Promise<SectionSubjectScheduleRecord[]> => {
   if (!(await hasSectionSubjectSchedulesTable())) return [];
   let query = supabase
     .from('registrar_section_subject_schedules')
-    .select('id,section_id,section_name,subject_code,subject_title,day_of_week,start_time,end_time,room,is_active')
+    .select('id,section_id,preset_id,section_name,subject_code,subject_title,day_of_week,start_time,end_time,room,is_active')
     .order('section_name', { ascending: true })
     .order('subject_code', { ascending: true })
     .order('day_of_week', { ascending: true })
@@ -364,6 +481,7 @@ export const loadSectionSubjectSchedules = async (sectionIds?: string[]): Promis
     endTime: toText(row.end_time),
     id: toText(row.id),
     isActive: Boolean(row.is_active),
+    presetId: toText(row.preset_id),
     room: toText(row.room),
     sectionId: toText(row.section_id),
     sectionName: toText(row.section_name),

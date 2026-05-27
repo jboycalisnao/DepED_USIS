@@ -97,7 +97,7 @@ function LearnerPortalShell({
             <div className="learner-content">
               <Routes>
                 <Route path="/" element={<DashboardPage session={session} />} />
-                <Route path="/grades" element={<GradesPage />} />
+                <Route path="/grades" element={<GradesPage session={session} />} />
                 <Route path="/services" element={<ServicesPage session={session} />} />
                 <Route path="/services/enrollment-history" element={<EnrollmentHistoryServicePage session={session} />} />
                 <Route path="/services/document-requests" element={<DocumentRequestsServicePage />} />

@@ -392,6 +392,53 @@ body {
   line-height: 1.45;
 }
 
+.learner-grades-meta {
+  margin: 10px 20px 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  color: var(--deped-muted);
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.learner-grades-table-wrap {
+  margin: 12px 20px 18px;
+  border: 1px solid var(--deped-line);
+  border-radius: 0.375rem;
+  overflow-x: auto;
+  background: #ffffff;
+}
+
+.learner-grades-table {
+  width: 100%;
+  min-width: 820px;
+  border-collapse: collapse;
+}
+
+.learner-grades-table th,
+.learner-grades-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(18, 35, 61, 0.08);
+  text-align: left;
+  vertical-align: middle;
+  color: #13233d;
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.learner-grades-table th {
+  background: #f8faff;
+  color: #3a547f;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.learner-grades-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
 .learner-profile-panel {
   margin-top: 12px;
 }

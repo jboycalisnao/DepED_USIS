@@ -11,6 +11,9 @@ export function SubjectsManagementPage() {
   const { filteredRows, isLoading, query, refresh, setQuery, setTrackFilter, trackFilter } = useSubjectsManagement();
   const navigate = useNavigate();
   const [selectedSection, setSelectedSection] = useState<ManagedSection | null>(null);
+  const [selectedPresetId, setSelectedPresetId] = useState('');
+  const [lastExpandedGradeKey, setLastExpandedGradeKey] = useState('');
+  const [lastExpandedSectionKey, setLastExpandedSectionKey] = useState('');
 
   const groupedGrades = useMemo<UsisGradeSectionListGrade[]>(() => {
     const gradeMap = new Map<string, ManagedSection[]>();
@@ -34,7 +37,10 @@ export function SubjectsManagementPage() {
         .slice()
         .sort((a, b) => a.name.localeCompare(b.name))
         .map((row) => ({
-          content: <SectionSubjectsPreview section={row} onManage={setSelectedSection} />,
+          content: <SectionSubjectsPreview section={row} onManage={(section, presetId) => {
+            setSelectedSection(section);
+            setSelectedPresetId(presetId || '');
+          }} />,
           count: row.subjectCount,
           key: row.id,
           label: row.name,
@@ -80,6 +86,8 @@ export function SubjectsManagementPage() {
               <button type="button" className={`modal-record__chip${trackFilter === 'senior_high_school' ? ' is-active' : ''}`} onClick={() => setTrackFilter('senior_high_school')}>SHS</button>
             </div>
             <UsisGradeSectionList
+              autoExpandGradeKey={lastExpandedGradeKey}
+              autoExpandSectionKey={lastExpandedSectionKey}
               className="ia-subjects-grade-list"
               emptyMessage="No sections found."
               grades={groupedGrades}
@@ -87,7 +95,16 @@ export function SubjectsManagementPage() {
           </div>
         </article>
       </div>
-      {selectedSection ? <SectionSubjectsModal section={selectedSection} onClose={() => setSelectedSection(null)} onSaved={refresh} /> : null}
+      {selectedSection ? <SectionSubjectsModal
+        section={selectedSection}
+        initialPresetId={selectedPresetId}
+        onClose={() => { setSelectedSection(null); setSelectedPresetId(''); }}
+        onSaved={async () => {
+          setLastExpandedGradeKey(selectedSection.gradeLevel);
+          setLastExpandedSectionKey(selectedSection.id);
+          await refresh();
+        }}
+      /> : null}
     </div>
   );
 }

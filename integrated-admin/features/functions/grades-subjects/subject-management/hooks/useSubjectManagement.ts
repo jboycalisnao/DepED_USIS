@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   deleteSubjectManagementRecord,
+  loadCoordinatorDepartmentOptions,
   loadShsStrands,
   loadSubjectManagementRecords,
   saveSubjectManagementRecord,
@@ -18,16 +19,19 @@ export function useSubjectManagement() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [strands, setStrands] = useState<Array<{ label: string; value: string }>>([]);
+  const [departments, setDepartments] = useState<Array<{ label: string; value: string }>>([]);
 
   const refresh = async () => {
     setIsLoading(true);
     try {
-      const [subjects, shsStrands] = await Promise.all([
+      const [subjects, shsStrands, coordinatorDepartments] = await Promise.all([
         loadSubjectManagementRecords(),
         loadShsStrands(),
+        loadCoordinatorDepartmentOptions(),
       ]);
       setRows(subjects);
       setStrands(shsStrands);
+      setDepartments(coordinatorDepartments);
       setError('');
     } catch (nextError: any) {
       setError(nextError?.message || 'Unable to load subject management data.');
@@ -51,7 +55,8 @@ export function useSubjectManagement() {
         row.gradeLevel.toLowerCase().includes(normalized) ||
         row.programScope.toLowerCase().includes(normalized) ||
         row.subjectType.toLowerCase().includes(normalized) ||
-        row.strand.toLowerCase().includes(normalized)
+        row.strand.toLowerCase().includes(normalized) ||
+        row.departmentId.toLowerCase().includes(normalized)
       );
     });
   }, [query, rows, scopeFilter]);
@@ -101,6 +106,6 @@ export function useSubjectManagement() {
     setQuery,
     setScopeFilter,
     strands,
+    departments,
   };
 }
-

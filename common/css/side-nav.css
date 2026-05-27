@@ -159,6 +159,24 @@
   color: #0b3a8f;
 }
 
+.usis-side-nav__link--disabled {
+  color: #8b95a7;
+  background: #f4f5f7;
+  border-color: #e1e6ef;
+  cursor: not-allowed;
+  pointer-events: none;
+  box-shadow: none;
+}
+
+.usis-side-nav__link--disabled .material-symbols-outlined,
+.usis-side-nav__link--disabled .usis-side-nav__icon {
+  color: #98a2b3;
+}
+
+.usis-side-nav__group--disabled .usis-side-nav__group-summary {
+  color: #8b95a7;
+}
+
 .usis-side-nav__footer {
   margin-top: 0;
   padding-top: 6px;

@@ -256,8 +256,11 @@ create index if not exists idx_coordinator_account_departments_department on coo
 create table if not exists registrar_section_subjects (
   id uuid primary key default gen_random_uuid(),
   section_id text not null references registrar_sections(id) on update cascade on delete cascade,
+  department_id uuid not null references coordinator_departments(id) on update cascade on delete restrict,
   subject_code text not null,
   subject_title text not null,
+  teacher_account_id uuid references usis_core_coordinators(id) on update cascade on delete set null,
+  teacher_name text,
   is_core boolean not null default true,
   program_scope text not null default 'regular',
   created_at timestamptz not null default now(),
@@ -265,8 +268,33 @@ create table if not exists registrar_section_subjects (
   unique (section_id, subject_code)
 );
 
+alter table registrar_section_subjects
+  add column if not exists department_id uuid;
+
+alter table registrar_section_subjects
+  add column if not exists teacher_account_id uuid;
+
+alter table registrar_section_subjects
+  add column if not exists teacher_name text;
+
+alter table registrar_section_subjects
+  drop constraint if exists registrar_section_subjects_department_id_fkey;
+
+alter table registrar_section_subjects
+  add constraint registrar_section_subjects_department_id_fkey
+  foreign key (department_id) references coordinator_departments(id) on update cascade on delete restrict;
+
+alter table registrar_section_subjects
+  drop constraint if exists registrar_section_subjects_teacher_account_id_fkey;
+
+alter table registrar_section_subjects
+  add constraint registrar_section_subjects_teacher_account_id_fkey
+  foreign key (teacher_account_id) references usis_core_coordinators(id) on update cascade on delete set null;
+
 create index if not exists idx_registrar_section_subjects_section on registrar_section_subjects(section_id);
 create index if not exists idx_registrar_section_subjects_scope on registrar_section_subjects(program_scope);
+create index if not exists idx_registrar_section_subjects_department on registrar_section_subjects(department_id);
+create index if not exists idx_registrar_section_subjects_teacher on registrar_section_subjects(teacher_account_id);
 
 -- =========================================================
 -- Registrar Subject Schedule Presets (program-based templates managed in IA)
@@ -324,6 +352,7 @@ create index if not exists idx_registrar_section_subject_schedules_day on regist
 -- =========================================================
 create table if not exists registrar_subject_management (
   id uuid primary key default gen_random_uuid(),
+  department_id uuid not null references coordinator_departments(id) on update cascade on delete restrict,
   grade_level text not null,
   program_scope text not null default 'regular' check (program_scope in ('regular', 'special_program_ste', 'senior_high_school')),
   strand text,
@@ -335,8 +364,19 @@ create table if not exists registrar_subject_management (
   updated_at timestamptz not null default now()
 );
 
+alter table registrar_subject_management
+  add column if not exists department_id uuid;
+
+alter table registrar_subject_management
+  drop constraint if exists registrar_subject_management_department_id_fkey;
+
+alter table registrar_subject_management
+  add constraint registrar_subject_management_department_id_fkey
+  foreign key (department_id) references coordinator_departments(id) on update cascade on delete restrict;
+
 create index if not exists idx_registrar_subject_management_scope on registrar_subject_management(program_scope, grade_level);
 create index if not exists idx_registrar_subject_management_strand on registrar_subject_management(strand);
+create index if not exists idx_registrar_subject_management_department on registrar_subject_management(department_id);
 create unique index if not exists uq_registrar_subject_management_unique
   on registrar_subject_management(grade_level, program_scope, coalesce(strand, ''), subject_code);
 

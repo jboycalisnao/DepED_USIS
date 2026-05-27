@@ -1,16 +1,17 @@
 import type { FormEvent } from 'react';
 import { UsisSearchableSelect } from '../../../../../../common/components/ui/UsisSearchableSelect';
 import type { SectionTrack } from '../../services/subjectsManagementService';
-import { dayOptions, gradeOptions, plusOneHour } from '../utils/timeSlotHelpers';
+import { gradeOptions, plusOneHour } from '../utils/timeSlotHelpers';
+import { DayMultiSelectField } from './DayMultiSelectField';
 
 type Props = {
-  dayOfWeek: string;
   editingId: string;
   endTime: string;
   gradeLevel: string;
   isShsGrade: boolean;
   isSubmitting: boolean;
   isTableReady: boolean;
+  isInheritedContextLocked: boolean;
   jhsProgramOptions: Array<{ label: string; value: string }>;
   label: string;
   onClear: () => void;
@@ -19,7 +20,8 @@ type Props = {
   programName: string;
   programScope: SectionTrack;
   room: string;
-  setDayOfWeek: (value: string) => void;
+  selectedDays: string[];
+  setSelectedDays: (value: string[]) => void;
   setEndTime: (value: string) => void;
   setGradeLevel: (value: string) => void;
   setLabel: (value: string) => void;
@@ -34,13 +36,13 @@ type Props = {
 };
 
 export function TimeSlotsEditorModal({
-  dayOfWeek,
   editingId,
   endTime,
   gradeLevel,
   isShsGrade,
   isSubmitting,
   isTableReady,
+  isInheritedContextLocked,
   jhsProgramOptions,
   label,
   onClear,
@@ -49,7 +51,8 @@ export function TimeSlotsEditorModal({
   programName,
   programScope,
   room,
-  setDayOfWeek,
+  selectedDays,
+  setSelectedDays,
   setEndTime,
   setGradeLevel,
   setLabel,
@@ -65,7 +68,7 @@ export function TimeSlotsEditorModal({
   return (
     <div className="modal-overlay modal-overlay--high" role="presentation">
       <div className="modal-backdrop" onClick={() => { if (!isSubmitting) onClose(); }} />
-      <div className="modal-dialog modal-dialog--wide ia-subjects-modal ia-time-slots-editor-modal" role="dialog" aria-modal="true" aria-label="Time slot preset form">
+      <div className={`modal-dialog modal-dialog--wide ia-subjects-modal ia-time-slots-editor-modal${isInheritedContextLocked ? ' is-context-locked' : ''}`} role="dialog" aria-modal="true" aria-label="Time slot preset form">
         <div className="modal-dialog__header">
           <div className="modal-dialog__title-group">
             <p className="modal-dialog__eyebrow">Grades and Subjects</p>
@@ -77,7 +80,7 @@ export function TimeSlotsEditorModal({
         </div>
         <form className="modal-dialog__body" onSubmit={onSubmit}>
           <div className="floating-field-grid ia-time-slots-editor-modal__grid">
-            <UsisSearchableSelect ariaLabel="Grade Level" allowTyping={false} floatingLabel forcePortalMenu label="Grade Level" onChange={setGradeLevel} options={gradeOptions} value={gradeLevel} required />
+            <UsisSearchableSelect ariaLabel="Grade Level" allowTyping={false} floatingLabel forcePortalMenu label="Grade Level" onChange={setGradeLevel} options={gradeOptions} value={gradeLevel} required disabled={isInheritedContextLocked} />
             {isShsGrade ? (
               <>
                 <UsisSearchableSelect ariaLabel="Program Scope" allowTyping={false} disabled floatingLabel forcePortalMenu label="Program Scope" onChange={() => {}} options={[{ label: 'Senior High School', value: 'senior_high_school' }]} value="senior_high_school" />
@@ -93,12 +96,12 @@ export function TimeSlotsEditorModal({
                     setProgramScope('special_program_ste');
                     setProgramName(value.replace('special::', '').trim());
                   }
-                }} options={jhsProgramOptions} value={programScope === 'regular' ? 'regular' : `special::${programName}`} required />
+                }} options={jhsProgramOptions} value={programScope === 'regular' ? 'regular' : `special::${programName}`} required disabled={isInheritedContextLocked} />
                 <label className="floating-field"><div className="floating-field__control"><input value="Not Applicable for Grade 7-10" placeholder=" " disabled /><span>SHS Strand</span></div></label>
               </>
             )}
             <label className="floating-field"><div className="floating-field__control"><input value={label} onChange={(e) => setLabel(e.target.value)} placeholder=" " required /><span>Slot Label</span></div></label>
-            <UsisSearchableSelect ariaLabel="Day" allowTyping={false} floatingLabel forcePortalMenu label="Day" onChange={setDayOfWeek} options={dayOptions} value={dayOfWeek} required />
+            <DayMultiSelectField value={selectedDays} onChange={setSelectedDays} required disabled={isInheritedContextLocked} />
             <label className="floating-field"><div className="floating-field__control"><input type="time" value={startTime} onChange={(e) => { const next = e.target.value; setStartTime(next); setEndTime(plusOneHour(next)); }} placeholder=" " required /><span>Start Time</span></div></label>
             <label className="floating-field"><div className="floating-field__control"><input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} placeholder=" " required /><span>End Time</span></div></label>
             <label className="floating-field"><div className="floating-field__control"><input value={room} onChange={(e) => setRoom(e.target.value)} placeholder=" " /><span>Room</span></div></label>

@@ -3,6 +3,7 @@ import { UsisSearchableSelect } from '../../../../../../common/components/ui/Usi
 import type { ProgramScope, SaveSubjectManagementInput, SubjectManagementRecord, SubjectType } from '../services/subjectManagementService';
 
 type Props = {
+  departments: Array<{ label: string; value: string }>;
   initialValue?: SubjectManagementRecord | null;
   isSubmitting: boolean;
   onClose: () => void;
@@ -15,7 +16,8 @@ const gradeLevelOptions = ['Grade 7', 'Grade 8', 'Grade 9', 'Grade 10', 'Grade 1
   value,
 }));
 
-export function SubjectManagementFormModal({ initialValue, isSubmitting, onClose, onSubmit, strands }: Props) {
+export function SubjectManagementFormModal({ departments, initialValue, isSubmitting, onClose, onSubmit, strands }: Props) {
+  const [departmentId, setDepartmentId] = useState('');
   const [gradeLevel, setGradeLevel] = useState('Grade 7');
   const [programScope, setProgramScope] = useState<ProgramScope>('regular');
   const [subjectType, setSubjectType] = useState<SubjectType>('core');
@@ -27,6 +29,7 @@ export function SubjectManagementFormModal({ initialValue, isSubmitting, onClose
 
   useEffect(() => {
     if (!initialValue) return;
+    setDepartmentId(initialValue.departmentId || '');
     setGradeLevel(initialValue.gradeLevel || 'Grade 7');
     setProgramScope(initialValue.programScope || 'regular');
     setSubjectType(initialValue.subjectType || 'core');
@@ -60,6 +63,7 @@ export function SubjectManagementFormModal({ initialValue, isSubmitting, onClose
             }
             setFormError('');
             void onSubmit({
+              departmentId,
               gradeLevel,
               id: initialValue?.id,
               isActive,
@@ -72,6 +76,17 @@ export function SubjectManagementFormModal({ initialValue, isSubmitting, onClose
           }}
         >
           <div className="floating-field-grid ia-teaching-credential-form-grid">
+            <UsisSearchableSelect
+              ariaLabel="Department"
+              allowTyping
+              floatingLabel
+              forcePortalMenu
+              label="Department"
+              onChange={setDepartmentId}
+              options={departments}
+              required
+              value={departmentId}
+            />
             <UsisSearchableSelect
               ariaLabel="Grade Level"
               allowTyping={false}
@@ -161,4 +176,3 @@ export function SubjectManagementFormModal({ initialValue, isSubmitting, onClose
     </div>
   );
 }
-

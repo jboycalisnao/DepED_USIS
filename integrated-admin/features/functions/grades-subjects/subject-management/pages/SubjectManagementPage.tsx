@@ -31,8 +31,14 @@ export function SubjectManagementPage() {
     setQuery,
     setScopeFilter,
     strands,
+    departments,
   } = useSubjectManagement();
   const [editing, setEditing] = useState<SubjectManagementRecord | null>(null);
+  const departmentNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    departments.forEach((department) => map.set(department.value, department.label));
+    return map;
+  }, [departments]);
 
   const groupedRows = useMemo<UsisGradeSectionListGrade[]>(() => {
     const gradeBucket = new Map<string, SubjectManagementRecord[]>();
@@ -75,6 +81,7 @@ export function SubjectManagementPage() {
                     <tr>
                       <th>Code</th>
                       <th>Title</th>
+                      <th>Department</th>
                       <th>Type</th>
                       <th>Status</th>
                       <th>Actions</th>
@@ -85,6 +92,7 @@ export function SubjectManagementPage() {
                       <tr key={row.id}>
                         <td><strong>{row.subjectCode}</strong></td>
                         <td>{row.subjectTitle}</td>
+                        <td>{departmentNameById.get(row.departmentId) || '--'}</td>
                         <td><span className="modal-record__chip">{typeLabelMap[row.subjectType]}</span></td>
                         <td>{row.isActive ? 'Active' : 'Inactive'}</td>
                         <td>
@@ -160,6 +168,7 @@ export function SubjectManagementPage() {
       </div>
       {editing ? (
         <SubjectManagementFormModal
+          departments={departments}
           initialValue={editing.id ? editing : null}
           isSubmitting={isSubmitting}
           onClose={() => {

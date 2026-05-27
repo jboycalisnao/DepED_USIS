@@ -6,6 +6,7 @@ export type UsisSideNavItem = {
   iconType?: 'material' | 'fa';
   label: string;
   path: string;
+  disabled?: boolean;
   children?: UsisSideNavItem[];
 };
 
@@ -84,10 +85,11 @@ export function UsisSideNav({
           {items.map((item) => {
             if (item.children?.length) {
               const hasActiveChild = item.children.some((child) => isPathActive(child.path));
+              const allChildrenDisabled = item.children.every((child) => Boolean(child.disabled));
               return (
                 <details
                   key={item.path}
-                  className={`usis-side-nav__group ${hasActiveChild ? 'usis-side-nav__group--active' : ''}`}
+                  className={`usis-side-nav__group ${hasActiveChild ? 'usis-side-nav__group--active' : ''} ${allChildrenDisabled ? 'usis-side-nav__group--disabled' : ''}`}
                   open={hasActiveChild ? true : undefined}
                 >
                   <summary className="usis-side-nav__group-summary">
@@ -104,7 +106,22 @@ export function UsisSideNav({
                     </span>
                   </summary>
                   <div className="usis-side-nav__group-items">
-                    {item.children.map((child) => (
+                    {item.children.map((child) => child.disabled ? (
+                      <span
+                        key={child.path}
+                        className="usis-side-nav__link usis-side-nav__link--nested usis-side-nav__link--disabled"
+                        aria-disabled="true"
+                      >
+                        {child.iconType === 'fa' ? (
+                          <i className={`fa-solid ${child.icon} usis-side-nav__icon`} aria-hidden="true" />
+                        ) : (
+                          <span className="material-symbols-outlined usis-side-nav__icon" aria-hidden="true">
+                            {child.icon}
+                          </span>
+                        )}
+                        {child.label}
+                      </span>
+                    ) : (
                       <NavLink
                         key={child.path}
                         to={child.path}
@@ -134,8 +151,10 @@ export function UsisSideNav({
                 <button
                   key={item.path}
                   type="button"
-                  className={`usis-side-nav__link usis-side-nav__link-button ${isActive ? 'usis-side-nav__link--active' : ''}`}
-                  onClick={() => handleItemSelect(item.path)}
+                  className={`usis-side-nav__link usis-side-nav__link-button ${isActive ? 'usis-side-nav__link--active' : ''} ${item.disabled ? 'usis-side-nav__link--disabled' : ''}`}
+                  onClick={() => { if (!item.disabled) handleItemSelect(item.path); }}
+                  disabled={item.disabled}
+                  aria-disabled={item.disabled ? 'true' : undefined}
                 >
                   {item.iconType === 'fa' ? (
                     <i className={`fa-solid ${item.icon} usis-side-nav__icon`} aria-hidden="true" />
@@ -150,22 +169,39 @@ export function UsisSideNav({
             }
 
             return (
-              <NavLink
-                key={item.path}
-                to={item.path}
-                end={item.path === '/'}
-                className={({ isActive }) => `usis-side-nav__link ${isActive ? 'usis-side-nav__link--active' : ''}`}
-                onClick={() => setIsMobileOpen(false)}
-              >
-                {item.iconType === 'fa' ? (
-                  <i className={`fa-solid ${item.icon} usis-side-nav__icon`} aria-hidden="true" />
-                ) : (
-                  <span className="material-symbols-outlined usis-side-nav__icon" aria-hidden="true">
-                    {item.icon}
-                  </span>
-                )}
-                {item.label}
-              </NavLink>
+              item.disabled ? (
+                <span
+                  key={item.path}
+                  className="usis-side-nav__link usis-side-nav__link--disabled"
+                  aria-disabled="true"
+                >
+                  {item.iconType === 'fa' ? (
+                    <i className={`fa-solid ${item.icon} usis-side-nav__icon`} aria-hidden="true" />
+                  ) : (
+                    <span className="material-symbols-outlined usis-side-nav__icon" aria-hidden="true">
+                      {item.icon}
+                    </span>
+                  )}
+                  {item.label}
+                </span>
+              ) : (
+                <NavLink
+                  key={item.path}
+                  to={item.path}
+                  end={item.path === '/'}
+                  className={({ isActive }) => `usis-side-nav__link ${isActive ? 'usis-side-nav__link--active' : ''}`}
+                  onClick={() => setIsMobileOpen(false)}
+                >
+                  {item.iconType === 'fa' ? (
+                    <i className={`fa-solid ${item.icon} usis-side-nav__icon`} aria-hidden="true" />
+                  ) : (
+                    <span className="material-symbols-outlined usis-side-nav__icon" aria-hidden="true">
+                      {item.icon}
+                    </span>
+                  )}
+                  {item.label}
+                </NavLink>
+              )
             );
           })}
         </nav>

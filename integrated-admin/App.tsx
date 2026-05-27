@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { UsisUnifiedHeader } from '../common/header/UsisUnifiedHeader';
 import { UsisGlobalFooter } from '../common/footer/UsisGlobalFooter';
 import UsisPageLoader from '../common/components/UsisPageLoader';
 import { UsisSideNav, type UsisSideNavItem } from '../common/components/UsisSideNav';
 import { UsisBreadcrumbBar } from '../common/components/UsisBreadcrumbBar';
+import { UsisAlertModal } from '../common/components/UsisAlertModal';
 import { IntegratedAdminLoginPage } from './features/auth/pages/IntegratedAdminLoginPage';
 import {
   clearStoredIntegratedAdminAccess,
@@ -22,6 +23,7 @@ import { DepartmentsPage } from './features/functions/coordinator/departments/pa
 import { LearnerBasedCredentialsPage } from './features/functions/coordinator/learner-credentials/LearnerBasedCredentialsPage';
 import { TeachingNonTeachingCredentialsPage } from './features/functions/coordinator/pages/TeachingNonTeachingCredentialsPage';
 import { SubjectsManagementPage } from './features/functions/grades-subjects/pages/SubjectsManagementPage';
+import { GradesPage } from './features/functions/grades-subjects/pages/GradesPage';
 import { SubjectManagementPage } from './features/functions/grades-subjects/subject-management/pages/SubjectManagementPage';
 import { TimeSlotsPage } from './features/functions/grades-subjects/time-slots/pages/TimeSlotsPage';
 import { MerchandiseControlPage } from './features/functions/merchandise/MerchandiseControlPage';
@@ -29,6 +31,21 @@ import { MerchOrderControlPage } from './features/functions/merchandise/MerchOrd
 import { MerchOrderPaymentPage } from './features/functions/merchandise/MerchOrderPaymentPage';
 import { MerchOrderCountsPage } from './features/functions/merchandise/MerchOrderCountsPage';
 import { resolveCoordinatorDepartmentAccess } from '../common/auth/coordinatorDepartmentAccess';
+import { loadCoordinatorIaPageAccessMapFromSupabase, loadCoordinatorModuleAccessMapFromSupabase } from '../common/auth/moduleAccess';
+
+const iaPathToPageKey: Record<string, string> = {
+  '/functions/coordinator/departments': 'ia.coordinator.departments',
+  '/functions/coordinator/teaching-non-teaching': 'ia.coordinator.teaching_non_teaching',
+  '/functions/coordinator/learner-credentials': 'ia.coordinator.learner_credentials',
+  '/functions/grades-subjects/subjects': 'ia.grades_subjects.subjects',
+  '/functions/grades-subjects/grades': 'ia.grades_subjects.grades',
+  '/functions/grades-subjects/subject-management': 'ia.grades_subjects.subject_management',
+  '/functions/grades-subjects/time-slots': 'ia.grades_subjects.time_slots',
+  '/functions/merchandise-control': 'ia.merch.merchandise_control',
+  '/functions/merch-control': 'ia.merch.orders',
+  '/functions/order-payment': 'ia.merch.payment',
+  '/functions/order-counts': 'ia.merch.order_counts',
+};
 
 function IntegratedAdminOverview({
   session,
@@ -90,14 +107,48 @@ const iaNavItems: UsisSideNavItem[] = [
     icon: 'menu_book',
     children: [
       { path: '/functions/grades-subjects/subjects', label: 'Subjects', icon: 'library_books' },
+      { path: '/functions/grades-subjects/grades', label: 'Grades', icon: 'grading' },
       { path: '/functions/grades-subjects/subject-management', label: 'Subject Management', icon: 'fact_check' },
       { path: '/functions/grades-subjects/time-slots', label: 'Time Slots', icon: 'schedule' },
     ],
   },
 ];
 
+const buildNavItemsWithIaAccessState = (
+  items: UsisSideNavItem[],
+  hasIaModule: boolean,
+  allowedIaPages: string[],
+) => {
+  const allowedSet = new Set(allowedIaPages);
+  const isAllowedPath = (path: string) => {
+    if (path === '/') return true;
+    const pageKey = iaPathToPageKey[path];
+    if (!pageKey) return true;
+    if (!hasIaModule) return false;
+    if (allowedSet.size === 0) return false;
+    return allowedSet.has(pageKey);
+  };
+
+  const mark = (source: UsisSideNavItem[]): UsisSideNavItem[] =>
+    source
+      .map((item) => {
+        const nextChildren = item.children?.length ? mark(item.children) : undefined;
+        const isAllowed = isAllowedPath(item.path);
+        if (item.children?.length) {
+          if (!nextChildren?.length) return null;
+          return { ...item, children: nextChildren, disabled: false };
+        }
+        if (!isAllowed) return null;
+        return { ...item, children: undefined, disabled: false };
+      })
+      .filter((item): item is UsisSideNavItem => Boolean(item));
+
+  return mark(items);
+};
+
 function IntegratedAdminShell() {
   const location = useLocation();
+  const navigate = useNavigate();
   const [session, setSession] = useState<IntegratedAdminAccessRecord | null>(() => {
     const stored = getStoredIntegratedAdminAccess();
     if (stored) {
@@ -111,6 +162,10 @@ function IntegratedAdminShell() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [isRouteLoading, setIsRouteLoading] = useState(false);
+  const [currentModules, setCurrentModules] = useState<string[]>([]);
+  const [currentIaPages, setCurrentIaPages] = useState<string[]>([]);
+  const [hasLoadedPageAccess, setHasLoadedPageAccess] = useState(false);
+  const [noAccessAlert, setNoAccessAlert] = useState<{ message: string; open: boolean }>({ message: '', open: false });
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -177,9 +232,56 @@ function IntegratedAdminShell() {
     return () => window.clearTimeout(timer);
   }, [location.pathname, session]);
 
+  useEffect(() => {
+    let isMounted = true;
+    const loadAccess = async () => {
+      if (!session?.userId) return;
+      try {
+        const [moduleMap, pageMap] = await Promise.all([
+          loadCoordinatorModuleAccessMapFromSupabase([session.userId]),
+          loadCoordinatorIaPageAccessMapFromSupabase([session.userId]),
+        ]);
+        if (!isMounted) return;
+        setCurrentModules(moduleMap[session.userId] || []);
+        setCurrentIaPages(pageMap[session.userId] || []);
+        setHasLoadedPageAccess(true);
+      } catch {
+        if (!isMounted) return;
+        setCurrentModules([]);
+        setCurrentIaPages([]);
+        setHasLoadedPageAccess(true);
+      }
+    };
+    void loadAccess();
+    return () => {
+      isMounted = false;
+    };
+  }, [session?.userId]);
+
+  const visibleNavItems = useMemo(() => {
+    const hasIaModule = currentModules.includes('ia');
+    return buildNavItemsWithIaAccessState(iaNavItems, hasIaModule, currentIaPages);
+  }, [currentIaPages, currentModules]);
+
+  useEffect(() => {
+    if (!session?.userId || !hasLoadedPageAccess) return;
+    const requiredPageKey = iaPathToPageKey[location.pathname];
+    if (!requiredPageKey) return;
+    const hasIaModule = currentModules.includes('ia');
+    if (!hasIaModule) {
+      setNoAccessAlert({ open: true, message: 'No access: this account is not granted IA module access.' });
+      navigate('/', { replace: true });
+      return;
+    }
+    if (!currentIaPages.includes(requiredPageKey)) {
+      setNoAccessAlert({ open: true, message: 'No access: this IA page is not granted for this account.' });
+      navigate('/', { replace: true });
+    }
+  }, [currentIaPages, currentModules, hasLoadedPageAccess, location.pathname, navigate, session?.userId]);
+
   const currentSectionLabel = useMemo(() => {
     if (location.pathname === '/') return 'Overview';
-    for (const item of iaNavItems) {
+    for (const item of visibleNavItems) {
       if (item.children?.length) {
         const child = item.children.find(
           (entry) =>
@@ -196,7 +298,7 @@ function IntegratedAdminShell() {
       }
     }
     return 'Overview';
-  }, [location.pathname]);
+  }, [location.pathname, visibleNavItems]);
 
   return (
     <div className="integrated-admin-app">
@@ -233,7 +335,7 @@ function IntegratedAdminShell() {
               />
               <section className="integrated-admin-shell">
                 <UsisSideNav
-                  items={iaNavItems}
+                  items={visibleNavItems}
                   onLogout={handleLogout}
                   ariaLabel="Integrated Admin sections"
                   isMobileOpen={isMobileNavOpen}
@@ -259,6 +361,7 @@ function IntegratedAdminShell() {
                       <Route path="/functions/order-payment" element={<MerchOrderPaymentPage />} />
                       <Route path="/functions/order-counts" element={<MerchOrderCountsPage />} />
                       <Route path="/functions/grades-subjects/subjects" element={<SubjectsManagementPage />} />
+                      <Route path="/functions/grades-subjects/grades" element={<GradesPage />} />
                       <Route path="/functions/grades-subjects/subject-management" element={<SubjectManagementPage />} />
                       <Route path="/functions/grades-subjects/time-slots" element={<TimeSlotsPage />} />
                       <Route path="*" element={<Navigate to="/" replace />} />
@@ -290,6 +393,13 @@ function IntegratedAdminShell() {
       </main>
 
       <UsisGlobalFooter />
+      <UsisAlertModal
+        open={noAccessAlert.open}
+        title="No Access"
+        message={noAccessAlert.message}
+        tone="danger"
+        onClose={() => setNoAccessAlert({ open: false, message: '' })}
+      />
     </div>
   );
 }

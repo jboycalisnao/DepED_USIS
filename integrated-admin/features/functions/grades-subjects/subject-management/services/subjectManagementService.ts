@@ -4,6 +4,7 @@ export type SubjectType = 'core' | 'elective';
 export type ProgramScope = 'regular' | 'special_program_ste' | 'senior_high_school';
 
 export type SubjectManagementRecord = {
+  departmentId: string;
   gradeLevel: string;
   id: string;
   isActive: boolean;
@@ -15,6 +16,7 @@ export type SubjectManagementRecord = {
 };
 
 export type SaveSubjectManagementInput = {
+  departmentId: string;
   gradeLevel: string;
   id?: string;
   isActive?: boolean;
@@ -42,7 +44,7 @@ const hasRequiredShsStrand = (programScope: ProgramScope, strand: string) =>
 export const loadSubjectManagementRecords = async (): Promise<SubjectManagementRecord[]> => {
   const { data, error } = await supabase
     .from('registrar_subject_management')
-    .select('id,grade_level,program_scope,strand,subject_code,subject_title,subject_type,is_active')
+    .select('id,department_id,grade_level,program_scope,strand,subject_code,subject_title,subject_type,is_active')
     .order('grade_level', { ascending: true })
     .order('program_scope', { ascending: true })
     .order('strand', { ascending: true })
@@ -53,6 +55,7 @@ export const loadSubjectManagementRecords = async (): Promise<SubjectManagementR
   }
 
   return (data || []).map((row: any) => ({
+    departmentId: toText(row.department_id),
     gradeLevel: toText(row.grade_level),
     id: toText(row.id),
     isActive: Boolean(row.is_active),
@@ -62,6 +65,21 @@ export const loadSubjectManagementRecords = async (): Promise<SubjectManagementR
     subjectTitle: toText(row.subject_title),
     subjectType: normalizeType(toText(row.subject_type)),
   }));
+};
+
+export const loadCoordinatorDepartmentOptions = async (): Promise<Array<{ label: string; value: string }>> => {
+  const { data, error } = await supabase
+    .from('coordinator_departments')
+    .select('id,name,is_active')
+    .eq('is_active', true)
+    .order('name', { ascending: true });
+  if (error) return [];
+  return (data || [])
+    .map((row: any) => ({
+      label: toText(row.name),
+      value: toText(row.id),
+    }))
+    .filter((row) => Boolean(row.value));
 };
 
 export const loadShsStrands = async (): Promise<Array<{ label: string; value: string }>> => {
@@ -85,17 +103,20 @@ export const loadShsStrands = async (): Promise<Array<{ label: string; value: st
 export const saveSubjectManagementRecord = async (payload: SaveSubjectManagementInput) => {
   const programScope = normalizeScope(payload.programScope);
   const gradeLevel = toText(payload.gradeLevel);
+  const departmentId = toText(payload.departmentId);
   const subjectCode = toUpper(payload.subjectCode);
   const subjectTitle = toText(payload.subjectTitle);
   const subjectType = normalizeType(payload.subjectType);
   const strand = programScope === 'senior_high_school' ? toText(payload.strand) : '';
 
   if (!gradeLevel) throw new Error('Grade level is required.');
+  if (!departmentId) throw new Error('Department is required.');
   if (!subjectCode) throw new Error('Subject code is required.');
   if (!subjectTitle) throw new Error('Subject title is required.');
   if (!hasRequiredShsStrand(programScope, strand)) throw new Error('Strand is required for SHS subjects.');
 
   const record = {
+    department_id: departmentId,
     grade_level: gradeLevel,
     is_active: payload.isActive ?? true,
     program_scope: programScope,
@@ -120,4 +141,3 @@ export const deleteSubjectManagementRecord = async (id: string) => {
   const { error } = await supabase.from('registrar_subject_management').delete().eq('id', id);
   if (error) throw new Error(error.message || 'Unable to delete subject.');
 };
-
