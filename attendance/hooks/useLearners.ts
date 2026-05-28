@@ -15,14 +15,22 @@ export const useLearners = () => {
     try {
       setIsSyncing(true);
       
-      // 1. Fetch ALL Sections
-      const { data: sectionsData, error: sectionsError } = await supabase
-        .from('sections')
+      // 1. Fetch shared registrar section catalog first, then fallback to legacy sections table.
+      const { data: registrarSectionsData, error: registrarSectionsError } = await supabase
+        .from('registrar_sections')
         .select('*');
+
+      let sectionsData: Section[] | null = registrarSectionsData as Section[] | null;
+
+      if (registrarSectionsError) {
+        const { data: fallbackSectionsData, error: fallbackSectionsError } = await supabase
+          .from('sections')
+          .select('*');
+        if (fallbackSectionsError) throw fallbackSectionsError;
+        sectionsData = fallbackSectionsData as Section[] | null;
+      }
       
-      if (sectionsError) throw sectionsError;
-      
-      const sectionsMap = (sectionsData as Section[]).reduce((acc, s) => {
+      const sectionsMap = (sectionsData || []).reduce((acc, s) => {
         acc[String(s.id)] = s;
         return acc;
       }, {} as Record<string, Section>);
@@ -38,7 +46,7 @@ export const useLearners = () => {
         // Without this, pagination is non-deterministic for rows with identical last names,
         // causing records to be skipped or duplicated between the 'from' ranges.
         const { data, error } = await supabase
-          .from('learners')
+          .from('registrar_learners')
           .select('*')
           .range(from, from + step - 1)
           .order('last_name', { ascending: true })
@@ -48,7 +56,7 @@ export const useLearners = () => {
 
         if (data && data.length > 0) {
           const enriched = data.map(l => {
-            const sId = (l as any).section_id;
+            const sId = (l as any).section_id || (l as any).sectionId;
             const section = sId ? sectionsMap[String(sId)] : null;
             
             // Priority: 1. grade_level 2. gradeLevel 3. Default
@@ -56,7 +64,9 @@ export const useLearners = () => {
             
             return {
               ...l,
-              section_name: section ? section.name : (sId ? 'Unknown Section' : 'No Section Assigned'),
+              section_name: section
+                ? (section.name || 'Unknown Section')
+                : (sId ? 'Unknown Section' : 'No Section Assigned'),
               grade_level: gradeVal
             };
           });

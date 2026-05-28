@@ -1,6 +1,12 @@
 @import "../../common/css/index.css";
 
+@config "../tailwind.config.cjs";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 :root {
+  --attendance-radius-md: 0.375rem;
   --usis-module-label: "Attendance Portal";
   --usis-module-kicker: "School";
   --usis-module-title: "ATTENDANCE PORTAL";
@@ -88,7 +94,7 @@ body {
   align-items: center;
   gap: 10px;
   border: 1px solid transparent;
-  border-radius: 10px;
+  border-radius: var(--attendance-radius-md);
   padding: 10px;
   color: #1f2937;
   background: transparent;
@@ -132,7 +138,7 @@ body {
   width: 100%;
   min-height: 40px;
   border: 1px solid transparent;
-  border-radius: 10px;
+  border-radius: var(--attendance-radius-md);
   background: transparent;
   color: var(--deped-red);
   font-size: 16px;
@@ -201,7 +207,7 @@ body {
 .attendance-profile-chip {
   width: 34px;
   height: 34px;
-  border-radius: 999px;
+  border-radius: var(--attendance-radius-md);
   border: 2px solid #e5b100;
   background: #f6bc00;
   color: #111827;
@@ -220,7 +226,7 @@ body {
   z-index: 40;
   min-width: 250px;
   border: 1px solid var(--deped-line);
-  border-radius: 12px;
+  border-radius: var(--attendance-radius-md);
   background: #f9fafb;
   box-shadow: 0 14px 30px rgba(15, 23, 42, 0.18);
   padding: 14px 14px 10px;
@@ -229,7 +235,7 @@ body {
 .attendance-profile-popover__avatar {
   width: 56px;
   height: 56px;
-  border-radius: 999px;
+  border-radius: var(--attendance-radius-md);
   background: #f6bc00;
   color: #1f2937;
   font-size: 18px;
@@ -271,7 +277,7 @@ body {
   align-items: center;
   gap: 8px;
   padding: 7px 6px;
-  border-radius: 8px;
+  border-radius: var(--attendance-radius-md);
   cursor: pointer;
 }
 
@@ -299,7 +305,7 @@ body {
   min-height: 36px;
   padding: 0 12px;
   border: 1px solid var(--deped-line);
-  border-radius: 10px;
+  border-radius: var(--attendance-radius-md);
   background: var(--deped-white);
   color: var(--deped-blue);
   font-size: var(--usis-helper-size);
@@ -323,7 +329,7 @@ body {
   min-height: 36px;
   padding: 0 8px;
   border: 1px solid var(--deped-line);
-  border-radius: 10px;
+  border-radius: var(--attendance-radius-md);
   background: var(--deped-white);
 }
 
@@ -336,7 +342,7 @@ body {
 .attendance-toolbar__monitor select {
   min-height: 28px;
   border: 1px solid var(--deped-line);
-  border-radius: 6px;
+  border-radius: var(--attendance-radius-md);
   padding: 0 6px;
   font-size: 11px;
   font-weight: 700;
@@ -348,7 +354,7 @@ body {
   min-height: 28px;
   min-width: 44px;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--attendance-radius-md);
   padding: 0 10px;
   background: var(--deped-blue);
   color: var(--deped-white);
@@ -360,7 +366,7 @@ body {
 .attendance-user-line {
   min-height: 42px;
   border: 1px solid var(--deped-line);
-  border-radius: var(--usis-radius-control);
+  border-radius: var(--attendance-radius-md);
   background: var(--deped-white);
   display: inline-flex;
   align-items: center;
@@ -401,14 +407,11 @@ body {
 }
 
 .attendance-main .bg-white,
-.attendance-main .rounded-xl,
-.attendance-main .rounded-2xl,
-.attendance-main .rounded-3xl,
-.attendance-main .rounded-full,
+.attendance-main .rounded-md,
 .attendance-main .shadow-sm,
 .attendance-main .shadow-md,
 .attendance-main .shadow-lg {
-  border-radius: 12px;
+  border-radius: var(--attendance-radius-md);
   box-shadow: none;
 }
 
@@ -512,4 +515,5 @@ body {
     border-bottom: 1px solid var(--deped-line);
   }
 }
+
 

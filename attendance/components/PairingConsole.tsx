@@ -16,7 +16,7 @@ const PairingConsole: React.FC<PairingConsoleProps> = ({
   activeRfid, selectedLearner, conflictWarning, scanFlash, onSave, isAdmin, onToggleAdmin
 }) => {
   return (
-    <section className="bg-white rounded-xl p-8 shadow-sm border border-gray-200 relative overflow-hidden">
+    <section className="bg-white rounded-md p-8 shadow-sm border border-gray-200 relative overflow-hidden">
       <div className="absolute top-0 right-0 p-6 opacity-[0.03] pointer-events-none">
         <span className="material-symbols-outlined text-9xl leading-none">link</span>
       </div>
@@ -45,7 +45,7 @@ const PairingConsole: React.FC<PairingConsoleProps> = ({
           </div>
           
           <div 
-            className={`p-8 rounded-2xl border-2 transition-all duration-300 ${scanFlash ? 'scale-[1.02] bg-primary-50' : 'bg-gray-50'} ${
+            className={`p-8 rounded-md border-2 transition-all duration-300 ${scanFlash ? 'scale-[1.02] bg-primary-50' : 'bg-gray-50'} ${
               activeRfid 
               ? (conflictWarning ? 'border-error-600/20 bg-error-50' : 'border-primary-600/20 bg-white shadow-lg shadow-primary-600/5') 
               : 'border-gray-200'
@@ -53,7 +53,7 @@ const PairingConsole: React.FC<PairingConsoleProps> = ({
           >
             {activeRfid ? (
               <div className="flex items-center gap-5">
-                <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                <div className={`w-12 h-12 rounded-md flex items-center justify-center ${
                   conflictWarning 
                   ? 'bg-error-600 text-white shadow-lg shadow-error-600/20' 
                   : (isAdmin ? 'bg-accent-600 text-white shadow-lg shadow-accent-600/20' : 'bg-primary-600 text-white shadow-lg shadow-primary-600/50')
@@ -84,10 +84,10 @@ const PairingConsole: React.FC<PairingConsoleProps> = ({
 
         <div className="space-y-4">
           <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider px-1">Assignment Target</label>
-          <div className={`p-8 rounded-2xl border-2 transition-all duration-300 ${selectedLearner ? 'bg-white border-primary-600/20 shadow-lg shadow-primary-600/5' : 'bg-gray-50 border-gray-200 border-dashed'}`}>
+          <div className={`p-8 rounded-md border-2 transition-all duration-300 ${selectedLearner ? 'bg-white border-primary-600/20 shadow-lg shadow-primary-600/5' : 'bg-gray-50 border-gray-200 border-dashed'}`}>
             {selectedLearner ? (
               <div className="flex items-center gap-5">
-                <div className="w-14 h-14 bg-primary-600 text-white rounded-xl flex items-center justify-center font-bold text-xl shadow-lg shadow-primary-600/20 flex-shrink-0">
+                <div className="w-14 h-14 bg-primary-600 text-white rounded-md flex items-center justify-center font-bold text-xl shadow-lg shadow-primary-600/20 flex-shrink-0">
                   {selectedLearner.last_name?.charAt(0)}
                 </div>
                 <div className="overflow-hidden">
@@ -114,7 +114,7 @@ const PairingConsole: React.FC<PairingConsoleProps> = ({
         <button
           disabled={!activeRfid || !selectedLearner || !!conflictWarning}
           onClick={onSave}
-          className="w-full bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-4 rounded-lg shadow-sm hover:bg-primary-700 active:scale-[0.98] transition-all flex items-center justify-center gap-3 text-sm"
+          className="w-full bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-4 rounded-md shadow-sm hover:bg-primary-700 active:scale-[0.98] transition-all flex items-center justify-center gap-3 text-sm"
         >
           <span className="material-symbols-outlined text-xl leading-none">link</span>
           Complete Link
@@ -125,3 +125,4 @@ const PairingConsole: React.FC<PairingConsoleProps> = ({
 };
 
 export default PairingConsole;
+

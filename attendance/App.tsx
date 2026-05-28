@@ -83,6 +83,8 @@ function App() {
   
   const lastProcessedIds = useRef<(string | null)[]>([null, null, null]);
   const idleTimers = useRef<(number | null)[]>([null, null, null]);
+  const usbRfidBufferRef = useRef('');
+  const usbRfidTimerRef = useRef<number | null>(null);
 
   const speak = (text: string) => {
     window.speechSynthesis.cancel();
@@ -242,6 +244,128 @@ function App() {
       return () => clearTimeout(t);
     }
   }, [lastScanResults, unknownTags]);
+
+  useEffect(() => {
+    const clearUsbTimer = () => {
+      if (usbRfidTimerRef.current) {
+        window.clearTimeout(usbRfidTimerRef.current);
+        usbRfidTimerRef.current = null;
+      }
+    };
+
+    const finalizeUsbUid = () => {
+      clearUsbTimer();
+      const raw = usbRfidBufferRef.current.trim();
+      usbRfidBufferRef.current = '';
+      if (!raw) return;
+
+      const scannedUid = normalizeRfidValue(raw);
+      if (!scannedUid) return;
+
+      if (adminUids.includes(scannedUid)) {
+        setScanFlash(true);
+        setTimeout(() => setScanFlash(false), 300);
+        const entering = !isStandbyMode;
+        setIsStandbyMode(entering);
+        speak(entering ? 'Master key authorized. Entering Kiosk mode.' : 'Master key authorized. System unlocked.');
+        return;
+      }
+
+      if (isStandbyMode) {
+        const learner = learners.find(l => {
+          const dbUid = normalizeRfidValue(l.rfid);
+          const localUid = normalizeRfidValue(uidMappings[l.id]);
+          return dbUid === scannedUid || localUid === scannedUid;
+        });
+
+        if (learner) {
+          const now = new Date();
+          const type = determineAttendanceType(now, settings);
+          const todayStr = now.toDateString();
+          const isDuplicate = attendanceLogs.some(log => {
+            const logDate = new Date(log.timestamp).toDateString();
+            return log.learnerId === learner.id && log.type === type && logDate === todayStr;
+          });
+
+          if (!isDuplicate) {
+            logAttendance(learner.id, type);
+            speak(`Welcome, ${learner.first_name}.`);
+          }
+
+          setLastScanResults(prev => {
+            const next = [...prev];
+            next[0] = {
+              learner,
+              type,
+              uid: scannedUid,
+              isDuplicate,
+              time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            };
+            return next;
+          });
+          setUnknownTags(prev => {
+            const next = [...prev];
+            next[0] = null;
+            return next;
+          });
+        } else {
+          setUnknownTags(prev => {
+            const next = [...prev];
+            next[0] = scannedUid;
+            return next;
+          });
+          setLastScanResults(prev => {
+            const next = [...prev];
+            next[0] = null;
+            return next;
+          });
+        }
+        return;
+      }
+
+      setScanFlash(true);
+      setActiveRfid(scannedUid);
+      setConflictWarning(null);
+
+      const owner = learners.find(l => {
+        const dbUid = normalizeRfidValue(l.rfid);
+        const localUid = normalizeRfidValue(uidMappings[l.id]);
+        return dbUid === scannedUid || localUid === scannedUid;
+      });
+      if (owner) {
+        setConflictWarning(`Tag assigned to: ${owner.last_name}, ${owner.first_name}`);
+      }
+      setTimeout(() => setScanFlash(false), 500);
+    };
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const tag = target?.tagName?.toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select' || target?.isContentEditable) return;
+
+      if (event.key === 'Enter') {
+        finalizeUsbUid();
+        return;
+      }
+
+      if (event.key === 'Backspace') {
+        usbRfidBufferRef.current = usbRfidBufferRef.current.slice(0, -1);
+        return;
+      }
+
+      if (event.key.length === 1 && /[0-9a-fA-F]/.test(event.key)) {
+        usbRfidBufferRef.current += event.key.toUpperCase();
+        clearUsbTimer();
+        usbRfidTimerRef.current = window.setTimeout(finalizeUsbUid, 120);
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      clearUsbTimer();
+    };
+  }, [adminUids, attendanceLogs, isStandbyMode, learners, logAttendance, settings, uidMappings]);
 
   const handleSaveMapping = () => {
     if (!selectedLearnerId || !activeRfid || conflictWarning) return;
@@ -456,7 +580,7 @@ function App() {
                   onToggleAdmin={() => toggleAdmin(activeRfid)}
                 />
                 
-                <section className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+                <section className="bg-white rounded-md p-6 shadow-sm border border-gray-200">
                   <div className="flex justify-between items-center mb-4">
                     <h2 className="text-[11px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
                       <span className="material-symbols-outlined text-sm leading-none">terminal</span>
@@ -472,7 +596,7 @@ function App() {
                             {m.status.toUpperCase()}
                           </span>
                         </div>
-                        <div className="h-32 rounded-xl overflow-hidden bg-gray-50 border border-gray-200">
+                        <div className="h-32 rounded-md overflow-hidden bg-gray-50 border border-gray-200">
                           <Terminal logs={m.logs.slice(-50)} />
                         </div>
                       </div>
@@ -514,3 +638,4 @@ function App() {
 }
 
 export default App;
+

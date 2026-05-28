@@ -18,6 +18,7 @@ import { GradesPage } from './features/portal/pages/GradesPage';
 import { ServicesPage } from './features/portal/pages/ServicesPage';
 import { ProfilePage } from './features/portal/pages/ProfilePage';
 import { EnrollmentHistoryServicePage } from './features/portal/pages/services/EnrollmentHistoryServicePage';
+import { AttendanceServicePage } from './features/portal/pages/services/AttendanceServicePage';
 import { DocumentRequestsServicePage } from './features/portal/pages/services/DocumentRequestsServicePage';
 import { StudentSupportServicePage } from './features/portal/pages/services/StudentSupportServicePage';
 import { PtaFeeServicePage } from './features/portal/pages/services/PtaFeeServicePage';
@@ -99,6 +100,7 @@ function LearnerPortalShell({
                 <Route path="/" element={<DashboardPage session={session} />} />
                 <Route path="/grades" element={<GradesPage session={session} />} />
                 <Route path="/services" element={<ServicesPage session={session} />} />
+                <Route path="/services/attendance" element={<AttendanceServicePage session={session} />} />
                 <Route path="/services/enrollment-history" element={<EnrollmentHistoryServicePage session={session} />} />
                 <Route path="/services/document-requests" element={<DocumentRequestsServicePage />} />
                 <Route path="/services/student-support" element={<StudentSupportServicePage />} />

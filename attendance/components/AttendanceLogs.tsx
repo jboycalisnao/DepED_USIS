@@ -34,10 +34,10 @@ const AttendanceLogs: React.FC<AttendanceLogsProps> = ({ logs, learners, onDelet
   };
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm flex flex-col min-h-[600px] animate-in fade-in duration-500">
+    <div className="bg-white rounded-md border border-gray-200 overflow-hidden shadow-sm flex flex-col min-h-[600px] animate-in fade-in duration-500">
       <div className="p-10 border-b border-gray-200 flex flex-col lg:flex-row justify-between items-center gap-6 bg-gray-50/50">
         <div className="flex items-center gap-6">
-          <div className="w-14 h-14 bg-primary-600 text-white rounded-xl flex items-center justify-center shadow-lg">
+          <div className="w-14 h-14 bg-primary-600 text-white rounded-md flex items-center justify-center shadow-lg">
             <span className="material-symbols-outlined text-3xl leading-none">history_edu</span>
           </div>
           <div>
@@ -45,7 +45,7 @@ const AttendanceLogs: React.FC<AttendanceLogsProps> = ({ logs, learners, onDelet
             <h3 className="text-2xl font-bold text-gray-900 leading-none tracking-tight">Attendance Log</h3>
           </div>
         </div>
-        <div className="flex bg-white px-6 py-2.5 rounded-lg border border-gray-200 shadow-sm items-center">
+        <div className="flex bg-white px-6 py-2.5 rounded-md border border-gray-200 shadow-sm items-center">
           <span className="text-xl font-bold text-primary-600 mr-3">{logs.length}</span>
           <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
             {logs.length === 1 ? 'Captured Record' : 'Captured Records'}
@@ -96,7 +96,7 @@ const AttendanceLogs: React.FC<AttendanceLogsProps> = ({ logs, learners, onDelet
                       </div>
                     </td>
                     <td className="p-6 text-center">
-                      <span className={`px-4 py-1.5 rounded-full text-[10px] font-bold tracking-wider uppercase border ${color} shadow-sm`}>
+                      <span className={`px-4 py-1.5 rounded-md text-[10px] font-bold tracking-wider uppercase border ${color} shadow-sm`}>
                         {label}
                       </span>
                     </td>
@@ -113,7 +113,7 @@ const AttendanceLogs: React.FC<AttendanceLogsProps> = ({ logs, learners, onDelet
                           e.stopPropagation();
                           setDeleteId(log.id);
                         }}
-                        className="p-2 text-gray-400 hover:text-accent-600 hover:bg-accent-50 rounded-lg transition-all"
+                        className="p-2 text-gray-400 hover:text-accent-600 hover:bg-accent-50 rounded-md transition-all"
                         title="Delete record"
                       >
                         <span className="material-symbols-outlined text-xl leading-none">delete</span>
@@ -145,3 +145,4 @@ const AttendanceLogs: React.FC<AttendanceLogsProps> = ({ logs, learners, onDelet
 };
 
 export default AttendanceLogs;
+

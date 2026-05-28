@@ -52,14 +52,14 @@ const LearnerItem: React.FC<{
       <div className="flex items-center gap-4 flex-shrink-0">
         <div className="hidden sm:block">
           {tag ? (
-            <div className={`flex items-center gap-2 px-3 py-1 rounded-full border ${isLocallyMapped ? 'bg-primary-50 border-primary-200' : 'bg-gray-50 border-gray-200'}`}>
+            <div className={`flex items-center gap-2 px-3 py-1 rounded-md border ${isLocallyMapped ? 'bg-primary-50 border-primary-200' : 'bg-gray-50 border-gray-200'}`}>
               <span className={`material-symbols-outlined text-[12px] leading-none ${isLocallyMapped ? 'text-primary-600' : 'text-gray-400'}`}>
                 {isLocallyMapped ? 'tag' : 'database'}
               </span>
               <span className={`text-[10px] font-mono font-bold ${isLocallyMapped ? 'text-primary-700' : 'text-gray-600'}`}>{tag}</span>
             </div>
           ) : (
-            <div className="flex items-center gap-2 px-3 py-1 bg-accent-50 border border-accent-100 rounded-full">
+            <div className="flex items-center gap-2 px-3 py-1 bg-accent-50 border border-accent-100 rounded-md">
               <span className="material-symbols-outlined text-[12px] text-accent-600 leading-none">link_off</span>
               <span className="text-[10px] font-bold text-accent-700 uppercase tracking-wider">Unlinked</span>
             </div>
@@ -75,7 +75,7 @@ const LearnerItem: React.FC<{
                 e.stopPropagation();
                 onUnlink(learner.id);
               }}
-              className="p-2 text-gray-400 hover:text-accent-600 hover:bg-accent-50 rounded-lg transition-all"
+              className="p-2 text-gray-400 hover:text-accent-600 hover:bg-accent-50 rounded-md transition-all"
               title="Unlink RFID Tag"
             >
               <span className="material-symbols-outlined text-xl leading-none">link_off</span>
@@ -85,7 +85,7 @@ const LearnerItem: React.FC<{
           <button 
             type="button"
             onClick={() => onSelect(isSelected ? null : learner.id)} 
-            className={`flex items-center justify-center w-8 h-8 rounded-full transition-all active:scale-90 border-2 ${
+            className={`flex items-center justify-center w-8 h-8 rounded-md transition-all active:scale-90 border-2 ${
               isSelected 
               ? 'bg-primary-600 text-white border-primary-600 shadow-md' 
               : 'bg-white border-gray-200 text-gray-300 hover:border-primary-600 hover:text-primary-600'
@@ -105,6 +105,7 @@ const LearnerItem: React.FC<{
 const LearnerDirectory: React.FC<LearnerDirectoryProps> = ({
   learners, uidMappings, selectedId, onSelect, onUnlink, isLoading, isSearching, isSyncing, fetchedCount
 }) => {
+  const [listSearchQuery, setListSearchQuery] = useState('');
   const [expandedGrades, setExpandedGrades] = useState<Set<string>>(new Set());
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
   const [unlinkId, setUnlinkId] = useState<string | null>(null);
@@ -112,11 +113,23 @@ const LearnerDirectory: React.FC<LearnerDirectoryProps> = ({
   const groupedData = useMemo(() => {
     if (isSearching) return {}; 
 
+    const localQuery = listSearchQuery.trim().toLowerCase();
     const groups: Record<string, Record<string, Learner[]>> = {};
 
     learners.forEach(learner => {
       const grade = learner.grade_level || 'NO GRADE ASSIGNED';
       const section = learner.section_name || 'Unassigned';
+      const fullName = `${learner.last_name || ''} ${learner.first_name || ''}`.toLowerCase();
+      const lrn = (learner.lrn || '').toLowerCase();
+      const sectionSearchArea = `${grade} ${section}`.toLowerCase();
+
+      if (localQuery) {
+        const matches =
+          fullName.includes(localQuery) ||
+          lrn.includes(localQuery) ||
+          sectionSearchArea.includes(localQuery);
+        if (!matches) return;
+      }
 
       if (!groups[grade]) groups[grade] = {};
       if (!groups[grade][section]) groups[grade][section] = [];
@@ -142,7 +155,7 @@ const LearnerDirectory: React.FC<LearnerDirectoryProps> = ({
         }, {} as Record<string, Learner[]>);
       return acc;
     }, {} as Record<string, Record<string, Learner[]>>);
-  }, [learners, isSearching]);
+  }, [learners, isSearching, listSearchQuery]);
 
   const toggleGrade = (grade: string) => {
     const next = new Set(expandedGrades);
@@ -159,17 +172,37 @@ const LearnerDirectory: React.FC<LearnerDirectoryProps> = ({
   };
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm min-h-[500px]">
+    <div className="bg-white rounded-md border border-gray-200 overflow-hidden shadow-sm min-h-[500px]">
       {isLoading ? (
           <div className="p-40 text-center flex flex-col items-center gap-6">
-            <div className="w-10 h-10 border-4 border-gray-100 border-t-primary-600 rounded-full animate-spin" />
+            <div className="w-10 h-10 border-4 border-gray-100 border-t-primary-600 rounded-md animate-spin" />
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest">Querying Registry...</p>
           </div>
       ) : (
         <div className="p-4 space-y-4">
+          {!isSearching && (
+            <div className="px-2">
+              <label htmlFor="global-section-search" className="sr-only">
+                Search shared global section list
+              </label>
+              <div className="relative">
+                <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-[18px] leading-none">
+                  search
+                </span>
+                <input
+                  id="global-section-search"
+                  type="text"
+                  value={listSearchQuery}
+                  onChange={(event) => setListSearchQuery(event.target.value)}
+                  placeholder="Search shared global section list (grade, section, learner, LRN)"
+                  className="w-full rounded-md border border-gray-200 bg-white py-3 pl-11 pr-4 text-[13px] text-gray-700 outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
+                />
+              </div>
+            </div>
+          )}
           {isSearching ? (
             <div className="space-y-1 animate-in fade-in duration-300">
-              <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50 rounded-t-xl">
+              <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50 rounded-md">
                 <h3 className="text-[11px] font-bold text-primary-700 uppercase tracking-wider">
                   {learners.length === 1 ? 'Search Result' : 'Search Results'}
                 </h3>
@@ -197,12 +230,17 @@ const LearnerDirectory: React.FC<LearnerDirectoryProps> = ({
               </div>
             </div>
           ) : (
+            Object.keys(groupedData).length === 0 ? (
+              <div className="p-16 text-center text-gray-400 text-xs font-semibold uppercase tracking-wider">
+                No records match this section list search
+              </div>
+            ) : (
             Object.entries(groupedData).map(([grade, sections]) => {
               const isUnassignedGroup = grade === 'NO GRADE ASSIGNED';
               const gradeStudentCount = Object.values(sections).flat().length;
 
               return (
-                <div key={grade} className={`rounded-xl overflow-hidden border border-gray-200 ${isUnassignedGroup ? 'bg-gray-50' : 'bg-white shadow-sm'}`}>
+                <div key={grade} className={`rounded-md overflow-hidden border border-gray-200 ${isUnassignedGroup ? 'bg-gray-50' : 'bg-white shadow-sm'}`}>
                   <button 
                     onClick={() => toggleGrade(grade)}
                     className="w-full flex items-center justify-between p-5 hover:bg-gray-50 transition-colors"
@@ -214,7 +252,7 @@ const LearnerDirectory: React.FC<LearnerDirectoryProps> = ({
                       <h3 className="text-sm font-bold tracking-tight text-gray-900">
                         {grade}
                       </h3>
-                      <span className="text-[10px] font-bold text-gray-500 bg-gray-100 px-3 py-1 rounded-full border border-gray-200">
+                      <span className="text-[10px] font-bold text-gray-500 bg-gray-100 px-3 py-1 rounded-md border border-gray-200">
                         {gradeStudentCount} {gradeStudentCount === 1 ? 'Record' : 'Records'}
                       </span>
                     </div>
@@ -227,7 +265,7 @@ const LearnerDirectory: React.FC<LearnerDirectoryProps> = ({
                         const isExpanded = expandedSections.has(sectionKey);
                         
                         return (
-                          <div key={sectionKey} className="bg-gray-50/50 rounded-xl border border-gray-200 overflow-hidden">
+                          <div key={sectionKey} className="bg-gray-50/50 rounded-md border border-gray-200 overflow-hidden">
                             <button 
                               onClick={() => toggleSection(sectionKey)}
                               className="w-full flex items-center justify-between p-4 hover:bg-white transition-colors"
@@ -262,13 +300,13 @@ const LearnerDirectory: React.FC<LearnerDirectoryProps> = ({
                   )}
                 </div>
               );
-            })
+            }))
           )}
         </div>
       )}
       {isSyncing && (
         <div className="p-3 bg-primary-600 text-white flex items-center justify-center gap-3">
-          <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+          <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-md animate-spin" />
           <p className="text-[10px] font-bold uppercase tracking-widest animate-pulse">
             Syncing Master Registry... ({fetchedCount})
           </p>
@@ -293,3 +331,4 @@ const LearnerDirectory: React.FC<LearnerDirectoryProps> = ({
 };
 
 export default LearnerDirectory;
+

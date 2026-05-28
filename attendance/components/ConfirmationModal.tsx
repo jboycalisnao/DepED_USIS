@@ -41,11 +41,11 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl border border-gray-100 overflow-hidden"
+            className="relative w-full max-w-md bg-white rounded-md shadow-2xl border border-gray-100 overflow-hidden"
           >
             <div className="p-8">
               <div className="flex items-center gap-4 mb-6">
-                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${
+                <div className={`w-12 h-12 rounded-md flex items-center justify-center ${
                   variant === 'danger' ? 'bg-accent-50 text-accent-600' : 'bg-primary-50 text-primary-600'
                 }`}>
                   <span className="material-symbols-outlined text-2xl leading-none">
@@ -63,7 +63,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
                 <button
                   type="button"
                   onClick={onClose}
-                  className="flex-1 px-6 py-3.5 rounded-xl text-xs font-black uppercase tracking-widest text-gray-500 hover:bg-gray-50 border border-gray-200 transition-all active:scale-95"
+                  className="flex-1 px-6 py-3.5 rounded-md text-xs font-black uppercase tracking-widest text-gray-500 hover:bg-gray-50 border border-gray-200 transition-all active:scale-95"
                 >
                   {cancelLabel}
                 </button>
@@ -73,7 +73,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
                     onConfirm();
                     onClose();
                   }}
-                  className={`flex-1 px-6 py-3.5 rounded-xl text-xs font-black uppercase tracking-widest text-white transition-all active:scale-95 shadow-lg ${
+                  className={`flex-1 px-6 py-3.5 rounded-md text-xs font-black uppercase tracking-widest text-white transition-all active:scale-95 shadow-lg ${
                     variant === 'danger' 
                     ? 'bg-accent-600 hover:bg-accent-700 shadow-accent-600/20' 
                     : 'bg-primary-600 hover:bg-primary-700 shadow-primary-600/20'
@@ -91,3 +91,4 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
 };
 
 export default ConfirmationModal;
+

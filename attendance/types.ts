@@ -66,6 +66,7 @@ export interface AttendanceRecord {
   learnerId: string;
   type: AttendanceType;
   timestamp: string;
+  synced?: boolean;
 }
 
 export interface TimeSlot {

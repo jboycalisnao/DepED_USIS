@@ -383,6 +383,13 @@ export default function PublicEnrollmentSubmissionsPage() {
     });
   }, [groupedByGrade]);
 
+  const priorYearLearnerOptions = useMemo(() => {
+    return priorYearLearners.map((row) => ({
+      value: row.id,
+      label: `${row.fullName} | ${row.lrn || 'No LRN'} | ${row.latestSchoolYear || '--'} ${row.latestGradeLevel ? `| ${row.latestGradeLevel}` : ''}`,
+    }));
+  }, [priorYearLearners]);
+
   if (isLoading) {
     return <UsisPageLoader message="Loading enrollment submissions..." />;
   }
@@ -413,13 +420,6 @@ export default function PublicEnrollmentSubmissionsPage() {
     );
     kioskWindow?.focus();
   };
-
-  const priorYearLearnerOptions = useMemo(() => {
-    return priorYearLearners.map((row) => ({
-      value: row.id,
-      label: `${row.fullName} | ${row.lrn || 'No LRN'} | ${row.latestSchoolYear || '--'} ${row.latestGradeLevel ? `| ${row.latestGradeLevel}` : ''}`,
-    }));
-  }, [priorYearLearners]);
 
   const openEdit = (row: PublicEnrollmentSubmission) => {
     navigate(`/enroll/${row.id}/edit`);

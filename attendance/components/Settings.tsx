@@ -19,9 +19,9 @@ const Settings: React.FC<SettingsProps> = ({ settings, onUpdate }) => {
   };
 
   const SlotCard = ({ title, slotKey, icon }: { title: string, slotKey: keyof TimeSlotSettings, icon: string }) => (
-    <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-4 hover:border-primary-600/20 transition-colors group">
+    <div className="bg-white p-6 rounded-md border border-gray-200 shadow-sm space-y-4 hover:border-primary-600/20 transition-colors group">
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 bg-gray-50 text-gray-400 rounded-lg flex items-center justify-center group-hover:bg-primary-50 group-hover:text-primary-600 transition-colors">
+        <div className="w-10 h-10 bg-gray-50 text-gray-400 rounded-md flex items-center justify-center group-hover:bg-primary-50 group-hover:text-primary-600 transition-colors">
           <span className="material-symbols-outlined text-xl leading-none">{icon}</span>
         </div>
         <h4 className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">{title}</h4>
@@ -33,7 +33,7 @@ const Settings: React.FC<SettingsProps> = ({ settings, onUpdate }) => {
             type="time" 
             value={settings[slotKey].start}
             onChange={(e) => handleChange(slotKey, 'start', e.target.value)}
-            className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm font-bold text-gray-900 focus:ring-4 focus:ring-primary-600/10 focus:border-primary-600 outline-none transition-all"
+            className="w-full bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-sm font-bold text-gray-900 focus:ring-4 focus:ring-primary-600/10 focus:border-primary-600 outline-none transition-all"
           />
         </div>
         <div className="space-y-1.5">
@@ -42,7 +42,7 @@ const Settings: React.FC<SettingsProps> = ({ settings, onUpdate }) => {
             type="time" 
             value={settings[slotKey].end}
             onChange={(e) => handleChange(slotKey, 'end', e.target.value)}
-            className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm font-bold text-gray-900 focus:ring-4 focus:ring-primary-600/10 focus:border-primary-600 outline-none transition-all"
+            className="w-full bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-sm font-bold text-gray-900 focus:ring-4 focus:ring-primary-600/10 focus:border-primary-600 outline-none transition-all"
           />
         </div>
       </div>
@@ -52,7 +52,7 @@ const Settings: React.FC<SettingsProps> = ({ settings, onUpdate }) => {
   return (
     <div className="w-full space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
       <div className="flex items-center gap-6">
-        <div className="w-14 h-14 bg-white border border-gray-200 rounded-xl flex items-center justify-center shadow-sm">
+        <div className="w-14 h-14 bg-white border border-gray-200 rounded-md flex items-center justify-center shadow-sm">
           <span className="material-symbols-outlined text-primary-600 text-3xl leading-none">tune</span>
         </div>
         <div>
@@ -68,8 +68,8 @@ const Settings: React.FC<SettingsProps> = ({ settings, onUpdate }) => {
         <SlotCard title="Afternoon Exit" slotKey="pmOut" icon="logout" />
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-xl p-8 flex items-start gap-6 shadow-sm">
-        <div className="w-12 h-12 bg-primary-50 rounded-xl flex items-center justify-center flex-shrink-0">
+      <div className="bg-white border border-gray-200 rounded-md p-8 flex items-start gap-6 shadow-sm">
+        <div className="w-12 h-12 bg-primary-50 rounded-md flex items-center justify-center flex-shrink-0">
           <span className="material-symbols-outlined text-primary-600 text-3xl leading-none">policy</span>
         </div>
         <div className="space-y-3">
@@ -86,3 +86,4 @@ const Settings: React.FC<SettingsProps> = ({ settings, onUpdate }) => {
 };
 
 export default Settings;
+

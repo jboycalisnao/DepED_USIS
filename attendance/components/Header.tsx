@@ -23,10 +23,10 @@ const Header: React.FC<HeaderProps> = ({
         searchLabel="Search attendance module"
         actions={
           <div className="flex flex-wrap items-center gap-4">
-        <div className="flex bg-gray-100/50 p-1 rounded-xl border border-gray-200 shadow-sm">
+        <div className="flex bg-gray-100/50 p-1 rounded-md border border-gray-200 shadow-sm">
           <button 
             onClick={() => onViewChange('registrar')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-md text-xs font-bold transition-all ${
               currentView === 'registrar' 
               ? 'bg-primary-600 text-white shadow-md' 
               : 'text-gray-500 hover:text-gray-700'
@@ -37,7 +37,7 @@ const Header: React.FC<HeaderProps> = ({
           </button>
           <button 
             onClick={() => onViewChange('attendance')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-md text-xs font-bold transition-all ${
               currentView === 'attendance' 
               ? 'bg-primary-600 text-white shadow-md' 
               : 'text-gray-500 hover:text-gray-700'
@@ -48,7 +48,7 @@ const Header: React.FC<HeaderProps> = ({
           </button>
           <button 
             onClick={() => onViewChange('settings')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-md text-xs font-bold transition-all ${
               currentView === 'settings' 
               ? 'bg-primary-600 text-white shadow-md' 
               : 'text-gray-500 hover:text-gray-700'
@@ -64,7 +64,7 @@ const Header: React.FC<HeaderProps> = ({
         <div className="flex items-center gap-3">
           <button 
             onClick={onEnterKiosk}
-            className="flex items-center gap-2 px-4 py-2 bg-white text-gray-700 rounded-lg text-xs font-semibold border border-gray-200 shadow-sm hover:bg-gray-50 transition-all active:scale-95"
+            className="flex items-center gap-2 px-4 py-2 bg-white text-gray-700 rounded-md text-xs font-semibold border border-gray-200 shadow-sm hover:bg-gray-50 transition-all active:scale-95"
           >
             <span className="material-symbols-outlined text-lg leading-none">fullscreen</span>
             Kiosk
@@ -72,7 +72,7 @@ const Header: React.FC<HeaderProps> = ({
           
           <div className="flex flex-col gap-2">
             {monitors.map((m, i) => (
-              <div key={i} className="flex items-center gap-1 bg-white p-1 rounded-lg border border-gray-200 shadow-sm">
+              <div key={i} className="flex items-center gap-1 bg-white p-1 rounded-md border border-gray-200 shadow-sm">
                 <span className="text-[9px] font-bold text-gray-400 px-2">M{i+1}</span>
                 <select 
                   value={baudRates[i]} 
@@ -104,3 +104,4 @@ const Header: React.FC<HeaderProps> = ({
 };
 
 export default Header;
+

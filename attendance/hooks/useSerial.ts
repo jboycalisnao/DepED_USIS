@@ -2,6 +2,16 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { SerialLog, ConnectionStatus, SerialOptions } from '../types';
 
+// Limit chooser to common USB serial chipsets used by school RFID/Arduino devices.
+// This avoids Bluetooth serial profile noise from Chrome's blocklist warnings.
+const SERIAL_PORT_FILTERS = [
+  { usbVendorId: 0x2341 }, // Arduino
+  { usbVendorId: 0x1a86 }, // QinHeng (CH340/CH341)
+  { usbVendorId: 0x10c4 }, // Silicon Labs (CP210x)
+  { usbVendorId: 0x0403 }, // FTDI
+  { usbVendorId: 0x2a03 }, // Arduino (legacy/alt VID)
+];
+
 export const useSerial = (index: number = 0) => {
   const [status, setStatus] = useState<ConnectionStatus>('disconnected');
   const [logs, setLogs] = useState<SerialLog[]>([]);
@@ -159,7 +169,11 @@ export const useSerial = (index: number = 0) => {
       setError(null);
       setStatus('connecting');
 
-      const selectedPort = existingPort || await (navigator as any).serial.requestPort();
+      const selectedPort =
+        existingPort ||
+        await (navigator as any).serial.requestPort({
+          filters: SERIAL_PORT_FILTERS,
+        });
       await selectedPort.open({ baudRate: options.baudRate });
       
       localStorage.setItem(baudRateKey, options.baudRate.toString());

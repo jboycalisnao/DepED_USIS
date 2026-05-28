@@ -15,4 +15,8 @@ if (!supabaseUrl || !supabaseKey) {
   throw new Error('Attendance Supabase environment variables are missing. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseKey);
+export const supabase = createClient(supabaseUrl, supabaseKey, {
+  auth: {
+    storageKey: 'usis-attendance-auth',
+  },
+});

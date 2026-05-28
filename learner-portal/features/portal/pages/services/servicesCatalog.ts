@@ -7,6 +7,12 @@ export type LearnerServiceItem = {
 
 const BASE_SERVICES: LearnerServiceItem[] = [
   {
+    title: 'Attendance Service',
+    description: 'View your recorded attendance entries from the RFID attendance subsystem.',
+    path: '/services/attendance',
+    actionLabel: 'View Attendance',
+  },
+  {
     title: 'Enrollment History',
     description: 'View your yearly enrollment records, class sections, and latest enrollment status.',
     path: '/services/enrollment-history',
