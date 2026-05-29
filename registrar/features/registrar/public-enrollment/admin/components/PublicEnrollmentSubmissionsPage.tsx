@@ -390,10 +390,6 @@ export default function PublicEnrollmentSubmissionsPage() {
     }));
   }, [priorYearLearners]);
 
-  if (isLoading) {
-    return <UsisPageLoader message="Loading enrollment submissions..." />;
-  }
-
   const openCreate = () => {
     setActionError(null);
     setEditorMode('submission');
@@ -652,6 +648,10 @@ export default function PublicEnrollmentSubmissionsPage() {
     if (!selectedPriorLearnerId) return;
     navigate(`/enroll/prior-learner/${selectedPriorLearnerId}/edit`);
   }, [selectedPriorLearnerId, navigate]);
+
+  if (isLoading) {
+    return <UsisPageLoader message="Loading enrollment submissions..." />;
+  }
 
   const removeSubmission = async (id: string) => {
     setActionError(null);
