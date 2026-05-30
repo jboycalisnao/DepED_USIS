@@ -2,7 +2,7 @@
 
 ## Overview
 
-This repository is being organized as the main codebase for **DepED USIS (Unified School Information System)** of Leon National High School. The goal is to maintain multiple school information system modules in one repository while keeping them aligned around a **shared platform**, **shared data source**, and **shared development standards**.
+This repository is being organized as the main open source codebase for **DepED USIS (Unified School Information System)** of Leon National High School. The goal is to maintain multiple school information system modules in one repository while keeping them aligned around a **shared platform**, **shared data source**, and **shared development standards**.
 
 The project is intended to function as a **monorepo-style repository**:
 
