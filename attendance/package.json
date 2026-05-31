@@ -7,14 +7,16 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "archive:attendance": "node ./scripts/archive-attendance-records.mjs"
   },
   "dependencies": {
     "@deped-usis/shared-supabase": "file:../packages/shared-supabase",
     "@supabase/supabase-js": "2.48.1",
     "motion": "^12.36.0",
     "react": "19.2.5",
-    "react-dom": "19.2.5"
+    "react-dom": "19.2.5",
+    "react-router-dom": "^7.9.4"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

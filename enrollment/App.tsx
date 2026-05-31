@@ -4,6 +4,7 @@ import { UsisUnifiedHeader } from '../common/header/UsisUnifiedHeader';
 import { UsisGlobalFooter } from '../common/footer/UsisGlobalFooter';
 import { EnrollmentFormPage } from './features/enrollment-form/components/EnrollmentFormPage';
 import { RequirementsPage } from './features/portal/components/RequirementsPage';
+import { SubmissionConfirmationPage } from './features/portal/components/SubmissionConfirmationPage';
 import { SubmissionStatusLoginPage } from './features/portal/components/SubmissionStatusLoginPage';
 import { SubmissionStatusPage } from './features/portal/components/SubmissionStatusPage';
 import type { SubmissionStatusAccessRecord } from './features/enrollment-form/services/submissionStatusAuth';
@@ -80,6 +81,7 @@ function EnrollmentShell() {
         <Route path="/" element={<Navigate to="/enrollment-form" replace />} />
         <Route path="/enrollment-form" element={<EnrollmentFormPage />} />
         <Route path="/requirements" element={<RequirementsPage />} />
+        <Route path="/submission-confirmation" element={<SubmissionConfirmationPage />} />
         <Route
           path="/submission-status/login"
           element={

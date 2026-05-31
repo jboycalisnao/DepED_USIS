@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ScanResult, AttendanceType, TimeSlotSettings } from '../types';
 
 interface KioskModeProps {
@@ -11,58 +11,11 @@ interface KioskModeProps {
 
 const KioskMode: React.FC<KioskModeProps> = ({ onExit, lastScanResults, unknownTags, settings }) => {
   const [currentTime, setCurrentTime] = useState(new Date());
-  const lastSpokenRefs = useRef<(string | null)[]>([null, null, null]);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
-
-  const formatNameForSpeech = (name: string | null) => {
-    if (!name) return '';
-    return name
-      .toLowerCase()
-      .split(' ')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ');
-  };
-
-  // Text-to-Speech Logic
-  useEffect(() => {
-    lastScanResults.forEach((result, index) => {
-      if (result) {
-        const scanId = `${result.learner.id}-${result.time}`;
-        if (lastSpokenRefs.current[index] === scanId) return;
-        lastSpokenRefs.current[index] = scanId;
-
-        // We don't cancel here to allow multiple voices if possible, 
-        // though browser support for simultaneous voices varies.
-        // window.speechSynthesis.cancel(); 
-        
-        const firstName = formatNameForSpeech(result.learner.first_name) || 'Student';
-        const lastName = formatNameForSpeech(result.learner.last_name) || '';
-        
-        const message = result.isDuplicate 
-          ? `${firstName} ${lastName}, already logged.` 
-          : `Welcome, ${firstName} ${lastName}.`;
-        
-        const utterance = new SpeechSynthesisUtterance(message);
-        utterance.lang = 'en-US';
-        utterance.rate = 0.85;
-        window.speechSynthesis.speak(utterance);
-      } else if (unknownTags[index]) {
-        const tag = unknownTags[index];
-        if (lastSpokenRefs.current[index] === tag) return;
-        lastSpokenRefs.current[index] = tag;
-
-        const utterance = new SpeechSynthesisUtterance("Access restricted. Unknown card.");
-        utterance.lang = 'en-US';
-        window.speechSynthesis.speak(utterance);
-      } else {
-        lastSpokenRefs.current[index] = null;
-      }
-    });
-  }, [lastScanResults, unknownTags]);
 
   const getSessionInfo = () => {
     const timeStr = currentTime.getHours().toString().padStart(2, '0') + ':' + currentTime.getMinutes().toString().padStart(2, '0');

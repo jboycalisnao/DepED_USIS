@@ -41,3 +41,36 @@ The normalization logic lives in [utils/rfid.ts](./utils/rfid.ts) and is used so
 - 10-digit decimal reader-style input
 
 If this hardware mapping ever changes, re-verify it with real card samples before updating the conversion logic.
+
+## Attendance Retention and Archiving
+
+This module now supports a 90-day raw retention model with historical summaries and CSV archiving.
+
+### Schema
+
+Run the SQL in [schema.sql](./schema.sql). It adds:
+
+- `attendance_daily_summary`
+- `attendance_monthly_summary`
+- `attendance_archive_batches`
+- `attendance_refresh_summaries(p_start_date, p_end_date)`
+
+### Archive job
+
+Run from repo root:
+
+- `npm run archive:attendance --workspace ./attendance`
+
+Required env vars:
+
+- `SUPABASE_URL` (or `VITE_SUPABASE_URL`)
+- `SUPABASE_SERVICE_ROLE_KEY`
+
+Optional env vars:
+
+- `ATTENDANCE_RETENTION_DAYS` (default `90`)
+- `ATTENDANCE_ARCHIVE_BUCKET` (default `attendance-archives`)
+
+Recommended schedule:
+
+- Daily during off-hours (for example 11:30 PM).

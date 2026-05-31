@@ -28,6 +28,7 @@ const LearnerList: React.FC = () => {
       const currentEnrol = l.enrollments?.find((e) => e.schoolYear === activeSchoolYear.label);
       const hasActiveSection = studentSid && activeSectionIds.has(studentSid);
       const hasMatchingEnrollment = !!currentEnrol;
+      const hasNoSectionAssignment = !studentSid;
       const query = searchTerm.toLowerCase();
       const fullName = `${l.lastName}, ${l.firstName} ${l.middleName || ''}`.toLowerCase();
       const matchesSearch =
@@ -36,7 +37,9 @@ const LearnerList: React.FC = () => {
         String(l.loginUsername || '').toLowerCase().includes(query) ||
         String(l.loginStatus || '').toLowerCase().includes(query);
 
-      return (hasActiveSection || hasMatchingEnrollment) && matchesSearch;
+      // Only include learners assigned to an active-year section.
+      // Fallback to enrollment-history match only when learner has no section assignment yet.
+      return (hasActiveSection || (hasNoSectionAssignment && hasMatchingEnrollment)) && matchesSearch;
     });
   }, [learners, sections, activeSchoolYear, searchTerm]);
 

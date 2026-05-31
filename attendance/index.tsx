@@ -1,6 +1,7 @@
 
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import './styles/global.css';
 import { applyDocumentBranding } from '../common/config/usisBranding';
@@ -17,7 +18,9 @@ const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
     <UsisAppLoaderGate label="Loading attendance subsystem">
-      <App />
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>
     </UsisAppLoaderGate>
   </React.StrictMode>
 );

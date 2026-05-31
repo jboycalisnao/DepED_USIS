@@ -1,5 +1,6 @@
 import { FormEvent, useMemo, useRef, useState } from 'react';
 import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { UsisSearchableSelect } from '../../../../common/components/ui/UsisSearchableSelect';
 import { supabase } from '../../../lib/supabase';
 import {
@@ -57,6 +58,7 @@ type LrnLookupState =
   | { status: 'not_found'; message: string };
 
 export function EnrollmentFormPage() {
+  const navigate = useNavigate();
   const [draft, setDraft] = useState<EnrollmentDraft>(initialDraft);
   const [isFormEnabled, setIsFormEnabled] = useState(true);
   const [formAvailabilityMessage, setFormAvailabilityMessage] = useState<string>('The online enrollment form is currently unavailable.');
@@ -195,7 +197,7 @@ export function EnrollmentFormPage() {
       try {
         const { data, error } = await supabase
           .from('registrar_learners')
-          .select('lrn,first_name,last_name,middle_name,birth_date,gender,address,contact_number,guardian_name,father_name,mother_name,is_4ps,email,enrollment_history')
+          .select('id,lrn,first_name,last_name,middle_name,birth_date,gender,address,contact_number,guardian_name,father_name,mother_name,is_4ps,email,enrollment_history')
           .eq('lrn', normalizedLrn)
           .maybeSingle();
         if (isCancelled) return;
@@ -210,25 +212,41 @@ export function EnrollmentFormPage() {
             message: 'New Enrollment – No existing learner record found. Continue by completing the form.',
           });
           setDraft((current) => ({
-            ...current,
+            ...initialDraft,
+            schoolYear: current.schoolYear,
+            schoolId: current.schoolId || LEON_NHS_ID,
+            schoolToEnroll: current.schoolToEnroll || LEON_NHS_NAME,
             lrn: normalizedLrn,
             studentType: 'New Student',
             learnerCategory: SAME_SCHOOL_LABEL,
+            previousSchool: LEON_NHS_NAME,
           }));
           return;
         }
 
-        const enrollmentHistory = Array.isArray((data as any).enrollment_history)
-          ? ([...(data as any).enrollment_history] as Array<any>)
-          : [];
-        const latestEnrollment = enrollmentHistory
+        const learnerId = String((data as any).id || '').trim();
+        const { data: latestHistoryRow } = learnerId
+          ? await supabase
+              .from('registrar_enrollment_history')
+              .select('school_year,grade_level,submission_payload,enrollment_date,created_at')
+              .eq('learner_id', learnerId)
+              .order('enrollment_date', { ascending: false, nullsFirst: false })
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle()
+          : { data: null as any };
+
+        const enrollmentHistory = Array.isArray((data as any).enrollment_history) ? ([...(data as any).enrollment_history] as Array<any>) : [];
+        const latestEnrollmentLegacy = enrollmentHistory
           .filter((entry) => entry && typeof entry === 'object')
           .sort((a, b) => new Date(String(b.enrollmentDate || b.created_at || 0)).getTime() - new Date(String(a.enrollmentDate || a.created_at || 0)).getTime())[0];
-        const latestSchoolYear = String(latestEnrollment?.schoolYear || '').trim();
-        const latestGradeLevel = String(latestEnrollment?.gradeLevel || '').trim();
+        const latestSchoolYear = String((latestHistoryRow as any)?.school_year || latestEnrollmentLegacy?.schoolYear || '').trim();
+        const latestGradeLevel = String((latestHistoryRow as any)?.grade_level || latestEnrollmentLegacy?.gradeLevel || '').trim();
         const nextGradeLevel = getNextGradeLevel(latestGradeLevel);
-        const submissionPayload = latestEnrollment?.submissionPayload && typeof latestEnrollment.submissionPayload === 'object'
-          ? latestEnrollment.submissionPayload
+        const submissionPayload = (latestHistoryRow as any)?.submission_payload && typeof (latestHistoryRow as any).submission_payload === 'object'
+          ? (latestHistoryRow as any).submission_payload
+          : latestEnrollmentLegacy?.submissionPayload && typeof latestEnrollmentLegacy.submissionPayload === 'object'
+            ? latestEnrollmentLegacy.submissionPayload
           : {};
 
         setDraft((current) => ({
@@ -569,8 +587,16 @@ export function EnrollmentFormPage() {
     }
     setIsSubmitting(true);
     try {
-      await createPublicEnrollmentSubmission(draft);
-      setModalNotice({ type: 'success', title: 'Submission Complete', message: 'Enrollment form received. Proceed to confirmation slip generation.' });
+      const created = await createPublicEnrollmentSubmission(draft);
+      const fullName = [draft.lastName, draft.firstName, draft.middleName].filter(Boolean).join(', ');
+      navigate('/submission-confirmation', {
+        replace: true,
+        state: {
+          submissionReferenceId: created.submissionReferenceId,
+          lrn: draft.lrn,
+          fullName,
+        },
+      });
     } catch (error: any) {
       setModalNotice({ type: 'error', title: 'Submission Failed', message: error?.message || 'Unable to submit enrollment form. Please try again.' });
     } finally {

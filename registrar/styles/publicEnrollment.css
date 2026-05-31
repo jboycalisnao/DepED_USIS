@@ -320,14 +320,22 @@
 }
 
 .registrar-kiosk-page {
-  height: 100vh;
-  width: 100%;
+  height: 100dvh;
+  min-height: 100dvh;
+  width: 100vw;
   background: #eef3f9;
   padding: 12px;
   display: grid;
   gap: 10px;
   grid-template-rows: auto 1fr;
   overflow: hidden;
+}
+
+.registrar-kiosk-page--idle {
+  background: #ffffff;
+  padding: 0;
+  gap: 0;
+  grid-template-rows: 1fr;
 }
 
 .registrar-kiosk-page__header {
@@ -367,7 +375,33 @@
   grid-template-columns: minmax(240px, 0.78fr) minmax(0, 1fr) minmax(0, 1fr);
   gap: 10px;
   min-height: 0;
-  align-content: start;
+  height: 100%;
+  align-content: stretch;
+}
+
+.registrar-kiosk-page--idle .registrar-kiosk-board {
+  grid-template-columns: 1fr;
+  gap: 0;
+}
+
+.registrar-kiosk-empty-view {
+  grid-column: 1 / -1;
+  min-height: 0;
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+  background: #ffffff;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.registrar-kiosk-empty-view__icon {
+  width: min(960px, 84vw);
+  max-height: 70dvh;
+  height: auto;
+  display: block;
+  object-fit: contain;
 }
 
 .registrar-kiosk-column {

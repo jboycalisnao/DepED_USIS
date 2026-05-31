@@ -294,15 +294,42 @@ export default function PublicEnrollmentPage() {
       try {
         const { data, error } = await supabase
           .from('registrar_learners')
-          .select('lrn,first_name,middle_name,last_name,birth_date,gender,address,contact_number,guardian_name,father_name,mother_name,email,is_4ps,enrollment_history')
+          .select('id,lrn,first_name,middle_name,last_name,birth_date,gender,address,contact_number,guardian_name,father_name,mother_name,email,is_4ps,enrollment_history')
           .eq('lrn', normalizedLrn)
           .maybeSingle();
 
-        if (cancelled || error || !data) return;
+        if (cancelled || error) return;
+        if (!data) {
+          setDraft((current) => ({
+            ...initialDraft,
+            schoolYear: current.schoolYear,
+            schoolId: current.schoolId || LEON_NHS_ID,
+            schoolToEnroll: current.schoolToEnroll || LEON_NHS_NAME,
+            lrn: normalizedLrn,
+            previousSchool: LEON_NHS_NAME,
+          }));
+          setLastFetchedLrn(normalizedLrn);
+          return;
+        }
+
+        const learnerId = String((data as any).id || '').trim();
+        const { data: latestHistoryRow } = learnerId
+          ? await supabase
+              .from('registrar_enrollment_history')
+              .select('school_year,grade_level,submission_payload,enrollment_date,created_at')
+              .eq('learner_id', learnerId)
+              .order('enrollment_date', { ascending: false, nullsFirst: false })
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle()
+          : { data: null as any };
 
         const history = Array.isArray((data as any).enrollment_history) ? (data as any).enrollment_history : [];
-        const latestEntry = history[history.length - 1] || {};
-        const payload = (latestEntry as any).submissionPayload || {};
+        const latestEntryLegacy = history[history.length - 1] || {};
+        const payload =
+          ((latestHistoryRow as any)?.submission_payload && typeof (latestHistoryRow as any).submission_payload === 'object'
+            ? (latestHistoryRow as any).submission_payload
+            : (latestEntryLegacy as any).submissionPayload) || {};
 
         setDraft((current) => ({
           ...current,
@@ -322,8 +349,8 @@ export default function PublicEnrollmentPage() {
           is4Ps: (data as any).is_4ps === true ? 'Yes' : String(payload.is4Ps || current.is4Ps || 'No'),
           schoolToEnroll: String(payload.schoolToEnroll || current.schoolToEnroll || LEON_NHS_NAME).trim(),
           previousSchool: String(payload.previousSchool || current.previousSchool || '').trim(),
-          previousSchoolYear: String(payload.previousSchoolYear || current.previousSchoolYear || '').trim(),
-          lastGradeLevel: String(payload.lastGradeLevel || current.lastGradeLevel || '').trim(),
+          previousSchoolYear: String(payload.previousSchoolYear || (latestHistoryRow as any)?.school_year || current.previousSchoolYear || '').trim(),
+          lastGradeLevel: String(payload.lastGradeLevel || (latestHistoryRow as any)?.grade_level || current.lastGradeLevel || '').trim(),
           gradeToEnroll: String(payload.gradeToEnroll || current.gradeToEnroll || '').trim(),
           track: String(payload.track || current.track || 'Academic Track').trim(),
           strand: String(payload.strand || current.strand || '').trim(),

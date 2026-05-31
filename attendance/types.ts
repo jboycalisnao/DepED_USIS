@@ -69,6 +69,45 @@ export interface AttendanceRecord {
   synced?: boolean;
 }
 
+export type AttendanceReportMode = 'raw' | 'summary';
+
+export interface AttendanceDailySummaryRow {
+  learnerId: string;
+  attendanceDate: string;
+  amIn: string | null;
+  amOut: string | null;
+  pmIn: string | null;
+  pmOut: string | null;
+  unscheduledCount: number;
+  lastStationNo: number | null;
+}
+
+export interface AttendanceReportResult {
+  mode: AttendanceReportMode;
+  rawRecords: AttendanceRecord[];
+  summaryRows: AttendanceDailySummaryRow[];
+}
+
+export interface AttendanceWeeklySummaryRow {
+  weekStart: string;
+  sectionName: string;
+  gradeLevel: string;
+  learnerDays: number;
+  expectedSlots: number;
+  presentSlots: number;
+  missingSlots: number;
+}
+
+export interface AttendanceMonthlySummaryRow {
+  summaryMonth: string;
+  sectionName: string;
+  gradeLevel: string;
+  learnerDays: number;
+  expectedSlots: number;
+  presentSlots: number;
+  missingSlots: number;
+}
+
 export interface TimeSlot {
   start: string; // HH:mm format
   end: string;

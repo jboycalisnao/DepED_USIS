@@ -142,6 +142,10 @@ const buildDraft = (student: Student, activeSchoolYearLabel: string): LearnerMod
 export default function LearnerEditModal({ student, activeSchoolYearLabel, strandOptions, loading, onClose, onError, onSuccess, onSubmit }: Props) {
   const [draft, setDraft] = useState<LearnerModalDraft | null>(null);
   const [isLoadingRecord, setIsLoadingRecord] = useState(false);
+  const [availableSchoolYears, setAvailableSchoolYears] = useState<Array<{ id: string; label: string }>>([]);
+  const [availableSections, setAvailableSections] = useState<Array<{ id: string; name: string; gradeLevel: string; strand?: string; schoolYearId: string }>>([]);
+  const [selectedSchoolYearLabel, setSelectedSchoolYearLabel] = useState('');
+  const [selectedSectionId, setSelectedSectionId] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -155,11 +159,15 @@ export default function LearnerEditModal({ student, activeSchoolYearLabel, stran
       setDraft(buildDraft(student, activeSchoolYearLabel));
       setIsLoadingRecord(true);
       try {
-        const { data, error } = await supabase
+        const [{ data, error }, { data: schoolYearRows }, { data: sectionRows }] = await Promise.all([
+          supabase
           .from('registrar_learners')
           .select('*')
           .eq('id', student.id)
-          .maybeSingle();
+          .maybeSingle(),
+          supabase.from('registrar_school_years').select('id,label').order('label', { ascending: false }),
+          supabase.from('registrar_sections').select('id,name,grade_level,strand,school_year_id').order('name', { ascending: true }),
+        ]);
         if (cancelled || error || !data) return;
 
         const dbStudent: Student = {
@@ -176,11 +184,25 @@ export default function LearnerEditModal({ student, activeSchoolYearLabel, stran
           guardian_name: String((data as any).guardian_name || ''),
           father_name: String((data as any).father_name || ''),
           mother_name: String((data as any).mother_name || ''),
+          sectionId: String((data as any).section_id || ''),
           enrollments: Array.isArray((data as any).enrollment_history) ? (data as any).enrollment_history : [],
           status: student.status,
           is4Ps: !!(data as any).is_4ps,
         };
-        setDraft(buildDraft(dbStudent, activeSchoolYearLabel));
+        const nextDraft = buildDraft(dbStudent, activeSchoolYearLabel);
+        setDraft(nextDraft);
+        const mappedSchoolYears = (schoolYearRows || []).map((row: any) => ({ id: String(row.id || ''), label: String(row.label || '') })).filter((row) => row.id && row.label);
+        const mappedSections = (sectionRows || []).map((row: any) => ({
+          id: String(row.id || ''),
+          name: String(row.name || ''),
+          gradeLevel: String(row.grade_level || ''),
+          strand: String(row.strand || ''),
+          schoolYearId: String(row.school_year_id || ''),
+        })).filter((row) => row.id && row.schoolYearId);
+        setAvailableSchoolYears(mappedSchoolYears);
+        setAvailableSections(mappedSections);
+        setSelectedSchoolYearLabel(nextDraft.schoolYear || activeSchoolYearLabel);
+        setSelectedSectionId(String((data as any).section_id || student.sectionId || ''));
       } catch {
         // Keep fallback values if fetch fails.
       } finally {
@@ -195,6 +217,15 @@ export default function LearnerEditModal({ student, activeSchoolYearLabel, stran
   }, [student, activeSchoolYearLabel]);
 
   if (!student || !draft) return null;
+
+  const selectedSchoolYearId =
+    availableSchoolYears.find((row) => row.label === (selectedSchoolYearLabel || draft.schoolYear))?.id || '';
+  const sectionOptions = availableSections
+    .filter((section) => section.schoolYearId === selectedSchoolYearId)
+    .map((section) => ({
+      value: section.id,
+      label: `${section.name}${section.strand ? ` [${section.strand}]` : ''} - ${section.gradeLevel}`,
+    }));
 
   return (
     <div className="modal-overlay">
@@ -216,6 +247,29 @@ export default function LearnerEditModal({ student, activeSchoolYearLabel, stran
               <div className="floating-field-grid">
                 <InputField label="School ID" value={draft.schoolId} onChange={(value) => setDraft((current) => (current ? { ...current, schoolId: value } : current))} readOnly />
                 <InputField label="School Year" value={draft.schoolYear} onChange={(value) => setDraft((current) => (current ? { ...current, schoolYear: value } : current))} />
+                <SearchableSelect
+                  label="Edit School Year Scope"
+                  placeholder="Edit School Year Scope"
+                  floatingLabel
+                  showLabel={false}
+                  value={selectedSchoolYearLabel || draft.schoolYear}
+                  onChange={(value) => {
+                    setSelectedSchoolYearLabel(value);
+                    setDraft((current) => (current ? { ...current, schoolYear: value } : current));
+                    setSelectedSectionId('');
+                  }}
+                  options={availableSchoolYears.map((row) => ({ value: row.label, label: row.label }))}
+                />
+                <SearchableSelect
+                  label="Section (Selected School Year)"
+                  placeholder="Section (Selected School Year)"
+                  floatingLabel
+                  showLabel={false}
+                  value={selectedSectionId}
+                  onChange={setSelectedSectionId}
+                  options={sectionOptions}
+                  disabled={!selectedSchoolYearId}
+                />
                 <SelectField label="Learner Type" value={draft.studentType} onChange={(value) => setDraft((current) => (current ? { ...current, studentType: value } : current))} options={studentTypeOptions as unknown as string[]} />
                 <SelectField label="Learner Category" value={draft.learnerCategory} onChange={(value) => setDraft((current) => (current ? { ...current, learnerCategory: value } : current))} options={learnerCategoryOptions as unknown as string[]} />
                 <InputField label="School to Enroll" value={draft.schoolToEnroll} onChange={(value) => setDraft((current) => (current ? { ...current, schoolToEnroll: value } : current))} />
@@ -279,26 +333,38 @@ export default function LearnerEditModal({ student, activeSchoolYearLabel, stran
             className="modal-dialog__blue"
             onClick={async () => {
               const currentHistory = Array.isArray(student.enrollments) ? [...student.enrollments] : [];
+              const scopedSchoolYear = selectedSchoolYearLabel || draft.schoolYear || activeSchoolYearLabel;
+              const selectedSection = availableSections.find((section) => section.id === selectedSectionId);
               const submissionPayload = {
                 ...draft,
                 consent: true,
               };
-              const nextHistory =
-                currentHistory.length > 0
-                  ? currentHistory.map((entry: any, index) =>
-                      index === currentHistory.length - 1
-                        ? { ...entry, submissionPayload }
-                        : entry,
-                    )
-                  : [{
-                      id: crypto.randomUUID(),
-                      schoolYear: draft.schoolYear || activeSchoolYearLabel,
-                      gradeLevel: draft.gradeToEnroll || draft.lastGradeLevel || '',
-                      section: '',
-                      enrollmentDate: new Date().toISOString(),
-                      status: 'Information Updated',
+              let matched = false;
+              const nextHistory = currentHistory.length > 0
+                ? currentHistory.map((entry: any) => {
+                    if (String(entry?.schoolYear || '').trim() !== String(scopedSchoolYear || '').trim()) return entry;
+                    matched = true;
+                    return {
+                      ...entry,
+                      schoolYear: scopedSchoolYear,
+                      gradeLevel: selectedSection?.gradeLevel || draft.gradeToEnroll || entry?.gradeLevel || draft.lastGradeLevel || '',
+                      section: selectedSection?.name || entry?.section || '',
                       submissionPayload,
-                    }];
+                    };
+                  })
+                : [];
+
+              if (!matched) {
+                nextHistory.push({
+                  id: crypto.randomUUID(),
+                  schoolYear: scopedSchoolYear,
+                  gradeLevel: selectedSection?.gradeLevel || draft.gradeToEnroll || draft.lastGradeLevel || '',
+                  section: selectedSection?.name || '',
+                  enrollmentDate: new Date().toISOString(),
+                  status: 'Information Updated',
+                  submissionPayload,
+                });
+              }
 
               const result = await onSubmit(student.id, {
                 lrn: draft.lrn.trim(),
@@ -314,6 +380,7 @@ export default function LearnerEditModal({ student, activeSchoolYearLabel, stran
                 father_name: draft.fatherName.trim(),
                 mother_name: draft.motherName.trim(),
                 is4Ps: draft.is4Ps === 'Yes',
+                sectionId: selectedSectionId || undefined,
                 enrollments: nextHistory as any,
               });
               if (result?.error) {

@@ -138,5 +138,42 @@ export const useLearners = () => {
       .map(i => i.learner);
   }, [learners]);
 
-  return { learners, isLoading, isSyncing, fetchedCount, getFiltered };
+  const saveLearnerRfid = useCallback(async (learnerId: string, rfid: string) => {
+    const normalizedRfid = normalizeRfidValue(rfid);
+    if (!learnerId || !normalizedRfid) return { ok: false as const, error: 'Learner and RFID are required.' };
+
+    const { error } = await supabase
+      .from('registrar_learners')
+      .update({ rfid: normalizedRfid })
+      .eq('id', learnerId);
+
+    if (error) {
+      return { ok: false as const, error: error.message || 'Failed to save learner RFID.' };
+    }
+
+    setLearners((prev) =>
+      prev.map((learner) => (learner.id === learnerId ? { ...learner, rfid: normalizedRfid } : learner))
+    );
+    return { ok: true as const };
+  }, []);
+
+  const clearLearnerRfid = useCallback(async (learnerId: string) => {
+    if (!learnerId) return { ok: false as const, error: 'Learner is required.' };
+
+    const { error } = await supabase
+      .from('registrar_learners')
+      .update({ rfid: null })
+      .eq('id', learnerId);
+
+    if (error) {
+      return { ok: false as const, error: error.message || 'Failed to clear learner RFID.' };
+    }
+
+    setLearners((prev) =>
+      prev.map((learner) => (learner.id === learnerId ? { ...learner, rfid: null } : learner))
+    );
+    return { ok: true as const };
+  }, []);
+
+  return { learners, isLoading, isSyncing, fetchedCount, getFiltered, saveLearnerRfid, clearLearnerRfid };
 };

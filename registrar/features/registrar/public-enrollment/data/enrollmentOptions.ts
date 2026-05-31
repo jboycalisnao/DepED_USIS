@@ -15,6 +15,13 @@ export const learnerCategoryOptions = [
 
 export const gradeLevelOptions = ['Grade 7', 'Grade 8', 'Grade 9', 'Grade 10', 'Grade 11', 'Grade 12'] as const;
 
+export const trackOptions = [
+  'Academic Track',
+  'Technical-Vocational-Livelihood (TVL)',
+  'Sports Track',
+  'Arts and Design Track',
+] as const;
+
 export const semesterOptions = ['1st Sem', '2nd Sem'] as const;
 
 export const religionOptions = [

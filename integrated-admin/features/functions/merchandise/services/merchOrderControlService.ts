@@ -231,36 +231,33 @@ export const loadMerchOrderControlRecords = async (): Promise<MerchOrderControlR
     rows = primaryResult.data || [];
   }
 
+  const activeSectionIds = new Set<string>();
+  const sectionLookup = new Map<string, LearnerSectionInfo>();
   const activeSchoolYearResult = await supabase
     .from('registrar_school_years')
-    .select('id,label')
+    .select('id')
     .eq('is_active', true)
     .limit(1)
     .maybeSingle();
-  if (activeSchoolYearResult.error || !activeSchoolYearResult.data?.id) {
-    throw new Error('Active school year not found.');
+  const activeSchoolYearId = String(activeSchoolYearResult.data?.id || '').trim();
+  if (!activeSchoolYearResult.error && activeSchoolYearId) {
+    const sectionsResult = await supabase
+      .from('registrar_sections')
+      .select('id,name,grade_level,school_year_id')
+      .eq('school_year_id', activeSchoolYearId);
+    if (!sectionsResult.error) {
+      const activeSections = sectionsResult.data || [];
+      activeSections.forEach((section: any) => {
+        const sectionId = String(section.id || '').trim();
+        if (!sectionId) return;
+        activeSectionIds.add(sectionId);
+        sectionLookup.set(sectionId, {
+          gradeLevel: String(section.grade_level || '').trim() || 'Unassigned',
+          sectionName: String(section.name || '').trim() || 'Unassigned',
+        });
+      });
+    }
   }
-
-  const activeSchoolYearId = String(activeSchoolYearResult.data.id || '').trim();
-  const sectionsResult = await supabase
-    .from('registrar_sections')
-    .select('id,name,grade_level,school_year_id')
-    .eq('school_year_id', activeSchoolYearId);
-  if (sectionsResult.error) {
-    throw new Error('Unable to load active school year sections.');
-  }
-
-  const activeSections = sectionsResult.data || [];
-  const activeSectionIds = new Set(
-    activeSections.map((section: any) => String(section.id || '').trim()).filter(Boolean),
-  );
-  const sectionLookup = new Map<string, LearnerSectionInfo>();
-  activeSections.forEach((section: any) => {
-    sectionLookup.set(String(section.id || '').trim(), {
-      gradeLevel: String(section.grade_level || '').trim() || 'Unassigned',
-      sectionName: String(section.name || '').trim() || 'Unassigned',
-    });
-  });
 
   const learnerIds = Array.from(
     new Set(
@@ -331,15 +328,13 @@ export const loadMerchOrderControlRecords = async (): Promise<MerchOrderControlR
     const learnerLrnKey = `lrn:${String(row.learner_lrn || '').trim()}`;
     const learnerInfo = learnerLookup.get(learnerIdKey) || learnerLookup.get(learnerLrnKey);
 
-    if (!learnerInfo) {
-      return [];
-    }
+    const resolvedLearnerInfo = learnerInfo || { gradeLevel: 'Unassigned', sectionName: 'Unassigned' };
 
     if (items.length === 0) {
       return [
         {
           createdAt: String(row.created_at || ''),
-          gradeLevel: learnerInfo.gradeLevel,
+          gradeLevel: resolvedLearnerInfo.gradeLevel,
           id: String(row.id || ''),
           learnerLrn: String(row.learner_lrn || ''),
           learnerName: String(row.learner_name || ''),
@@ -355,7 +350,7 @@ export const loadMerchOrderControlRecords = async (): Promise<MerchOrderControlR
           productName: 'Unknown Product',
           quantity: 0,
           referenceNo: String(row.reference_no || ''),
-          sectionName: learnerInfo.sectionName,
+          sectionName: resolvedLearnerInfo.sectionName,
           selectedSize: '',
           unitPrice: 0,
         } satisfies MerchOrderControlRecord,
@@ -366,7 +361,7 @@ export const loadMerchOrderControlRecords = async (): Promise<MerchOrderControlR
       const unitPrice = Number(item?.merch_products?.price || 0);
       return ({
       createdAt: String(row.created_at || ''),
-      gradeLevel: learnerInfo.gradeLevel,
+      gradeLevel: resolvedLearnerInfo.gradeLevel,
       id: String(row.id || ''),
       learnerLrn: String(row.learner_lrn || ''),
       learnerName: String(row.learner_name || ''),
@@ -382,7 +377,7 @@ export const loadMerchOrderControlRecords = async (): Promise<MerchOrderControlR
       productName: String(item?.merch_products?.name || 'Unknown Product'),
       quantity,
       referenceNo: String(row.reference_no || ''),
-      sectionName: learnerInfo.sectionName,
+      sectionName: resolvedLearnerInfo.sectionName,
       selectedSize: String(item.selected_size || ''),
       unitPrice: Math.max(0, unitPrice),
     } satisfies MerchOrderControlRecord);

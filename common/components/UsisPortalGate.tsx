@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { supabase } from '../../packages/shared-supabase/src';
+import { supabase } from '@deped-usis/shared-supabase';
 
 type PortalStatusMode = 'live' | 'maintenance' | 'soon_open';
 

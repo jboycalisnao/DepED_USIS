@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { getEnrollmentKioskState, subscribeEnrollmentKioskState, type EnrollmentKioskState } from './enrollmentKioskSync';
 import '../../../../styles/publicEnrollment.css';
+import usisHeaderImage from '../../../../../common/assets/Leon-NHS_USIS-Header-Image.png';
 
 function formatDateTime(value: string) {
   const date = new Date(value);
@@ -63,6 +64,7 @@ function fallbackLabelFromKey(key: string) {
 
 export default function EnrollmentKioskPage() {
   const [state, setState] = useState<EnrollmentKioskState>(() => getEnrollmentKioskState());
+  const isIdle = !state.selectedLearner;
 
   useEffect(() => {
     return subscribeEnrollmentKioskState(setState);
@@ -116,22 +118,31 @@ export default function EnrollmentKioskPage() {
   };
 
   return (
-    <div className="registrar-kiosk-page">
-      <header className="registrar-kiosk-page__header">
-        <div>
-          <p className="registrar-kiosk-page__eyebrow">Registrar Enrollment Kiosk</p>
-          <h1>Live Learner Information Display</h1>
-          <p className="registrar-kiosk-page__meta">Last update: {formatDateTime(state.updatedAt)}</p>
-        </div>
-        <div className="registrar-kiosk-page__header-right">
-          <span className={`registrar-kiosk-status-chip ${state.isEditing ? 'registrar-kiosk-status-chip--active' : ''}`}>
-            {state.isEditing ? 'Encoding in progress' : 'Waiting for active edit session'}
-          </span>
-          <p className="registrar-kiosk-page__meta">Live sync from Registrar Enrollment</p>
-        </div>
-      </header>
+    <div className={`registrar-kiosk-page ${isIdle ? 'registrar-kiosk-page--idle' : ''}`}>
+      {!isIdle ? (
+        <header className="registrar-kiosk-page__header">
+          <div>
+            <p className="registrar-kiosk-page__eyebrow">Registrar Enrollment Kiosk</p>
+            <h1>Live Learner Information Display</h1>
+            <p className="registrar-kiosk-page__meta">Last update: {formatDateTime(state.updatedAt)}</p>
+          </div>
+          <div className="registrar-kiosk-page__header-right">
+            <span className={`registrar-kiosk-status-chip ${state.isEditing ? 'registrar-kiosk-status-chip--active' : ''}`}>
+              {state.isEditing ? 'Encoding in progress' : 'Waiting for active edit session'}
+            </span>
+            <p className="registrar-kiosk-page__meta">Live sync from Registrar Enrollment</p>
+          </div>
+        </header>
+      ) : null}
 
       <section className="registrar-kiosk-board">
+        {isIdle ? (
+          <div className="registrar-kiosk-empty-view" aria-label="Kiosk idle screen">
+            <img src={usisHeaderImage} alt="USIS Header" className="registrar-kiosk-empty-view__icon" />
+          </div>
+        ) : null}
+        {!isIdle ? (
+          <>
         <aside className="registrar-kiosk-column">
           <article className="registrar-kiosk-card">
             <div className="registrar-kiosk-card__head">
@@ -255,6 +266,8 @@ export default function EnrollmentKioskPage() {
             )}
           </article>
         </div>
+          </>
+        ) : null}
       </section>
     </div>
   );

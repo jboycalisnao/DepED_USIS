@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import usisIcon from '../assets/USIS_Icon.png';
-import { supabase } from '../../packages/shared-supabase/src';
+import { supabase } from '@deped-usis/shared-supabase';
 
 type UsisLoginModalProps = {
   title: string;

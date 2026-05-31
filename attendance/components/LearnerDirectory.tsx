@@ -3,6 +3,10 @@ import React, { useState, useMemo } from 'react';
 import { Learner } from '../types';
 import ConfirmationModal from './ConfirmationModal';
 import { normalizeRfidValue } from '../utils/rfid';
+import {
+  UsisGradeSectionList,
+  type UsisGradeSectionListGrade,
+} from '../../common/components/ui/UsisGradeSectionList';
 
 interface LearnerDirectoryProps {
   learners: Learner[];
@@ -19,6 +23,24 @@ interface LearnerDirectoryProps {
 const naturalSort = (a: string, b: string) => {
   return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
 };
+
+const genderRank = (gender: string | null | undefined) => {
+  const normalized = String(gender || '').trim().toLowerCase();
+  if (normalized === 'male') return 0;
+  if (normalized === 'female') return 1;
+  return 2;
+};
+
+const learnerGenderNameSort = (a: Learner, b: Learner) => {
+  const rankDelta = genderRank(a.gender) - genderRank(b.gender);
+  if (rankDelta !== 0) return rankDelta;
+  const last = (a.last_name || '').localeCompare(b.last_name || '', undefined, { sensitivity: 'base' });
+  if (last !== 0) return last;
+  return (a.first_name || '').localeCompare(b.first_name || '', undefined, { sensitivity: 'base' });
+};
+
+const isMale = (learner: Learner) => genderRank(learner.gender) === 0;
+const isFemale = (learner: Learner) => genderRank(learner.gender) === 1;
 
 const LearnerItem: React.FC<{
   learner: Learner;
@@ -106,13 +128,9 @@ const LearnerDirectory: React.FC<LearnerDirectoryProps> = ({
   learners, uidMappings, selectedId, onSelect, onUnlink, isLoading, isSearching, isSyncing, fetchedCount
 }) => {
   const [listSearchQuery, setListSearchQuery] = useState('');
-  const [expandedGrades, setExpandedGrades] = useState<Set<string>>(new Set());
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
   const [unlinkId, setUnlinkId] = useState<string | null>(null);
 
   const groupedData = useMemo(() => {
-    if (isSearching) return {}; 
-
     const localQuery = listSearchQuery.trim().toLowerCase();
     const groups: Record<string, Record<string, Learner[]>> = {};
 
@@ -148,28 +166,73 @@ const LearnerDirectory: React.FC<LearnerDirectoryProps> = ({
       acc[grade] = Object.keys(sections)
         .sort(naturalSort)
         .reduce((secAcc, sec) => {
-          secAcc[sec] = sections[sec].sort((a, b) => 
-            (a.last_name || '').localeCompare(b.last_name || '')
-          );
+          secAcc[sec] = sections[sec].sort(learnerGenderNameSort);
           return secAcc;
         }, {} as Record<string, Learner[]>);
       return acc;
     }, {} as Record<string, Record<string, Learner[]>>);
   }, [learners, isSearching, listSearchQuery]);
 
-  const toggleGrade = (grade: string) => {
-    const next = new Set(expandedGrades);
-    if (next.has(grade)) next.delete(grade);
-    else next.add(grade);
-    setExpandedGrades(next);
-  };
+  const sharedGradeSectionListData = useMemo<UsisGradeSectionListGrade[]>(() => {
+    return Object.entries(groupedData).map(([grade, sections]) => {
+      const gradeStudentCount = Object.values(sections).flat().length;
+      return {
+        key: grade,
+        label: grade,
+        countLabel: `${gradeStudentCount} ${gradeStudentCount === 1 ? 'Record' : 'Records'}`,
+        sections: Object.entries(sections).map(([sectionName, sectionLearners]) => ({
+          key: sectionName,
+          label: sectionName,
+          count: sectionLearners.length,
+          content: (
+            <div className="border-t border-gray-200 bg-white">
+              <div className="px-4 py-2 bg-primary-50 border-b border-primary-100">
+                <p className="text-[10px] font-bold text-primary-700 uppercase tracking-wider">
+                  Male
+                </p>
+              </div>
+              <div className="divide-y divide-gray-100">
+                {sectionLearners.filter(isMale).map((learner) => (
+                  <LearnerItem
+                    key={learner.id}
+                    learner={learner}
+                    uidMappings={uidMappings}
+                    isSelected={selectedId === learner.id}
+                    onSelect={onSelect}
+                    onUnlink={setUnlinkId}
+                  />
+                ))}
+                {sectionLearners.filter(isMale).length === 0 ? (
+                  <p className="px-8 py-3 text-[11px] text-gray-400">No male learners</p>
+                ) : null}
+              </div>
 
-  const toggleSection = (sectionKey: string) => {
-    const next = new Set(expandedSections);
-    if (next.has(sectionKey)) next.delete(sectionKey);
-    else next.add(sectionKey);
-    setExpandedSections(next);
-  };
+              <div className="px-4 py-2 bg-accent-50 border-y border-accent-100">
+                <p className="text-[10px] font-bold text-accent-700 uppercase tracking-wider">
+                  Female
+                </p>
+              </div>
+              <div className="divide-y divide-gray-100">
+                {sectionLearners.filter(isFemale).map((learner) => (
+                  <LearnerItem
+                    key={learner.id}
+                    learner={learner}
+                    uidMappings={uidMappings}
+                    isSelected={selectedId === learner.id}
+                    onSelect={onSelect}
+                    onUnlink={setUnlinkId}
+                  />
+                ))}
+                {sectionLearners.filter(isFemale).length === 0 ? (
+                  <p className="px-8 py-3 text-[11px] text-gray-400">No female learners</p>
+                ) : null}
+              </div>
+            </div>
+          ),
+        })),
+      };
+    });
+  }, [groupedData, onSelect, selectedId, uidMappings]);
 
   return (
     <div className="bg-white rounded-md border border-gray-200 overflow-hidden shadow-sm min-h-[500px]">
@@ -210,24 +273,12 @@ const LearnerDirectory: React.FC<LearnerDirectoryProps> = ({
                   {learners.length} {learners.length === 1 ? 'Match' : 'Matches'}
                 </span>
               </div>
-              <div className="max-h-[700px] overflow-y-auto no-scrollbar">
-                {learners.length === 0 ? (
-                  <div className="p-20 text-center text-gray-300 font-semibold uppercase text-xs tracking-wider">
-                    No matching records found
-                  </div>
-                ) : (
-                  learners.map(learner => (
-                    <LearnerItem 
-                      key={learner.id}
-                      learner={learner}
-                      uidMappings={uidMappings}
-                      isSelected={selectedId === learner.id}
-                      onSelect={onSelect}
-                      onUnlink={setUnlinkId}
-                    />
-                  ))
-                )}
-              </div>
+              <UsisGradeSectionList
+                className="attendance-grade-section-list"
+                grades={sharedGradeSectionListData}
+                expandAll
+                emptyMessage="No matching records found"
+              />
             </div>
           ) : (
             Object.keys(groupedData).length === 0 ? (
@@ -235,72 +286,13 @@ const LearnerDirectory: React.FC<LearnerDirectoryProps> = ({
                 No records match this section list search
               </div>
             ) : (
-            Object.entries(groupedData).map(([grade, sections]) => {
-              const isUnassignedGroup = grade === 'NO GRADE ASSIGNED';
-              const gradeStudentCount = Object.values(sections).flat().length;
-
-              return (
-                <div key={grade} className={`rounded-md overflow-hidden border border-gray-200 ${isUnassignedGroup ? 'bg-gray-50' : 'bg-white shadow-sm'}`}>
-                  <button 
-                    onClick={() => toggleGrade(grade)}
-                    className="w-full flex items-center justify-between p-5 hover:bg-gray-50 transition-colors"
-                  >
-                    <div className="flex items-center gap-4">
-                      <span className={`material-symbols-outlined text-xl leading-none ${isUnassignedGroup ? 'text-gray-400' : 'text-primary-600'}`}>
-                        {expandedGrades.has(grade) ? 'expand_more' : 'chevron_right'}
-                      </span>
-                      <h3 className="text-sm font-bold tracking-tight text-gray-900">
-                        {grade}
-                      </h3>
-                      <span className="text-[10px] font-bold text-gray-500 bg-gray-100 px-3 py-1 rounded-md border border-gray-200">
-                        {gradeStudentCount} {gradeStudentCount === 1 ? 'Record' : 'Records'}
-                      </span>
-                    </div>
-                  </button>
-
-                  {expandedGrades.has(grade) && (
-                    <div className="px-4 pb-4 space-y-3 animate-in slide-in-from-top-2 duration-300">
-                      {Object.entries(sections).map(([sectionName, sectionLearners]) => {
-                        const sectionKey = `${grade}-${sectionName}`;
-                        const isExpanded = expandedSections.has(sectionKey);
-                        
-                        return (
-                          <div key={sectionKey} className="bg-gray-50/50 rounded-md border border-gray-200 overflow-hidden">
-                            <button 
-                              onClick={() => toggleSection(sectionKey)}
-                              className="w-full flex items-center justify-between p-4 hover:bg-white transition-colors"
-                            >
-                              <div className="flex items-center gap-4">
-                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Section:</span>
-                                <span className="text-xs font-bold text-primary-700">{sectionName}</span>
-                                <span className="text-[10px] text-gray-500 font-bold bg-white px-2 py-0.5 rounded border border-gray-200">
-                                  {sectionLearners.length}
-                                </span>
-                              </div>
-                            </button>
-
-                            {isExpanded && (
-                              <div className="divide-y divide-gray-100 border-t border-gray-200 bg-white">
-                                {sectionLearners.map(learner => (
-                                  <LearnerItem 
-                                    key={learner.id}
-                                    learner={learner}
-                                    uidMappings={uidMappings}
-                                    isSelected={selectedId === learner.id}
-                                    onSelect={onSelect}
-                                    onUnlink={setUnlinkId}
-                                  />
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              );
-            }))
+              <UsisGradeSectionList
+                className="attendance-grade-section-list"
+                grades={sharedGradeSectionListData}
+                expandAll={listSearchQuery.trim().length > 0}
+                emptyMessage="No records match this section list search"
+              />
+            )
           )}
         </div>
       )}

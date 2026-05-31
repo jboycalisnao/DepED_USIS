@@ -121,11 +121,13 @@
 .integrated-admin-merch-modal .modal-dialog__body {
   display: grid;
   gap: 10px;
-  overflow: visible;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
 }
 
 .integrated-admin-merch-modal {
-  overflow: visible;
+  overflow: hidden;
 }
 
 .integrated-admin-merch-modal .registry-radio-option {

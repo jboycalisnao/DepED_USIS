@@ -14,9 +14,6 @@ export interface AttendanceAccessRecord {
 
 const STORAGE_KEY = 'usis_attendance_access';
 
-const isMissingRelationError = (error: { code?: string; message?: string } | null) =>
-  error?.code === '42P01' || error?.message?.includes('usis_core_users');
-
 const normalizeIdentity = (value: string) => value.trim().toLowerCase();
 
 const hasExplicitAttendanceDeny = (accountId: string) => {
@@ -73,19 +70,6 @@ export const resolveAttendanceAccess = async (
     )
   `;
 
-  const coreUsersResponse = await supabase
-    .from('usis_core_users')
-    .select(schoolJoin)
-    .eq('username', normalizedUsername)
-    .eq('is_active', true)
-    .in('role', ['attendance_coordinator', 'school_usis_coordinator', 'system_admin'])
-    .limit(1)
-    .maybeSingle();
-
-  if (coreUsersResponse.error && !isMissingRelationError(coreUsersResponse.error)) {
-    return { error: 'Unable to contact the USIS core users registry.', record: null };
-  }
-
   const coordinatorsResponse = await supabase
     .from('usis_core_coordinators')
     .select(schoolJoin)
@@ -100,9 +84,6 @@ export const resolveAttendanceAccess = async (
   }
 
   const candidates: Array<{ source: AttendanceAccessRecord['accountSource']; data: any }> = [];
-  if (coreUsersResponse.data) {
-    candidates.push({ source: 'usis_core_users', data: coreUsersResponse.data });
-  }
   if (coordinatorsResponse.data) {
     candidates.push({ source: 'usis_core_coordinators', data: coordinatorsResponse.data });
   }

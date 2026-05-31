@@ -15,8 +15,17 @@ if (!supabaseUrl || !supabaseKey) {
   throw new Error('Attendance Supabase environment variables are missing. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseKey, {
-  auth: {
-    storageKey: 'usis-attendance-auth',
-  },
-});
+type SupabaseGlobal = typeof globalThis & { __usisAttendanceSupabase?: ReturnType<typeof createClient> };
+const globalWithSupabase = globalThis as SupabaseGlobal;
+
+export const supabase =
+  globalWithSupabase.__usisAttendanceSupabase ??
+  createClient(supabaseUrl, supabaseKey, {
+    auth: {
+      storageKey: 'usis-attendance-auth',
+    },
+  });
+
+if (!globalWithSupabase.__usisAttendanceSupabase) {
+  globalWithSupabase.__usisAttendanceSupabase = supabase;
+}

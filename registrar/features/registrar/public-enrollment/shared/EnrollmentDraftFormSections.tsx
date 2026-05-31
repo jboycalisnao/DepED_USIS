@@ -1,6 +1,6 @@
 import { SearchableSelect } from '../../../../components/ui/SearchableSelect';
 import type { EnrollmentDraft } from '../types';
-import { deviceOptions, gradeLevelOptions, learnerCategoryOptions, modalityOptions, religionOptions, semesterOptions, studentTypeOptions } from '../data/enrollmentOptions';
+import { deviceOptions, gradeLevelOptions, learnerCategoryOptions, modalityOptions, religionOptions, semesterOptions, studentTypeOptions, trackOptions } from '../data/enrollmentOptions';
 
 type Props = {
   draft: EnrollmentDraft;
@@ -41,7 +41,7 @@ export default function EnrollmentDraftFormSections({
         <InputField label="Last S.Y. Attended" value={draft.previousSchoolYear} onChange={(v) => onFieldChange('previousSchoolYear', v)} inputMode="numeric" maxLength={9} pattern="\\d{4}-\\d{4}" />
         <SelectField label="Last Grade Level Attended" value={draft.lastGradeLevel} onChange={(v) => onFieldChange('lastGradeLevel', v)} options={gradeLevelOptions as unknown as string[]} />
         <SelectField label="Grade Level to Enroll" value={draft.gradeToEnroll} onChange={(v) => onFieldChange('gradeToEnroll', v)} options={gradeTargets as unknown as string[]} />
-        <InputField label="Track" value={draft.track} onChange={(v) => onFieldChange('track', v)} />
+        <SelectField label="Track" value={draft.track} onChange={(v) => onFieldChange('track', v)} options={trackOptions as unknown as string[]} disabled={!isSeniorHighTargetGrade} />
         <SelectField label="Preferred Strand" value={draft.strand} onChange={(v) => onFieldChange('strand', v)} options={availableStrands.filter(Boolean)} disabled={!isSeniorHighTargetGrade} />
         <SelectField label="Semester" value={draft.semester} onChange={(v) => onFieldChange('semester', v)} options={semesterOptions as unknown as string[]} disabled={!isSeniorHighTargetGrade || !draft.strand} />
       </div></section>

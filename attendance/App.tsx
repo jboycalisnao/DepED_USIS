@@ -1,5 +1,6 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { useSerial } from './hooks/useSerial';
 import { useLearners } from './hooks/useLearners';
 import { useAttendance } from './hooks/useAttendance';
@@ -14,6 +15,7 @@ import LearnerDirectory from './components/LearnerDirectory';
 import Terminal from './components/Terminal';
 import AttendanceLogs from './components/AttendanceLogs';
 import Settings from './components/Settings';
+import AttendanceSummaryPage from './features/reports/components/AttendanceSummaryPage';
 import { normalizeRfidValue } from './utils/rfid';
 import AttendanceLandingPage from './features/auth/components/AttendanceLandingPage';
 import {
@@ -53,18 +55,36 @@ function App() {
   const [access, setAccess] = useState<AttendanceAccessRecord | null>(() => getStoredAttendanceAccess());
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
+  const location = useLocation();
+  const navigate = useNavigate();
   const monitor1 = useSerial(0);
   const monitor2 = useSerial(1);
   const monitor3 = useSerial(2);
   
   const monitors = [monitor1, monitor2, monitor3];
 
-  const { learners, isLoading, isSyncing, fetchedCount, getFiltered } = useLearners();
-  const { uidMappings, adminUids, attendanceLogs, addMapping, removeMapping, toggleAdmin, logAttendance, deleteRecord } = useAttendance();
+  const { learners, isLoading, isSyncing, fetchedCount, getFiltered, saveLearnerRfid, clearLearnerRfid } = useLearners();
+  const {
+    uidMappings,
+    adminUids,
+    attendanceLogs,
+    addMapping,
+    removeMapping,
+    toggleAdmin,
+    logAttendance,
+    deleteRecord,
+    queryRecordsByDateRange,
+    querySummaryByDateRange,
+  } = useAttendance();
   const { settings, updateSettings } = useSettings();
 
-  const [currentView, setCurrentView] = useState<'registrar' | 'attendance' | 'settings'>('registrar');
   const [isStandbyMode, setIsStandbyMode] = useState(false);
+  const currentView: 'registrar' | 'attendance' | 'summary' | 'settings' = useMemo(() => {
+    if (location.pathname.startsWith('/records')) return 'attendance';
+    if (location.pathname.startsWith('/summary')) return 'summary';
+    if (location.pathname.startsWith('/settings')) return 'settings';
+    return 'registrar';
+  }, [location.pathname]);
 
   const [baudRates, setBaudRates] = useState<number[]>(() => {
     return [0, 1, 2].map(i => {
@@ -86,14 +106,6 @@ function App() {
   const idleTimers = useRef<(number | null)[]>([null, null, null]);
   const usbRfidBufferRef = useRef('');
   const usbRfidTimerRef = useRef<number | null>(null);
-
-  const speak = (text: string) => {
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'en-US';
-    utterance.rate = 0.9;
-    window.speechSynthesis.speak(utterance);
-  };
 
   const clearIdleTimer = (index: number) => {
     if (idleTimers.current[index]) {
@@ -141,11 +153,6 @@ function App() {
         const entering = !isStandbyMode;
         setIsStandbyMode(entering);
         
-        if (entering) {
-          speak("Master key authorized. Entering Kiosk mode.");
-        } else {
-          speak("Master key authorized. System unlocked.");
-        }
         return;
       }
 
@@ -182,7 +189,6 @@ function App() {
           } else {
             logAttendance(learner.id, type);
             monitor.write(`DISPLAY|${learner.last_name}|${learner.first_name}`);
-            speak(`Welcome, ${learner.first_name}.`);
 
             setLastScanResults(prev => {
               const next = [...prev];
@@ -268,7 +274,6 @@ function App() {
         setTimeout(() => setScanFlash(false), 300);
         const entering = !isStandbyMode;
         setIsStandbyMode(entering);
-        speak(entering ? 'Master key authorized. Entering Kiosk mode.' : 'Master key authorized. System unlocked.');
         return;
       }
 
@@ -290,7 +295,6 @@ function App() {
 
           if (!isDuplicate) {
             logAttendance(learner.id, type);
-            speak(`Welcome, ${learner.first_name}.`);
           }
 
           setLastScanResults(prev => {
@@ -368,14 +372,31 @@ function App() {
     };
   }, [adminUids, attendanceLogs, isStandbyMode, learners, logAttendance, settings, uidMappings]);
 
-  const handleSaveMapping = () => {
+  const handleSaveMapping = async () => {
     if (!selectedLearnerId || !activeRfid || conflictWarning) return;
+    const persist = await saveLearnerRfid(selectedLearnerId, activeRfid);
+    if (!persist.ok) {
+      setConflictWarning(persist.error);
+      return;
+    }
     addMapping(selectedLearnerId, activeRfid);
     setActiveRfid('');
     setSelectedLearnerId(null);
     setConflictWarning(null);
     setScanFlash(true);
     setTimeout(() => setScanFlash(false), 400);
+  };
+
+  const handleUnlinkMapping = async (learnerId: string) => {
+    const result = await clearLearnerRfid(learnerId);
+    if (!result.ok) {
+      setConflictWarning(result.error);
+      return;
+    }
+    removeMapping(learnerId);
+    if (selectedLearnerId === learnerId) {
+      setSelectedLearnerId(null);
+    }
   };
 
   const filteredLearners = useMemo(() => 
@@ -395,7 +416,9 @@ function App() {
       ? 'Registrar'
       : currentView === 'attendance'
         ? 'Attendance Records'
-        : 'Settings';
+        : currentView === 'summary'
+          ? 'Attendance Summary'
+          : 'Settings';
 
   useEffect(() => {
     if (!isProfileOpen) return;
@@ -502,7 +525,7 @@ function App() {
               <button
                 type="button"
                 className={`attendance-side-nav__link ${currentView === 'registrar' ? 'attendance-side-nav__link--active' : ''}`}
-                onClick={() => setCurrentView('registrar')}
+                onClick={() => navigate('/registrar')}
               >
                 <span className="material-symbols-outlined" aria-hidden="true">badge</span>
                 Registrar
@@ -510,15 +533,23 @@ function App() {
               <button
                 type="button"
                 className={`attendance-side-nav__link ${currentView === 'attendance' ? 'attendance-side-nav__link--active' : ''}`}
-                onClick={() => setCurrentView('attendance')}
+                onClick={() => navigate('/records')}
               >
                 <span className="material-symbols-outlined" aria-hidden="true">event_note</span>
                 Attendance Records
               </button>
               <button
                 type="button"
+                className={`attendance-side-nav__link ${currentView === 'summary' ? 'attendance-side-nav__link--active' : ''}`}
+                onClick={() => navigate('/summary')}
+              >
+                <span className="material-symbols-outlined" aria-hidden="true">query_stats</span>
+                Attendance Summary
+              </button>
+              <button
+                type="button"
                 className={`attendance-side-nav__link ${currentView === 'settings' ? 'attendance-side-nav__link--active' : ''}`}
-                onClick={() => setCurrentView('settings')}
+                onClick={() => navigate('/settings')}
               >
                 <span className="material-symbols-outlined" aria-hidden="true">settings</span>
                 Settings
@@ -577,66 +608,81 @@ function App() {
               </div>
             </div>
             <main className="attendance-main animate-in fade-in duration-700">
-          {currentView === 'registrar' && (
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-              <div className="lg:col-span-4 space-y-6">
-                <PairingConsole 
-                  activeRfid={activeRfid} 
-                  selectedLearner={selectedLearner} 
-                  conflictWarning={conflictWarning} 
-                  scanFlash={scanFlash} 
-                  onSave={handleSaveMapping}
-                  isAdmin={adminUids.includes(activeRfid)}
-                  onToggleAdmin={() => toggleAdmin(activeRfid)}
-                />
-                
-                <section className="bg-white rounded-md p-6 shadow-sm border border-gray-200">
-                  <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-[11px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
-                      <span className="material-symbols-outlined text-sm leading-none">terminal</span>
-                      Serial Monitors
-                    </h2>
-                  </div>
-                  <div className="space-y-4">
-                    {monitors.map((m, i) => (
-                      <div key={i} className="space-y-2">
-                        <div className="flex justify-between items-center">
-                          <span className="text-[10px] font-bold text-gray-400 uppercase">Monitor {i + 1}</span>
-                          <span className={`text-[9px] font-bold px-2 py-0.5 rounded ${m.status === 'connected' ? 'bg-success-50 text-success-700 border border-success-600/10' : 'bg-gray-100 text-gray-500 border border-gray-200'}`}>
-                            {m.status.toUpperCase()}
-                          </span>
-                        </div>
-                        <div className="h-32 rounded-md overflow-hidden bg-gray-50 border border-gray-200">
-                          <Terminal logs={m.logs.slice(-50)} />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-              </div>
-              <div className="lg:col-span-8 space-y-6">
-                <LearnerDirectory 
-                  learners={filteredLearners} 
-                  uidMappings={uidMappings} 
-                  selectedId={selectedLearnerId} 
-                  onSelect={setSelectedLearnerId} 
-                  onUnlink={removeMapping}
-                  isLoading={isLoading} 
-                  isSearching={searchQuery.trim().length > 0}
-                  isSyncing={isSyncing} 
-                  fetchedCount={fetchedCount} 
-                />
-              </div>
-            </div>
-          )}
-          
-          {currentView === 'attendance' && (
-            <AttendanceLogs logs={attendanceLogs} learners={learners} onDelete={deleteRecord} />
-          )}
+              <Routes>
+                <Route
+                  path="/registrar"
+                  element={
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                      <div className="lg:col-span-4 space-y-6">
+                        <PairingConsole
+                          activeRfid={activeRfid}
+                          selectedLearner={selectedLearner}
+                          conflictWarning={conflictWarning}
+                          scanFlash={scanFlash}
+                          onSave={handleSaveMapping}
+                          isAdmin={adminUids.includes(activeRfid)}
+                          onToggleAdmin={() => toggleAdmin(activeRfid)}
+                        />
 
-          {currentView === 'settings' && (
-            <Settings settings={settings} onUpdate={updateSettings} />
-          )}
+                        <section className="bg-white rounded-md p-6 shadow-sm border border-gray-200">
+                          <div className="flex justify-between items-center mb-4">
+                            <h2 className="text-[11px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
+                              <span className="material-symbols-outlined text-sm leading-none">terminal</span>
+                              Serial Monitors
+                            </h2>
+                          </div>
+                          <div className="space-y-4">
+                            {monitors.map((m, i) => (
+                              <div key={i} className="space-y-2">
+                                <div className="flex justify-between items-center">
+                                  <span className="text-[10px] font-bold text-gray-400 uppercase">Monitor {i + 1}</span>
+                                  <span className={`text-[9px] font-bold px-2 py-0.5 rounded ${m.status === 'connected' ? 'bg-success-50 text-success-700 border border-success-600/10' : 'bg-gray-100 text-gray-500 border border-gray-200'}`}>
+                                    {m.status.toUpperCase()}
+                                  </span>
+                                </div>
+                                <div className="h-32 rounded-md overflow-hidden bg-gray-50 border border-gray-200">
+                                  <Terminal logs={m.logs.slice(-50)} />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </section>
+                      </div>
+                      <div className="lg:col-span-8 space-y-6">
+                        <LearnerDirectory
+                          learners={filteredLearners}
+                          uidMappings={uidMappings}
+                          selectedId={selectedLearnerId}
+                          onSelect={setSelectedLearnerId}
+                          onUnlink={handleUnlinkMapping}
+                          isLoading={isLoading}
+                          isSearching={searchQuery.trim().length > 0}
+                          isSyncing={isSyncing}
+                          fetchedCount={fetchedCount}
+                        />
+                      </div>
+                    </div>
+                  }
+                />
+                <Route
+                  path="/records"
+                  element={
+                    <AttendanceLogs
+                      logs={attendanceLogs}
+                      learners={learners}
+                      onDelete={deleteRecord}
+                      onQueryRange={queryRecordsByDateRange}
+                    />
+                  }
+                />
+                <Route
+                  path="/summary"
+                  element={<AttendanceSummaryPage onQuerySummaryRange={querySummaryByDateRange} />}
+                />
+                <Route path="/settings" element={<Settings settings={settings} onUpdate={updateSettings} />} />
+                <Route path="/" element={<Navigate to="/registrar" replace />} />
+                <Route path="*" element={<Navigate to="/registrar" replace />} />
+              </Routes>
             </main>
           </div>
         </div>
@@ -648,4 +694,3 @@ function App() {
 }
 
 export default App;
-

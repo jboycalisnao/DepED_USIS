@@ -43,6 +43,7 @@ export type EnrollmentDraft = {
 
 export type PublicEnrollmentSubmission = {
   id: string;
+  submission_reference_id?: string | null;
   created_at: string;
   school_id: string | null;
   school_year: string | null;

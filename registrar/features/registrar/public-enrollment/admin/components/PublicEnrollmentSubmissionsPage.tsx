@@ -66,6 +66,26 @@ function normalizeSchoolYear(value: string) {
   return normalized.toLowerCase();
 }
 
+const insertEnrollmentHistoryRow = async (input: {
+  learnerId: string;
+  schoolYear: string;
+  gradeLevel?: string;
+  section?: string;
+  status: string;
+  submissionPayload?: Record<string, any>;
+}) => {
+  await supabase.from('registrar_enrollment_history').insert({
+    learner_id: input.learnerId,
+    school_year: input.schoolYear || '',
+    grade_level: input.gradeLevel || null,
+    section: input.section || null,
+    status: input.status,
+    enrollment_date: new Date().toISOString(),
+    submission_payload: input.submissionPayload || {},
+    source: 'registrar.public-enrollment',
+  });
+};
+
 function CloseIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" style={{ width: 18, height: 18 }}>
@@ -191,24 +211,38 @@ export default function PublicEnrollmentSubmissionsPage() {
         return;
       }
 
-      const { data, error } = await supabase
-        .from('registrar_learners')
-        .select('lrn,enrollment_history')
-        .in('lrn', lrns);
+      const { data, error } = await supabase.from('registrar_learners').select('id,lrn').in('lrn', lrns);
       if (error) return;
 
       const allExistingLrns = new Set<string>();
       const yearsByLrn: Record<string, Set<string>> = {};
+      const learnerIds: string[] = [];
       for (const row of data || []) {
         const lrn = String((row as any).lrn || '').trim();
         if (!lrn) continue;
         allExistingLrns.add(lrn);
-        const history = Array.isArray((row as any).enrollment_history) ? (row as any).enrollment_history : [];
-        yearsByLrn[lrn] = new Set(
-          history
-            .map((entry: any) => normalizeSchoolYear(String(entry?.schoolYear || '').trim()))
-            .filter(Boolean)
-        );
+        yearsByLrn[lrn] = new Set();
+        const learnerId = String((row as any).id || '').trim();
+        if (learnerId) learnerIds.push(learnerId);
+      }
+
+      if (learnerIds.length > 0) {
+        const { data: historyRows } = await supabase
+          .from('registrar_enrollment_history')
+          .select('learner_id,school_year')
+          .in('learner_id', learnerIds);
+        const lrnByLearnerId = new Map<string, string>();
+        for (const row of data || []) {
+          const learnerId = String((row as any).id || '').trim();
+          const lrn = String((row as any).lrn || '').trim();
+          if (learnerId && lrn) lrnByLearnerId.set(learnerId, lrn);
+        }
+        for (const historyRow of historyRows || []) {
+          const learnerId = String((historyRow as any).learner_id || '').trim();
+          const schoolYear = normalizeSchoolYear(String((historyRow as any).school_year || '').trim());
+          const lrn = lrnByLearnerId.get(learnerId);
+          if (lrn && schoolYear) yearsByLrn[lrn]?.add(schoolYear);
+        }
       }
 
       setExistingLearnerLrns(allExistingLrns);
@@ -255,7 +289,7 @@ export default function PublicEnrollmentSubmissionsPage() {
       }
       let queryBuilder = supabase
         .from('registrar_learners')
-        .select('id,lrn,first_name,middle_name,last_name,enrollment_history,section_id')
+        .select('id,lrn,first_name,middle_name,last_name,section_id')
         .order('last_name', { ascending: true })
         .limit(80)
         .or(`lrn.ilike.%${lookup}%,first_name.ilike.%${lookup}%,last_name.ilike.%${lookup}%,middle_name.ilike.%${lookup}%`);
@@ -308,13 +342,37 @@ export default function PublicEnrollmentSubmissionsPage() {
         }
       }
 
+      const learnerIds = (data as any[]).map((row) => String(row.id || '').trim()).filter(Boolean);
+      const { data: historyRows } = learnerIds.length
+        ? await supabase
+            .from('registrar_enrollment_history')
+            .select('learner_id,school_year,grade_level,section,enrollment_date,created_at')
+            .in('learner_id', learnerIds)
+        : { data: [] as any[] };
+
+      const historyByLearnerId = new Map<string, any[]>();
+      for (const historyRow of historyRows || []) {
+        const learnerId = String((historyRow as any).learner_id || '').trim();
+        if (!learnerId) continue;
+        const current = historyByLearnerId.get(learnerId) || [];
+        current.push(historyRow);
+        historyByLearnerId.set(learnerId, current);
+      }
+
       const mapped: PriorYearLearner[] = [];
       for (const row of data as any[]) {
-        const history = Array.isArray(row.enrollment_history) ? row.enrollment_history : [];
-        const allYearEntries = history.filter((entry: any) => {
-          const sy = String(entry?.schoolYear || '').trim();
-          return Boolean(sy);
-        });
+        const allYearEntries = [...(historyByLearnerId.get(String(row.id || '').trim()) || [])]
+          .sort(
+            (a, b) =>
+              new Date(String((a as any).enrollment_date || (a as any).created_at || 0)).getTime() -
+              new Date(String((b as any).enrollment_date || (b as any).created_at || 0)).getTime(),
+          )
+          .map((entry: any) => ({
+            schoolYear: String(entry?.school_year || '').trim(),
+            gradeLevel: String(entry?.grade_level || '').trim(),
+            section: String(entry?.section || '').trim(),
+          }))
+          .filter((entry: any) => Boolean(entry.schoolYear));
 
         const linkedSection = sectionMap.get(String(row.section_id || '').trim());
         const linkedSchoolYearLabel = linkedSection ? schoolYearMap.get(linkedSection.schoolYearId) || '' : '';
@@ -428,17 +486,28 @@ export default function PublicEnrollmentSubmissionsPage() {
     try {
       const { data, error } = await supabase
         .from('registrar_learners')
-        .select('id,school_id,lrn,first_name,middle_name,last_name,birth_date,gender,address,contact_number,guardian_name,father_name,mother_name,email,enrollment_history')
+        .select('id,school_id,lrn,first_name,middle_name,last_name,birth_date,gender,address,contact_number,guardian_name,father_name,mother_name,email')
         .eq('id', learnerId)
         .maybeSingle();
       if (error || !data) throw new Error('Learner record not found.');
 
-      const history = Array.isArray((data as any).enrollment_history) ? (data as any).enrollment_history : [];
-      const priorEntries = history.filter((entry: any) => {
-        const sy = String(entry?.schoolYear || '').trim();
-        if (!sy) return false;
-        return !activeSchoolYearLabel || normalizeSchoolYear(sy) !== normalizeSchoolYear(activeSchoolYearLabel);
-      });
+      const { data: learnerHistoryRows } = await supabase
+        .from('registrar_enrollment_history')
+        .select('school_year,grade_level,submission_payload,enrollment_date,created_at')
+        .eq('learner_id', String((data as any).id || learnerId));
+      const priorEntries = (learnerHistoryRows || [])
+        .map((entry: any) => ({
+          schoolYear: String(entry?.school_year || '').trim(),
+          gradeLevel: String(entry?.grade_level || '').trim(),
+          submissionPayload: entry?.submission_payload && typeof entry.submission_payload === 'object' ? entry.submission_payload : {},
+          sortAt: new Date(String(entry?.enrollment_date || entry?.created_at || 0)).getTime(),
+        }))
+        .filter((entry: any) => {
+          const sy = String(entry?.schoolYear || '').trim();
+          if (!sy) return false;
+          return !activeSchoolYearLabel || normalizeSchoolYear(sy) !== normalizeSchoolYear(activeSchoolYearLabel);
+        })
+        .sort((a: any, b: any) => a.sortAt - b.sortAt);
       const latestPriorEntry = priorEntries[priorEntries.length - 1] || {};
       const sourcePayload = (latestPriorEntry as any).submissionPayload || {};
       const sourceSchoolToEnroll = String(sourcePayload.schoolToEnroll || '').trim();
@@ -590,23 +659,11 @@ export default function PublicEnrollmentSubmissionsPage() {
     try {
       const { data: existingLearner, error: findError } = await supabase
         .from('registrar_learners')
-        .select('enrollment_history')
+        .select('id')
         .eq('id', editingPriorLearner.id)
         .maybeSingle();
       if (findError) throw findError;
-
-      const nextHistory = [
-        ...(Array.isArray((existingLearner as any)?.enrollment_history) ? (existingLearner as any).enrollment_history : []),
-        {
-          id: crypto.randomUUID(),
-          schoolYear: draftEditor.schoolYear || '',
-          gradeLevel: draftEditor.gradeToEnroll || '',
-          section: '',
-          enrollmentDate: new Date().toISOString(),
-          status: 'Information Updated',
-          submissionPayload: draftEditor,
-        },
-      ];
+      if (!existingLearner?.id) throw new Error('Learner record not found.');
 
       const updatePayload: Record<string, any> = {
         school_id: editingPriorLearner.schoolId || schoolId,
@@ -622,7 +679,6 @@ export default function PublicEnrollmentSubmissionsPage() {
         father_name: draftEditor.fatherName.trim() || null,
         mother_name: draftEditor.motherName.trim() || null,
         email: draftEditor.email.trim() || null,
-        enrollment_history: nextHistory,
       };
 
       const { error: updateError } = await supabase
@@ -630,6 +686,15 @@ export default function PublicEnrollmentSubmissionsPage() {
         .update(updatePayload)
         .eq('id', editingPriorLearner.id);
       if (updateError) throw updateError;
+
+      await insertEnrollmentHistoryRow({
+        learnerId: editingPriorLearner.id,
+        schoolYear: draftEditor.schoolYear || '',
+        gradeLevel: draftEditor.gradeToEnroll || '',
+        section: '',
+        status: 'Information Updated',
+        submissionPayload: draftEditor as unknown as Record<string, any>,
+      });
 
       setTopAlert({
         title: 'Learner Updated',
@@ -760,19 +825,11 @@ export default function PublicEnrollmentSubmissionsPage() {
         .eq('id', String(sectionInfo.school_year_id))
         .maybeSingle();
 
-      const enrollmentEntry = {
-        id: crypto.randomUUID(),
-        schoolYear: String(schoolYearInfo?.label || enrollingSubmission.school_year || payload.schoolYear || ''),
-        gradeLevel: gradeToEnroll,
-        section: String(sectionInfo.name || ''),
-        enrollmentDate: new Date().toISOString(),
-        status: 'Enrolled',
-        submissionPayload: payload,
-      };
+      const enrolledSchoolYear = String(schoolYearInfo?.label || enrollingSubmission.school_year || payload.schoolYear || '');
 
       const { data: existingLearner } = await supabase
         .from('registrar_learners')
-        .select('id,enrollment_history')
+        .select('id')
         .eq('lrn', lrn)
         .maybeSingle();
 
@@ -793,11 +850,22 @@ export default function PublicEnrollmentSubmissionsPage() {
         section_id: selectedSectionId,
         school_id: (enrollingSubmission.school_id || payload.schoolId || schoolId).trim(),
         email: (payload.email || '').trim() || null,
-        enrollment_history: [...(Array.isArray(existingLearner?.enrollment_history) ? existingLearner.enrollment_history : []), enrollmentEntry],
       };
 
       const { error: upsertError } = await supabase.from('registrar_learners').upsert(upsertPayload, { onConflict: 'lrn' });
       if (upsertError) throw upsertError;
+
+      const { data: resolvedLearner } = await supabase.from('registrar_learners').select('id').eq('lrn', lrn).maybeSingle();
+      const resolvedLearnerId = String((resolvedLearner as any)?.id || existingLearner?.id || '').trim();
+      if (!resolvedLearnerId) throw new Error('Unable to resolve learner id for enrollment history insert.');
+      await insertEnrollmentHistoryRow({
+        learnerId: resolvedLearnerId,
+        schoolYear: enrolledSchoolYear,
+        gradeLevel: gradeToEnroll,
+        section: String(sectionInfo.name || ''),
+        status: 'Enrolled',
+        submissionPayload: payload as unknown as Record<string, any>,
+      });
 
       await updatePublicEnrollmentSubmissionRecord(enrollingSubmission.id, {
         payload: appendSubmissionAudit(
@@ -834,7 +902,7 @@ export default function PublicEnrollmentSubmissionsPage() {
     try {
       const { data: existingLearner, error: findError } = await supabase
         .from('registrar_learners')
-        .select('id,lrn,enrollment_history')
+        .select('id,lrn')
         .eq('lrn', lrn)
         .maybeSingle();
 
@@ -854,23 +922,20 @@ export default function PublicEnrollmentSubmissionsPage() {
         mother_name: (payload.motherName || '').trim() || null,
         school_id: (row.school_id || payload.schoolId || schoolId).trim(),
         email: (payload.email || '').trim() || null,
-        enrollment_history: [
-          ...(Array.isArray(existingLearner.enrollment_history) ? existingLearner.enrollment_history : []),
-          {
-            id: crypto.randomUUID(),
-            schoolYear: (row.school_year || payload.schoolYear || '').trim(),
-            gradeLevel: (row.grade_to_enroll || payload.gradeToEnroll || '').trim(),
-            section: '',
-            enrollmentDate: new Date().toISOString(),
-            status: 'Information Updated',
-            submissionPayload: payload,
-          },
-        ],
       };
 
       // Keep the learner's existing LRN intact by updating via row id only.
       const { error: updateError } = await supabase.from('registrar_learners').update(updatePayload).eq('id', existingLearner.id);
       if (updateError) throw updateError;
+
+      await insertEnrollmentHistoryRow({
+        learnerId: String(existingLearner.id),
+        schoolYear: (row.school_year || payload.schoolYear || '').trim(),
+        gradeLevel: (row.grade_to_enroll || payload.gradeToEnroll || '').trim(),
+        section: '',
+        status: 'Information Updated',
+        submissionPayload: payload as unknown as Record<string, any>,
+      });
 
       setTopAlert({
         title: 'Information Updated',

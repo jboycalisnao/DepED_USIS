@@ -5,9 +5,11 @@ export const REGISTRAR_PUBLIC_ENROLLMENT_TABLE = 'registrar_public_enrollment_su
 
 type CreateSubmissionResult = {
   id: string;
+  submissionReferenceId?: string;
 };
 
 export type PublicEnrollmentSubmissionMutation = {
+  submission_reference_id?: string | null;
   school_id: string | null;
   school_year: string | null;
   lrn: string | null;
@@ -19,8 +21,19 @@ export type PublicEnrollmentSubmissionMutation = {
   payload: EnrollmentDraft;
 };
 
+const buildSubmissionReferenceId = () => {
+  const now = new Date();
+  const yyyy = String(now.getFullYear());
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  const rand = Math.floor(100000 + Math.random() * 900000);
+  return `USIS-ENR-${yyyy}${mm}${dd}-${rand}`;
+};
+
 export async function createPublicEnrollmentSubmission(draft: EnrollmentDraft): Promise<CreateSubmissionResult> {
+  const submissionReferenceId = buildSubmissionReferenceId();
   const payload = {
+    submission_reference_id: submissionReferenceId,
     school_id: draft.schoolId || null,
     school_year: draft.schoolYear || null,
     lrn: draft.lrn?.trim() ? draft.lrn.trim() : null,
@@ -35,20 +48,20 @@ export async function createPublicEnrollmentSubmission(draft: EnrollmentDraft): 
   const { data, error } = await supabase
     .from(REGISTRAR_PUBLIC_ENROLLMENT_TABLE)
     .insert(payload)
-    .select('id')
+    .select('id,submission_reference_id')
     .single();
 
   if (error) {
     throw error;
   }
 
-  return { id: String(data.id) };
+  return { id: String(data.id), submissionReferenceId: String((data as any).submission_reference_id || submissionReferenceId) };
 }
 
 export async function fetchPublicEnrollmentSubmissions(limit = 500): Promise<PublicEnrollmentSubmission[]> {
   const { data, error } = await supabase
     .from(REGISTRAR_PUBLIC_ENROLLMENT_TABLE)
-    .select('id,created_at,school_id,school_year,lrn,last_name,first_name,middle_name,grade_to_enroll,guardian_contact,payload')
+    .select('id,submission_reference_id,created_at,school_id,school_year,lrn,last_name,first_name,middle_name,grade_to_enroll,guardian_contact,payload')
     .order('created_at', { ascending: false })
     .limit(limit);
 
@@ -62,7 +75,7 @@ export async function fetchPublicEnrollmentSubmissions(limit = 500): Promise<Pub
 export async function fetchPublicEnrollmentSubmissionById(id: string): Promise<PublicEnrollmentSubmission | null> {
   const { data, error } = await supabase
     .from(REGISTRAR_PUBLIC_ENROLLMENT_TABLE)
-    .select('id,created_at,school_id,school_year,lrn,last_name,first_name,middle_name,grade_to_enroll,guardian_contact,payload')
+    .select('id,submission_reference_id,created_at,school_id,school_year,lrn,last_name,first_name,middle_name,grade_to_enroll,guardian_contact,payload')
     .eq('id', id)
     .maybeSingle();
 

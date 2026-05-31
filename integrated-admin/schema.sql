@@ -216,6 +216,15 @@ create index if not exists idx_coord_learner_ops_active on coordinator_learner_o
 create index if not exists idx_coord_learner_ops_learner_id on coordinator_learner_operation_credentials(learner_id);
 
 -- =========================================================
+-- Registrar Public Enrollment Submission Reference
+-- =========================================================
+alter table if exists public.registrar_public_enrollment_submissions
+  add column if not exists submission_reference_id text;
+
+create index if not exists idx_registrar_public_enroll_submission_reference_id
+  on public.registrar_public_enrollment_submissions using btree (submission_reference_id);
+
+-- =========================================================
 -- Coordinator Module Access (DB-backed)
 -- =========================================================
 create table if not exists coordinator_module_access (

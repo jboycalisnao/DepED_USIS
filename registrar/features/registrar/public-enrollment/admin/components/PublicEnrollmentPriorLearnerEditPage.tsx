@@ -14,6 +14,15 @@ const SAME_SCHOOL_LABEL = 'Same School';
 const SHS_GRADES = new Set(['Grade 11', 'Grade 12']);
 const gradeLevelOrder = gradeLevelOptions.map((level) => ({ label: level, value: Number(level.replace(/\D/g, '')) }));
 
+type LearnerEnrollmentHistoryRow = {
+  id: string;
+  schoolYear: string;
+  gradeLevel: string;
+  section: string;
+  status: string;
+  enrolledAt: string;
+};
+
 function normalizeSchoolYear(value: string) {
   const raw = String(value || '').trim();
   if (!raw) return '';
@@ -22,6 +31,26 @@ function normalizeSchoolYear(value: string) {
   if (match) return `${match[1]}-${match[2]}`;
   return normalized.toLowerCase();
 }
+
+const insertEnrollmentHistoryRow = async (input: {
+  learnerId: string;
+  schoolYear: string;
+  gradeLevel?: string;
+  section?: string;
+  status: string;
+  submissionPayload?: Record<string, any>;
+}) => {
+  await supabase.from('registrar_enrollment_history').insert({
+    learner_id: input.learnerId,
+    school_year: input.schoolYear || '',
+    grade_level: input.gradeLevel || null,
+    section: input.section || null,
+    status: input.status,
+    enrollment_date: new Date().toISOString(),
+    submission_payload: input.submissionPayload || {},
+    source: 'registrar.public-enrollment',
+  });
+};
 
 const emptyDraft = (schoolId: string): EnrollmentDraft => ({
   schoolId,
@@ -78,9 +107,19 @@ export default function PublicEnrollmentPriorLearnerEditPage() {
   const [draft, setDraft] = useState<EnrollmentDraft>(() => emptyDraft(schoolId));
   const [resolvedLearnerId, setResolvedLearnerId] = useState('');
   const [resolvedSchoolId, setResolvedSchoolId] = useState(schoolId);
+  const [latestPriorSchoolYear, setLatestPriorSchoolYear] = useState('');
+  const [latestPriorGradeLevel, setLatestPriorGradeLevel] = useState('');
   const [isTaggingReEnroll, setIsTaggingReEnroll] = useState(false);
+  const [deletingHistoryId, setDeletingHistoryId] = useState('');
   const [focusedSection, setFocusedSection] = useState<'enrollmentContext' | 'learnerInfo' | 'addressInfo' | 'guardianInfo' | null>(null);
+  const [enrollmentHistoryRows, setEnrollmentHistoryRows] = useState<LearnerEnrollmentHistoryRow[]>([]);
   const isSeniorHighTargetGrade = SHS_GRADES.has(draft.gradeToEnroll);
+
+  const formatDateTime = (value: string) => {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value || '--';
+    return date.toLocaleString();
+  };
 
   useEffect(() => {
     const loadActiveSchoolYear = async () => {
@@ -98,17 +137,29 @@ export default function PublicEnrollmentPriorLearnerEditPage() {
       try {
         const { data, error: learnerError } = await supabase
           .from('registrar_learners')
-          .select('id,school_id,lrn,first_name,middle_name,last_name,birth_date,gender,address,contact_number,guardian_name,father_name,mother_name,email,enrollment_history')
+          .select('id,school_id,lrn,first_name,middle_name,last_name,birth_date,gender,address,contact_number,guardian_name,father_name,mother_name,email')
           .eq('id', learnerId)
           .maybeSingle();
         if (learnerError || !data) throw new Error('Learner record not found.');
 
-        const history = Array.isArray((data as any).enrollment_history) ? (data as any).enrollment_history : [];
-        const priorEntries = history.filter((entry: any) => {
-          const sy = String(entry?.schoolYear || '').trim();
-          if (!sy) return false;
-          return !activeSchoolYearLabel || normalizeSchoolYear(sy) !== normalizeSchoolYear(activeSchoolYearLabel);
-        });
+        const { data: learnerHistoryRows } = await supabase
+          .from('registrar_enrollment_history')
+          .select('id,school_year,grade_level,section,status,submission_payload,enrollment_date,created_at')
+          .eq('learner_id', String((data as any).id || learnerId));
+        const priorEntries = (learnerHistoryRows || [])
+          .map((entry: any) => ({
+            schoolYear: String(entry?.school_year || '').trim(),
+            gradeLevel: String(entry?.grade_level || '').trim(),
+            section: String(entry?.section || '').trim(),
+            submissionPayload: entry?.submission_payload && typeof entry.submission_payload === 'object' ? entry.submission_payload : {},
+            sortAt: new Date(String(entry?.enrollment_date || entry?.created_at || 0)).getTime(),
+          }))
+          .filter((entry: any) => {
+            const sy = String(entry?.schoolYear || '').trim();
+            if (!sy) return false;
+            return !activeSchoolYearLabel || normalizeSchoolYear(sy) !== normalizeSchoolYear(activeSchoolYearLabel);
+          })
+          .sort((a: any, b: any) => a.sortAt - b.sortAt);
         const latestPriorEntry = priorEntries[priorEntries.length - 1] || {};
         const sourcePayload = (latestPriorEntry as any).submissionPayload || {};
         const sourceSchoolToEnroll = String(sourcePayload.schoolToEnroll || '').trim();
@@ -146,6 +197,20 @@ export default function PublicEnrollmentPriorLearnerEditPage() {
         if (cancelled) return;
         setResolvedLearnerId(String((data as any).id || learnerId));
         setResolvedSchoolId(nextSchoolId);
+        setLatestPriorSchoolYear(String((latestPriorEntry as any).schoolYear || '').trim());
+        setLatestPriorGradeLevel(String((latestPriorEntry as any).gradeLevel || '').trim());
+        setEnrollmentHistoryRows(
+          (learnerHistoryRows || [])
+            .map((entry: any) => ({
+              id: String(entry?.id || crypto.randomUUID()),
+              schoolYear: String(entry?.school_year || '').trim(),
+              gradeLevel: String(entry?.grade_level || '').trim(),
+              section: String(entry?.section || '').trim(),
+              status: String(entry?.status || '').trim(),
+              enrolledAt: String(entry?.enrollment_date || entry?.created_at || '').trim(),
+            }))
+            .sort((a, b) => new Date(b.enrolledAt || 0).getTime() - new Date(a.enrolledAt || 0).getTime()),
+        );
         setDraft(mappedDraft);
         publishEnrollmentKioskState({
           selectedLearner: {
@@ -181,18 +246,52 @@ export default function PublicEnrollmentPriorLearnerEditPage() {
 
   useEffect(() => {
     if (!isSeniorHighTargetGrade) {
-      if (!draft.strand && !draft.semester) return;
-      setDraft((current) => ({ ...current, strand: '', semester: '' }));
+      if (!draft.track && !draft.strand && !draft.semester) return;
+      setDraft((current) => ({ ...current, track: '', strand: '', semester: '' }));
       return;
     }
+    if (!draft.track) setDraft((current) => ({ ...current, track: 'Academic Track' }));
     if (!draft.semester) setDraft((current) => ({ ...current, semester: semesterOptions[0] }));
-  }, [isSeniorHighTargetGrade, draft.strand, draft.semester]);
+  }, [isSeniorHighTargetGrade, draft.track, draft.strand, draft.semester]);
+
+  const deleteEnrollmentHistoryEntry = async (rowId: string) => {
+    if (!rowId || !resolvedLearnerId) return;
+    const confirmed = window.confirm('Delete this enrollment history record? This action cannot be undone.');
+    if (!confirmed) return;
+    setDeletingHistoryId(rowId);
+    setError(null);
+    try {
+      const { error: deleteError } = await supabase.from('registrar_enrollment_history').delete().eq('id', rowId);
+      if (deleteError) throw deleteError;
+
+      const nextRows = enrollmentHistoryRows.filter((entry) => entry.id !== rowId);
+      setEnrollmentHistoryRows(nextRows);
+
+      const latestPrior = nextRows
+        .filter((entry) => {
+          const sy = String(entry.schoolYear || '').trim();
+          if (!sy) return false;
+          return !activeSchoolYearLabel || normalizeSchoolYear(sy) !== normalizeSchoolYear(activeSchoolYearLabel);
+        })
+        .sort((a, b) => new Date(a.enrolledAt || 0).getTime() - new Date(b.enrolledAt || 0).getTime())
+        .at(-1);
+      setLatestPriorSchoolYear(String(latestPrior?.schoolYear || '').trim());
+      setLatestPriorGradeLevel(String(latestPrior?.gradeLevel || '').trim());
+    } catch (e: any) {
+      setError(e?.message || 'Unable to delete enrollment history record.');
+    } finally {
+      setDeletingHistoryId('');
+    }
+  };
 
   useEffect(() => {
     publishEnrollmentKioskState({
       isEditing: true,
       draft,
     });
+  }, [draft]);
+
+  useEffect(() => {
     return () => {
       publishEnrollmentKioskState({
         isEditing: false,
@@ -200,7 +299,7 @@ export default function PublicEnrollmentPriorLearnerEditPage() {
         focusedSection: null,
       });
     };
-  }, [draft]);
+  }, []);
 
   const focusSectionInKiosk = (section: 'enrollmentContext' | 'learnerInfo' | 'addressInfo' | 'guardianInfo') => {
     setFocusedSection(section);
@@ -242,11 +341,11 @@ export default function PublicEnrollmentPriorLearnerEditPage() {
         .maybeSingle();
 
       const activeSchoolYear = String((activeYearRow as any)?.label || '').trim();
-      const sourceLastGrade = String(draft.gradeToEnroll || draft.lastGradeLevel || '').trim();
+      const sourceLastGrade = String(latestPriorGradeLevel || draft.lastGradeLevel || '').trim();
       const sourceLastGradeNum = Number(sourceLastGrade.replace(/\D/g, ''));
       const nextGradeLabel = Number.isFinite(sourceLastGradeNum)
-        ? gradeLevelOrder.find((grade) => grade.value === sourceLastGradeNum + 1)?.label || draft.gradeToEnroll
-        : draft.gradeToEnroll;
+        ? gradeLevelOrder.find((grade) => grade.value === sourceLastGradeNum + 1)?.label || ''
+        : '';
       const enrolledSchool = String(draft.schoolToEnroll || draft.previousSchool || 'Leon National High School').trim();
 
       setDraft((current) => ({
@@ -256,7 +355,7 @@ export default function PublicEnrollmentPriorLearnerEditPage() {
         learnerCategory: SAME_SCHOOL_LABEL,
         schoolToEnroll: enrolledSchool,
         previousSchool: enrolledSchool,
-        previousSchoolYear: current.schoolYear || current.previousSchoolYear,
+        previousSchoolYear: latestPriorSchoolYear || current.previousSchoolYear,
         lastGradeLevel: sourceLastGrade || current.lastGradeLevel,
         gradeToEnroll: nextGradeLabel || current.gradeToEnroll,
         track: current.track || 'Academic Track',
@@ -276,23 +375,11 @@ export default function PublicEnrollmentPriorLearnerEditPage() {
 
       const { data: existingLearner, error: findError } = await supabase
         .from('registrar_learners')
-        .select('enrollment_history')
+        .select('id')
         .eq('id', resolvedLearnerId)
         .maybeSingle();
       if (findError) throw findError;
-
-      const nextHistory = [
-        ...(Array.isArray((existingLearner as any)?.enrollment_history) ? (existingLearner as any).enrollment_history : []),
-        {
-          id: crypto.randomUUID(),
-          schoolYear: draft.schoolYear || '',
-          gradeLevel: draft.gradeToEnroll || '',
-          section: '',
-          enrollmentDate: new Date().toISOString(),
-          status: 'Information Updated',
-          submissionPayload: draft,
-        },
-      ];
+      if (!existingLearner?.id) throw new Error('Learner record not found.');
 
       const updatePayload: Record<string, any> = {
         school_id: resolvedSchoolId || schoolId,
@@ -308,11 +395,18 @@ export default function PublicEnrollmentPriorLearnerEditPage() {
         father_name: draft.fatherName.trim() || null,
         mother_name: draft.motherName.trim() || null,
         email: draft.email.trim() || null,
-        enrollment_history: nextHistory,
       };
 
       const { error: updateError } = await supabase.from('registrar_learners').update(updatePayload).eq('id', resolvedLearnerId);
       if (updateError) throw updateError;
+      await insertEnrollmentHistoryRow({
+        learnerId: resolvedLearnerId,
+        schoolYear: draft.schoolYear || '',
+        gradeLevel: draft.gradeToEnroll || '',
+        section: '',
+        status: 'Information Updated',
+        submissionPayload: draft as unknown as Record<string, any>,
+      });
 
       await refreshData(true);
       navigate('/enroll');
@@ -351,6 +445,51 @@ export default function PublicEnrollmentPriorLearnerEditPage() {
           focusedSection={focusedSection}
           onUnfocusSection={unfocusSectionInKiosk}
         />
+        <section className="table-card" aria-label="Learner enrollment history">
+          <div style={{ padding: '10px 14px', fontWeight: 700, color: 'var(--deped-blue)', borderBottom: '1px solid var(--line)' }}>
+            Enrollment History
+          </div>
+          {enrollmentHistoryRows.length ? (
+            <table className="usis-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>School Year</th>
+                  <th>Grade Level</th>
+                  <th>Section</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {enrollmentHistoryRows.map((row) => (
+                  <tr key={row.id}>
+                    <td>{formatDateTime(row.enrolledAt)}</td>
+                    <td>{row.schoolYear || '--'}</td>
+                    <td>{row.gradeLevel || '--'}</td>
+                    <td>{row.section || '--'}</td>
+                    <td>{row.status || '--'}</td>
+                    <td>
+                      <button
+                        type="button"
+                        className="secondary-button"
+                        style={{ minHeight: 32, padding: '0 10px' }}
+                        onClick={() => deleteEnrollmentHistoryEntry(row.id)}
+                        disabled={isSaving || deletingHistoryId === row.id}
+                      >
+                        {deletingHistoryId === row.id ? 'Deleting...' : 'Delete'}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <div style={{ padding: 14, color: 'var(--deped-muted)', fontSize: 13 }}>
+              No enrollment history rows found for this learner.
+            </div>
+          )}
+        </section>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
           <button type="button" className="secondary-button" onClick={() => navigate('/enroll')} disabled={isSaving}>Cancel</button>
           <button type="button" className="primary-button" onClick={save} disabled={isSaving}>{isSaving ? 'Saving...' : 'Save Learner Information'}</button>

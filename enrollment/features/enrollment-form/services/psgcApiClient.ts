@@ -5,6 +5,7 @@ export type PsgcLocation = {
 };
 
 const PSGC_BASE_URLS = ['https://psgc.cloud/api', 'https://psgc.gitlab.io/api'];
+const isValidPsgcLocalityCode = (value: string) => /^\d{9,10}$/.test(String(value || '').trim());
 
 async function getJson(path: string) {
   let lastError = '';
@@ -108,7 +109,7 @@ export async function fetchPsgcCitiesAndMunicipalitiesByRegion(regionCode: strin
 
 export async function fetchPsgcBarangaysByLocality(localityCode: string): Promise<PsgcLocation[]> {
   const normalizedCode = String(localityCode || '').trim();
-  if (!normalizedCode) return [];
+  if (!normalizedCode || !isValidPsgcLocalityCode(normalizedCode)) return [];
 
   const tryPaths = [`/cities/${normalizedCode}/barangays`, `/municipalities/${normalizedCode}/barangays`];
   for (const path of tryPaths) {
