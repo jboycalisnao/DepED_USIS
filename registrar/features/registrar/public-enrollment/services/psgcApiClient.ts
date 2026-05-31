@@ -4,12 +4,10 @@ export type PsgcLocation = {
   type?: string;
 };
 
-const PSGC_BASE_URL = 'https://psgc.cloud/api';
-
 async function getJson(path: string) {
-  const response = await fetch(`${PSGC_BASE_URL}${path}`);
+  const response = await fetch(path);
   if (!response.ok) {
-    throw new Error(`PSGC API request failed (${response.status}).`);
+    throw new Error(`PSGC API request failed (${response.status}) for ${path}.`);
   }
   return response.json();
 }
@@ -26,30 +24,16 @@ const normalizeRows = (payload: any): PsgcLocation[] =>
     : [];
 
 export async function fetchPsgcRegions(): Promise<PsgcLocation[]> {
-  const payload = await getJson('/regions');
+  const payload = await getJson('/api/psgc?type=regions');
   return normalizeRows(payload);
 }
 
 export async function fetchPsgcProvinces(): Promise<PsgcLocation[]> {
-  const payload = await getJson('/provinces');
+  const payload = await getJson('/api/psgc?type=provinces');
   return normalizeRows(payload);
 }
 
 export async function fetchPsgcCitiesAndMunicipalities(): Promise<PsgcLocation[]> {
-  const [citiesPayload, municipalitiesPayload] = await Promise.all([
-    getJson('/cities'),
-    getJson('/municipalities'),
-  ]);
-
-  const merged = [...normalizeRows(citiesPayload), ...normalizeRows(municipalitiesPayload)];
-  const seen = new Set<string>();
-  const unique: PsgcLocation[] = [];
-  for (const row of merged) {
-    const key = `${row.code}:${row.name.toLowerCase()}`;
-    if (!seen.has(key)) {
-      seen.add(key);
-      unique.push(row);
-    }
-  }
-  return unique;
+  const payload = await getJson('/api/psgc?type=cities');
+  return normalizeRows(payload);
 }

@@ -1,6 +1,6 @@
 import { FormEvent, useMemo, useRef, useState } from 'react';
 import { useEffect } from 'react';
-import { SearchableSelect } from '../../../components/ui/SearchableSelect';
+import { UsisSearchableSelect } from '../../../../common/components/ui/UsisSearchableSelect';
 import { supabase } from '../../../lib/supabase';
 import {
   deviceOptions,
@@ -729,9 +729,9 @@ export function EnrollmentFormPage() {
                     options={learnerCategoryOptions as unknown as string[]}
                     disabled={draft.studentType === 'Continuing Student' || lrnLookupState.status === 'matched'}
                   />
-                  <SearchableSelect
+                  <UsisSearchableSelect
+                    ariaLabel="Previous School Attended"
                     label="Previous School Attended"
-                    placeholder="Search by school name or ID (DepEd API active schools)"
                     floatingLabel
                     showLabel={false}
                     value={selectedPreviousSchoolValue}
@@ -743,6 +743,7 @@ export function EnrollmentFormPage() {
                     requireQueryBeforeOptions={draft.learnerCategory !== SAME_SCHOOL_LABEL}
                     minQueryLength={1}
                     serverSearch
+                    forceInlineMenu
                     disabled={draft.learnerCategory === SAME_SCHOOL_LABEL}
                     options={
                       draft.learnerCategory === SAME_SCHOOL_LABEL

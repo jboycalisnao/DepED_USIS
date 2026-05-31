@@ -1,4 +1,4 @@
-import { SearchableSelect } from '../../../../components/ui/SearchableSelect';
+import { UsisSearchableSelect } from '../../../../../common/components/ui/UsisSearchableSelect';
 
 type BaseFieldProps = {
   label: string;
@@ -37,5 +37,17 @@ export function DateField({ label, value, onChange, required = false, disabled =
 type SelectFieldProps = BaseFieldProps & { options: Array<{ value: string; label: string }> | string[] };
 export function SelectField({ label, value, onChange, options, disabled = false }: SelectFieldProps) {
   const normalizedOptions = typeof options[0] === 'string' ? (options as string[]).map((option) => ({ value: option, label: option })) : (options as Array<{ value: string; label: string }>);
-  return <SearchableSelect label={label} placeholder={label} floatingLabel showLabel={false} value={value} onChange={onChange} disabled={disabled} options={normalizedOptions} />;
+  return (
+    <UsisSearchableSelect
+      ariaLabel={label}
+      label={label}
+      floatingLabel
+      showLabel={false}
+      value={value}
+      onChange={onChange}
+      disabled={disabled}
+      options={normalizedOptions}
+      forceInlineMenu
+    />
+  );
 }

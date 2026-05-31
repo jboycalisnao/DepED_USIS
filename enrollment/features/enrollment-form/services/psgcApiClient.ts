@@ -4,14 +4,19 @@ export type PsgcLocation = {
   type?: string;
 };
 
-const PSGC_BASE_URL = 'https://psgc.cloud/api';
+const PSGC_BASE_URLS = ['https://psgc.cloud/api', 'https://psgc.gitlab.io/api'];
 
 async function getJson(path: string) {
-  const response = await fetch(`${PSGC_BASE_URL}${path}`);
-  if (!response.ok) {
-    throw new Error(`PSGC API request failed (${response.status}).`);
+  let lastError = '';
+  for (const baseUrl of PSGC_BASE_URLS) {
+    const response = await fetch(`${baseUrl}${path}`);
+    if (!response.ok) {
+      lastError = `PSGC API request failed (${response.status}) at ${baseUrl}${path}.`;
+      continue;
+    }
+    return response.json();
   }
-  return response.json();
+  throw new Error(lastError || 'PSGC API request failed.');
 }
 
 const normalizeRows = (payload: any): PsgcLocation[] =>

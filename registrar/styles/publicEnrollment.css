@@ -22,9 +22,60 @@
   font-family: var(--deped-font);
 }
 
+.registrar-public-enrollment__panel {
+  border: 1px solid rgba(18, 35, 61, 0.14);
+}
+
+.registrar-public-enrollment__hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.registrar-public-enrollment__eyebrow {
+  margin: 0 0 4px;
+  color: var(--deped-muted);
+  font-size: var(--usis-helper-size);
+  font-weight: 600;
+}
+
+.registrar-public-enrollment__hero-meta {
+  display: grid;
+  gap: 10px;
+  min-width: 260px;
+}
+
+.registrar-public-enrollment__hero-chip {
+  border: 1px solid rgba(18, 35, 61, 0.14);
+  border-radius: 12px;
+  background: #f7f9fd;
+  padding: 10px 12px;
+  display: grid;
+  gap: 2px;
+}
+
+.registrar-public-enrollment__hero-chip span {
+  color: var(--deped-muted);
+  font-size: var(--usis-helper-size);
+}
+
+.registrar-public-enrollment__hero-chip strong {
+  color: var(--deped-blue);
+  font-size: 14px;
+  font-weight: 700;
+}
+
 .registrar-public-enrollment__section {
   display: grid;
   gap: 14px;
+}
+
+.registrar-public-enrollment__section--boxed {
+  border: 1px solid rgba(18, 35, 61, 0.1);
+  border-radius: 12px;
+  background: #fcfdff;
+  padding: 16px;
 }
 
 .registrar-public-enrollment__section h3 {
@@ -51,6 +102,34 @@
   color: var(--deped-muted);
   font-size: var(--usis-helper-size);
   line-height: 1.6;
+}
+
+.registrar-public-enrollment__same-address {
+  margin-top: 12px;
+}
+
+.year-pair-field {
+  grid-column: span 2;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+
+.year-pair-field__label-wrap {
+  grid-column: 1 / -1;
+  margin-bottom: 2px;
+}
+
+.year-pair-field__label {
+  font-size: var(--usis-helper-size);
+  font-weight: 700;
+  color: var(--deped-muted);
+}
+
+.year-pair-field__divider {
+  font-weight: 700;
+  color: var(--deped-blue);
 }
 
 .registrar-public-enrollment .floating-field__control select,
@@ -179,6 +258,18 @@
 @media (max-width: 720px) {
   .registrar-public-enrollment .portal-panel__body {
     padding: 16px;
+  }
+
+  .registrar-public-enrollment__hero {
+    display: grid;
+  }
+
+  .registrar-public-enrollment__hero-meta {
+    min-width: 0;
+  }
+
+  .year-pair-field {
+    grid-column: span 1;
   }
 }
 

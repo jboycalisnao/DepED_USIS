@@ -121,7 +121,7 @@ export default function PublicEnrollmentPriorLearnerEditPage() {
           studentType: normalizeLearnerType(String(sourcePayload.studentType || 'Continuing Learner')) || 'Continuing Learner',
           learnerCategory: SAME_SCHOOL_LABEL,
           schoolId: nextSchoolId,
-          schoolYear: String((latestPriorEntry as any).schoolYear || ''),
+          schoolYear: String(activeSchoolYearLabel || (latestPriorEntry as any).schoolYear || ''),
           schoolToEnroll: sourceSchoolToEnroll,
           previousSchool: sourcePreviousSchool || sourceSchoolToEnroll,
           lrn: String((data as any).lrn || ''),

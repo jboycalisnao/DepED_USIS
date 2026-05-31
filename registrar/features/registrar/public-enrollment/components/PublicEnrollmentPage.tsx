@@ -2,7 +2,7 @@ import { FormEvent, useMemo, useRef, useState } from 'react';
 import { useEffect } from 'react';
 import { RegistrarHeader } from '../../../../components/shell/RegistrarHeader';
 import { RegistrarFooter } from '../../../../components/shell/RegistrarFooter';
-import { SearchableSelect } from '../../../../components/ui/SearchableSelect';
+import { UsisSearchableSelect } from '../../../../../common/components/ui/UsisSearchableSelect';
 import { supabase } from '../../../../lib/supabase';
 import UsisPageLoader from '../../../../../common/components/UsisPageLoader';
 import {
@@ -24,6 +24,7 @@ import {
   fetchPsgcRegions,
   type PsgcLocation,
 } from '../services/psgcApiClient';
+import { DateField, SelectField, TextField, YearPairField } from '../shared/PublicEnrollmentFields';
 
 import '../../../../styles/publicEnrollment.css';
 
@@ -153,6 +154,7 @@ export default function PublicEnrollmentPage() {
   const [sameAsPermanent, setSameAsPermanent] = useState(false);
   const [strandOptions, setStrandOptions] = useState<Array<{ value: string; label: string }>>([]);
   const isSeniorHighTargetGrade = SHS_GRADES.has(draft.gradeToEnroll);
+  const [lastFetchedLrn, setLastFetchedLrn] = useState('');
 
   useEffect(() => {
     let isMounted = true;
@@ -160,7 +162,7 @@ export default function PublicEnrollmentPage() {
     const loadPageSetup = async () => {
       setIsPageLoading(true);
       try {
-        const [activeYearResult, strandsResult, regionRows, provinceRows, cityRows] = await Promise.all([
+        const [activeYearResult, strandsResult, regionResult, provinceResult, cityResult] = await Promise.allSettled([
           supabase.from('registrar_school_years').select('label').eq('is_active', true).limit(1).maybeSingle(),
           supabase.from('registrar_strands').select('acronym, full_name').order('acronym', { ascending: true }),
           fetchPsgcRegions(),
@@ -170,22 +172,30 @@ export default function PublicEnrollmentPage() {
 
         if (!isMounted) return;
 
-        if (!activeYearResult.error && activeYearResult.data?.label) {
-          setDraft((current) => ({ ...current, schoolYear: String(activeYearResult.data.label), schoolId: LEON_NHS_ID, schoolToEnroll: LEON_NHS_NAME }));
+        if (activeYearResult.status === 'fulfilled' && !activeYearResult.value.error && activeYearResult.value.data?.label) {
+          setDraft((current) => ({ ...current, schoolYear: String(activeYearResult.value.data.label), schoolId: LEON_NHS_ID, schoolToEnroll: LEON_NHS_NAME }));
         }
 
-        if (!strandsResult.error && strandsResult.data?.length) {
+        if (strandsResult.status === 'fulfilled' && !strandsResult.value.error && strandsResult.value.data?.length) {
           setStrandOptions(
-            strandsResult.data.map((row) => ({
+            strandsResult.value.data.map((row) => ({
               value: String(row.acronym || '').trim(),
               label: String(row.full_name || row.acronym || '').trim(),
             }))
           );
         }
 
-        setRegions(regionRows);
-        setProvinces(provinceRows);
-        setCities(cityRows);
+        if (regionResult.status === 'fulfilled') setRegions(regionResult.value);
+        if (provinceResult.status === 'fulfilled') setProvinces(provinceResult.value);
+        if (cityResult.status === 'fulfilled') setCities(cityResult.value);
+
+        if (regionResult.status === 'rejected' || provinceResult.status === 'rejected' || cityResult.status === 'rejected') {
+          setModalNotice({
+            type: 'error',
+            title: 'Address Data Notice',
+            message: 'Some address lookup lists were not fully loaded. Please refresh and try again.',
+          });
+        }
       } catch (error: any) {
         if (!isMounted) return;
         setModalNotice({
@@ -275,7 +285,77 @@ export default function PublicEnrollmentPage() {
     }
   }, [isSeniorHighTargetGrade, draft.strand, draft.semester]);
 
+  useEffect(() => {
+    const normalizedLrn = digitsOnly(String(draft.lrn || ''));
+    if (normalizedLrn.length !== 12 || normalizedLrn === lastFetchedLrn) return;
+
+    let cancelled = false;
+    const loadLearnerByLrn = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('registrar_learners')
+          .select('lrn,first_name,middle_name,last_name,birth_date,gender,address,contact_number,guardian_name,father_name,mother_name,email,is_4ps,enrollment_history')
+          .eq('lrn', normalizedLrn)
+          .maybeSingle();
+
+        if (cancelled || error || !data) return;
+
+        const history = Array.isArray((data as any).enrollment_history) ? (data as any).enrollment_history : [];
+        const latestEntry = history[history.length - 1] || {};
+        const payload = (latestEntry as any).submissionPayload || {};
+
+        setDraft((current) => ({
+          ...current,
+          lrn: normalizedLrn,
+          firstName: String((data as any).first_name || payload.firstName || current.firstName || '').trim(),
+          middleName: String((data as any).middle_name || payload.middleName || current.middleName || '').trim(),
+          lastName: String((data as any).last_name || payload.lastName || current.lastName || '').trim(),
+          birthDate: String((data as any).birth_date || payload.birthDate || current.birthDate || '').trim(),
+          gender: String((data as any).gender || payload.gender || current.gender || 'Male').trim(),
+          currentAddress: String((data as any).address || payload.currentAddress || current.currentAddress || '').trim(),
+          permanentAddress: String(payload.permanentAddress || (data as any).address || current.permanentAddress || '').trim(),
+          learnerContact: String((data as any).contact_number || payload.learnerContact || current.learnerContact || '').trim(),
+          guardianName: String((data as any).guardian_name || payload.guardianName || current.guardianName || '').trim(),
+          fatherName: String((data as any).father_name || payload.fatherName || current.fatherName || '').trim(),
+          motherName: String((data as any).mother_name || payload.motherName || current.motherName || '').trim(),
+          email: String((data as any).email || payload.email || current.email || '').trim(),
+          is4Ps: (data as any).is_4ps === true ? 'Yes' : String(payload.is4Ps || current.is4Ps || 'No'),
+          schoolToEnroll: String(payload.schoolToEnroll || current.schoolToEnroll || LEON_NHS_NAME).trim(),
+          previousSchool: String(payload.previousSchool || current.previousSchool || '').trim(),
+          previousSchoolYear: String(payload.previousSchoolYear || current.previousSchoolYear || '').trim(),
+          lastGradeLevel: String(payload.lastGradeLevel || current.lastGradeLevel || '').trim(),
+          gradeToEnroll: String(payload.gradeToEnroll || current.gradeToEnroll || '').trim(),
+          track: String(payload.track || current.track || 'Academic Track').trim(),
+          strand: String(payload.strand || current.strand || '').trim(),
+          semester: String(payload.semester || current.semester || '').trim(),
+          placeOfBirth: String(payload.placeOfBirth || current.placeOfBirth || '').trim(),
+          motherTongue: String(payload.motherTongue || current.motherTongue || '').trim(),
+          religion: String(payload.religion || current.religion || 'Roman Catholic').trim(),
+          fourPsHouseholdId: String(payload.fourPsHouseholdId || current.fourPsHouseholdId || '').trim(),
+          fatherContact: String(payload.fatherContact || current.fatherContact || '').trim(),
+          motherContact: String(payload.motherContact || current.motherContact || '').trim(),
+          guardianContact: String(payload.guardianContact || current.guardianContact || '').trim(),
+          hasSpedNeed: String(payload.hasSpedNeed || current.hasSpedNeed || 'No').trim(),
+          preferredModality: String(payload.preferredModality || current.preferredModality || modalityOptions[0]).trim(),
+          deviceAccess: String(payload.deviceAccess || current.deviceAccess || deviceOptions[0]).trim(),
+          hasInternet: String(payload.hasInternet || current.hasInternet || 'Yes').trim(),
+        }));
+        setLastFetchedLrn(normalizedLrn);
+      } catch {
+        // Keep manual entry flow when learner lookup fails.
+      }
+    };
+
+    void loadLearnerByLrn();
+    return () => {
+      cancelled = true;
+    };
+  }, [draft.lrn, lastFetchedLrn]);
+
   const updateField = (name: keyof EnrollmentDraft, value: string | boolean) => {
+    if (name === 'lrn' && typeof value === 'string') {
+      setLastFetchedLrn('');
+    }
     setDraft((current) => ({ ...current, [name]: value }));
   };
 
@@ -370,29 +450,42 @@ export default function PublicEnrollmentPage() {
       <main className="page-frame registrar-public-enrollment">
         <div className="content-width">
           <section className="section-shell">
-            <div className="portal-panel">
-              <header className="portal-panel__header">
-                <h2>Basic Education Enrollment Form</h2>
-                <p>This form is not for sale. Revised based on DepEd enrollment template.</p>
+            <div className="portal-panel registrar-public-enrollment__panel">
+              <header className="portal-panel__header registrar-public-enrollment__hero">
+                <div>
+                  <p className="registrar-public-enrollment__eyebrow">Public Enrollment</p>
+                  <h2>Basic Education Enrollment Form</h2>
+                  <p>This form is not for sale. Revised based on DepEd enrollment template.</p>
+                </div>
+                <div className="registrar-public-enrollment__hero-meta">
+                  <div className="registrar-public-enrollment__hero-chip">
+                    <span>School ID</span>
+                    <strong>{LEON_NHS_ID}</strong>
+                  </div>
+                  <div className="registrar-public-enrollment__hero-chip">
+                    <span>School Name</span>
+                    <strong>{LEON_NHS_NAME}</strong>
+                  </div>
+                </div>
               </header>
 
               <form className="portal-panel__body registrar-public-enrollment__form" onSubmit={handleSubmit}>
-                <section className="registrar-public-enrollment__section">
+                <section className="registrar-public-enrollment__section registrar-public-enrollment__section--boxed">
                   <div className="notice-box">
                     <strong>School to Enroll</strong>
                     <span>{LEON_NHS_NAME} ({LEON_NHS_ID})</span>
                   </div>
                 </section>
 
-                <section className="registrar-public-enrollment__section">
+                <section className="registrar-public-enrollment__section registrar-public-enrollment__section--boxed">
                   <h3>1. Enrollment Context</h3>
                   <div className="floating-field-grid">
                     <TextField label="School Year (Active Registrar Year)" value={draft.schoolYear} onChange={() => {}} disabled />
                     <SelectField label="Learner Type" value={draft.studentType} onChange={(value) => updateField('studentType', value)} options={studentTypeOptions as unknown as string[]} />
                     <SelectField label="Learner Category" value={draft.learnerCategory} onChange={(value) => updateField('learnerCategory', value)} options={learnerCategoryOptions as unknown as string[]} />
-                    <SearchableSelect
+                    <UsisSearchableSelect
+                      ariaLabel="Previous School Attended"
                       label="Previous School Attended"
-                      placeholder="Search by school name or ID (DepEd API active schools)"
                       floatingLabel
                       showLabel={false}
                       value={selectedPreviousSchoolValue}
@@ -404,6 +497,7 @@ export default function PublicEnrollmentPage() {
                       requireQueryBeforeOptions
                       minQueryLength={1}
                       serverSearch
+                      forceInlineMenu
                       options={previousSchoolOptions.map((entry) => ({
                         value: `${entry.schoolId}::${entry.schoolName}`,
                         label: `${entry.schoolName} (${entry.schoolId})`,
@@ -444,7 +538,7 @@ export default function PublicEnrollmentPage() {
                   </div>
                 </section>
 
-                <section className="registrar-public-enrollment__section">
+                <section className="registrar-public-enrollment__section registrar-public-enrollment__section--boxed">
                   <h3>2. Learner Personal Information</h3>
                   <div className="floating-field-grid">
                     <TextField label="PSA Birth Certificate No." value={draft.birthCertificateNo} onChange={(value) => updateField('birthCertificateNo', value)} />
@@ -465,7 +559,7 @@ export default function PublicEnrollmentPage() {
                   </div>
                 </section>
 
-                <section className="registrar-public-enrollment__section">
+                <section className="registrar-public-enrollment__section registrar-public-enrollment__section--boxed">
                   <h3>3. Address Information</h3>
                   <div className="notice-box">
                     <strong>Permanent Address</strong>
@@ -496,7 +590,7 @@ export default function PublicEnrollmentPage() {
                       onChange={(value) => setPermanentAddress((current) => ({ ...current, streetLine: value }))}
                     />
                   </div>
-                  <label className="choice-row" style={{ marginTop: 12 }}>
+                  <label className="choice-row registrar-public-enrollment__same-address">
                     <input type="checkbox" checked={sameAsPermanent} onChange={(event) => setSameAsPermanent(event.target.checked)} />
                     <span>Current address is same as permanent address.</span>
                   </label>
@@ -535,7 +629,7 @@ export default function PublicEnrollmentPage() {
                   </div>
                 </section>
 
-                <section className="registrar-public-enrollment__section">
+                <section className="registrar-public-enrollment__section registrar-public-enrollment__section--boxed">
                   <h3>4. Parent and Guardian Information</h3>
                   <div className="floating-field-grid">
                     <TextField label="Father's Full Name" value={draft.fatherName} onChange={(value) => updateField('fatherName', value)} />
@@ -547,7 +641,7 @@ export default function PublicEnrollmentPage() {
                   </div>
                 </section>
 
-                <section className="registrar-public-enrollment__section">
+                <section className="registrar-public-enrollment__section registrar-public-enrollment__section--boxed">
                   <h3>5. Learning Modality and Access</h3>
                   <div className="floating-field-grid">
                     <SelectField label="Special Needs Education Program" value={draft.hasSpedNeed} onChange={(value) => updateField('hasSpedNeed', value)} options={['Yes', 'No']} />
@@ -557,12 +651,14 @@ export default function PublicEnrollmentPage() {
                   </div>
                 </section>
 
-                <section className="notice-box registrar-public-enrollment__consent">
-                  <strong>Validate Entry</strong>
-                  <label className="choice-row">
-                    <input type="checkbox" checked={draft.consent} onChange={(event) => updateField('consent', event.target.checked)} />
-                    <span>I certify that the information provided is true and correct and I authorize DepEd to process learner data in compliance with the Data Privacy Act of 2012.</span>
-                  </label>
+                <section className="registrar-public-enrollment__section registrar-public-enrollment__section--boxed">
+                  <div className="notice-box registrar-public-enrollment__consent">
+                    <strong>Validate Entry</strong>
+                    <label className="choice-row">
+                      <input type="checkbox" checked={draft.consent} onChange={(event) => updateField('consent', event.target.checked)} />
+                      <span>I certify that the information provided is true and correct and I authorize DepEd to process learner data in compliance with the Data Privacy Act of 2012.</span>
+                    </label>
+                  </div>
                 </section>
 
                 <div className="form-actions">
@@ -599,105 +695,5 @@ export default function PublicEnrollmentPage() {
       ) : null}
       <RegistrarFooter />
     </>
-  );
-}
-
-type BaseFieldProps = {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  required?: boolean;
-  inputMode?: 'text' | 'search' | 'none' | 'tel' | 'url' | 'email' | 'numeric' | 'decimal';
-  maxLength?: number;
-  pattern?: string;
-  type?: string;
-  disabled?: boolean;
-};
-
-function TextField({ label, value, onChange, required = false, inputMode, maxLength, pattern, type = 'text', disabled = false }: BaseFieldProps) {
-  return (
-    <label className="floating-field">
-      <div className="floating-field__control">
-        <input
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          placeholder=" "
-          required={required}
-          inputMode={inputMode}
-          maxLength={maxLength}
-          pattern={pattern}
-          type={type}
-          disabled={disabled}
-        />
-        <span>{label}</span>
-      </div>
-    </label>
-  );
-}
-
-function DateField({ label, value, onChange, required = false, disabled = false }: BaseFieldProps) {
-  return (
-    <label className="floating-field">
-      <div className="floating-field__control">
-        <input type="date" value={value} onChange={(event) => onChange(event.target.value)} placeholder=" " required={required} disabled={disabled} />
-        <span>{label}</span>
-      </div>
-    </label>
-  );
-}
-
-type YearPairFieldProps = {
-  startYear: string;
-  endYear: string;
-  onStartYearChange: (value: string) => void;
-  onEndYearChange: (value: string) => void;
-};
-
-function YearPairField({ startYear, endYear, onStartYearChange, onEndYearChange }: YearPairFieldProps) {
-  return (
-    <div style={{ gridColumn: 'span 2', display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: 8 }}>
-      <div style={{ gridColumn: '1 / -1', marginBottom: 2 }}>
-        <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--deped-muted)' }}>
-          Last School Year Attended (Previous S.Y.)
-        </span>
-      </div>
-      <label className="floating-field" style={{ marginBottom: 0 }}>
-        <div className="floating-field__control">
-          <input value={startYear} onChange={(event) => onStartYearChange(event.target.value)} placeholder=" " inputMode="numeric" maxLength={4} />
-          <span>Start Year</span>
-        </div>
-      </label>
-      <span style={{ fontWeight: 900, color: 'var(--deped-blue)' }}>-</span>
-      <label className="floating-field" style={{ marginBottom: 0 }}>
-        <div className="floating-field__control">
-          <input value={endYear} onChange={(event) => onEndYearChange(event.target.value)} placeholder=" " inputMode="numeric" maxLength={4} />
-          <span>End Year</span>
-        </div>
-      </label>
-    </div>
-  );
-}
-
-type SelectFieldProps = BaseFieldProps & {
-  options: Array<{ value: string; label: string }> | string[];
-};
-
-function SelectField({ label, value, onChange, options, disabled = false }: SelectFieldProps) {
-  const normalizedOptions =
-    typeof options[0] === 'string'
-      ? (options as string[]).map((option) => ({ value: option, label: option }))
-      : (options as Array<{ value: string; label: string }>);
-
-  return (
-    <SearchableSelect
-      label={label}
-      placeholder={label}
-      floatingLabel
-      showLabel={false}
-      value={value}
-      onChange={onChange}
-      disabled={disabled}
-      options={normalizedOptions}
-    />
   );
 }

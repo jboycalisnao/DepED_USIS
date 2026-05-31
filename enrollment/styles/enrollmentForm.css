@@ -97,12 +97,6 @@
   white-space: nowrap;
 }
 
-.enrollment-public-enrollment .searchable-select__menu {
-  left: -1px;
-  right: -1px;
-  width: auto;
-}
-
 @media (max-width: 720px) {
   .enrollment-public-enrollment .portal-panel__body {
     padding: 16px;

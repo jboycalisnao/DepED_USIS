@@ -62,6 +62,7 @@ type Props = {
   loading: boolean;
   onClose: () => void;
   onError: (message: string) => void;
+  onSuccess?: (message: string) => void;
   onSubmit: (id: string, updates: Partial<Student>) => Promise<{ error?: string }>;
 };
 
@@ -70,6 +71,7 @@ const firstNonEmpty = (...values: Array<string | undefined | null>) =>
 
 const buildDraft = (student: Student, activeSchoolYearLabel: string): LearnerModalDraft => {
   const history = Array.isArray(student.enrollments) ? [...student.enrollments] : [];
+  const latestEntry = history[history.length - 1] as any;
   const latestWithPayload = history
     .reverse()
     .find((entry: any) => entry && typeof entry === 'object' && entry.submissionPayload && typeof entry.submissionPayload === 'object') as any;
@@ -82,9 +84,28 @@ const buildDraft = (student: Student, activeSchoolYearLabel: string): LearnerMod
     studentType: normalizeLearnerType(firstNonEmpty(payload.studentType, payload.student_type, payload.learnerType, payload.learner_type)) || studentTypeOptions[0],
     learnerCategory: firstNonEmpty(payload.learnerCategory, learnerCategoryOptions[0]),
     previousSchool: firstNonEmpty(payload.previousSchool),
-    previousSchoolYear: firstNonEmpty(payload.previousSchoolYear),
-    lastGradeLevel: firstNonEmpty(payload.lastGradeLevel),
-    gradeToEnroll: firstNonEmpty(payload.gradeToEnroll),
+    previousSchoolYear: firstNonEmpty(
+      payload.previousSchoolYear,
+      payload.previous_school_year,
+      payload.lastSchoolYearAttended,
+      payload.last_school_year_attended,
+      latestWithPayload?.schoolYear,
+      latestEntry?.schoolYear,
+    ),
+    lastGradeLevel: firstNonEmpty(
+      payload.lastGradeLevel,
+      payload.last_grade_level,
+      payload.gradeLevel,
+      latestWithPayload?.gradeLevel,
+      latestEntry?.gradeLevel,
+    ),
+    gradeToEnroll: firstNonEmpty(
+      payload.gradeToEnroll,
+      payload.grade_to_enroll,
+      payload.targetGradeLevel,
+      latestWithPayload?.gradeLevel,
+      latestEntry?.gradeLevel,
+    ),
     track: firstNonEmpty(payload.track, 'Academic Track'),
     strand: firstNonEmpty(payload.strand),
     semester: firstNonEmpty(payload.semester, semesterOptions[0]),
@@ -118,7 +139,7 @@ const buildDraft = (student: Student, activeSchoolYearLabel: string): LearnerMod
   };
 };
 
-export default function LearnerEditModal({ student, activeSchoolYearLabel, strandOptions, loading, onClose, onError, onSubmit }: Props) {
+export default function LearnerEditModal({ student, activeSchoolYearLabel, strandOptions, loading, onClose, onError, onSuccess, onSubmit }: Props) {
   const [draft, setDraft] = useState<LearnerModalDraft | null>(null);
   const [isLoadingRecord, setIsLoadingRecord] = useState(false);
 
@@ -257,6 +278,28 @@ export default function LearnerEditModal({ student, activeSchoolYearLabel, stran
             type="button"
             className="modal-dialog__blue"
             onClick={async () => {
+              const currentHistory = Array.isArray(student.enrollments) ? [...student.enrollments] : [];
+              const submissionPayload = {
+                ...draft,
+                consent: true,
+              };
+              const nextHistory =
+                currentHistory.length > 0
+                  ? currentHistory.map((entry: any, index) =>
+                      index === currentHistory.length - 1
+                        ? { ...entry, submissionPayload }
+                        : entry,
+                    )
+                  : [{
+                      id: crypto.randomUUID(),
+                      schoolYear: draft.schoolYear || activeSchoolYearLabel,
+                      gradeLevel: draft.gradeToEnroll || draft.lastGradeLevel || '',
+                      section: '',
+                      enrollmentDate: new Date().toISOString(),
+                      status: 'Information Updated',
+                      submissionPayload,
+                    }];
+
               const result = await onSubmit(student.id, {
                 lrn: draft.lrn.trim(),
                 firstName: draft.firstName.trim(),
@@ -271,16 +314,18 @@ export default function LearnerEditModal({ student, activeSchoolYearLabel, stran
                 father_name: draft.fatherName.trim(),
                 mother_name: draft.motherName.trim(),
                 is4Ps: draft.is4Ps === 'Yes',
+                enrollments: nextHistory as any,
               });
               if (result?.error) {
                 onError(result.error);
                 return;
               }
+              onSuccess?.('Learner information saved successfully.');
               onClose();
             }}
             disabled={loading || isLoadingRecord}
           >
-            Save Submission
+            Save Learner Information
           </button>
         </div>
       </div>

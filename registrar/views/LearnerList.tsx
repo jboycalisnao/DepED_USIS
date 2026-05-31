@@ -358,6 +358,7 @@ const LearnerList: React.FC = () => {
         loading={loading}
         onClose={() => setEditingStudent(null)}
         onError={(message) => setFeedback(message)}
+        onSuccess={(message) => setFeedback(message)}
         onSubmit={updateLearner}
       />
       <ConfirmationModal
