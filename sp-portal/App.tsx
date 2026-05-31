@@ -5,10 +5,12 @@ import { AdmissionPortalPage } from './features/admissions/portal/AdmissionPorta
 import { PortalStatusPage } from './features/admissions/portal/components/PortalStatusPage';
 import { RequireSpPortalAdmin } from './features/admin/components/RequireSpPortalAdmin';
 import { AdminPanelPage } from './features/admin/pages/AdminPanelPage';
+import { UsisPortalGate } from '../common/components/UsisPortalGate';
 
 export default function App() {
   return (
     <BrowserRouter>
+      <UsisPortalGate moduleKey="sp_portal" />
       <Routes>
         <Route element={<AppLayout />}>
           <Route index element={<Navigate to="/admissions/region-vi/iloilo/302345" replace />} />

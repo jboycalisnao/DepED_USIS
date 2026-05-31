@@ -63,6 +63,7 @@ export default function AttendanceLandingPage({ onAuthenticated }: AttendanceLan
         <div className="content-width">
           <section className="section-shell attendance-login">
             <UsisLoginModal
+              moduleKey="attendance"
               title="Attendance Portal"
               username={username}
               password={password}

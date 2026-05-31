@@ -261,3 +261,52 @@ For `merch/` and IA merchandise CMS work:
 - any generated code snippet that introduces, removes, or changes merchandise data fields, table structure, view shape, or query contract must include the matching schema update in `integrated-admin/schema.sql` within the same change set
 - when providing SQL patch snippets for merchandise changes, also update `integrated-admin/schema.sql` so repository schema reference stays aligned with implementation
 - do not ship merchandise code-only schema assumptions without the corresponding schema-file update
+
+## Integrated Admin (IA) Delivery and CSS Hardening Rules
+
+For IA feature work and newly created IA pages, apply the following mandatory standards:
+
+- keep IA changes scoped in phases to avoid oversized diffs and token-heavy rework:
+  - Phase 1: data/service/schema wiring
+  - Phase 2: page/form structure
+  - Phase 3: visual polish and responsive hardening
+  - Phase 4: cross-module wiring (only when explicitly requested)
+- avoid broad exploratory scans when a targeted file search is sufficient
+- run builds primarily for touched modules unless a full sweep is explicitly requested
+
+New IA pages must be CSS-complete and not depend on unrelated feature CSS load order:
+
+- include full page-local styling coverage for:
+  - section/page wrapper layout
+  - form controls (`input`, `select`, `textarea`) including floating-label states
+  - radio/checkbox/toggle groups
+  - primary and secondary actions
+  - modal structure and spacing
+  - loading, empty, and error states
+  - mobile breakpoints
+- for floating-label selects, wire `data-has-value=\"true\"` when value exists so labels do not overlap selected text
+- do not assume another IA page stylesheet has already been loaded before the new page is rendered
+
+## IA Portal Controls and Gating Rules
+
+Source of truth:
+
+- table: `ia_portal_controls`
+- schema file: `integrated-admin/schema.sql`
+
+Behavior standards:
+
+- module gate state is controlled from IA Portal Controls and read from Supabase
+- when `is_enabled = true` and `mode != 'live'`, module access must be blocked by the shared gate modal
+- maintain fail-open behavior if gate config cannot be loaded (to prevent accidental total lockout from transient fetch errors)
+
+Shared login modal enforcement:
+
+- all login prompts using `common/components/UsisLoginModal.tsx` must pass the correct `moduleKey`
+- when module gate is active, shared login modal fields must be disabled:
+  - username input disabled
+  - password input disabled
+  - password visibility toggle disabled
+  - submit button disabled
+- show a clear helper notice that login is temporarily disabled while the portal is unavailable
+- do not fork page-specific login modal variants for this behavior; keep logic centralized in shared `UsisLoginModal`

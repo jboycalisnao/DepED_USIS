@@ -25,6 +25,7 @@ export function LearnerLoginPage({
   return (
     <section className="section-shell">
       <UsisLoginModal
+        moduleKey="learner_portal"
         title="Learner's Portal"
         username={username}
         password={password}

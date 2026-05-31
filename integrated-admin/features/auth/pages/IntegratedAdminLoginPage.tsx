@@ -25,6 +25,7 @@ export function IntegratedAdminLoginPage({
   return (
     <section className="section-shell integrated-admin-login">
       <UsisLoginModal
+        moduleKey="integrated_admin"
         title="Integrated Admin"
         username={username}
         password={password}

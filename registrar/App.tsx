@@ -8,6 +8,7 @@ import BulkImport from './views/BulkImport';
 import SectionManagement from './views/SectionManagement';
 import Settings from './views/Settings';
 import Credentials from './views/Credentials';
+import CredentialDetailPage from './views/credentials/CredentialDetailPage';
 import Landing from './views/Landing';
 import PublicEnrollmentSubmissionsPage from './features/registrar/public-enrollment/admin/components/PublicEnrollmentSubmissionsPage';
 import PublicEnrollmentSubmissionDetailsPage from './features/registrar/public-enrollment/admin/components/PublicEnrollmentSubmissionDetailsPage';
@@ -16,6 +17,7 @@ import PublicEnrollmentPriorLearnerEditPage from './features/registrar/public-en
 import EnrollmentKioskPage from './features/registrar/public-enrollment/kiosk/EnrollmentKioskPage';
 import PublicEnrollmentPage from './features/registrar/public-enrollment/components/PublicEnrollmentPage';
 import { useStore } from './store';
+import { UsisPortalGate } from '../common/components/UsisPortalGate';
 
 const AuthenticatedRouter: React.FC = () => {
   const location = useLocation();
@@ -54,6 +56,7 @@ const AuthenticatedRouter: React.FC = () => {
         <Route path="/import" element={<BulkImport />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/credentials" element={<Credentials />} />
+        <Route path="/credentials/:learnerId" element={<CredentialDetailPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Layout>
@@ -66,6 +69,7 @@ const App: React.FC = () => {
   if (!isAuthenticated) {
     return (
       <BrowserRouter>
+        <UsisPortalGate moduleKey="registrar" />
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/public-enrollment" element={<PublicEnrollmentPage />} />
@@ -77,6 +81,7 @@ const App: React.FC = () => {
 
   return (
     <BrowserRouter>
+      <UsisPortalGate moduleKey="registrar" />
       <AuthenticatedRouter />
     </BrowserRouter>
   );

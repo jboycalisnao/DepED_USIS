@@ -15,6 +15,7 @@ import {
   storeSupportAccess,
   type SupportAccessRecord,
 } from './features/support/utils/supportAccess';
+import { UsisPortalGate } from '../common/components/UsisPortalGate';
 
 function SupportShell() {
   const location = useLocation();
@@ -39,6 +40,7 @@ function SupportShell() {
 
   return (
     <div className="support-app">
+      <UsisPortalGate moduleKey="support" />
       <header className="site-chrome">
         <div className="content-width">
           <UsisUnifiedHeader searchId="support-search" searchLabel="Search learner support portal" />

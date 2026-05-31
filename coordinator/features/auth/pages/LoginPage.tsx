@@ -90,6 +90,7 @@ export function LoginPage() {
         {!pendingAccess ? (
           <>
             <UsisLoginModal
+              moduleKey="coordinator"
               title="Coordinator Registry Login"
               username={username}
               password={password}

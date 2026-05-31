@@ -10,6 +10,8 @@ type PrintPayload = {
   createDefaultPassword: (learner: Student) => string;
 };
 
+type PrintMode = 'portal' | 'microsoft';
+
 const escapeHtml = (value: string) =>
   value
     .replaceAll('&', '&amp;')
@@ -18,6 +20,13 @@ const escapeHtml = (value: string) =>
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#39;');
 
+const normalizeGender = (value: string | undefined | null): 'Male' | 'Female' | 'Other' => {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (normalized === 'male') return 'Male';
+  if (normalized === 'female') return 'Female';
+  return 'Other';
+};
+
 const buildPrintHtml = ({
   learners,
   sectionMap,
@@ -25,7 +34,8 @@ const buildPrintHtml = ({
   gradeLabel,
   scopeLabel,
   createDefaultPassword,
-}: PrintPayload) => {
+}: PrintPayload, mode: PrintMode) => {
+  const isMicrosoftMode = mode === 'microsoft';
   const logoSrc = USIS_SEAL_SRC;
   const grouped: Record<string, Student[]> = {};
   learners.forEach((learner) => {
@@ -39,20 +49,46 @@ const buildPrintHtml = ({
   const sectionsHtml = sectionNames
     .sort((a, b) => a.localeCompare(b))
     .map((sectionName, index) => {
-      const rows = grouped[sectionName]
-        .sort((a, b) => `${a.lastName}, ${a.firstName}`.localeCompare(`${b.lastName}, ${b.firstName}`))
-        .map((learner) => {
-          const username = learner.loginUsername || learner.lrn;
-          const password = learner.loginPassword || createDefaultPassword(learner);
-          const fullName = `${learner.lastName}, ${learner.firstName}${learner.middleName ? ` ${learner.middleName}` : ''}`;
+      const rowsByGender = grouped[sectionName]
+        .reduce<Record<'Male' | 'Female' | 'Other', Student[]>>(
+          (acc, learner) => {
+            acc[normalizeGender(learner.gender)].push(learner);
+            return acc;
+          },
+          { Male: [], Female: [], Other: [] },
+        );
+
+      const rows = (['Male', 'Female', 'Other'] as const)
+        .filter((gender) => rowsByGender[gender].length > 0)
+        .map((gender) => {
+          const genderRows = rowsByGender[gender]
+            .sort((a, b) => `${a.lastName}, ${a.firstName}`.localeCompare(`${b.lastName}, ${b.firstName}`))
+            .map((learner) => {
+              const username = isMicrosoftMode
+                ? (learner.microsoftUpn || 'Not Linked')
+                : (learner.loginUsername || learner.lrn);
+              const password = learner.loginPassword || createDefaultPassword(learner);
+              const fullName = `${learner.lastName}, ${learner.firstName}${learner.middleName ? ` ${learner.middleName}` : ''}`;
+              const status = isMicrosoftMode
+                ? (learner.microsoftAccountStatus || (learner.microsoftUpn ? 'Active' : 'Not Linked'))
+                : (learner.loginStatus || 'Active');
+              return `
+                <tr>
+                  <td>${escapeHtml(String(learner.lrn || ''))}</td>
+                  <td>${escapeHtml(fullName)}</td>
+                  <td>${escapeHtml(username)}</td>
+                  <td>${escapeHtml(password)}</td>
+                  <td>${escapeHtml(status)}</td>
+                </tr>
+              `;
+            })
+            .join('');
+
           return `
-            <tr>
-              <td>${escapeHtml(String(learner.lrn || ''))}</td>
-              <td>${escapeHtml(fullName)}</td>
-              <td>${escapeHtml(username)}</td>
-              <td>${escapeHtml(password)}</td>
-              <td>${escapeHtml(learner.loginStatus || 'Active')}</td>
+            <tr class="gender-row">
+              <td colspan="5"><strong>${escapeHtml(gender)}</strong> - ${rowsByGender[gender].length}</td>
             </tr>
+            ${genderRows}
           `;
         })
         .join('');
@@ -66,7 +102,7 @@ const buildPrintHtml = ({
               </td>
               <td class="title-cell" rowspan="2">
                 <div class="title-main">LEON NATIONAL HIGH SCHOOL</div>
-                <div class="title-sub">USIS CREDENTIALS LIST</div>
+                <div class="title-sub">${isMicrosoftMode ? 'USIS MICROSOFT CREDENTIALS LIST' : 'USIS CREDENTIALS LIST'}</div>
               </td>
               <td class="docs-cell" rowspan="2">
                 <table class="docs-table">
@@ -89,13 +125,13 @@ const buildPrintHtml = ({
           </div>
 
           <section class="block">
-            <h3>Credentials List - ${escapeHtml(sectionName)}</h3>
+            <h3>${isMicrosoftMode ? 'Microsoft Credentials List' : 'Credentials List'} - ${escapeHtml(sectionName)}</h3>
             <table class="data">
               <thead>
                 <tr>
                   <th class="col-lrn">LRN</th>
                   <th class="col-name">Learner Name</th>
-                  <th class="col-user">Username</th>
+                  <th class="col-user">${isMicrosoftMode ? 'Microsoft Email' : 'Username'}</th>
                   <th class="col-pass">Password</th>
                   <th class="col-stat">Status</th>
                 </tr>
@@ -177,11 +213,11 @@ const buildPrintHtml = ({
   `;
 };
 
-export const openCredentialsPrintWindow = (payload: PrintPayload): boolean => {
+const openPrintWindow = (payload: PrintPayload, mode: PrintMode): boolean => {
   const printWindow = window.open('about:blank', '_blank', 'width=1100,height=760');
   if (!printWindow) return false;
 
-  const html = buildPrintHtml(payload);
+  const html = buildPrintHtml(payload, mode);
   printWindow.document.open();
   printWindow.document.write(html);
   printWindow.document.close();
@@ -197,3 +233,7 @@ export const openCredentialsPrintWindow = (payload: PrintPayload): boolean => {
 
   return true;
 };
+
+export const openCredentialsPrintWindow = (payload: PrintPayload): boolean => openPrintWindow(payload, 'portal');
+
+export const openMicrosoftCredentialsPrintWindow = (payload: PrintPayload): boolean => openPrintWindow(payload, 'microsoft');

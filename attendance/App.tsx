@@ -7,6 +7,7 @@ import { useSettings } from './hooks/useSettings';
 import { ScanResult, AttendanceType, TimeSlotSettings } from './types';
 import { UsisUnifiedHeader } from '../common/header/UsisUnifiedHeader';
 import { UsisGlobalFooter } from '../common/footer/UsisGlobalFooter';
+import { UsisPortalGate } from '../common/components/UsisPortalGate';
 import KioskMode from './components/KioskMode';
 import PairingConsole from './components/PairingConsole';
 import LearnerDirectory from './components/LearnerDirectory';
@@ -409,21 +410,30 @@ function App() {
 
   if (isStandbyMode) {
     return (
-      <KioskMode 
-        onExit={() => setIsStandbyMode(false)} 
-        lastScanResults={lastScanResults} 
-        unknownTags={unknownTags} 
-        settings={settings}
-      />
+      <>
+        <UsisPortalGate moduleKey="attendance" />
+        <KioskMode 
+          onExit={() => setIsStandbyMode(false)} 
+          lastScanResults={lastScanResults} 
+          unknownTags={unknownTags} 
+          settings={settings}
+        />
+      </>
     );
   }
 
   if (!access) {
-    return <AttendanceLandingPage onAuthenticated={setAccess} />;
+    return (
+      <>
+        <UsisPortalGate moduleKey="attendance" />
+        <AttendanceLandingPage onAuthenticated={setAccess} />
+      </>
+    );
   }
 
   return (
     <div className="attendance-app min-h-screen bg-gray-50 text-gray-900 flex flex-col font-sans selection:bg-primary-100 selection:text-primary-900">
+      <UsisPortalGate moduleKey="attendance" />
       <header className="site-chrome attendance-chrome">
         <div className="content-width">
           <div className="attendance-header">

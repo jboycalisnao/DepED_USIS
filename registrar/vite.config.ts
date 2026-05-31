@@ -10,37 +10,7 @@ export default defineConfig(({ mode }) => {
       name: 'registrar-microsoft-user-api',
       configureServer(server: any) {
         server.middlewares.use('/api/microsoft-users', async (req: any, res: any) => {
-          if (req.method !== 'POST') {
-            res.statusCode = 405;
-            res.setHeader('Content-Type', 'application/json');
-            res.end(JSON.stringify({ error: 'Method not allowed' }));
-            return;
-          }
-
           try {
-            const body = await new Promise<string>((resolve, reject) => {
-              let raw = '';
-              req.on('data', (chunk: Buffer) => {
-                raw += chunk.toString('utf8');
-              });
-              req.on('end', () => resolve(raw));
-              req.on('error', reject);
-            });
-
-            const parsed = JSON.parse(body || '{}');
-            const learnerId = String(parsed.learnerId || '').trim();
-            const displayName = String(parsed.displayName || '').trim();
-            const mailNickname = String(parsed.mailNickname || '').trim();
-            const userPrincipalName = String(parsed.userPrincipalName || '').trim();
-            const temporaryPassword = String(parsed.temporaryPassword || '').trim();
-
-            if (!learnerId || !displayName || !mailNickname || !userPrincipalName || !temporaryPassword) {
-              res.statusCode = 400;
-              res.setHeader('Content-Type', 'application/json');
-              res.end(JSON.stringify({ error: 'learnerId, displayName, mailNickname, userPrincipalName, and temporaryPassword are required.' }));
-              return;
-            }
-
             const clientId = process.env.AZURE_CLIENT_ID || env.AZURE_CLIENT_ID || '';
             const tenantId = process.env.AZURE_TENANT_ID || env.AZURE_TENANT_ID || '';
             const clientSecret = process.env.AZURE_CLIENT_SECRET || env.AZURE_CLIENT_SECRET || '';
@@ -55,12 +25,7 @@ export default defineConfig(({ mode }) => {
             if (missingAzureVars.length > 0) {
               res.statusCode = 500;
               res.setHeader('Content-Type', 'application/json');
-              res.end(
-                JSON.stringify({
-                  error: 'Azure/M365 environment variables are not configured.',
-                  missing: missingAzureVars,
-                }),
-              );
+              res.end(JSON.stringify({ error: 'Azure/M365 environment variables are not configured.', missing: missingAzureVars }));
               return;
             }
 
@@ -77,6 +42,293 @@ export default defineConfig(({ mode }) => {
             const canUseSupabase = Boolean(supabaseUrl && supabaseKey);
             const supabaseAdmin = canUseSupabase ? createClient(supabaseUrl, supabaseKey) : null;
 
+            const getAccessToken = async () => {
+              const tokenUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`;
+              const tokenResponse = await fetch(tokenUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({
+                  client_id: clientId,
+                  client_secret: clientSecret,
+                  scope: 'https://graph.microsoft.com/.default',
+                  grant_type: 'client_credentials',
+                }),
+              });
+              if (!tokenResponse.ok) throw new Error(`Token request failed: ${await tokenResponse.text()}`);
+              const tokenJson = await tokenResponse.json();
+              const accessToken = String(tokenJson.access_token || '');
+              if (!accessToken) throw new Error('Token response missing access token');
+              return accessToken;
+            };
+
+            if (req.method === 'GET') {
+              const requestUrl = new URL(req.url || '', `http://${req.headers.host || 'localhost'}`);
+              const learnerId = String(requestUrl.searchParams.get('learnerId') || '').trim();
+              if (!learnerId) {
+                res.statusCode = 400;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ error: 'learnerId is required.' }));
+                return;
+              }
+
+              if (!supabaseAdmin) {
+                res.statusCode = 500;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ error: 'Supabase service is required for Microsoft status sync.' }));
+                return;
+              }
+
+              const learnerResult = await supabaseAdmin
+                .from('registrar_learners')
+                .select('id,microsoft_user_id,microsoft_upn,microsoft_mail_nickname,microsoft_created_at')
+                .eq('id', learnerId)
+                .maybeSingle();
+
+              if (learnerResult.error) {
+                res.statusCode = 502;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ error: 'Failed to read learner record', details: learnerResult.error.message }));
+                return;
+              }
+              if (!learnerResult.data) {
+                res.statusCode = 404;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ error: 'Learner not found' }));
+                return;
+              }
+
+              const localUserId = String(learnerResult.data.microsoft_user_id || '').trim();
+              const localUpn = String(learnerResult.data.microsoft_upn || '').trim();
+              const localNickname = String(learnerResult.data.microsoft_mail_nickname || '').trim();
+              const nowIso = new Date().toISOString();
+
+              if (!localUserId && !localUpn) {
+                await supabaseAdmin
+                  .from('registrar_learners')
+                  .update({ microsoft_account_status: 'Not Linked', microsoft_last_synced_at: nowIso })
+                  .eq('id', learnerId);
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({
+                  exists: false,
+                  learnerId,
+                  microsoftAccountStatus: 'Not Linked',
+                  microsoftLastSyncedAt: nowIso,
+                  microsoftMailNickname: localNickname,
+                  microsoftUserId: '',
+                  userPrincipalName: '',
+                }));
+                return;
+              }
+
+              const accessToken = await getAccessToken();
+              const graphKey = localUserId || localUpn;
+              const graphResponse = await fetch(`https://graph.microsoft.com/v1.0/users/${encodeURIComponent(graphKey)}?$select=id,userPrincipalName`, {
+                headers: { Authorization: `Bearer ${accessToken}` },
+              });
+
+              if (graphResponse.status === 404) {
+                await supabaseAdmin
+                  .from('registrar_learners')
+                  .update({
+                    microsoft_user_id: null,
+                    microsoft_upn: null,
+                    microsoft_account_status: 'Deleted',
+                    microsoft_last_synced_at: nowIso,
+                  })
+                  .eq('id', learnerId);
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({
+                  exists: false,
+                  learnerId,
+                  microsoftAccountStatus: 'Deleted',
+                  microsoftCreatedAt: learnerResult.data.microsoft_created_at || null,
+                  microsoftLastSyncedAt: nowIso,
+                  microsoftMailNickname: localNickname,
+                  microsoftUserId: '',
+                  userPrincipalName: '',
+                }));
+                return;
+              }
+
+              if (!graphResponse.ok) {
+                res.statusCode = 502;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ error: 'Graph status check failed', details: await graphResponse.text() }));
+                return;
+              }
+
+              const graphJson = await graphResponse.json();
+              const graphUserId = String(graphJson?.id || localUserId || '').trim();
+              const graphUpn = String(graphJson?.userPrincipalName || localUpn || '').trim();
+
+              await supabaseAdmin
+                .from('registrar_learners')
+                .update({
+                  microsoft_user_id: graphUserId || null,
+                  microsoft_upn: graphUpn || null,
+                  microsoft_account_status: 'Active',
+                  microsoft_last_synced_at: nowIso,
+                })
+                .eq('id', learnerId);
+
+              res.statusCode = 200;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({
+                exists: true,
+                learnerId,
+                microsoftAccountStatus: 'Active',
+                microsoftCreatedAt: learnerResult.data.microsoft_created_at || null,
+                microsoftLastSyncedAt: nowIso,
+                microsoftMailNickname: localNickname,
+                microsoftUserId: graphUserId,
+                userPrincipalName: graphUpn,
+              }));
+              return;
+            }
+
+            if (req.method !== 'POST') {
+              res.statusCode = 405;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ error: 'Method not allowed' }));
+              return;
+            }
+
+            const body = await new Promise<string>((resolve, reject) => {
+              let raw = '';
+              req.on('data', (chunk: Buffer) => {
+                raw += chunk.toString('utf8');
+              });
+              req.on('end', () => resolve(raw));
+              req.on('error', reject);
+            });
+
+            const parsed = JSON.parse(body || '{}');
+            const action = String(parsed.action || '').trim().toLowerCase();
+            const learnerId = String(parsed.learnerId || '').trim();
+            const displayName = String(parsed.displayName || '').trim();
+            const mailNickname = String(parsed.mailNickname || '').trim();
+            const userPrincipalName = String(parsed.userPrincipalName || '').trim();
+            const temporaryPassword = String(parsed.temporaryPassword || '').trim();
+            const newPassword = String(parsed.newPassword || '').trim();
+
+            if (action === 'reset-password' || action === 'delete-account') {
+              if (!learnerId) {
+                res.statusCode = 400;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ error: 'learnerId is required.' }));
+                return;
+              }
+              if (!supabaseAdmin) {
+                res.statusCode = 500;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ error: 'Supabase service is required.' }));
+                return;
+              }
+
+              const learnerResult = await supabaseAdmin
+                .from('registrar_learners')
+                .select('id,microsoft_user_id,microsoft_upn')
+                .eq('id', learnerId)
+                .maybeSingle();
+              if (learnerResult.error) {
+                res.statusCode = 502;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ error: 'Failed to read learner record', details: learnerResult.error.message }));
+                return;
+              }
+              if (!learnerResult.data) {
+                res.statusCode = 404;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ error: 'Learner not found' }));
+                return;
+              }
+
+              const graphKey = String(learnerResult.data.microsoft_user_id || learnerResult.data.microsoft_upn || '').trim();
+              const nowIso = new Date().toISOString();
+
+              if (action === 'reset-password') {
+                if (!newPassword) {
+                  res.statusCode = 400;
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({ error: 'newPassword is required for reset-password.' }));
+                  return;
+                }
+                if (!graphKey) {
+                  res.statusCode = 409;
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({ error: 'Learner has no linked Microsoft account.' }));
+                  return;
+                }
+                const accessToken = await getAccessToken();
+                const resetResponse = await fetch(`https://graph.microsoft.com/v1.0/users/${encodeURIComponent(graphKey)}`, {
+                  method: 'PATCH',
+                  headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    passwordProfile: {
+                      forceChangePasswordNextSignIn: false,
+                      password: newPassword,
+                    },
+                  }),
+                });
+                if (!resetResponse.ok) {
+                  res.statusCode = 502;
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({ error: 'Microsoft password reset failed', details: await resetResponse.text() }));
+                  return;
+                }
+                await supabaseAdmin
+                  .from('registrar_learners')
+                  .update({ microsoft_last_synced_at: nowIso, microsoft_account_status: 'Active' })
+                  .eq('id', learnerId);
+
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ learnerId, microsoftAccountStatus: 'Active', microsoftLastSyncedAt: nowIso }));
+                return;
+              }
+
+              if (graphKey) {
+                const accessToken = await getAccessToken();
+                const deleteResponse = await fetch(`https://graph.microsoft.com/v1.0/users/${encodeURIComponent(graphKey)}`, {
+                  method: 'DELETE',
+                  headers: { Authorization: `Bearer ${accessToken}` },
+                });
+                if (!deleteResponse.ok && deleteResponse.status !== 404) {
+                  res.statusCode = 502;
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({ error: 'Microsoft delete failed', details: await deleteResponse.text() }));
+                  return;
+                }
+              }
+
+              await supabaseAdmin
+                .from('registrar_learners')
+                .update({
+                  microsoft_user_id: null,
+                  microsoft_upn: null,
+                  microsoft_account_status: 'Deleted',
+                  microsoft_last_synced_at: nowIso,
+                })
+                .eq('id', learnerId);
+
+              res.statusCode = 200;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ learnerId, microsoftAccountStatus: 'Deleted', microsoftLastSyncedAt: nowIso }));
+              return;
+            }
+
+            if (!learnerId || !displayName || !mailNickname || !userPrincipalName || !temporaryPassword) {
+              res.statusCode = 400;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ error: 'learnerId, displayName, mailNickname, userPrincipalName, and temporaryPassword are required.' }));
+              return;
+            }
+
             if (supabaseAdmin) {
               const existingLearnerResult = await supabaseAdmin
                 .from('registrar_learners')
@@ -90,57 +342,25 @@ export default defineConfig(({ mode }) => {
                 res.end(JSON.stringify({ error: 'Failed to read learner record', details: existingLearnerResult.error.message }));
                 return;
               }
-
               if (!existingLearnerResult.data) {
                 res.statusCode = 404;
                 res.setHeader('Content-Type', 'application/json');
                 res.end(JSON.stringify({ error: 'Learner not found' }));
                 return;
               }
-
               if (existingLearnerResult.data.microsoft_user_id || existingLearnerResult.data.microsoft_upn) {
                 res.statusCode = 409;
                 res.setHeader('Content-Type', 'application/json');
-                res.end(
-                  JSON.stringify({
-                    error: 'Learner already has a Microsoft account',
-                    microsoftUserId: existingLearnerResult.data.microsoft_user_id,
-                    userPrincipalName: existingLearnerResult.data.microsoft_upn,
-                  }),
-                );
+                res.end(JSON.stringify({
+                  error: 'Learner already has a Microsoft account',
+                  microsoftUserId: existingLearnerResult.data.microsoft_user_id,
+                  userPrincipalName: existingLearnerResult.data.microsoft_upn,
+                }));
                 return;
               }
             }
 
-            const tokenUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`;
-            const tokenResponse = await fetch(tokenUrl, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-              body: new URLSearchParams({
-                client_id: clientId,
-                client_secret: clientSecret,
-                scope: 'https://graph.microsoft.com/.default',
-                grant_type: 'client_credentials',
-              }),
-            });
-
-            if (!tokenResponse.ok) {
-              const tokenErrorText = await tokenResponse.text();
-              res.statusCode = 502;
-              res.setHeader('Content-Type', 'application/json');
-              res.end(JSON.stringify({ error: 'Token request failed', details: tokenErrorText }));
-              return;
-            }
-
-            const tokenJson = await tokenResponse.json();
-            const accessToken = String(tokenJson.access_token || '');
-            if (!accessToken) {
-              res.statusCode = 502;
-              res.setHeader('Content-Type', 'application/json');
-              res.end(JSON.stringify({ error: 'Token response missing access token' }));
-              return;
-            }
-
+            const accessToken = await getAccessToken();
             const createUserResponse = await fetch('https://graph.microsoft.com/v1.0/users', {
               method: 'POST',
               headers: {
@@ -168,13 +388,10 @@ export default defineConfig(({ mode }) => {
             }
 
             const createdUser = createUserText ? JSON.parse(createUserText) : {};
-
             const createdUserId = String(createdUser?.id || '').trim();
             const userGraphKey = createdUserId || userPrincipalName;
-
             const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-            // Retry usageLocation patch to handle propagation delays.
             let usageLocationUpdated = false;
             let usageLocationLastError = '';
             for (let attempt = 1; attempt <= 3; attempt += 1) {
@@ -186,12 +403,10 @@ export default defineConfig(({ mode }) => {
                 },
                 body: JSON.stringify({ usageLocation: 'PH' }),
               });
-
               if (usageLocationResponse.ok) {
                 usageLocationUpdated = true;
                 break;
               }
-
               usageLocationLastError = await usageLocationResponse.text();
               await sleep(700 * attempt);
             }
@@ -199,18 +414,15 @@ export default defineConfig(({ mode }) => {
             if (!usageLocationUpdated) {
               res.statusCode = 502;
               res.setHeader('Content-Type', 'application/json');
-              res.end(
-                JSON.stringify({
-                  error: 'usageLocation update failed',
-                  createdUserId: createdUser?.id || null,
-                  userPrincipalName,
-                  details: usageLocationLastError,
-                }),
-              );
+              res.end(JSON.stringify({
+                error: 'usageLocation update failed',
+                createdUserId: createdUser?.id || null,
+                userPrincipalName,
+                details: usageLocationLastError,
+              }));
               return;
             }
 
-            // Retry license assignment because Graph can still lag after usageLocation patch.
             let assignLicenseText = '';
             let licenseAssigned = false;
             for (let attempt = 1; attempt <= 4; attempt += 1) {
@@ -228,32 +440,27 @@ export default defineConfig(({ mode }) => {
                   }),
                 },
               );
-
               assignLicenseText = await assignLicenseResponse.text();
               if (assignLicenseResponse.ok) {
                 licenseAssigned = true;
                 break;
               }
-
               await sleep(900 * attempt);
             }
 
             if (!licenseAssigned) {
               res.statusCode = 502;
               res.setHeader('Content-Type', 'application/json');
-              res.end(
-                JSON.stringify({
-                  error: 'License assignment failed',
-                  createdUserId: createdUser?.id || null,
-                  userPrincipalName,
-                  details: assignLicenseText,
-                }),
-              );
+              res.end(JSON.stringify({
+                error: 'License assignment failed',
+                createdUserId: createdUser?.id || null,
+                userPrincipalName,
+                details: assignLicenseText,
+              }));
               return;
             }
 
             const licenseAssignmentResult = assignLicenseText ? JSON.parse(assignLicenseText) : { ok: true };
-
             if (supabaseAdmin) {
               const persistResult = await supabaseAdmin
                 .from('registrar_learners')
@@ -267,31 +474,26 @@ export default defineConfig(({ mode }) => {
                   microsoft_last_synced_at: new Date().toISOString(),
                 })
                 .eq('id', learnerId);
-
               if (persistResult.error) {
                 res.statusCode = 502;
                 res.setHeader('Content-Type', 'application/json');
-                res.end(
-                  JSON.stringify({
-                    error: 'Microsoft account was created but failed to persist learner link',
-                    createdUserId: createdUser?.id || null,
-                    userPrincipalName,
-                    details: persistResult.error.message,
-                  }),
-                );
+                res.end(JSON.stringify({
+                  error: 'Microsoft account was created but failed to persist learner link',
+                  createdUserId: createdUser?.id || null,
+                  userPrincipalName,
+                  details: persistResult.error.message,
+                }));
                 return;
               }
             }
 
             res.statusCode = 200;
             res.setHeader('Content-Type', 'application/json');
-            res.end(
-              JSON.stringify({
-                id: createdUser?.id || null,
-                userPrincipalName,
-                licenseAssignmentResult,
-              }),
-            );
+            res.end(JSON.stringify({
+              id: createdUser?.id || null,
+              userPrincipalName,
+              licenseAssignmentResult,
+            }));
           } catch (error: any) {
             res.statusCode = 500;
             res.setHeader('Content-Type', 'application/json');

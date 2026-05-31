@@ -72,6 +72,7 @@ const Login: React.FC<LoginProps> = ({
               <>
                 <div className="w-full max-w-[720px]">
                   <UsisLoginModal
+                    moduleKey="election"
                     title="Election Portal Access"
                     username={username}
                     password={password}

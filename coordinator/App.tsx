@@ -7,10 +7,12 @@ import { CredentialsPage } from './features/access/pages/CredentialsPage';
 import { RegistryPage } from './features/access/pages/RegistryPage';
 import { RequireRegistrationAccess } from './features/registration/components/RequireRegistrationAccess';
 import { RegistrationCredentialsPage } from './features/registration/pages/RegistrationCredentialsPage';
+import { UsisPortalGate } from '../common/components/UsisPortalGate';
 
 export default function App() {
   return (
     <BrowserRouter>
+      <UsisPortalGate moduleKey="coordinator" />
       <Routes>
         <Route element={<AppLayout />}>
           <Route index element={<Navigate to="/login" replace />} />

@@ -539,6 +539,14 @@
   font-size: 14px;
 }
 
+.registrar-credentials-page__learner-row {
+  cursor: pointer;
+}
+
+.registrar-credentials-page__learner-row:hover td {
+  background: #f8fafc;
+}
+
 .registrar-credentials-page__group-row td {
   background: #f8fafc;
   color: var(--deped-muted);
@@ -611,10 +619,109 @@
   text-overflow: ellipsis;
 }
 
+.registrar-credentials-page__copy-cell {
+  width: auto;
+  max-width: 100%;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  padding: 6px 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  cursor: pointer;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.registrar-credentials-page__copy-cell .material-symbols-outlined {
+  font-size: 16px;
+  color: var(--deped-muted);
+}
+
+.registrar-credentials-page__copy-cell > span:first-child {
+  display: inline-block;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.registrar-credentials-page__copy-cell:hover {
+  border-color: var(--deped-line);
+  background: #f8fafc;
+}
+
+.registrar-credentials-page__status-tag {
+  min-width: 92px;
+  border: 1px solid var(--deped-line);
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.registrar-credentials-page__status-tag.is-active {
+  background: #e9f7ef;
+  border-color: #66bf8a;
+  color: #1f7a45;
+}
+
+.registrar-credentials-page__status-tag.is-inactive {
+  background: #fff1f2;
+  border-color: #f199a0;
+  color: #a8353f;
+}
+
+.registrar-credentials-page__status-tag:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
 .registrar-credentials-page__empty {
   text-align: center;
   color: var(--deped-muted);
   font-weight: 700;
+}
+
+.registrar-credential-detail {
+  max-width: 980px;
+  margin: 0 auto;
+}
+
+.registrar-credential-detail__panel {
+  border: 1px solid var(--deped-line);
+  border-radius: 12px;
+  background: var(--deped-white);
+  padding: 18px;
+}
+
+.registrar-credential-detail__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.registrar-credential-detail__head h3 {
+  margin: 0;
+  color: var(--deped-blue);
+}
+
+.registrar-credential-detail__grid {
+  display: grid;
+  gap: 10px;
+}
+
+.registrar-credential-detail__actions {
+  margin-top: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .registrar-settings-page {

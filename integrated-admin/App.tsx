@@ -6,6 +6,7 @@ import UsisPageLoader from '../common/components/UsisPageLoader';
 import { UsisSideNav, type UsisSideNavItem } from '../common/components/UsisSideNav';
 import { UsisBreadcrumbBar } from '../common/components/UsisBreadcrumbBar';
 import { UsisAlertModal } from '../common/components/UsisAlertModal';
+import { UsisPortalGate } from '../common/components/UsisPortalGate';
 import { IntegratedAdminLoginPage } from './features/auth/pages/IntegratedAdminLoginPage';
 import {
   clearStoredIntegratedAdminAccess,
@@ -30,6 +31,7 @@ import { MerchandiseControlPage } from './features/functions/merchandise/Merchan
 import { MerchOrderControlPage } from './features/functions/merchandise/MerchOrderControlPage';
 import { MerchOrderPaymentPage } from './features/functions/merchandise/MerchOrderPaymentPage';
 import { MerchOrderCountsPage } from './features/functions/merchandise/MerchOrderCountsPage';
+import { PortalControlsPage } from './features/functions/portal-controls/pages/PortalControlsPage';
 import { resolveCoordinatorDepartmentAccess } from '../common/auth/coordinatorDepartmentAccess';
 import { loadCoordinatorIaPageAccessMapFromSupabase, loadCoordinatorModuleAccessMapFromSupabase } from '../common/auth/moduleAccess';
 
@@ -111,6 +113,11 @@ const iaNavItems: UsisSideNavItem[] = [
       { path: '/functions/grades-subjects/subject-management', label: 'Subject Management', icon: 'fact_check' },
       { path: '/functions/grades-subjects/time-slots', label: 'Time Slots', icon: 'schedule' },
     ],
+  },
+  {
+    path: '/functions/portal-controls',
+    label: 'Portal Controls',
+    icon: 'tune',
   },
 ];
 
@@ -302,6 +309,7 @@ function IntegratedAdminShell() {
 
   return (
     <div className="integrated-admin-app">
+      <UsisPortalGate moduleKey="integrated_admin" />
       <header className="site-chrome">
         <div className="content-width">
           <UsisUnifiedHeader searchId="integrated-admin-search" searchLabel="Search integrated admin portal" />
@@ -364,6 +372,7 @@ function IntegratedAdminShell() {
                       <Route path="/functions/grades-subjects/grades" element={<GradesPage />} />
                       <Route path="/functions/grades-subjects/subject-management" element={<SubjectManagementPage />} />
                       <Route path="/functions/grades-subjects/time-slots" element={<TimeSlotsPage />} />
+                      <Route path="/functions/portal-controls" element={<PortalControlsPage />} />
                       <Route path="*" element={<Navigate to="/" replace />} />
                     </Routes>
                   )}

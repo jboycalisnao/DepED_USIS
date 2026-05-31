@@ -1,4 +1,6 @@
 @import "./modules/ia-shell.css";
+@import "./modules/ia-foundation.css";
 @import "./modules/ia-merch-control.css";
 @import "./modules/ia-merch-orders.css";
 @import "./modules/ia-merch-detail.css";
+@import "./modules/ia-portal-controls.css";

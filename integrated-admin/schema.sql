@@ -396,6 +396,27 @@ create index if not exists idx_registrar_subject_management_department on regist
 create unique index if not exists uq_registrar_subject_management_unique
   on registrar_subject_management(grade_level, program_scope, coalesce(strand, ''), subject_code);
 
+-- =========================================================
+-- IA Portal Controls (module maintenance/soon-open gating)
+-- =========================================================
+create table if not exists ia_portal_controls (
+  id uuid primary key default gen_random_uuid(),
+  module_key text not null unique,
+  module_label text not null,
+  is_enabled boolean not null default false,
+  mode text not null default 'maintenance' check (mode in ('live', 'maintenance', 'soon_open')),
+  message_source text not null default 'preset' check (message_source in ('preset', 'custom')),
+  preset_key text,
+  title_text text not null default 'Portal Under Maintenance',
+  body_text text not null default 'This module is currently under maintenance. Please check back shortly.',
+  icon_name text not null default 'construction',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_ia_portal_controls_enabled on ia_portal_controls(is_enabled);
+create index if not exists idx_ia_portal_controls_mode on ia_portal_controls(mode);
+
 -- normalize legacy learner_id text values and enforce FK to registrar_learners
 alter table coordinator_learner_operation_credentials
   alter column learner_id type uuid
@@ -489,6 +510,11 @@ for each row execute function set_updated_at();
 drop trigger if exists trg_registrar_subject_management_updated_at on registrar_subject_management;
 create trigger trg_registrar_subject_management_updated_at
 before update on registrar_subject_management
+for each row execute function set_updated_at();
+
+drop trigger if exists trg_ia_portal_controls_updated_at on ia_portal_controls;
+create trigger trg_ia_portal_controls_updated_at
+before update on ia_portal_controls
 for each row execute function set_updated_at();
 
 -- =========================================================

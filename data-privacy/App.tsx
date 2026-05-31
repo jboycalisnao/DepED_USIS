@@ -1,5 +1,6 @@
 import { UsisUnifiedHeader } from '../common/header/UsisUnifiedHeader';
 import { UsisGlobalFooter } from '../common/footer/UsisGlobalFooter';
+import { UsisPortalGate } from '../common/components/UsisPortalGate';
 
 const coreLaws = [
   {
@@ -124,6 +125,7 @@ const recommendedPages = [
 export default function App() {
   return (
     <div className="privacy-app">
+      <UsisPortalGate moduleKey="data_privacy" />
       <header className="site-chrome">
         <div className="content-width">
           <UsisUnifiedHeader />

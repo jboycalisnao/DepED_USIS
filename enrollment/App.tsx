@@ -7,6 +7,7 @@ import { RequirementsPage } from './features/portal/components/RequirementsPage'
 import { SubmissionStatusLoginPage } from './features/portal/components/SubmissionStatusLoginPage';
 import { SubmissionStatusPage } from './features/portal/components/SubmissionStatusPage';
 import type { SubmissionStatusAccessRecord } from './features/enrollment-form/services/submissionStatusAuth';
+import { UsisPortalGate } from '../common/components/UsisPortalGate';
 
 const SUBMISSION_STATUS_SESSION_KEY = 'usis_enrollment_submission_status_session';
 const ENROLLMENT_BASENAME = '/enrollment';
@@ -46,6 +47,7 @@ function EnrollmentShell() {
 
   return (
     <div className="enrollment-app">
+      <UsisPortalGate moduleKey="enrollment" />
       <header className="site-chrome">
         <div className="content-width">
           <UsisUnifiedHeader

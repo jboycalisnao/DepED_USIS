@@ -17,6 +17,7 @@ import CandidateAuditView from './components/CandidateAuditView';
 import LiveTallyMonitor from './components/admin/dashboard/LiveTallyMonitor';
 import SystemAlerts from './components/SystemAlerts';
 import { UsisLoginModal } from '../common/components/UsisLoginModal';
+import { UsisPortalGate } from '../common/components/UsisPortalGate';
 import { hasCoordinatorModuleAccess } from '../common/auth/moduleAccess';
 import { Candidate, AppView, User, ElectionConfig, ElectionStatus, Position, GradeLevel } from './types';
 import { DEPED_SEAL_URL, DEPED_LOGO_URL, LEON_NHS_LOGO_URL, LG_COMEA_LOGO_URL } from './constants';
@@ -330,7 +331,7 @@ const App: React.FC = () => {
 
     const credentialPassword = String(credentialRecord?.login_password_plain || '').trim();
     const loginStatus = String(credentialRecord?.login_status || 'Active').trim().toLowerCase();
-    const credentialsDisabled = loginStatus === 'disabled' || loginStatus === 'inactive';
+    const credentialsDisabled = loginStatus !== 'active';
 
     if (
       credentialError ||
@@ -520,18 +521,22 @@ const App: React.FC = () => {
 
   if (view === 'monitoring') {
     return (
-      <div className="h-screen w-screen bg-slate-50 overflow-hidden">
-        <LiveTallyMonitor 
-          voters={voters} 
-          learnerDatabase={store.learners || []} 
-          sections={store.sections || []} 
-        />
-      </div>
+      <>
+        <UsisPortalGate moduleKey="election" />
+        <div className="h-screen w-screen bg-slate-50 overflow-hidden">
+          <LiveTallyMonitor 
+            voters={voters} 
+            learnerDatabase={store.learners || []} 
+            sections={store.sections || []} 
+          />
+        </div>
+      </>
     );
   }
 
   return (
     <div className={`election-app flex min-h-screen flex-col bg-[#f8fafc]${isIdentityFocusView ? ' election-app--identity-focus' : ''}`}>
+      <UsisPortalGate moduleKey="election" />
       <SystemAlerts isOnline={store.online} isSyncing={store.loading || isSubmitting} hasError={store.connError} />
       <NotificationModal config={modalConfig} onClose={() => setModalConfig({ ...modalConfig, isOpen: false })} />
       
@@ -565,6 +570,7 @@ const App: React.FC = () => {
             <div className="w-full px-[var(--page-inset)] py-4 md:py-6">
               <div className="mx-auto flex w-full max-w-[720px] flex-col items-center">
                 <UsisLoginModal
+                  moduleKey="election"
                   title="Admin Access"
                   username={adminUsername}
                   password={adminPassword}

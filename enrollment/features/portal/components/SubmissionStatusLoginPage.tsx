@@ -36,6 +36,7 @@ export function SubmissionStatusLoginPage({ onLogin }: Props) {
       <div className="content-width">
         <section className="section-shell">
           <UsisLoginModal
+            moduleKey="enrollment"
             title="Submission Status Login"
             username={username}
             password={password}

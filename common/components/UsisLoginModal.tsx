@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import usisIcon from '../assets/USIS_Icon.png';
+import { supabase } from '../../packages/shared-supabase/src';
 
 type UsisLoginModalProps = {
   title: string;
@@ -17,6 +18,7 @@ type UsisLoginModalProps = {
   noticeMessage?: string | null;
   noticeTitle?: string;
   helperContent?: React.ReactNode;
+  moduleKey?: string;
   onDismissNotice?: () => void;
   onUsernameChange: (value: string) => void;
   onPasswordChange: (value: string) => void;
@@ -37,13 +39,44 @@ export function UsisLoginModal({
   noticeMessage = null,
   noticeTitle = 'Login Notice',
   helperContent,
+  moduleKey,
   onDismissNotice,
   onUsernameChange,
   onPasswordChange,
   onSubmit,
 }: UsisLoginModalProps) {
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+  const [isPortalBlocked, setIsPortalBlocked] = useState(false);
   const canUsePortal = typeof document !== 'undefined' && !!document.body;
+
+  React.useEffect(() => {
+    let isMounted = true;
+    const loadGateState = async () => {
+      if (!moduleKey) {
+        if (isMounted) setIsPortalBlocked(false);
+        return;
+      }
+      try {
+        const { data, error } = await supabase
+          .from('ia_portal_controls')
+          .select('is_enabled,mode')
+          .eq('module_key', moduleKey)
+          .limit(1)
+          .maybeSingle();
+        if (!isMounted || error || !data) return;
+        const isBlocked = Boolean(data.is_enabled && data.mode !== 'live');
+        setIsPortalBlocked(isBlocked);
+      } catch {
+        if (isMounted) setIsPortalBlocked(false);
+      }
+    };
+    void loadGateState();
+    return () => {
+      isMounted = false;
+    };
+  }, [moduleKey]);
+
+  const isFormDisabled = isSubmitting || isPortalBlocked;
 
   return (
     <section className="usis-login-modal" aria-labelledby="usis-login-title">
@@ -68,6 +101,7 @@ export function UsisLoginModal({
                 name="username"
                 autoComplete={usernameAutoComplete}
                 inputMode={usernameInputMode}
+                disabled={isFormDisabled}
                 required
                 placeholder=" "
               />
@@ -84,6 +118,7 @@ export function UsisLoginModal({
                 name="password"
                 autoComplete={passwordAutoComplete}
                 inputMode={passwordInputMode}
+                disabled={isFormDisabled}
                 required
                 placeholder=" "
                 className="floating-field__input--password"
@@ -93,6 +128,7 @@ export function UsisLoginModal({
                 type="button"
                 className="floating-field__password-toggle"
                 aria-label={isPasswordVisible ? 'Hide password' : 'Show password'}
+                disabled={isFormDisabled}
                 onClick={() => setIsPasswordVisible((visible) => !visible)}
               >
                 <svg viewBox="0 0 24 24" aria-hidden="true" className="floating-field__password-icon">
@@ -114,9 +150,12 @@ export function UsisLoginModal({
             </div>
           </label>
 
-          <button type="submit" className="primary-button usis-login-modal__submit" disabled={isSubmitting}>
+          <button type="submit" className="primary-button usis-login-modal__submit" disabled={isFormDisabled}>
             {isSubmitting ? 'Logging In...' : 'Login'}
           </button>
+          {isPortalBlocked ? (
+            <p className="usis-login-modal__helper">Login is temporarily disabled while this portal is unavailable.</p>
+          ) : null}
           {helperContent ? <div className="usis-login-modal__helper">{helperContent}</div> : null}
         </form>
       </div>
