@@ -30,6 +30,37 @@ export default function CredentialDetailPage() {
     }
   };
 
+  const copyCredentialNotice = async () => {
+    if (!learner) return;
+    const firstName = String(learner.firstName || '').trim() || 'Learner';
+    const lrn = String(learner.lrn || '').trim() || '-';
+    const password = String(learner.loginPassword || '').trim() || '-';
+    const email = String(learner.microsoftUpn || '').trim() || 'Not Linked';
+
+    const notice = `Leon NHS - MIS (Credentials Notice)
+
+Hi, ${firstName}. This is to inform you that you can now access the Leon NHS – USIS portal with following credentials:
+
+Username  (LRN): ${lrn}
+Password: ${password}
+
+And you can also access your Microsoft for Education Account with the following credentials:
+
+Microsoft Email: ${email}
+Password: ${password}
+
+If you been having trouble in accessing your account, you can go to help.leonnhs.edu.ph/recover to self-reset your password, or to create a help ticket to assist you.
+
+#onlythebestforleonnhs`;
+
+    try {
+      await navigator.clipboard.writeText(notice);
+      setFeedback('Credentials notice text copied.');
+    } catch {
+      setFeedback('Unable to copy credentials notice text.');
+    }
+  };
+
   const performResetPortalAndMicrosoft = async () => {
     if (!learner) return;
     const nextPassword = createResetVariantPassword(learner);
@@ -150,6 +181,9 @@ export default function CredentialDetailPage() {
         </div>
 
         <div className="registrar-credential-detail__actions">
+          <button type="button" className="secondary-button" onClick={copyCredentialNotice} disabled={isBusy}>
+            Copy Notice Text
+          </button>
           <button type="button" className="primary-button" onClick={handleResetPortalAndMicrosoft} disabled={isBusy}>
             Reset Learner + Microsoft Password
           </button>
