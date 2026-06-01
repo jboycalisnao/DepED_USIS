@@ -32,6 +32,8 @@ const draftFieldLabels: Array<{ key: string; label: string }> = [
   { key: 'birthDate', label: 'Date of Birth' },
   { key: 'gender', label: 'Gender' },
   { key: 'placeOfBirth', label: 'Place of Birth' },
+  { key: 'height', label: 'Height (cm)' },
+  { key: 'weight', label: 'Weight (kg)' },
   { key: 'learnerContact', label: 'Learner Contact Number' },
   { key: 'motherTongue', label: 'Mother Tongue' },
   { key: 'religion', label: 'Religion' },
@@ -85,7 +87,7 @@ export default function EnrollmentKioskPage() {
 
   const groupedRows = useMemo(() => {
     const enrollmentContextKeys = ['schoolId', 'schoolYear', 'schoolToEnroll', 'studentType', 'learnerCategory', 'previousSchool', 'previousSchoolYear', 'lastGradeLevel', 'gradeToEnroll', 'track', 'strand', 'semester'];
-    const learnerInfoKeys = ['birthCertificateNo', 'lrn', 'email', 'lastName', 'firstName', 'middleName', 'extensionName', 'birthDate', 'gender', 'placeOfBirth', 'learnerContact', 'motherTongue', 'religion', 'is4Ps', 'fourPsHouseholdId'];
+    const learnerInfoKeys = ['birthCertificateNo', 'lrn', 'email', 'lastName', 'firstName', 'middleName', 'extensionName', 'birthDate', 'gender', 'placeOfBirth', 'height', 'weight', 'learnerContact', 'motherTongue', 'religion', 'is4Ps', 'fourPsHouseholdId'];
     const addressInfoKeys = ['currentAddress', 'permanentAddress'];
     const guardianInfoKeys = ['fatherName', 'fatherContact', 'motherName', 'motherContact', 'guardianName', 'guardianContact', 'hasSpedNeed', 'preferredModality', 'deviceAccess', 'hasInternet'];
 

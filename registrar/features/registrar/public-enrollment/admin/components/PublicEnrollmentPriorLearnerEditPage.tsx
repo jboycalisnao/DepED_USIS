@@ -75,6 +75,8 @@ const emptyDraft = (schoolId: string): EnrollmentDraft => ({
   birthDate: '',
   gender: 'Male',
   placeOfBirth: '',
+  height: '',
+  weight: '',
   learnerContact: '',
   motherTongue: '',
   religion: religionOptions[0],

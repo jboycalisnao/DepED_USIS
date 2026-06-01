@@ -3,12 +3,15 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../../../../../lib/supabase';
 import UsisPageLoader from '../../../../../../common/components/UsisPageLoader';
 import type { PublicEnrollmentSubmission } from '../../types';
-import { fetchPublicEnrollmentSubmissionById } from '../../services/publicEnrollmentSubmissions';
+import { fetchPublicEnrollmentSubmissionById, updatePublicEnrollmentSubmissionRecord } from '../../services/publicEnrollmentSubmissions';
 
 type AuditItem = {
+  id: string;
   title: string;
   date: string;
   detail: string;
+  deletable: boolean;
+  trailIndex: number;
 };
 
 type PayloadAuditEntry = {
@@ -30,6 +33,7 @@ export default function PublicEnrollmentSubmissionDetailsPage() {
   const [submission, setSubmission] = useState<PublicEnrollmentSubmission | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isDeletingTrailId, setIsDeletingTrailId] = useState<string | null>(null);
   const [learnerHistory, setLearnerHistory] = useState<Array<any>>([]);
 
   useEffect(() => {
@@ -75,17 +79,23 @@ export default function PublicEnrollmentSubmissionDetailsPage() {
 
     const payloadTrail: AuditItem[] = (Array.isArray((payload as any).auditTrail) ? ((payload as any).auditTrail as PayloadAuditEntry[]) : [])
       .filter((entry) => entry && (entry.at || entry.action || entry.detail))
-      .map((entry) => ({
+      .map((entry, index) => ({
+        id: String(entry.id || `trail-${index}`),
         title: String(entry.action || 'Submission Event'),
         date: String(entry.at || ''),
         detail: String(entry.detail || 'No details provided.'),
+        deletable: true,
+        trailIndex: index,
       }));
 
     const list: AuditItem[] = [
       {
+        id: 'system-submission-received',
         title: 'Submission Received',
         date: submission.created_at,
         detail: `Public enrollment submission captured for ${schoolYear || 'unspecified school year'}.`,
+        deletable: false,
+        trailIndex: -1,
       },
       ...payloadTrail,
     ];
@@ -97,9 +107,12 @@ export default function PublicEnrollmentSubmissionDetailsPage() {
         const matchLrn = String(entry?.submissionPayload?.lrn || '').trim() === String(submission.lrn || payload.lrn || '').trim();
         if (!matchYear && !matchLrn) return;
         list.push({
+          id: `system-history-${String(entry.id || entry.enrollmentDate || Math.random())}`,
           title: 'Learner Enrollment Recorded',
           date: String(entry.enrollmentDate || ''),
           detail: `Enrolled to ${String(entry.section || 'section not specified')} (${String(entry.gradeLevel || 'grade not specified')}).`,
+          deletable: false,
+          trailIndex: -1,
         });
       });
 
@@ -123,6 +136,39 @@ export default function PublicEnrollmentSubmissionDetailsPage() {
   const payload = submission.payload || ({} as any);
   const fullName = [submission.last_name || payload.lastName, submission.first_name || payload.firstName, submission.middle_name || payload.middleName].filter(Boolean).join(', ');
 
+  const deleteTrail = async (item: AuditItem) => {
+    if (!submission || !item.deletable || item.trailIndex < 0) return;
+    const confirmed = window.confirm('Delete this audit trail entry? This action cannot be undone.');
+    if (!confirmed) return;
+    try {
+      setIsDeletingTrailId(item.id);
+      setError(null);
+      const currentPayload = ((submission.payload && typeof submission.payload === 'object' ? submission.payload : {}) as Record<string, any>);
+      const currentTrail = Array.isArray(currentPayload.auditTrail) ? [...currentPayload.auditTrail] : [];
+      currentTrail.splice(item.trailIndex, 1);
+      const nextPayload = {
+        ...currentPayload,
+        auditTrail: currentTrail,
+      } as any;
+      await updatePublicEnrollmentSubmissionRecord(submission.id, {
+        school_id: submission.school_id || null,
+        school_year: submission.school_year || null,
+        lrn: submission.lrn || null,
+        last_name: submission.last_name || null,
+        first_name: submission.first_name || null,
+        middle_name: submission.middle_name || null,
+        grade_to_enroll: submission.grade_to_enroll || null,
+        guardian_contact: submission.guardian_contact || null,
+        payload: nextPayload,
+      });
+      setSubmission((current) => (current ? { ...current, payload: nextPayload } : current));
+    } catch (e: any) {
+      setError(e?.message || 'Unable to delete audit trail entry.');
+    } finally {
+      setIsDeletingTrailId(null);
+    }
+  };
+
   return (
     <section className="portal-panel registrar-public-enrollment-submissions">
       <div className="portal-panel__header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
@@ -141,8 +187,21 @@ export default function PublicEnrollmentSubmissionDetailsPage() {
           <strong>Audit Trail</strong>
           <div style={{ display: 'grid', gap: 10, marginTop: 8 }}>
             {auditTrail.map((item, index) => (
-              <article key={`${item.title}-${item.date}-${index}`} style={{ border: '1px solid rgba(18,35,61,0.14)', borderRadius: 10, padding: '10px 12px', background: '#fbfcff' }}>
-                <strong>{item.title}</strong>
+              <article key={`${item.id}-${index}`} style={{ border: '1px solid rgba(18,35,61,0.14)', borderRadius: 10, padding: '10px 12px', background: '#fbfcff' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'start' }}>
+                  <strong>{item.title}</strong>
+                  {item.deletable ? (
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      style={{ minHeight: 30, padding: '0 10px' }}
+                      onClick={() => void deleteTrail(item)}
+                      disabled={isDeletingTrailId === item.id}
+                    >
+                      {isDeletingTrailId === item.id ? 'Deleting...' : 'Delete'}
+                    </button>
+                  ) : null}
+                </div>
                 <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--deped-muted)' }}>{formatDate(item.date)}</p>
                 <p style={{ margin: '4px 0 0' }}>{item.detail}</p>
               </article>

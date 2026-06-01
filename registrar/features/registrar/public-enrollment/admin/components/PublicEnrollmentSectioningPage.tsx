@@ -29,6 +29,7 @@ export default function PublicEnrollmentSectioningPage() {
   const [submissions, setSubmissions] = useState<PublicEnrollmentSubmission[]>([]);
   const [sections, setSections] = useState<SectionOption[]>([]);
   const [selectedSectionBySubmission, setSelectedSectionBySubmission] = useState<Record<string, string>>({});
+  const [currentSectionBySubmission, setCurrentSectionBySubmission] = useState<Record<string, string>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
 
@@ -72,8 +73,60 @@ export default function PublicEnrollmentSectioningPage() {
     }
 
     const rows = (submissionRows || []) as PublicEnrollmentSubmission[];
+    const lrnList = Array.from(
+      new Set(
+        rows
+          .map((row) => String(row.lrn || '').trim())
+          .filter(Boolean),
+      ),
+    );
+
+    const nextCurrentSectionBySubmission: Record<string, string> = {};
+    if (lrnList.length) {
+      const { data: learnerRows } = await supabase
+        .from('registrar_learners')
+        .select('lrn,section_id')
+        .in('lrn', lrnList);
+
+      const sectionIds = Array.from(
+        new Set(
+          (learnerRows || [])
+            .map((row: any) => String(row.section_id || '').trim())
+            .filter(Boolean),
+        ),
+      );
+
+      const sectionNameById: Record<string, string> = {};
+      if (sectionIds.length) {
+        const { data: sectionNameRows } = await supabase
+          .from('registrar_sections')
+          .select('id,name')
+          .in('id', sectionIds);
+        for (const sectionRow of sectionNameRows || []) {
+          const key = String((sectionRow as any).id || '').trim();
+          if (key) sectionNameById[key] = String((sectionRow as any).name || '').trim();
+        }
+      }
+
+      const learnerSectionByLrn: Record<string, string> = {};
+      for (const learnerRow of learnerRows || []) {
+        const lrn = String((learnerRow as any).lrn || '').trim();
+        const sectionId = String((learnerRow as any).section_id || '').trim();
+        if (!lrn) continue;
+        learnerSectionByLrn[lrn] = sectionNameById[sectionId] || '--';
+      }
+
+      for (const row of rows) {
+        const lrn = String(row.lrn || '').trim();
+        nextCurrentSectionBySubmission[row.id] = lrn ? learnerSectionByLrn[lrn] || '--' : '--';
+      }
+    } else {
+      for (const row of rows) nextCurrentSectionBySubmission[row.id] = '--';
+    }
+
     setSubmissions(rows);
     setSections(nextSections);
+    setCurrentSectionBySubmission(nextCurrentSectionBySubmission);
     setSelectedSectionBySubmission(() => {
       const initial: Record<string, string> = {};
       for (const row of rows) {
@@ -201,6 +254,7 @@ export default function PublicEnrollmentSectioningPage() {
       setSubmissions((current) =>
         current.map((entry) => (entry.id === row.id ? { ...entry, payload: nextPayload } : entry)),
       );
+      setCurrentSectionBySubmission((current) => ({ ...current, [row.id]: selectedSection.name }));
     } catch (error: any) {
       setErrorMessage(error?.message || 'Unable to save section assignment.');
     } finally {
@@ -276,6 +330,7 @@ export default function PublicEnrollmentSectioningPage() {
                             <th style={{ padding: '8px 10px' }}>Submission Ref</th>
                             <th style={{ padding: '8px 10px' }}>Learner</th>
                             <th style={{ padding: '8px 10px' }}>LRN</th>
+                            <th style={{ padding: '8px 10px', minWidth: 150 }}>Current Section</th>
                             <th style={{ padding: '8px 10px', minWidth: 260 }}>Assign Section</th>
                             <th style={{ padding: '8px 10px' }}>Action</th>
                           </tr>
@@ -285,12 +340,14 @@ export default function PublicEnrollmentSectioningPage() {
                             filteredSubmissions.map((row) => {
                               const learner = [row.last_name, row.first_name, row.middle_name].filter(Boolean).join(', ') || '--';
                               const isSavingRow = savingId === row.id;
+                              const hasCurrentSection = String(currentSectionBySubmission[row.id] || '').trim() !== '' && String(currentSectionBySubmission[row.id] || '').trim() !== '--';
                               return (
                                 <tr key={row.id}>
                                   <td style={{ padding: '7px 10px' }}>{formatDate(row.created_at)}</td>
                                   <td style={{ padding: '7px 10px' }}>{row.submission_reference_id || '--'}</td>
                                   <td style={{ padding: '7px 10px' }}>{learner}</td>
                                   <td style={{ padding: '7px 10px' }}>{row.lrn || '--'}</td>
+                                  <td style={{ padding: '7px 10px' }}>{currentSectionBySubmission[row.id] || '--'}</td>
                                   <td style={{ padding: '7px 10px', minWidth: 260 }}>
                                     <SearchableSelect
                                       label="Section"
@@ -300,10 +357,11 @@ export default function PublicEnrollmentSectioningPage() {
                                       value={selectedSectionBySubmission[row.id] || ''}
                                       onChange={(value) => setSelectedSectionBySubmission((current) => ({ ...current, [row.id]: value }))}
                                       options={sections.map((section) => ({ value: section.id, label: section.name }))}
+                                      disabled={hasCurrentSection}
                                     />
                                   </td>
                                   <td style={{ padding: '7px 10px' }}>
-                                    <button type="button" className="secondary-button" onClick={() => void assignSection(row)} disabled={isSavingRow} style={{ minHeight: 34, padding: '0 10px' }}>
+                                    <button type="button" className="secondary-button" onClick={() => void assignSection(row)} disabled={isSavingRow || hasCurrentSection} style={{ minHeight: 34, padding: '0 10px' }}>
                                       {isSavingRow ? 'Saving...' : 'Save'}
                                     </button>
                                   </td>
@@ -312,7 +370,7 @@ export default function PublicEnrollmentSectioningPage() {
                             })
                           ) : (
                             <tr>
-                              <td colSpan={6} style={{ padding: '8px 10px' }}>No submissions found for this grade level.</td>
+                              <td colSpan={7} style={{ padding: '8px 10px' }}>No submissions found for this grade level.</td>
                             </tr>
                           )}
                         </tbody>

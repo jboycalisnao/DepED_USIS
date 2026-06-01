@@ -1,4 +1,4 @@
-import { FormEvent, useMemo, useRef, useState } from 'react';
+﻿import { FormEvent, useMemo, useRef, useState } from 'react';
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { UsisSearchableSelect } from '../../../../common/components/ui/UsisSearchableSelect';
@@ -11,6 +11,7 @@ import {
   religionOptions,
   semesterOptions,
   studentTypeOptions,
+  trackOptions,
 } from '../data/enrollmentOptions';
 import type { EnrollmentDraft } from '../types';
 import { createPublicEnrollmentSubmission } from '../services/publicEnrollmentSubmissions';
@@ -43,6 +44,9 @@ import UsisPageLoader from '../../../../common/components/UsisPageLoader';
 
 const gradeLevelOrder = gradeLevelOptions.map((level) => ({ label: level, value: Number(level.replace(/\D/g, '')) }));
 const SHS_GRADES = new Set(['Grade 11', 'Grade 12']);
+const ACADEMIC_TRACK_STRANDS = ['STEM', 'HUMSS', 'ABM', 'ALS'].map((strand) => ({ value: strand, label: strand }));
+const TECHPRO_TRACK_LABEL = 'TechPro Track';
+const TECHPRO_STRAND_LABEL = 'Technical Vocational Strand';
 const getNextGradeLevel = (gradeLevel: string) => {
   const current = gradeLevelOrder.find((entry) => entry.label === gradeLevel);
   if (!current) return '';
@@ -79,11 +83,11 @@ export function EnrollmentFormPage() {
   const [permanentAddress, setPermanentAddress] = useState<AddressSelection>(initialAddressSelection);
   const [currentAddress, setCurrentAddress] = useState<AddressSelection>(initialAddressSelection);
   const [sameAsPermanent, setSameAsPermanent] = useState(false);
-  const [strandOptions, setStrandOptions] = useState<Array<{ value: string; label: string }>>([]);
   const [lrnLookupState, setLrnLookupState] = useState<LrnLookupState>({
     status: 'empty',
     message: 'Enter a 12-digit LRN to unlock and continue the form.',
   });
+  const isSeniorHighTargetGrade = SHS_GRADES.has(draft.gradeToEnroll);
 
   useEffect(() => {
     const loadFormAvailability = async () => {
@@ -174,14 +178,6 @@ export function EnrollmentFormPage() {
   }, []);
 
   useEffect(() => {
-    const loadStrands = async () => {
-      const { data, error } = await supabase.from('registrar_strands').select('acronym, full_name').order('acronym', { ascending: true });
-      if (!error && data?.length) setStrandOptions(data.map((row) => ({ value: String(row.acronym || '').trim(), label: String(row.full_name || row.acronym || '').trim() })));
-    };
-    loadStrands();
-  }, []);
-
-  useEffect(() => {
     const normalizedLrn = digitsOnly(draft.lrn || '');
     if (!normalizedLrn) {
       setLrnLookupState({ status: 'empty', message: 'Enter a 12-digit LRN to unlock and continue the form.' });
@@ -210,7 +206,7 @@ export function EnrollmentFormPage() {
         if (!data) {
           setLrnLookupState({
             status: 'not_found',
-            message: 'New Enrollment – No existing learner record found. Continue by completing the form.',
+            message: 'New Enrollment â€“ No existing learner record found. Continue by completing the form.',
           });
           setDraft((current) => ({
             ...initialDraft,
@@ -488,6 +484,13 @@ export function EnrollmentFormPage() {
   }, [draft.lastGradeLevel, draft.learnerCategory, draft.studentType]);
 
   useEffect(() => {
+    if (!isSeniorHighTargetGrade) return;
+    if (draft.track === TECHPRO_TRACK_LABEL && draft.strand !== TECHPRO_STRAND_LABEL) {
+      setDraft((current) => ({ ...current, strand: TECHPRO_STRAND_LABEL }));
+    }
+  }, [isSeniorHighTargetGrade, draft.track, draft.strand]);
+
+  useEffect(() => {
     if (!draft.strand) setDraft((current) => ({ ...current, semester: '1st Sem' }));
   }, [draft.strand]);
 
@@ -562,7 +565,11 @@ export function EnrollmentFormPage() {
     const selected = previousSchoolOptions.find((entry) => entry.schoolName === draft.previousSchool);
     return selected ? `${selected.schoolId}::${selected.schoolName}` : '';
   }, [draft.learnerCategory, draft.previousSchool, previousSchoolOptions]);
-  const isSeniorHighTargetGrade = SHS_GRADES.has(draft.gradeToEnroll);
+  const displayedStrandOptions = useMemo(() => {
+    if (!isSeniorHighTargetGrade) return [] as Array<{ value: string; label: string }>;
+    if (draft.track === TECHPRO_TRACK_LABEL) return [{ value: TECHPRO_STRAND_LABEL, label: TECHPRO_STRAND_LABEL }];
+    return ACADEMIC_TRACK_STRANDS;
+  }, [isSeniorHighTargetGrade, draft.track]);
   const isLrnResolved = lrnLookupState.status === 'matched' || lrnLookupState.status === 'not_found';
   const isFormLockedByLrn = !isLrnResolved;
 
@@ -673,7 +680,7 @@ export function EnrollmentFormPage() {
                   </p>
                   <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center', marginTop: 6 }}>
                     <a href="/requirements" className="secondary-button">View Requirements</a>
-                    <a href="/submission-status/login" className="primary-button">Submission Status Login</a>
+                    <a href="/submission-status" className="primary-button">Submission Status Login</a>
                   </div>
                   <p
                     style={{
@@ -799,7 +806,8 @@ export function EnrollmentFormPage() {
                   />
                   <SelectField label="Last Grade Level" value={draft.lastGradeLevel} onChange={(value) => updateField('lastGradeLevel', value)} options={gradeLevelOptions as unknown as string[]} disabled={draft.studentType === 'New Student'} />
                   <SelectField label="Grade Level to Enroll" value={draft.gradeToEnroll} onChange={(value) => updateField('gradeToEnroll', value)} options={availableGradeToEnrollOptions as unknown as string[]} disabled={draft.studentType === 'New Student'} />
-                  <SelectField label="Preferred Strand (Optional - SHS only)" value={draft.strand} onChange={(value) => updateField('strand', value)} options={strandOptions} disabled={!isSeniorHighTargetGrade} />
+                  <SelectField label="Track" value={draft.track} onChange={(value) => updateField('track', value)} options={trackOptions as unknown as string[]} disabled={!isSeniorHighTargetGrade} />
+                  <SelectField label="Preferred Strand (Optional - SHS only)" value={draft.strand} onChange={(value) => updateField('strand', value)} options={displayedStrandOptions} disabled={!isSeniorHighTargetGrade || draft.track === TECHPRO_TRACK_LABEL} />
                   <SelectField label="Semester" value={draft.semester} onChange={(value) => updateField('semester', value)} options={semesterOptions as unknown as string[]} disabled={!isSeniorHighTargetGrade || !draft.strand} />
                 </div>
               </section>

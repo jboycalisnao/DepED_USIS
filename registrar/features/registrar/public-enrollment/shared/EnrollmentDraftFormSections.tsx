@@ -28,6 +28,7 @@ export default function EnrollmentDraftFormSections({
   onUnfocusSection,
 }: Props) {
   const gradeTargets = gradeToEnrollOptions?.length ? gradeToEnrollOptions : [...gradeLevelOptions];
+  const lastGradeLevelOptions = ['Grade 6', ...gradeLevelOptions];
 
   return (
     <>
@@ -39,7 +40,7 @@ export default function EnrollmentDraftFormSections({
         <InputField label="School to Enroll" value={draft.schoolToEnroll} onChange={(v) => onFieldChange('schoolToEnroll', v)} />
         <InputField label="Previous School Attended" value={draft.previousSchool} onChange={(v) => onFieldChange('previousSchool', v)} />
         <InputField label="Last S.Y. Attended" value={draft.previousSchoolYear} onChange={(v) => onFieldChange('previousSchoolYear', v)} inputMode="numeric" maxLength={9} pattern="\\d{4}-\\d{4}" />
-        <SelectField label="Last Grade Level Attended" value={draft.lastGradeLevel} onChange={(v) => onFieldChange('lastGradeLevel', v)} options={gradeLevelOptions as unknown as string[]} />
+        <SelectField label="Last Grade Level Attended" value={draft.lastGradeLevel} onChange={(v) => onFieldChange('lastGradeLevel', v)} options={lastGradeLevelOptions as unknown as string[]} />
         <SelectField label="Grade Level to Enroll" value={draft.gradeToEnroll} onChange={(v) => onFieldChange('gradeToEnroll', v)} options={gradeTargets as unknown as string[]} />
         <SelectField label="Track" value={draft.track} onChange={(v) => onFieldChange('track', v)} options={trackOptions as unknown as string[]} disabled={!isSeniorHighTargetGrade} />
         <SelectField label="Preferred Strand" value={draft.strand} onChange={(v) => onFieldChange('strand', v)} options={availableStrands.filter(Boolean)} disabled={!isSeniorHighTargetGrade} />
@@ -57,6 +58,8 @@ export default function EnrollmentDraftFormSections({
         <InputField label="Date of Birth" value={draft.birthDate} onChange={(v) => onFieldChange('birthDate', v)} type="date" />
         <SelectField label="Gender" value={draft.gender} onChange={(v) => onFieldChange('gender', v)} options={['Male', 'Female']} />
         <InputField label="Place of Birth" value={draft.placeOfBirth} onChange={(v) => onFieldChange('placeOfBirth', v)} />
+        <InputField label="Height (cm)" value={draft.height} onChange={(v) => onFieldChange('height', v)} inputMode="decimal" />
+        <InputField label="Weight (kg)" value={draft.weight} onChange={(v) => onFieldChange('weight', v)} inputMode="decimal" />
         <InputField label="Learner Contact Number" value={draft.learnerContact} onChange={(v) => onFieldChange('learnerContact', v)} inputMode="tel" maxLength={15} />
         <InputField label="Mother Tongue" value={draft.motherTongue} onChange={(v) => onFieldChange('motherTongue', v)} />
         <SelectField label="Religion" value={draft.religion} onChange={(v) => onFieldChange('religion', v)} options={religionOptions as unknown as string[]} />

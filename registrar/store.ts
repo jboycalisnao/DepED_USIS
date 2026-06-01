@@ -30,6 +30,7 @@ const STORAGE_KEY_PROGRAMS = 'leon_nhs_special_programs';
 const REGISTRAR_TABLES = {
   users: 'usis_core_coordinators',
   learners: 'registrar_learners',
+  submissions: 'registrar_public_enrollment_submissions',
   sections: 'registrar_sections',
   strands: 'registrar_strands',
   specialPrograms: 'registrar_special_programs',
@@ -550,7 +551,32 @@ export const useStore = () => {
       if (activeSchoolYear.isLocked) return { error: "Locked" };
       setGlobalLoading(true);
       try {
+        const targetLearner = learners.find((entry) => entry.id === id);
+        const targetLrn = String(targetLearner?.lrn || '').trim();
         const { error } = await supabase.from(REGISTRAR_TABLES.learners).delete().eq('id', id);
+
+        if (!error && targetLrn) {
+          const { data: submissionRows, error: submissionFetchError } = await supabase
+            .from(REGISTRAR_TABLES.submissions)
+            .select('id,payload')
+            .eq('lrn', targetLrn);
+
+          if (!submissionFetchError && submissionRows?.length) {
+            const updates = submissionRows.map((row: any) => {
+              const payload = row?.payload && typeof row.payload === 'object' ? { ...row.payload } : {};
+              delete (payload as any).assignedSectionId;
+              delete (payload as any).assignedSectionName;
+              delete (payload as any).assignedSectionAt;
+              delete (payload as any).assignedSectionBy;
+              return supabase
+                .from(REGISTRAR_TABLES.submissions)
+                .update({ payload })
+                .eq('id', String(row.id || '').trim());
+            });
+            await Promise.all(updates);
+          }
+        }
+
         if (!error) await fetchLearners();
         return { error: error?.message };
       } finally {

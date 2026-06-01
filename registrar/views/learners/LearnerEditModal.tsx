@@ -10,6 +10,7 @@ import {
   religionOptions,
   semesterOptions,
   studentTypeOptions,
+  trackOptions,
 } from '../../features/registrar/public-enrollment/data/enrollmentOptions';
 import { normalizeLearnerType } from '../../features/registrar/public-enrollment/shared/learnerType';
 
@@ -69,22 +70,25 @@ type Props = {
 const firstNonEmpty = (...values: Array<string | undefined | null>) =>
   values.map((v) => String(v || '').trim()).find(Boolean) || '';
 
-const buildDraft = (student: Student, activeSchoolYearLabel: string): LearnerModalDraft => {
+const buildDraft = (student: Student, activeSchoolYearLabel: string, latestSubmissionPayload?: Record<string, any>): LearnerModalDraft => {
   const history = Array.isArray(student.enrollments) ? [...student.enrollments] : [];
   const latestEntry = history[history.length - 1] as any;
   const latestWithPayload = history
     .reverse()
     .find((entry: any) => entry && typeof entry === 'object' && entry.submissionPayload && typeof entry.submissionPayload === 'object') as any;
   const payload = (latestWithPayload?.submissionPayload || {}) as Record<string, any>;
+  const submissionPayload = (latestSubmissionPayload && typeof latestSubmissionPayload === 'object' ? latestSubmissionPayload : {}) as Record<string, any>;
 
   return {
-    schoolId: firstNonEmpty(payload.schoolId, '302522'),
-    schoolYear: firstNonEmpty(payload.schoolYear, activeSchoolYearLabel),
-    schoolToEnroll: firstNonEmpty(payload.schoolToEnroll),
-    studentType: normalizeLearnerType(firstNonEmpty(payload.studentType, payload.student_type, payload.learnerType, payload.learner_type)) || studentTypeOptions[0],
-    learnerCategory: firstNonEmpty(payload.learnerCategory, learnerCategoryOptions[0]),
-    previousSchool: firstNonEmpty(payload.previousSchool),
+    schoolId: firstNonEmpty(submissionPayload.schoolId, payload.schoolId, '302522'),
+    schoolYear: firstNonEmpty(submissionPayload.schoolYear, payload.schoolYear, activeSchoolYearLabel),
+    schoolToEnroll: firstNonEmpty(submissionPayload.schoolToEnroll, payload.schoolToEnroll),
+    studentType: normalizeLearnerType(firstNonEmpty(submissionPayload.studentType, submissionPayload.student_type, payload.studentType, payload.student_type, payload.learnerType, payload.learner_type)) || studentTypeOptions[0],
+    learnerCategory: firstNonEmpty(submissionPayload.learnerCategory, payload.learnerCategory, learnerCategoryOptions[0]),
+    previousSchool: firstNonEmpty(submissionPayload.previousSchool, payload.previousSchool),
     previousSchoolYear: firstNonEmpty(
+      submissionPayload.previousSchoolYear,
+      submissionPayload.previous_school_year,
       payload.previousSchoolYear,
       payload.previous_school_year,
       payload.lastSchoolYearAttended,
@@ -93,6 +97,8 @@ const buildDraft = (student: Student, activeSchoolYearLabel: string): LearnerMod
       latestEntry?.schoolYear,
     ),
     lastGradeLevel: firstNonEmpty(
+      submissionPayload.lastGradeLevel,
+      submissionPayload.last_grade_level,
       payload.lastGradeLevel,
       payload.last_grade_level,
       payload.gradeLevel,
@@ -100,42 +106,44 @@ const buildDraft = (student: Student, activeSchoolYearLabel: string): LearnerMod
       latestEntry?.gradeLevel,
     ),
     gradeToEnroll: firstNonEmpty(
+      submissionPayload.gradeToEnroll,
+      submissionPayload.grade_to_enroll,
       payload.gradeToEnroll,
       payload.grade_to_enroll,
       payload.targetGradeLevel,
       latestWithPayload?.gradeLevel,
       latestEntry?.gradeLevel,
     ),
-    track: firstNonEmpty(payload.track, 'Academic Track'),
-    strand: firstNonEmpty(payload.strand),
-    semester: firstNonEmpty(payload.semester, semesterOptions[0]),
-    birthCertificateNo: firstNonEmpty(payload.birthCertificateNo),
-    lrn: firstNonEmpty(student.lrn, payload.lrn),
-    email: firstNonEmpty(student.email, payload.email),
-    lastName: firstNonEmpty(student.lastName, payload.lastName),
-    firstName: firstNonEmpty(student.firstName, payload.firstName),
-    middleName: firstNonEmpty(student.middleName, payload.middleName),
-    extensionName: firstNonEmpty(payload.extensionName),
-    birthDate: firstNonEmpty(student.birthDate, payload.birthDate),
-    gender: firstNonEmpty(student.gender, payload.gender, 'Male'),
-    placeOfBirth: firstNonEmpty(payload.placeOfBirth),
-    learnerContact: firstNonEmpty(student.contactNumber, payload.learnerContact, payload.guardianContact),
-    motherTongue: firstNonEmpty(payload.motherTongue),
-    religion: firstNonEmpty(payload.religion, religionOptions[0]),
-    is4Ps: student.is4Ps ? 'Yes' : firstNonEmpty(payload.is4Ps, 'No'),
-    fourPsHouseholdId: firstNonEmpty(payload.fourPsHouseholdId),
-    currentAddress: firstNonEmpty(payload.currentAddress, student.address),
-    permanentAddress: firstNonEmpty(payload.permanentAddress, student.address),
-    fatherName: firstNonEmpty(student.father_name, payload.fatherName),
-    fatherContact: firstNonEmpty(payload.fatherContact),
-    motherName: firstNonEmpty(student.mother_name, payload.motherName),
-    motherContact: firstNonEmpty(payload.motherContact),
-    guardianName: firstNonEmpty(student.guardian_name, payload.guardianName),
-    guardianContact: firstNonEmpty(payload.guardianContact, student.contactNumber),
-    hasSpedNeed: firstNonEmpty(payload.hasSpedNeed, 'No'),
-    preferredModality: firstNonEmpty(payload.preferredModality, modalityOptions[0]),
-    deviceAccess: firstNonEmpty(payload.deviceAccess, deviceOptions[0]),
-    hasInternet: firstNonEmpty(payload.hasInternet, 'Yes'),
+    track: firstNonEmpty(submissionPayload.track, payload.track, 'Academic Track'),
+    strand: firstNonEmpty(submissionPayload.strand, payload.strand),
+    semester: firstNonEmpty(submissionPayload.semester, payload.semester, semesterOptions[0]),
+    birthCertificateNo: firstNonEmpty(submissionPayload.birthCertificateNo, payload.birthCertificateNo),
+    lrn: firstNonEmpty(student.lrn, submissionPayload.lrn, payload.lrn),
+    email: firstNonEmpty(submissionPayload.email, student.email, payload.email),
+    lastName: firstNonEmpty(submissionPayload.lastName, student.lastName, payload.lastName),
+    firstName: firstNonEmpty(submissionPayload.firstName, student.firstName, payload.firstName),
+    middleName: firstNonEmpty(submissionPayload.middleName, student.middleName, payload.middleName),
+    extensionName: firstNonEmpty(submissionPayload.extensionName, payload.extensionName),
+    birthDate: firstNonEmpty(submissionPayload.birthDate, student.birthDate, payload.birthDate),
+    gender: firstNonEmpty(submissionPayload.gender, student.gender, payload.gender, 'Male'),
+    placeOfBirth: firstNonEmpty(submissionPayload.placeOfBirth, payload.placeOfBirth),
+    learnerContact: firstNonEmpty(submissionPayload.learnerContact, student.contactNumber, payload.learnerContact, payload.guardianContact),
+    motherTongue: firstNonEmpty(submissionPayload.motherTongue, payload.motherTongue),
+    religion: firstNonEmpty(submissionPayload.religion, payload.religion, religionOptions[0]),
+    is4Ps: student.is4Ps ? 'Yes' : firstNonEmpty(submissionPayload.is4Ps, payload.is4Ps, 'No'),
+    fourPsHouseholdId: firstNonEmpty(submissionPayload.fourPsHouseholdId, payload.fourPsHouseholdId),
+    currentAddress: firstNonEmpty(submissionPayload.currentAddress, payload.currentAddress, student.address),
+    permanentAddress: firstNonEmpty(submissionPayload.permanentAddress, payload.permanentAddress, student.address),
+    fatherName: firstNonEmpty(submissionPayload.fatherName, student.father_name, payload.fatherName),
+    fatherContact: firstNonEmpty(submissionPayload.fatherContact, payload.fatherContact),
+    motherName: firstNonEmpty(submissionPayload.motherName, student.mother_name, payload.motherName),
+    motherContact: firstNonEmpty(submissionPayload.motherContact, payload.motherContact),
+    guardianName: firstNonEmpty(submissionPayload.guardianName, student.guardian_name, payload.guardianName),
+    guardianContact: firstNonEmpty(submissionPayload.guardianContact, payload.guardianContact, student.contactNumber),
+    hasSpedNeed: firstNonEmpty(submissionPayload.hasSpedNeed, payload.hasSpedNeed, 'No'),
+    preferredModality: firstNonEmpty(submissionPayload.preferredModality, payload.preferredModality, modalityOptions[0]),
+    deviceAccess: firstNonEmpty(submissionPayload.deviceAccess, payload.deviceAccess, deviceOptions[0]),
+    hasInternet: firstNonEmpty(submissionPayload.hasInternet, payload.hasInternet, 'Yes'),
   };
 };
 
@@ -159,7 +167,7 @@ export default function LearnerEditModal({ student, activeSchoolYearLabel, stran
       setDraft(buildDraft(student, activeSchoolYearLabel));
       setIsLoadingRecord(true);
       try {
-        const [{ data, error }, { data: schoolYearRows }, { data: sectionRows }] = await Promise.all([
+        const [{ data, error }, { data: schoolYearRows }, { data: sectionRows }, { data: submissionRows }] = await Promise.all([
           supabase
           .from('registrar_learners')
           .select('*')
@@ -167,6 +175,12 @@ export default function LearnerEditModal({ student, activeSchoolYearLabel, stran
           .maybeSingle(),
           supabase.from('registrar_school_years').select('id,label').order('label', { ascending: false }),
           supabase.from('registrar_sections').select('id,name,grade_level,strand,school_year_id').order('name', { ascending: true }),
+          supabase
+            .from('registrar_public_enrollment_submissions')
+            .select('payload,created_at')
+            .eq('lrn', String(student.lrn || '').trim())
+            .order('created_at', { ascending: false })
+            .limit(1),
         ]);
         if (cancelled || error || !data) return;
 
@@ -189,7 +203,10 @@ export default function LearnerEditModal({ student, activeSchoolYearLabel, stran
           status: student.status,
           is4Ps: !!(data as any).is_4ps,
         };
-        const nextDraft = buildDraft(dbStudent, activeSchoolYearLabel);
+        const latestSubmissionPayload = submissionRows?.[0]?.payload && typeof submissionRows[0].payload === 'object'
+          ? (submissionRows[0].payload as Record<string, any>)
+          : undefined;
+        const nextDraft = buildDraft(dbStudent, activeSchoolYearLabel, latestSubmissionPayload);
         setDraft(nextDraft);
         const mappedSchoolYears = (schoolYearRows || []).map((row: any) => ({ id: String(row.id || ''), label: String(row.label || '') })).filter((row) => row.id && row.label);
         const mappedSections = (sectionRows || []).map((row: any) => ({
@@ -216,7 +233,19 @@ export default function LearnerEditModal({ student, activeSchoolYearLabel, stran
     };
   }, [student, activeSchoolYearLabel]);
 
+  useEffect(() => {
+    if (!draft) return;
+    const learnerType = String(draft.studentType || '').toLowerCase();
+    const isNewLearner = learnerType.includes('new');
+    const isIncomingGrade7 = String(draft.gradeToEnroll || '').trim() === 'Grade 7';
+    const hasLastGrade = String(draft.lastGradeLevel || '').trim().length > 0;
+    if (!isNewLearner || !isIncomingGrade7 || hasLastGrade) return;
+    setDraft((current) => (current ? { ...current, lastGradeLevel: 'Grade 6' } : current));
+  }, [draft]);
+
   if (!student || !draft) return null;
+  const isJuniorHighTargetGrade = ['Grade 7', 'Grade 8', 'Grade 9', 'Grade 10'].includes(String(draft.gradeToEnroll || '').trim());
+  const lastGradeLevelOptions = ['Grade 6', ...gradeLevelOptions];
 
   const selectedSchoolYearId =
     availableSchoolYears.find((row) => row.label === (selectedSchoolYearLabel || draft.schoolYear))?.id || '';
@@ -275,11 +304,11 @@ export default function LearnerEditModal({ student, activeSchoolYearLabel, stran
                 <InputField label="School to Enroll" value={draft.schoolToEnroll} onChange={(value) => setDraft((current) => (current ? { ...current, schoolToEnroll: value } : current))} />
                 <InputField label="Previous School Attended" value={draft.previousSchool} onChange={(value) => setDraft((current) => (current ? { ...current, previousSchool: value } : current))} />
                 <InputField label="Last S.Y. Attended" value={draft.previousSchoolYear} onChange={(value) => setDraft((current) => (current ? { ...current, previousSchoolYear: value } : current))} inputMode="numeric" maxLength={9} pattern="\\d{4}-\\d{4}" />
-                <SelectField label="Last Grade Level Attended" value={draft.lastGradeLevel} onChange={(value) => setDraft((current) => (current ? { ...current, lastGradeLevel: value } : current))} options={gradeLevelOptions as unknown as string[]} />
+                <SelectField label="Last Grade Level Attended" value={draft.lastGradeLevel} onChange={(value) => setDraft((current) => (current ? { ...current, lastGradeLevel: value } : current))} options={lastGradeLevelOptions as unknown as string[]} />
                 <SelectField label="Grade Level to Enroll" value={draft.gradeToEnroll} onChange={(value) => setDraft((current) => (current ? { ...current, gradeToEnroll: value } : current))} options={gradeLevelOptions as unknown as string[]} />
-                <InputField label="Track" value={draft.track} onChange={(value) => setDraft((current) => (current ? { ...current, track: value } : current))} />
-                <SelectField label="Preferred Strand" value={draft.strand} onChange={(value) => setDraft((current) => (current ? { ...current, strand: value } : current))} options={strandOptions} />
-                <SelectField label="Semester" value={draft.semester} onChange={(value) => setDraft((current) => (current ? { ...current, semester: value } : current))} options={semesterOptions as unknown as string[]} />
+                <SelectField label="Track" value={draft.track} onChange={(value) => setDraft((current) => (current ? { ...current, track: value } : current))} options={trackOptions as unknown as string[]} disabled={isJuniorHighTargetGrade} />
+                <SelectField label="Preferred Strand" value={draft.strand} onChange={(value) => setDraft((current) => (current ? { ...current, strand: value } : current))} options={strandOptions} disabled={isJuniorHighTargetGrade} />
+                <SelectField label="Semester" value={draft.semester} onChange={(value) => setDraft((current) => (current ? { ...current, semester: value } : current))} options={semesterOptions as unknown as string[]} disabled={isJuniorHighTargetGrade} />
               </div>
             </section>
             <section className="registrar-public-enrollment__section">

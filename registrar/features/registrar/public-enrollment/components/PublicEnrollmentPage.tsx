@@ -56,6 +56,8 @@ const initialDraft: EnrollmentDraft = {
   birthDate: '',
   gender: 'Male',
   placeOfBirth: '',
+  height: '',
+  weight: '',
   learnerContact: '',
   motherTongue: '',
   religion: 'Roman Catholic',
@@ -356,6 +358,8 @@ export default function PublicEnrollmentPage() {
           strand: String(payload.strand || current.strand || '').trim(),
           semester: String(payload.semester || current.semester || '').trim(),
           placeOfBirth: String(payload.placeOfBirth || current.placeOfBirth || '').trim(),
+          height: String(payload.height || current.height || '').trim(),
+          weight: String(payload.weight || current.weight || '').trim(),
           motherTongue: String(payload.motherTongue || current.motherTongue || '').trim(),
           religion: String(payload.religion || current.religion || 'Roman Catholic').trim(),
           fourPsHouseholdId: String(payload.fourPsHouseholdId || current.fourPsHouseholdId || '').trim(),
@@ -578,6 +582,8 @@ export default function PublicEnrollmentPage() {
                     <DateField label="Date of Birth" value={draft.birthDate} onChange={(value) => updateField('birthDate', value)} required />
                     <SelectField label="Gender" value={draft.gender} onChange={(value) => updateField('gender', value)} options={['Male', 'Female']} />
                     <TextField label="Place of Birth" value={draft.placeOfBirth} onChange={(value) => updateField('placeOfBirth', value)} />
+                    <TextField label="Height (cm)" value={draft.height} onChange={(value) => updateField('height', value)} inputMode="decimal" />
+                    <TextField label="Weight (kg)" value={draft.weight} onChange={(value) => updateField('weight', value)} inputMode="decimal" />
                     <TextField label="Learner Contact Number" value={draft.learnerContact} onChange={(value) => updateField('learnerContact', value)} inputMode="tel" />
                     <TextField label="Mother Tongue" value={draft.motherTongue} onChange={(value) => updateField('motherTongue', value)} />
                     <SelectField label="Religion" value={draft.religion} onChange={(value) => updateField('religion', value)} options={religionOptions as unknown as string[]} />

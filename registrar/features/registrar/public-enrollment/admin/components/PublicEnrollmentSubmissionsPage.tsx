@@ -123,6 +123,8 @@ const emptyDraft = (schoolId: string): EnrollmentDraft => ({
   birthDate: '',
   gender: 'Male',
   placeOfBirth: '',
+  height: '',
+  weight: '',
   learnerContact: '',
   motherTongue: '',
   religion: religionOptions[0],
@@ -644,6 +646,12 @@ export default function PublicEnrollmentSubmissionsPage() {
     }
     setDraftEditor((current) => ({ ...current, [name]: value }));
   };
+
+  useEffect(() => {
+    const isNewLearner = String(draftEditor.studentType || '').toLowerCase().includes('new');
+    if (!isNewLearner || draftEditor.gradeToEnroll !== 'Grade 7' || draftEditor.lastGradeLevel === 'Grade 6') return;
+    setDraftEditor((current) => ({ ...current, lastGradeLevel: 'Grade 6' }));
+  }, [draftEditor.studentType, draftEditor.gradeToEnroll, draftEditor.lastGradeLevel]);
 
   useEffect(() => {
     const currentGrade = gradeLevelOrder.find((grade) => grade.label === draftEditor.lastGradeLevel);
@@ -1263,6 +1271,8 @@ export default function PublicEnrollmentSubmissionsPage() {
                 <InputField label="Date of Birth" value={draftEditor.birthDate} onChange={(value) => updateDraftField('birthDate', value)} type="date" />
                 <SelectField label="Gender" value={draftEditor.gender} onChange={(value) => updateDraftField('gender', value)} options={['Male', 'Female']} />
                 <InputField label="Place of Birth" value={draftEditor.placeOfBirth} onChange={(value) => updateDraftField('placeOfBirth', value)} />
+                <InputField label="Height (cm)" value={draftEditor.height} onChange={(value) => updateDraftField('height', value)} inputMode="decimal" />
+                <InputField label="Weight (kg)" value={draftEditor.weight} onChange={(value) => updateDraftField('weight', value)} inputMode="decimal" />
                 <InputField label="Learner Contact Number" value={draftEditor.learnerContact} onChange={(value) => updateDraftField('learnerContact', value)} inputMode="tel" maxLength={15} />
                 <InputField label="Mother Tongue" value={draftEditor.motherTongue} onChange={(value) => updateDraftField('motherTongue', value)} />
                 <SelectField label="Religion" value={draftEditor.religion} onChange={(value) => updateDraftField('religion', value)} options={religionOptions as unknown as string[]} />

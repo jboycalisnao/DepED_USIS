@@ -37,6 +37,8 @@ const emptyDraft = (schoolId: string): EnrollmentDraft => ({
   birthDate: '',
   gender: 'Male',
   placeOfBirth: '',
+  height: '',
+  weight: '',
   learnerContact: '',
   motherTongue: '',
   religion: religionOptions[0],
@@ -114,12 +116,19 @@ export default function PublicEnrollmentSubmissionEditPage() {
   }, [id, schoolId]);
 
   useEffect(() => {
+    const isNewLearner = String(draft.studentType || '').toLowerCase().includes('new');
+    if (!isNewLearner || draft.gradeToEnroll !== 'Grade 7' || draft.lastGradeLevel === 'Grade 6') return;
+    setDraft((current) => ({ ...current, lastGradeLevel: 'Grade 6' }));
+  }, [draft.studentType, draft.gradeToEnroll, draft.lastGradeLevel]);
+
+  useEffect(() => {
     const currentGrade = gradeLevelOrder.find((grade) => grade.label === draft.lastGradeLevel);
     const targetGrade = gradeLevelOrder.find((grade) => grade.label === draft.gradeToEnroll);
-    const sameSchoolBlocked = draft.learnerCategory === SAME_SCHOOL_LABEL && draft.gradeToEnroll === 'Grade 7';
+    const isContinuingLearner = String(draft.studentType || '').toLowerCase().includes('continuing');
+    const sameSchoolBlocked = isContinuingLearner && draft.learnerCategory === SAME_SCHOOL_LABEL && draft.gradeToEnroll === 'Grade 7';
     const progressionBlocked = currentGrade && targetGrade ? targetGrade.value <= currentGrade.value : false;
     if (sameSchoolBlocked || progressionBlocked) setDraft((current) => ({ ...current, gradeToEnroll: '' }));
-  }, [draft.lastGradeLevel, draft.gradeToEnroll, draft.learnerCategory]);
+  }, [draft.lastGradeLevel, draft.gradeToEnroll, draft.learnerCategory, draft.studentType]);
 
   useEffect(() => {
     if (!isSeniorHighTargetGrade) {

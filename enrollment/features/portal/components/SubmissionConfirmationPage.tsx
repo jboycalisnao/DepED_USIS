@@ -1,4 +1,4 @@
-import { Link, useLocation } from 'react-router-dom';
+﻿import { Link, useLocation } from 'react-router-dom';
 import { useState } from 'react';
 
 type ConfirmationState = {
@@ -82,7 +82,7 @@ export function SubmissionConfirmationPage() {
                 Please take a screenshot or write down the Submission Reference ID and present it as proof of submission when requested by the school.
               </p>
               <div className="enrollment-confirmation__actions">
-                <Link to="/submission-status/login" className="primary-button">Check Submission Status</Link>
+                <Link to="/submission-status" className="primary-button">Check Submission Status</Link>
                 <Link to="/enrollment-form" className="secondary-button">Back to Enrollment Form</Link>
               </div>
             </div>
