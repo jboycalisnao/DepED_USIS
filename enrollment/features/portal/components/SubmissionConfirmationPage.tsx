@@ -1,4 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
+import { useState } from 'react';
 
 type ConfirmationState = {
   submissionReferenceId?: string;
@@ -7,6 +8,7 @@ type ConfirmationState = {
 };
 
 export function SubmissionConfirmationPage() {
+  const [showEnrollmentAdvisory, setShowEnrollmentAdvisory] = useState(true);
   const location = useLocation();
   const state = (location.state || {}) as ConfirmationState;
   const submissionReferenceId = String(state.submissionReferenceId || '').trim();
@@ -38,6 +40,7 @@ export function SubmissionConfirmationPage() {
     <main className="page-frame enrollment-public-enrollment">
       <div className="content-width">
         <section className="section-shell">
+          {!showEnrollmentAdvisory ? (
           <div className="portal-panel enrollment-confirmation">
             <header className="portal-panel__header enrollment-confirmation__header">
               <div className="enrollment-confirmation__hero-icon"><CheckIcon /></div>
@@ -84,8 +87,30 @@ export function SubmissionConfirmationPage() {
               </div>
             </div>
           </div>
+          ) : null}
         </section>
       </div>
+      {showEnrollmentAdvisory ? (
+        <div className="modal-overlay modal-overlay--high" role="presentation">
+          <div className="modal-backdrop" />
+          <div className="alert-modal alert-modal--warning" role="dialog" aria-modal="true" aria-labelledby="confirmation-advisory-title">
+            <div className="alert-modal__content enrollment-advisory">
+              <h3 id="confirmation-advisory-title">Important Enrollment Advisory</h3>
+              <p>
+                Filling out and submitting this online form <strong className="enrollment-advisory__highlight">DOES NOT mean you are already enrolled</strong>.
+              </p>
+              <p>
+                You still need to <strong className="enrollment-advisory__highlight">submit the required documents on your scheduled date</strong> at the school.
+              </p>
+            </div>
+            <div className="alert-modal__actions">
+              <button type="button" className="alert-modal__blue" onClick={() => setShowEnrollmentAdvisory(false)}>
+                I Understand
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }

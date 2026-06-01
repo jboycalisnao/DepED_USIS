@@ -225,6 +225,26 @@
   font-size: 13px;
 }
 
+.enrollment-advisory {
+  display: grid;
+  gap: 10px;
+}
+
+.enrollment-advisory p {
+  margin: 0;
+  color: var(--deped-ink);
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.enrollment-advisory__highlight {
+  color: #8a1010;
+  background: #fde9e9;
+  padding: 1px 4px;
+  border-radius: 4px;
+  font-weight: 700;
+}
+
 @media (max-width: 1024px) {
   .enrollment-public-enrollment .floating-field-grid {
     grid-template-columns: 1fr;

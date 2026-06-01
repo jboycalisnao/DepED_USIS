@@ -75,6 +75,7 @@ export function EnrollmentFormPage() {
   const [permanentBarangays, setPermanentBarangays] = useState<PsgcLocation[]>([]);
   const [currentBarangays, setCurrentBarangays] = useState<PsgcLocation[]>([]);
   const [modalNotice, setModalNotice] = useState<{ type: 'success' | 'error' | 'info'; title: string; message: string } | null>(null);
+  const [showEnrollmentAdvisory, setShowEnrollmentAdvisory] = useState(true);
   const [permanentAddress, setPermanentAddress] = useState<AddressSelection>(initialAddressSelection);
   const [currentAddress, setCurrentAddress] = useState<AddressSelection>(initialAddressSelection);
   const [sameAsPermanent, setSameAsPermanent] = useState(false);
@@ -895,6 +896,27 @@ export function EnrollmentFormPage() {
             </div>
             <div className="alert-modal__actions">
               <button type="button" className="alert-modal__blue" onClick={() => setModalNotice(null)}>OK</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+      {showEnrollmentAdvisory ? (
+        <div className="modal-overlay modal-overlay--high" role="presentation">
+          <div className="modal-backdrop" />
+          <div className="alert-modal alert-modal--warning" role="dialog" aria-modal="true" aria-labelledby="enrollment-advisory-title">
+            <div className="alert-modal__content enrollment-advisory">
+              <h3 id="enrollment-advisory-title">Important Enrollment Advisory</h3>
+              <p>
+                Filling out and submitting this online form <strong className="enrollment-advisory__highlight">DOES NOT mean you are already enrolled</strong>.
+              </p>
+              <p>
+                You still need to <strong className="enrollment-advisory__highlight">submit the required documents on your scheduled date</strong> at the school.
+              </p>
+            </div>
+            <div className="alert-modal__actions">
+              <button type="button" className="alert-modal__blue" onClick={() => setShowEnrollmentAdvisory(false)}>
+                I Understand
+              </button>
             </div>
           </div>
         </div>
