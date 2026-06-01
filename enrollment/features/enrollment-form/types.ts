@@ -19,6 +19,8 @@ export type EnrollmentDraft = {
   middleName: string;
   extensionName: string;
   birthDate: string;
+  height: string;
+  weight: string;
   gender: string;
   placeOfBirth: string;
   learnerContact: string;

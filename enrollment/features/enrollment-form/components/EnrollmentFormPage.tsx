@@ -263,6 +263,8 @@ export function EnrollmentFormPage() {
           lastName: String(data.last_name || submissionPayload.lastName || current.lastName || ''),
           middleName: String(data.middle_name || submissionPayload.middleName || current.middleName || ''),
           birthDate: data.birth_date ? String(data.birth_date) : String(submissionPayload.birthDate || current.birthDate || ''),
+          height: String(submissionPayload.height || current.height || ''),
+          weight: String(submissionPayload.weight || current.weight || ''),
           gender: String(data.gender || submissionPayload.gender || current.gender || 'Male'),
           placeOfBirth: String(submissionPayload.placeOfBirth || current.placeOfBirth || ''),
           motherTongue: String(submissionPayload.motherTongue || current.motherTongue || ''),
@@ -800,6 +802,8 @@ export function EnrollmentFormPage() {
                   <TextField label="Middle Name" value={draft.middleName} onChange={(value) => updateField('middleName', value)} />
                   <TextField label="Extension Name" value={draft.extensionName} onChange={(value) => updateField('extensionName', value)} />
                   <DateField label="Date of Birth" value={draft.birthDate} onChange={(value) => updateField('birthDate', value)} required />
+                  <TextField label="Height (cm)" value={draft.height} onChange={(value) => updateField('height', value)} inputMode="decimal" />
+                  <TextField label="Weight (kg)" value={draft.weight} onChange={(value) => updateField('weight', value)} inputMode="decimal" />
                   <SelectField label="Gender" value={draft.gender} onChange={(value) => updateField('gender', value)} options={['Male', 'Female']} />
                   <TextField label="Place of Birth" value={draft.placeOfBirth} onChange={(value) => updateField('placeOfBirth', value)} />
                   <TextField label="Learner Contact Number" value={draft.learnerContact} onChange={(value) => updateField('learnerContact', digitsOnly(value).slice(0, 11))} inputMode="numeric" maxLength={11} pattern="[0-9]{11}" />

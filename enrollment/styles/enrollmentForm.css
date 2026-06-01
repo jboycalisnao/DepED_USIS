@@ -98,9 +98,22 @@
 }
 
 .enrollment-public-enrollment .floating-field__control input,
-.enrollment-public-enrollment .floating-field__control textarea,
-.enrollment-public-enrollment .floating-field__control button {
+.enrollment-public-enrollment .floating-field__control textarea {
   padding-top: 28px;
+}
+
+.enrollment-public-enrollment .searchable-select--floating .searchable-select__toggle {
+  padding: 0;
+  margin: 0;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.enrollment-public-enrollment .searchable-select--floating .searchable-select__toggle svg {
+  display: block;
+  margin: 0;
 }
 
 .enrollment-confirmation {

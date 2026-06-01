@@ -47,6 +47,8 @@ export const initialDraft: EnrollmentDraft = {
   middleName: '',
   extensionName: '',
   birthDate: '',
+  height: '',
+  weight: '',
   gender: 'Male',
   placeOfBirth: '',
   learnerContact: '',
