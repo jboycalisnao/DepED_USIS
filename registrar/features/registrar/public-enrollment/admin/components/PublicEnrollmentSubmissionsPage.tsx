@@ -13,6 +13,11 @@ import {
   deletePublicEnrollmentSubmissionRecord,
   updatePublicEnrollmentSubmissionRecord,
 } from '../../services/publicEnrollmentSubmissions';
+import {
+  generateSectioningAccessCode,
+  listSectioningAccessCodes,
+  type SectioningAccessCodeRow,
+} from '../../services/sectioningAccessCodes';
 import { publishEnrollmentKioskState, type EnrollmentKioskSelectedLearner } from '../../kiosk/enrollmentKioskSync';
 import { validatePublicEnrollmentDraft } from '../../utils/validation';
 import {
@@ -183,6 +188,10 @@ export default function PublicEnrollmentSubmissionsPage() {
   const [selectedPriorLearnerId, setSelectedPriorLearnerId] = useState('');
   const [editorMode, setEditorMode] = useState<'submission' | 'priorLearner'>('submission');
   const [editingPriorLearner, setEditingPriorLearner] = useState<PriorLearnerEditorRecord | null>(null);
+  const [isSectioningAccessModalOpen, setIsSectioningAccessModalOpen] = useState(false);
+  const [sectioningCodes, setSectioningCodes] = useState<SectioningAccessCodeRow[]>([]);
+  const [sectioningGradeLevels, setSectioningGradeLevels] = useState<string[]>([]);
+  const [isGeneratingCode, setIsGeneratingCode] = useState<string | null>(null);
   const isEditorSeniorHighTargetGrade = SHS_GRADES.has(draftEditor.gradeToEnroll);
 
   const filtered = useMemo(() => {
@@ -473,6 +482,59 @@ export default function PublicEnrollmentSubmissionsPage() {
       `popup=yes,width=${popupWidth},height=${popupHeight},left=${left},top=${top},resizable=yes,scrollbars=yes`,
     );
     kioskWindow?.focus();
+  };
+
+  const openSectioningAccessModal = async () => {
+    setIsSectioningAccessModalOpen(true);
+    setActionError(null);
+    try {
+      const { data: activeSchoolYear } = await supabase
+        .from('registrar_school_years')
+        .select('id,label')
+        .eq('is_active', true)
+        .limit(1)
+        .maybeSingle();
+      const schoolYearLabel = String((activeSchoolYear as any)?.label || '').trim();
+      const schoolYearId = String((activeSchoolYear as any)?.id || '').trim();
+      if (!schoolYearLabel || !schoolYearId) throw new Error('Active school year not found.');
+
+      const { data: sectionRows } = await supabase
+        .from('registrar_sections')
+        .select('grade_level')
+        .eq('school_year_id', schoolYearId);
+      const grades = Array.from(
+        new Set((sectionRows || []).map((row: any) => String(row.grade_level || '').trim()).filter(Boolean)),
+      ).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+      setSectioningGradeLevels(grades);
+      setSectioningCodes(await listSectioningAccessCodes(schoolId, schoolYearLabel));
+    } catch (error: any) {
+      setActionError(error?.message || 'Unable to load sectioning access data.');
+    }
+  };
+
+  const handleGenerateCode = async (gradeLevel: string) => {
+    if (!activeSchoolYearLabel) {
+      setActionError('Active school year not found.');
+      return;
+    }
+    setIsGeneratingCode(gradeLevel);
+    try {
+      const nextRow = await generateSectioningAccessCode({
+        schoolId,
+        schoolYear: activeSchoolYearLabel,
+        gradeLevel,
+      });
+      setSectioningCodes((current) => {
+        const filteredCodes = current.filter((row) => row.grade_level !== gradeLevel);
+        return [...filteredCodes, nextRow].sort((a, b) =>
+          String(a.grade_level || '').localeCompare(String(b.grade_level || ''), undefined, { numeric: true }),
+        );
+      });
+    } catch (error: any) {
+      setActionError(error?.message || 'Unable to generate access code.');
+    } finally {
+      setIsGeneratingCode(null);
+    }
   };
 
   const openEdit = (row: PublicEnrollmentSubmission) => {
@@ -957,7 +1019,7 @@ export default function PublicEnrollmentSubmissionsPage() {
       </header>
 
       <div className="portal-panel__body" style={{ display: 'grid', gap: 16 }}>
-        <div className="form-grid" style={{ gridTemplateColumns: 'minmax(240px, 1fr) auto auto auto', alignItems: 'stretch' }}>
+        <div className="form-grid" style={{ gridTemplateColumns: 'minmax(240px, 1fr) auto auto auto auto', alignItems: 'stretch' }}>
           <label className="floating-field">
             <div className="floating-field__control">
               <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder=" " />
@@ -966,6 +1028,9 @@ export default function PublicEnrollmentSubmissionsPage() {
           </label>
           <button type="button" className="secondary-button" style={{ minHeight: 56 }} onClick={openKioskWindow}>
             Open Enrollment Kiosk
+          </button>
+          <button type="button" className="secondary-button" style={{ minHeight: 56 }} onClick={() => void openSectioningAccessModal()}>
+            Sectioning Access
           </button>
           <button type="button" className="secondary-button" style={{ minHeight: 56 }} onClick={() => refresh()} disabled={isLoading}>Refresh</button>
           <div className="status-badge status-badge--open" style={{ minHeight: 56, display: 'flex', alignItems: 'center' }} aria-label="Submission count">{filtered.length} shown</div>
@@ -1286,6 +1351,49 @@ export default function PublicEnrollmentSubmissionsPage() {
           </div>
         </div>
       )}
+
+      {isSectioningAccessModalOpen ? (
+        <div className="modal-overlay modal-overlay--high" role="presentation">
+          <div className="modal-backdrop" onClick={() => setIsSectioningAccessModalOpen(false)} />
+          <div className="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="sectioning-access-title">
+            <div className="modal-dialog__header">
+              <div className="modal-dialog__title-group">
+                <h3 id="sectioning-access-title">Generate Sectioning Access Codes</h3>
+              </div>
+              <button type="button" className="modal-dialog__close" onClick={() => setIsSectioningAccessModalOpen(false)} aria-label="Close sectioning access modal">
+                <CloseIcon />
+              </button>
+            </div>
+            <div className="modal-dialog__body">
+              <p style={{ marginTop: 0, marginBottom: 12, color: 'var(--deped-muted)' }}>
+                Active School Year: <strong>{activeSchoolYearLabel || '--'}</strong>
+              </p>
+              <div style={{ display: 'grid', gap: 10 }}>
+                {sectioningGradeLevels.length ? sectioningGradeLevels.map((gradeLevel) => {
+                  const row = sectioningCodes.find((item) => item.grade_level === gradeLevel);
+                  return (
+                    <div key={gradeLevel} style={{ display: 'grid', gridTemplateColumns: 'minmax(120px, 1fr) minmax(180px, 1fr) auto', gap: 10, alignItems: 'center' }}>
+                      <strong>{gradeLevel}</strong>
+                      <code style={{ background: '#f1f5ff', border: '1px solid #c9d8f6', borderRadius: 6, padding: '8px 10px', fontSize: 14 }}>
+                        {row?.access_code || 'No code yet'}
+                      </code>
+                      <button type="button" className="secondary-button" onClick={() => void handleGenerateCode(gradeLevel)} disabled={isGeneratingCode === gradeLevel}>
+                        {isGeneratingCode === gradeLevel ? 'Generating...' : row?.access_code ? 'Regenerate' : 'Generate'}
+                      </button>
+                    </div>
+                  );
+                }) : (
+                  <p style={{ margin: 0, color: 'var(--deped-muted)' }}>No active grade levels found from sections.</p>
+                )}
+              </div>
+            </div>
+            <div className="modal-dialog__actions">
+              <button type="button" className="modal-dialog__primary" onClick={() => setIsSectioningAccessModalOpen(false)}>Close</button>
+              <button type="button" className="modal-dialog__blue" onClick={() => window.open('/enroll/sectioning', '_blank')}>Open Sectioning Page</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <ConfirmationModal
         isOpen={!!pendingDeleteSubmissionId}

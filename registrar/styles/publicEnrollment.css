@@ -349,6 +349,44 @@
   color: var(--deped-blue);
 }
 
+/* Sectioning page uses compact in-table selects; keep toggle inside field and prevent split overflow. */
+.registrar-sectioning-page .searchable-select {
+  width: 100%;
+}
+
+.registrar-sectioning-page .searchable-select--floating .floating-field__control {
+  display: block;
+  position: relative;
+}
+
+.registrar-sectioning-page .searchable-select--floating .floating-field__control input {
+  border-right: 1px solid rgba(18, 35, 61, 0.14);
+  border-radius: var(--usis-radius-control);
+  padding: 24px 52px 8px 12px;
+  min-height: 48px;
+  height: 48px;
+}
+
+.registrar-sectioning-page .searchable-select--floating .searchable-select__toggle {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 0.375rem;
+  background: transparent;
+  transform: translateY(-50%);
+}
+
+.registrar-sectioning-page .searchable-select--floating .floating-field__control input:focus ~ span,
+.registrar-sectioning-page .searchable-select--floating .floating-field__control input[data-has-value="true"] ~ span {
+  top: 8px;
+}
+
 .registrar-kiosk-page {
   height: 100dvh;
   min-height: 100dvh;

@@ -14,6 +14,7 @@ import PublicEnrollmentSubmissionsPage from './features/registrar/public-enrollm
 import PublicEnrollmentSubmissionDetailsPage from './features/registrar/public-enrollment/admin/components/PublicEnrollmentSubmissionDetailsPage';
 import PublicEnrollmentSubmissionEditPage from './features/registrar/public-enrollment/admin/components/PublicEnrollmentSubmissionEditPage';
 import PublicEnrollmentPriorLearnerEditPage from './features/registrar/public-enrollment/admin/components/PublicEnrollmentPriorLearnerEditPage';
+import PublicEnrollmentSectioningPage from './features/registrar/public-enrollment/admin/components/PublicEnrollmentSectioningPage';
 import EnrollmentKioskPage from './features/registrar/public-enrollment/kiosk/EnrollmentKioskPage';
 import PublicEnrollmentPage from './features/registrar/public-enrollment/components/PublicEnrollmentPage';
 import { useStore } from './store';
@@ -23,6 +24,7 @@ const AuthenticatedRouter: React.FC = () => {
   const location = useLocation();
   const isKioskRoute = location.pathname === '/enroll/kiosk';
   const isPublicEnrollmentRoute = location.pathname === '/public-enrollment';
+  const isSectioningRoute = location.pathname === '/enroll/sectioning';
 
   if (isKioskRoute) {
     return (
@@ -42,6 +44,15 @@ const AuthenticatedRouter: React.FC = () => {
     );
   }
 
+  if (isSectioningRoute) {
+    return (
+      <Routes>
+        <Route path="/enroll/sectioning" element={<PublicEnrollmentSectioningPage />} />
+        <Route path="*" element={<Navigate to="/enroll/sectioning" replace />} />
+      </Routes>
+    );
+  }
+
   return (
     <Layout>
       <Routes>
@@ -51,6 +62,7 @@ const AuthenticatedRouter: React.FC = () => {
         <Route path="/enroll" element={<PublicEnrollmentSubmissionsPage />} />
         <Route path="/enroll/:id" element={<PublicEnrollmentSubmissionDetailsPage />} />
         <Route path="/enroll/:id/edit" element={<PublicEnrollmentSubmissionEditPage />} />
+        <Route path="/enroll/sectioning" element={<PublicEnrollmentSectioningPage />} />
         <Route path="/enroll/prior-learner/:learnerId/edit" element={<PublicEnrollmentPriorLearnerEditPage />} />
         <Route path="/sections" element={<SectionManagement />} />
         <Route path="/import" element={<BulkImport />} />
@@ -73,6 +85,7 @@ const App: React.FC = () => {
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/public-enrollment" element={<PublicEnrollmentPage />} />
+          <Route path="/enroll/sectioning" element={<PublicEnrollmentSectioningPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>

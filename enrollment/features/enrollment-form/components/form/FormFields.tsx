@@ -13,10 +13,24 @@ type BaseFieldProps = {
 };
 
 export function TextField({ label, value, onChange, required = false, inputMode, maxLength, pattern, type = 'text', disabled = false }: BaseFieldProps) {
+  const shouldPreserveCase = type === 'email';
   return (
     <label className="floating-field">
       <div className="floating-field__control">
-        <input value={value} onChange={(event) => onChange(event.target.value)} placeholder=" " required={required} inputMode={inputMode} maxLength={maxLength} pattern={pattern} type={type} disabled={disabled} />
+        <input
+          value={value}
+          onChange={(event) => {
+            const nextValue = event.target.value;
+            onChange(shouldPreserveCase ? nextValue : nextValue.toUpperCase());
+          }}
+          placeholder=" "
+          required={required}
+          inputMode={inputMode}
+          maxLength={maxLength}
+          pattern={pattern}
+          type={type}
+          disabled={disabled}
+        />
         <span>{label}</span>
       </div>
     </label>
