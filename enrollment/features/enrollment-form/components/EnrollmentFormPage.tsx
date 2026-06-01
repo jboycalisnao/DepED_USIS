@@ -453,12 +453,22 @@ export function EnrollmentFormPage() {
   }, [sameAsPermanent, permanentAddress, regions, permanentProvinces, permanentCities]);
 
   useEffect(() => {
+    if (draft.studentType !== 'New Student') return;
+    if (draft.lastGradeLevel === 'Grade 6' && draft.gradeToEnroll === 'Grade 7') return;
+    setDraft((current) => ({
+      ...current,
+      lastGradeLevel: 'Grade 6',
+      gradeToEnroll: 'Grade 7',
+    }));
+  }, [draft.studentType, draft.lastGradeLevel, draft.gradeToEnroll]);
+
+  useEffect(() => {
     const currentGrade = gradeLevelOrder.find((grade) => grade.label === draft.lastGradeLevel);
     const targetGrade = gradeLevelOrder.find((grade) => grade.label === draft.gradeToEnroll);
-    const sameSchoolBlocked = draft.learnerCategory === SAME_SCHOOL_LABEL && draft.gradeToEnroll === 'Grade 7';
+    const sameSchoolBlocked = draft.studentType === 'Continuing Student' && draft.learnerCategory === SAME_SCHOOL_LABEL && draft.gradeToEnroll === 'Grade 7';
     const progressionBlocked = currentGrade && targetGrade ? targetGrade.value <= currentGrade.value : false;
     if (sameSchoolBlocked || progressionBlocked) setDraft((current) => ({ ...current, gradeToEnroll: '' }));
-  }, [draft.lastGradeLevel, draft.gradeToEnroll, draft.learnerCategory]);
+  }, [draft.lastGradeLevel, draft.gradeToEnroll, draft.learnerCategory, draft.studentType]);
 
   useEffect(() => {
     if (!draft.lastGradeLevel) return;
@@ -467,14 +477,14 @@ export function EnrollmentFormPage() {
 
     const nextAllowed = gradeLevelOrder.find((grade) => {
       if (grade.value <= currentGrade.value) return false;
-      if (draft.learnerCategory === SAME_SCHOOL_LABEL && grade.label === 'Grade 7') return false;
+      if (draft.studentType === 'Continuing Student' && draft.learnerCategory === SAME_SCHOOL_LABEL && grade.label === 'Grade 7') return false;
       return true;
     });
 
     if (!nextAllowed) return;
     if (draft.gradeToEnroll === nextAllowed.label) return;
     setDraft((current) => ({ ...current, gradeToEnroll: nextAllowed.label }));
-  }, [draft.lastGradeLevel, draft.learnerCategory]);
+  }, [draft.lastGradeLevel, draft.learnerCategory, draft.studentType]);
 
   useEffect(() => {
     if (!draft.strand) setDraft((current) => ({ ...current, semester: '1st Sem' }));
@@ -537,12 +547,12 @@ export function EnrollmentFormPage() {
   const availableGradeToEnrollOptions = useMemo(() => {
     const lastGrade = gradeLevelOrder.find((grade) => grade.label === draft.lastGradeLevel);
     return gradeLevelOptions.filter((grade) => {
-      if (draft.learnerCategory === SAME_SCHOOL_LABEL && grade === 'Grade 7') return false;
+      if (draft.studentType === 'Continuing Student' && draft.learnerCategory === SAME_SCHOOL_LABEL && grade === 'Grade 7') return false;
       if (!lastGrade) return true;
       const nextGrade = gradeLevelOrder.find((entry) => entry.label === grade);
       return Boolean(nextGrade && nextGrade.value > lastGrade.value);
     });
-  }, [draft.lastGradeLevel, draft.learnerCategory]);
+  }, [draft.lastGradeLevel, draft.learnerCategory, draft.studentType]);
 
   const selectedPreviousSchoolValue = useMemo(() => {
     if (draft.learnerCategory === SAME_SCHOOL_LABEL) {
@@ -786,8 +796,8 @@ export function EnrollmentFormPage() {
                     inputMode="numeric"
                     maxLength={9}
                   />
-                  <SelectField label="Last Grade Level" value={draft.lastGradeLevel} onChange={(value) => updateField('lastGradeLevel', value)} options={gradeLevelOptions as unknown as string[]} />
-                  <SelectField label="Grade Level to Enroll" value={draft.gradeToEnroll} onChange={(value) => updateField('gradeToEnroll', value)} options={availableGradeToEnrollOptions as unknown as string[]} />
+                  <SelectField label="Last Grade Level" value={draft.lastGradeLevel} onChange={(value) => updateField('lastGradeLevel', value)} options={gradeLevelOptions as unknown as string[]} disabled={draft.studentType === 'New Student'} />
+                  <SelectField label="Grade Level to Enroll" value={draft.gradeToEnroll} onChange={(value) => updateField('gradeToEnroll', value)} options={availableGradeToEnrollOptions as unknown as string[]} disabled={draft.studentType === 'New Student'} />
                   <SelectField label="Preferred Strand (Optional - SHS only)" value={draft.strand} onChange={(value) => updateField('strand', value)} options={strandOptions} disabled={!isSeniorHighTargetGrade} />
                   <SelectField label="Semester" value={draft.semester} onChange={(value) => updateField('semester', value)} options={semesterOptions as unknown as string[]} disabled={!isSeniorHighTargetGrade || !draft.strand} />
                 </div>

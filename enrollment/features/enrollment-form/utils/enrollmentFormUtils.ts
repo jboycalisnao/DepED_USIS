@@ -136,7 +136,9 @@ export const validateCommonFields = (
   const lastGrade = gradeLevelOrder.find((grade) => grade.label === draft.lastGradeLevel);
   const nextGrade = gradeLevelOrder.find((grade) => grade.label === draft.gradeToEnroll);
   if (lastGrade && nextGrade && nextGrade.value <= lastGrade.value) return 'Grade Level to Enroll must be higher than Last Grade Level Attended.';
-  if (draft.learnerCategory === SAME_SCHOOL_LABEL && draft.gradeToEnroll === 'Grade 7') return 'Grade 7 is not available when learner category is Same School.';
+  if (draft.studentType === 'Continuing Student' && draft.learnerCategory === SAME_SCHOOL_LABEL && draft.gradeToEnroll === 'Grade 7') {
+    return 'Grade 7 is not available when learner category is Same School for continuing learners.';
+  }
   if (draft.previousSchool) {
     const [prevStart, prevEnd] = String(draft.previousSchoolYear || '').split('-');
     const normalized = normalizeSchoolYearPair(prevStart || '', prevEnd || '');
