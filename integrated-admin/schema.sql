@@ -225,6 +225,100 @@ create index if not exists idx_registrar_public_enroll_submission_reference_id
   on public.registrar_public_enrollment_submissions using btree (submission_reference_id);
 
 -- =========================================================
+-- Registrar Enrollment Confirmation Email Settings and Queue
+-- =========================================================
+create table if not exists registrar_enrollment_email_settings (
+  school_id text primary key,
+  is_enabled boolean not null default false,
+  apps_script_web_app_url text,
+  apps_script_bearer_token text,
+  status_page_base_url text not null default 'https://enroll.leonnhs.edu.ph/submission-status',
+  from_display_name text not null default 'DepED USIS Registrar',
+  reply_to_email text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_registrar_enrollment_email_settings_enabled
+  on registrar_enrollment_email_settings(is_enabled);
+
+alter table if exists registrar_enrollment_email_settings enable row level security;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_policies
+    where schemaname = 'public'
+      and tablename = 'registrar_enrollment_email_settings'
+      and policyname = 'Registrar enrollment email settings select'
+  ) then
+    create policy "Registrar enrollment email settings select"
+      on public.registrar_enrollment_email_settings
+      for select
+      to authenticated
+      using (true);
+  end if;
+end $$;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_policies
+    where schemaname = 'public'
+      and tablename = 'registrar_enrollment_email_settings'
+      and policyname = 'Registrar enrollment email settings insert'
+  ) then
+    create policy "Registrar enrollment email settings insert"
+      on public.registrar_enrollment_email_settings
+      for insert
+      to authenticated
+      with check (true);
+  end if;
+end $$;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_policies
+    where schemaname = 'public'
+      and tablename = 'registrar_enrollment_email_settings'
+      and policyname = 'Registrar enrollment email settings update'
+  ) then
+    create policy "Registrar enrollment email settings update"
+      on public.registrar_enrollment_email_settings
+      for update
+      to authenticated
+      using (true)
+      with check (true);
+  end if;
+end $$;
+
+create table if not exists registrar_enrollment_email_queue (
+  id uuid primary key default gen_random_uuid(),
+  submission_id uuid not null references registrar_public_enrollment_submissions(id) on update cascade on delete cascade,
+  school_id text,
+  recipient_email text not null,
+  recipient_name text,
+  lrn text,
+  submission_reference_id text not null,
+  status_lookup_url text not null,
+  email_subject text not null,
+  email_html text not null,
+  send_status text not null default 'pending' check (send_status in ('pending', 'sent', 'failed')),
+  attempts integer not null default 0,
+  last_error text,
+  sent_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (submission_id)
+);
+
+create index if not exists idx_registrar_enrollment_email_queue_status
+  on registrar_enrollment_email_queue(send_status, created_at);
+
+alter table if exists registrar_enrollment_email_queue enable row level security;
+
+-- =========================================================
 -- Coordinator Module Access (DB-backed)
 -- =========================================================
 create table if not exists coordinator_module_access (
@@ -524,6 +618,16 @@ for each row execute function set_updated_at();
 drop trigger if exists trg_ia_portal_controls_updated_at on ia_portal_controls;
 create trigger trg_ia_portal_controls_updated_at
 before update on ia_portal_controls
+for each row execute function set_updated_at();
+
+drop trigger if exists trg_registrar_enrollment_email_settings_updated_at on registrar_enrollment_email_settings;
+create trigger trg_registrar_enrollment_email_settings_updated_at
+before update on registrar_enrollment_email_settings
+for each row execute function set_updated_at();
+
+drop trigger if exists trg_registrar_enrollment_email_queue_updated_at on registrar_enrollment_email_queue;
+create trigger trg_registrar_enrollment_email_queue_updated_at
+before update on registrar_enrollment_email_queue
 for each row execute function set_updated_at();
 
 -- =========================================================

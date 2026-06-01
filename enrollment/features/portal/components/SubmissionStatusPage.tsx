@@ -1,4 +1,5 @@
 import { FormEvent, useState } from 'react';
+import { useEffect } from 'react';
 import { lookupSubmissionStatus, type SubmissionLookupResult } from '../../enrollment-form/services/submissionLookup';
 
 const normalizeStatus = (value: string) => String(value || '').trim().toLowerCase();
@@ -16,6 +17,31 @@ export function SubmissionStatusPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<SubmissionLookupResult | null>(null);
+
+  useEffect(() => {
+    const search = new URLSearchParams(window.location.search);
+    const prefill = String(search.get('q') || '').trim();
+    if (!prefill) return;
+    setQuery(prefill);
+    void (async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const row = await lookupSubmissionStatus(prefill);
+        if (!row) {
+          setResult(null);
+          setError('No submission found. Check your LRN or Submission Reference ID.');
+          return;
+        }
+        setResult(row);
+      } catch (e: any) {
+        setResult(null);
+        setError(e?.message || 'Unable to fetch submission status right now.');
+      } finally {
+        setIsLoading(false);
+      }
+    })();
+  }, []);
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();

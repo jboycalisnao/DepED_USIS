@@ -1,6 +1,7 @@
 import React from 'react';
 import AcademicClassifications from '../components/settings/AcademicClassifications';
 import AcademicCycles from '../components/settings/AcademicCycles';
+import EnrollmentEmailSettings from '../components/settings/EnrollmentEmailSettings';
 import EnrollmentPortalControls from '../components/settings/EnrollmentPortalControls';
 import GradeLevelManagement from '../components/settings/GradeLevelManagement';
 
@@ -24,6 +25,8 @@ const Settings: React.FC = () => {
           <AcademicClassifications />
           <hr />
           <EnrollmentPortalControls />
+          <hr />
+          <EnrollmentEmailSettings />
         </div>
       </section>
     </div>

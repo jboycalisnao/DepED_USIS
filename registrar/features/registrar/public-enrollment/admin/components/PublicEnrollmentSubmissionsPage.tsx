@@ -194,6 +194,7 @@ export default function PublicEnrollmentSubmissionsPage() {
   const [sectioningCodes, setSectioningCodes] = useState<SectioningAccessCodeRow[]>([]);
   const [sectioningGradeLevels, setSectioningGradeLevels] = useState<string[]>([]);
   const [isGeneratingCode, setIsGeneratingCode] = useState<string | null>(null);
+  const [sendingEmailSubmissionId, setSendingEmailSubmissionId] = useState<string | null>(null);
   const isEditorSeniorHighTargetGrade = SHS_GRADES.has(draftEditor.gradeToEnroll);
 
   const filtered = useMemo(() => {
@@ -824,6 +825,47 @@ export default function PublicEnrollmentSubmissionsPage() {
     await removeSubmission(id);
   };
 
+  const sendConfirmationEmail = async (row: PublicEnrollmentSubmission) => {
+    const recipientEmail = String(row.payload?.email || '').trim();
+    if (!recipientEmail) {
+      setActionError('This submission has no email address. Add learner email first before sending confirmation.');
+      return;
+    }
+    const submissionReferenceId = String(row.submission_reference_id || '').trim();
+    if (!submissionReferenceId) {
+      setActionError('Submission reference ID is missing.');
+      return;
+    }
+    setSendingEmailSubmissionId(row.id);
+    setActionError(null);
+    try {
+      const response = await fetch('/api/enrollment-email-queue', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ submissionId: row.id }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(String((result as any)?.error || 'Unable to send enrollment confirmation email.'));
+      }
+      if (!(result as any)?.queued) {
+        const reason = String((result as any)?.reason || 'unknown');
+        throw new Error(`Confirmation email not queued (${reason}).`);
+      }
+
+      setTopAlert({
+        title: 'Confirmation Email',
+        message: (result as any)?.sent_immediately
+          ? 'Enrollment confirmation email was sent.'
+          : 'Enrollment confirmation email was queued for sending.',
+      });
+    } catch (error: any) {
+      setActionError(error?.message || 'Unable to send enrollment confirmation email.');
+    } finally {
+      setSendingEmailSubmissionId(null);
+    }
+  };
+
   const openEnrollModal = async (row: PublicEnrollmentSubmission) => {
     setEnrollError(null);
     setEnrollingSubmission(row);
@@ -1164,6 +1206,22 @@ export default function PublicEnrollmentSubmissionsPage() {
                                 {isExistingForSubmissionYear ? 'check_circle' : 'school'}
                               </span>
                               <span>{isExistingLearner ? 'Re-enroll' : 'Enroll'}</span>
+                            </button>
+                            <button
+                              type="button"
+                              className="secondary-button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                void sendConfirmationEmail(row);
+                              }}
+                              disabled={sendingEmailSubmissionId === row.id || !String(row.payload?.email || '').trim()}
+                              title={!String(row.payload?.email || '').trim() ? 'No learner email in submission payload' : 'Send enrollment confirmation email'}
+                              aria-label="Send enrollment confirmation email"
+                              style={{ minWidth: 40, width: 40, height: 40, padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                            >
+                              <span className="material-symbols-outlined" aria-hidden="true">
+                                {sendingEmailSubmissionId === row.id ? 'hourglass_top' : 'mail'}
+                              </span>
                             </button>
                             <button
                               type="button"

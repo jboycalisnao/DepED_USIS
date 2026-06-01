@@ -500,6 +500,341 @@ export default defineConfig(({ mode }) => {
             res.end(JSON.stringify({ error: 'Unexpected server error', details: error?.message || String(error) }));
           }
         });
+
+        const parseJsonBody = async (req: any) => {
+          const body = await new Promise<string>((resolve, reject) => {
+            let raw = '';
+            req.on('data', (chunk: Buffer) => {
+              raw += chunk.toString('utf8');
+            });
+            req.on('end', () => resolve(raw));
+            req.on('error', reject);
+          });
+          return JSON.parse(body || '{}');
+        };
+
+        const normalize = (value: unknown) => String(value ?? '').trim();
+        const toEmail = (value: unknown) => normalize(value).toLowerCase();
+        const isLikelyEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+        const escapeHtml = (value: unknown) =>
+          normalize(value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+
+        const buildStatusLookupUrl = (baseUrl: string | null | undefined, submissionReferenceId: string) => {
+          const resolvedBase = normalize(baseUrl) || 'https://enroll.leonnhs.edu.ph/submission-status';
+          try {
+            const url = new URL(resolvedBase);
+            url.searchParams.set('q', submissionReferenceId);
+            return url.toString();
+          } catch {
+            const safeBase = resolvedBase.replace(/\?+$/, '');
+            const joiner = safeBase.includes('?') ? '&' : '?';
+            return `${safeBase}${joiner}q=${encodeURIComponent(submissionReferenceId)}`;
+          }
+        };
+
+        const buildEnrollmentEmailHtml = (input: {
+          learnerName: string;
+          lrn: string;
+          submissionReferenceId: string;
+          statusLookupUrl: string;
+          fromDisplayName: string;
+        }) => {
+          const learnerName = escapeHtml(input.learnerName || '--');
+          const lrn = escapeHtml(input.lrn || '--');
+          const submissionReferenceId = escapeHtml(input.submissionReferenceId || '--');
+          const statusLookupUrl = escapeHtml(input.statusLookupUrl || '#');
+          const fromDisplayName = escapeHtml(input.fromDisplayName || 'Leon NHS - USIS Registrar');
+          return `<!doctype html><html><body style="margin:0;padding:0;background:#f3f6fb;font-family:'Segoe UI',sans-serif;color:#10233d;"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f3f6fb;padding:20px 12px;"><tr><td align="center"><table role="presentation" width="640" cellspacing="0" cellpadding="0" style="max-width:640px;width:100%;background:#ffffff;border:1px solid #d5deea;border-radius:12px;overflow:hidden;"><tr><td style="background:#0f4c81;color:#ffffff;padding:16px 20px;"><div style="font-size:13px;font-weight:700;line-height:1.3;">Leon NHS - USIS</div><div style="font-size:22px;font-weight:700;line-height:1.2;margin-top:4px;">Enrollment Submission Confirmation</div></td></tr><tr><td style="padding:18px 20px;"><p style="margin:0 0 12px;font-size:14px;line-height:1.5;">Your online enrollment submission has been received.</p><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:1px solid #d9e2ef;border-radius:12px;background:#f8fbff;"><tr><td style="padding:14px 14px 4px;font-size:12px;color:#415a77;">Learner Name</td></tr><tr><td style="padding:0 14px 10px;font-size:16px;font-weight:700;">${learnerName}</td></tr><tr><td style="padding:0 14px 4px;font-size:12px;color:#415a77;">LRN</td></tr><tr><td style="padding:0 14px 10px;font-size:16px;font-weight:700;">${lrn}</td></tr><tr><td style="padding:0 14px 4px;font-size:12px;color:#415a77;">Submission Reference Number</td></tr><tr><td style="padding:0 14px 14px;font-size:16px;font-weight:700;">${submissionReferenceId}</td></tr></table><div style="margin-top:16px;"><a href="${statusLookupUrl}" style="display:inline-block;background:#0f4c81;color:#ffffff;text-decoration:none;border-radius:10px;padding:11px 14px;font-size:14px;font-weight:700;">Check Submission Status</a></div><p style="margin:12px 0 0;font-size:12px;color:#415a77;line-height:1.4;">If the button does not work, copy and open this link:<br /><a href="${statusLookupUrl}" style="color:#0f4c81;word-break:break-all;">${statusLookupUrl}</a></p></td></tr><tr><td style="border-top:1px solid #d5deea;padding:12px 20px;background:#f8fbff;font-size:12px;color:#415a77;">${fromDisplayName}<br />&copy; Leon NHS - USIS</td></tr></table></td></tr></table></body></html>`;
+        };
+
+        const getSupabaseAdmin = () => {
+          const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || env.SUPABASE_URL || env.VITE_SUPABASE_URL || '';
+          const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_SERVICE_ROLE_KEY || '';
+          if (!supabaseUrl || !serviceRoleKey) {
+            throw new Error('Supabase service-role credentials are missing.');
+          }
+          return createClient(supabaseUrl, serviceRoleKey);
+        };
+
+        server.middlewares.use('/api/enrollment-email-queue', async (req: any, res: any) => {
+          try {
+            if (req.method !== 'POST') {
+              res.statusCode = 405;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ error: 'Method not allowed' }));
+              return;
+            }
+            const body = await parseJsonBody(req);
+            const submissionId = normalize(body?.submissionId);
+            if (!submissionId) {
+              res.statusCode = 400;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ error: 'submissionId is required.' }));
+              return;
+            }
+
+            const supabaseAdmin = getSupabaseAdmin();
+            const { data: submission, error: submissionError } = await supabaseAdmin
+              .from('registrar_public_enrollment_submissions')
+              .select('id,school_id,lrn,submission_reference_id,last_name,first_name,middle_name,payload')
+              .eq('id', submissionId)
+              .maybeSingle();
+            if (submissionError) throw submissionError;
+            if (!submission) {
+              res.statusCode = 404;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ error: 'Submission not found.' }));
+              return;
+            }
+
+            const payload = submission.payload && typeof submission.payload === 'object' ? (submission.payload as Record<string, any>) : {};
+            const recipientEmail = toEmail(payload.email);
+            if (!isLikelyEmail(recipientEmail)) {
+              res.statusCode = 200;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ queued: false, reason: 'missing_or_invalid_email' }));
+              return;
+            }
+
+            const schoolId = normalize(submission.school_id || payload.schoolId || '');
+            if (!schoolId) {
+              res.statusCode = 200;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ queued: false, reason: 'missing_school_id' }));
+              return;
+            }
+
+            const { data: settings, error: settingsError } = await supabaseAdmin
+              .from('registrar_enrollment_email_settings')
+              .select('*')
+              .eq('school_id', schoolId)
+              .maybeSingle();
+            if (settingsError) throw settingsError;
+            if (!settings || !(settings as any).is_enabled) {
+              res.statusCode = 200;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ queued: false, reason: 'email_service_disabled' }));
+              return;
+            }
+
+            const submissionReferenceId = normalize((submission as any).submission_reference_id);
+            if (!submissionReferenceId) {
+              res.statusCode = 200;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ queued: false, reason: 'missing_submission_reference' }));
+              return;
+            }
+
+            const lrn = normalize(submission.lrn || payload.lrn || '');
+            const learnerName = [normalize(submission.last_name || payload.lastName), normalize(submission.first_name || payload.firstName), normalize(submission.middle_name || payload.middleName)].filter(Boolean).join(', ');
+            const statusLookupUrl = buildStatusLookupUrl((settings as any).status_page_base_url, submissionReferenceId);
+
+            const queueRow = {
+              submission_id: submission.id,
+              school_id: schoolId,
+              recipient_email: recipientEmail,
+              recipient_name: learnerName || null,
+              lrn: lrn || null,
+              submission_reference_id: submissionReferenceId,
+              status_lookup_url: statusLookupUrl,
+              email_subject: `USIS Enrollment Submission Confirmation - ${submissionReferenceId}`,
+              email_html: buildEnrollmentEmailHtml({
+                learnerName,
+                lrn,
+                submissionReferenceId,
+                statusLookupUrl,
+                fromDisplayName: normalize((settings as any).from_display_name) || 'Leon NHS - USIS Registrar',
+              }),
+              send_status: 'pending',
+              attempts: 0,
+              last_error: null,
+              sent_at: null,
+            };
+
+            const { error: queueError } = await supabaseAdmin
+              .from('registrar_enrollment_email_queue')
+              .upsert(queueRow, { onConflict: 'submission_id' });
+            if (queueError) throw queueError;
+
+            // Immediate send attempt (best effort). If this fails, row remains queued for retry/cron.
+            try {
+              const endpoint = normalize((settings as any).apps_script_web_app_url);
+              const bearerToken = normalize((settings as any).apps_script_bearer_token);
+              if (endpoint) {
+                const headers: Record<string, string> = {
+                  'Content-Type': 'application/json',
+                };
+                if (bearerToken) headers.Authorization = `Bearer ${bearerToken}`;
+                const dispatchResponse = await fetch(endpoint, {
+                  method: 'POST',
+                  headers,
+                  body: JSON.stringify({
+                    type: 'ENROLLMENT_CONFIRMATION',
+                    email: recipientEmail,
+                    to: recipientEmail,
+                    subject: `USIS Enrollment Submission Confirmation - ${submissionReferenceId}`,
+                    htmlContent: queueRow.email_html,
+                    html: queueRow.email_html,
+                    senderName: normalize((settings as any).from_display_name) || 'Leon NHS - USIS Registrar',
+                    fromDisplayName: normalize((settings as any).from_display_name) || 'Leon NHS - USIS Registrar',
+                    replyTo: normalize((settings as any).reply_to_email) || undefined,
+                  }),
+                });
+                if (dispatchResponse.ok) {
+                  await supabaseAdmin
+                    .from('registrar_enrollment_email_queue')
+                    .update({
+                      send_status: 'sent',
+                      attempts: 1,
+                      last_error: null,
+                      sent_at: new Date().toISOString(),
+                    })
+                    .eq('submission_id', submission.id);
+                  res.statusCode = 200;
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({ queued: true, sent_immediately: true }));
+                  return;
+                }
+
+                const dispatchError = `Apps Script send failed (${dispatchResponse.status}): ${await dispatchResponse.text()}`;
+                await supabaseAdmin
+                  .from('registrar_enrollment_email_queue')
+                  .update({
+                    send_status: 'pending',
+                    attempts: 1,
+                    last_error: dispatchError,
+                  })
+                  .eq('submission_id', submission.id);
+              }
+            } catch (dispatchError: any) {
+              await supabaseAdmin
+                .from('registrar_enrollment_email_queue')
+                .update({
+                  send_status: 'pending',
+                  attempts: 1,
+                  last_error: normalize(dispatchError?.message || dispatchError) || 'Immediate dispatch failed.',
+                })
+                .eq('submission_id', submission.id);
+            }
+
+            res.statusCode = 200;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ queued: true, sent_immediately: false }));
+          } catch (error: any) {
+            res.statusCode = 500;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ error: 'Unable to queue enrollment confirmation email.', details: error?.message || String(error) }));
+          }
+        });
+
+        server.middlewares.use('/api/enrollment-email-dispatch', async (req: any, res: any) => {
+          try {
+            if (req.method !== 'POST') {
+              res.statusCode = 405;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ error: 'Method not allowed' }));
+              return;
+            }
+            const expectedToken = normalize(process.env.REGISTRAR_EMAIL_DISPATCH_KEY || env.REGISTRAR_EMAIL_DISPATCH_KEY || '');
+            const providedToken = normalize(req.headers['x-dispatch-key'] || req.headers.authorization || '');
+            if (expectedToken && providedToken !== expectedToken && providedToken !== `Bearer ${expectedToken}`) {
+              res.statusCode = 401;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ error: 'Unauthorized dispatch request.' }));
+              return;
+            }
+
+            const body = await parseJsonBody(req);
+            const limit = Math.max(1, Math.min(50, Number(body?.limit || 10)));
+            const MAX_ATTEMPTS = 5;
+            const supabaseAdmin = getSupabaseAdmin();
+            const { data: queueRows, error: queueError } = await supabaseAdmin
+              .from('registrar_enrollment_email_queue')
+              .select('id,school_id,recipient_email,email_subject,email_html')
+              .eq('send_status', 'pending')
+              .lt('attempts', MAX_ATTEMPTS)
+              .order('created_at', { ascending: true })
+              .limit(limit);
+            if (queueError) throw queueError;
+
+            let sent = 0;
+            let failed = 0;
+            for (const row of queueRows || []) {
+              try {
+                const schoolId = normalize((row as any).school_id);
+                if (!schoolId) throw new Error('Missing school_id in queue row.');
+                const { data: settings, error: settingsError } = await supabaseAdmin
+                  .from('registrar_enrollment_email_settings')
+                  .select('*')
+                  .eq('school_id', schoolId)
+                  .maybeSingle();
+                if (settingsError) throw settingsError;
+                if (!(settings as any)?.is_enabled) throw new Error('Email service disabled.');
+                const endpoint = normalize((settings as any)?.apps_script_web_app_url);
+                const bearer = normalize((settings as any)?.apps_script_bearer_token);
+                if (!endpoint) throw new Error('Apps Script Web App URL is not configured.');
+
+                const headers: Record<string, string> = {
+                  'Content-Type': 'application/json',
+                };
+                if (bearer) headers.Authorization = `Bearer ${bearer}`;
+
+                const response = await fetch(endpoint, {
+                  method: 'POST',
+                  headers,
+                  body: JSON.stringify({
+                    type: 'ENROLLMENT_CONFIRMATION',
+                    email: String((row as any).recipient_email || ''),
+                    to: String((row as any).recipient_email || ''),
+                    subject: String((row as any).email_subject || ''),
+                    htmlContent: String((row as any).email_html || ''),
+                    html: String((row as any).email_html || ''),
+                    senderName: String((settings as any).from_display_name || 'Leon NHS - USIS Registrar'),
+                    fromDisplayName: String((settings as any).from_display_name || 'Leon NHS - USIS Registrar'),
+                    replyTo: normalize((settings as any).reply_to_email) || undefined,
+                  }),
+                });
+                if (!response.ok) throw new Error(`Apps Script send failed (${response.status}): ${await response.text()}`);
+
+                await supabaseAdmin
+                  .from('registrar_enrollment_email_queue')
+                  .update({ send_status: 'sent', attempts: 1, last_error: null, sent_at: new Date().toISOString() })
+                  .eq('id', String((row as any).id || ''));
+                sent += 1;
+              } catch (error: any) {
+                const { data: currentRow } = await supabaseAdmin
+                  .from('registrar_enrollment_email_queue')
+                  .select('attempts')
+                  .eq('id', String((row as any).id || ''))
+                  .maybeSingle();
+                const nextAttempts = Number((currentRow as any)?.attempts || 0) + 1;
+                const nextStatus = nextAttempts >= MAX_ATTEMPTS ? 'failed' : 'pending';
+                await supabaseAdmin
+                  .from('registrar_enrollment_email_queue')
+                  .update({
+                    attempts: nextAttempts,
+                    send_status: nextStatus,
+                    last_error: normalize(error?.message || error) || 'Unknown dispatch error.',
+                  })
+                  .eq('id', String((row as any).id || ''));
+                failed += 1;
+              }
+            }
+
+            res.statusCode = 200;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ processed: (queueRows || []).length, sent, failed }));
+          } catch (error: any) {
+            res.statusCode = 500;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ error: 'Unable to dispatch enrollment emails.', details: error?.message || String(error) }));
+          }
+        });
       },
     };
 
@@ -531,3 +866,4 @@ export default defineConfig(({ mode }) => {
       }
     };
 });
+

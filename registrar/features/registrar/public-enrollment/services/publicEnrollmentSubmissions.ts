@@ -55,7 +55,18 @@ export async function createPublicEnrollmentSubmission(draft: EnrollmentDraft): 
     throw error;
   }
 
-  return { id: String(data.id), submissionReferenceId: String((data as any).submission_reference_id || submissionReferenceId) };
+  const createdId = String(data.id);
+  try {
+    await fetch('/api/enrollment-email-queue', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ submissionId: createdId }),
+    });
+  } catch {
+    // Keep submission flow non-blocking if email queue endpoint is unavailable.
+  }
+
+  return { id: createdId, submissionReferenceId: String((data as any).submission_reference_id || submissionReferenceId) };
 }
 
 export async function fetchPublicEnrollmentSubmissions(limit = 500): Promise<PublicEnrollmentSubmission[]> {
@@ -97,7 +108,18 @@ export async function createPublicEnrollmentSubmissionRecord(input: PublicEnroll
     throw error;
   }
 
-  return { id: String(data.id) };
+  const createdId = String(data.id);
+  try {
+    await fetch('/api/enrollment-email-queue', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ submissionId: createdId }),
+    });
+  } catch {
+    // Keep submission creation non-blocking if queue endpoint is unavailable.
+  }
+
+  return { id: createdId };
 }
 
 export async function updatePublicEnrollmentSubmissionRecord(
