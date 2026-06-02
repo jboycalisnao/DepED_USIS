@@ -233,7 +233,7 @@ export default function PublicEnrollmentSectioningPage() {
         school_year: String(schoolYearInfo?.label || row.school_year || payload.schoolYear || '').trim(),
         grade_level: String(row.grade_to_enroll || payload.gradeToEnroll || (sectionInfo as any).grade_level || '').trim() || null,
         section: String((sectionInfo as any).name || selectedSection.name || '').trim() || null,
-        status: 'Section Assigned',
+        status: 'Enrolled',
         enrollment_date: new Date().toISOString(),
         submission_payload: nextPayload,
         source: 'registrar.sectioning',

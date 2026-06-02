@@ -4,6 +4,7 @@ type BaseFieldProps = {
   label: string;
   value: string;
   onChange: (value: string) => void;
+  onFocus?: () => void;
   required?: boolean;
   inputMode?: 'text' | 'search' | 'none' | 'tel' | 'url' | 'email' | 'numeric' | 'decimal';
   maxLength?: number;
@@ -12,13 +13,14 @@ type BaseFieldProps = {
   disabled?: boolean;
 };
 
-export function TextField({ label, value, onChange, required = false, inputMode, maxLength, pattern, type = 'text', disabled = false }: BaseFieldProps) {
+export function TextField({ label, value, onChange, onFocus, required = false, inputMode, maxLength, pattern, type = 'text', disabled = false }: BaseFieldProps) {
   const shouldPreserveCase = type === 'email';
   return (
     <label className="floating-field">
       <div className="floating-field__control">
         <input
           value={value}
+          onFocus={onFocus}
           onChange={(event) => {
             const nextValue = event.target.value;
             onChange(shouldPreserveCase ? nextValue : nextValue.toUpperCase());

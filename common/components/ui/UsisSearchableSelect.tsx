@@ -7,6 +7,7 @@ export interface UsisSearchableSelectOption {
 }
 
 interface UsisSearchableSelectProps {
+  allowCustomValue?: boolean;
   allowTyping?: boolean;
   ariaLabel: string;
   className?: string;
@@ -28,6 +29,7 @@ interface UsisSearchableSelectProps {
 }
 
 export function UsisSearchableSelect({
+  allowCustomValue = false,
   allowTyping = true,
   ariaLabel,
   className = '',
@@ -143,7 +145,10 @@ export function UsisSearchableSelect({
     setQuery('');
   };
 
-  const hasValue = Boolean(value?.trim()) || Boolean(selected) || (isOpen && query.trim().length > 0);
+  const normalizedQuery = query.trim();
+  const customValueAvailable = allowCustomValue && allowTyping && normalizedQuery.length > 0 && !filtered.some((option) => option.label.toLowerCase() === normalizedQuery.toLowerCase());
+  const hasValue = Boolean(value?.trim()) || Boolean(selected) || (isOpen && normalizedQuery.length > 0);
+  const displayValue = isOpen ? query : selected?.label || (allowCustomValue ? value : '');
   const menuBody = (
     <div
       className={`searchable-select__menu${renderInlineInModal ? ' searchable-select__menu--inline' : ''}`}
@@ -161,6 +166,20 @@ export function UsisSearchableSelect({
           : { left: `${menuPosition.left}px`, top: `${menuPosition.top}px`, width: `${menuPosition.width}px` }
       }
     >
+      {customValueAvailable ? (
+        <button
+          type="button"
+          className="searchable-select__option searchable-select__option--custom"
+          onMouseDown={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            selectValue(normalizedQuery);
+          }}
+          onClick={() => selectValue(normalizedQuery)}
+        >
+          Use “{normalizedQuery}”
+        </button>
+      ) : null}
       {filtered.length > 0 ? (
         filtered.map((option) => (
           <button
@@ -207,10 +226,16 @@ export function UsisSearchableSelect({
             onFocus={() => {
               if (!disabled) setIsOpen(true);
             }}
+            onKeyDown={(event) => {
+              if (!allowCustomValue || event.key !== 'Enter') return;
+              if (!normalizedQuery) return;
+              event.preventDefault();
+              selectValue(normalizedQuery);
+            }}
             placeholder={floatingLabel ? ' ' : selected?.label || placeholder || label || ariaLabel}
             readOnly={!allowTyping}
             type="text"
-            value={isOpen ? query : selected?.label || ''}
+            value={displayValue}
           />
           <button
             aria-label={`Toggle ${ariaLabel} options`}

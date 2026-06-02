@@ -72,6 +72,17 @@ export const initialDraft: EnrollmentDraft = {
 };
 
 export const digitsOnly = (value: string) => value.replace(/\D/g, '');
+export const isValidEmailAddress = (value: string) => {
+  const normalized = String(value || '').trim();
+  if (!normalized) return true;
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized);
+};
+
+export const isValidMobileNumber = (value: string) => {
+  const normalized = digitsOnly(String(value || '').trim());
+  if (!normalized) return true;
+  return /^09\d{9}$/.test(normalized);
+};
 
 export const depedSchoolToOption = (record: any): SchoolDirectoryEntry | null => {
   const schoolId = String(record?.beis_school_id || record?.school_id || record?.school_code || record?.schoolCode || record?.schoolId || record?.id || '').trim();
@@ -117,6 +128,7 @@ export const validateCommonFields = (
   if (trimmedLrn && !/^\d{12}$/.test(trimmedLrn)) return 'Learner Reference Number (LRN) must be exactly 12 digits.';
   const trimmedBirthCert = draft.birthCertificateNo.trim();
   if (trimmedBirthCert && !/^\d{12}$/.test(trimmedBirthCert)) return 'PSA Birth Certificate No. must be exactly 12 digits.';
+  if (!isValidEmailAddress(draft.email)) return 'Email Address must contain @ and a valid domain.';
   if (draft.birthDate) {
     const birthDate = new Date(draft.birthDate);
     const now = new Date();
@@ -131,6 +143,9 @@ export const validateCommonFields = (
     const normalized = digitsOnly(entry.value || '');
     if (normalized.length > 0 && normalized.length !== 11) {
       return `${entry.label} must contain exactly 11 digits.`;
+    }
+    if (normalized.length === 11 && !normalized.startsWith('09')) {
+      return `${entry.label} must start with 09.`;
     }
   }
   const lastGrade = gradeLevelOrder.find((grade) => grade.label === draft.lastGradeLevel);

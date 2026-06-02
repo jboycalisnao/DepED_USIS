@@ -41,12 +41,14 @@ import {
 } from '../utils/enrollmentFormUtils';
 import { DateField, SelectField, TextField } from './form/FormFields';
 import UsisPageLoader from '../../../../common/components/UsisPageLoader';
+import { buildDuplicateEnrollmentSubmissionMessage, findDuplicateEnrollmentSubmission } from '../services/publicEnrollmentSubmissions';
 
 const gradeLevelOrder = gradeLevelOptions.map((level) => ({ label: level, value: Number(level.replace(/\D/g, '')) }));
 const SHS_GRADES = new Set(['Grade 11', 'Grade 12']);
 const ACADEMIC_TRACK_STRANDS = ['STEM', 'HUMSS', 'ABM', 'ALS'].map((strand) => ({ value: strand, label: strand }));
 const TECHPRO_TRACK_LABEL = 'TechPro Track';
 const TECHPRO_STRAND_LABEL = 'Technical Vocational Strand';
+const MOTHER_TONGUE_OPTIONS = ['Kinaray-a', 'Hiligaynon', 'Bisaya', 'Tagalog', 'English'];
 const getNextGradeLevel = (gradeLevel: string) => {
   const current = gradeLevelOrder.find((entry) => entry.label === gradeLevel);
   if (!current) return '';
@@ -58,6 +60,7 @@ type LrnLookupState =
   | { status: 'empty'; message: string }
   | { status: 'checking'; message: string }
   | { status: 'invalid'; message: string }
+  | { status: 'duplicate'; message: string }
   | { status: 'matched'; message: string }
   | { status: 'not_found'; message: string };
 
@@ -83,6 +86,7 @@ export function EnrollmentFormPage() {
   const [permanentAddress, setPermanentAddress] = useState<AddressSelection>(initialAddressSelection);
   const [currentAddress, setCurrentAddress] = useState<AddressSelection>(initialAddressSelection);
   const [sameAsPermanent, setSameAsPermanent] = useState(false);
+  const lastDuplicateAlertKeyRef = useRef('');
   const [lrnLookupState, setLrnLookupState] = useState<LrnLookupState>({
     status: 'empty',
     message: 'Enter a 12-digit LRN to unlock and continue the form.',
@@ -162,6 +166,13 @@ export function EnrollmentFormPage() {
   }, []);
 
   useEffect(() => {
+    const search = new URLSearchParams(window.location.search);
+    const prefillLrn = digitsOnly(String(search.get('q') || '').trim()).slice(0, 12);
+    if (!prefillLrn) return;
+    setDraft((current) => (current.lrn === prefillLrn ? current : { ...current, lrn: prefillLrn }));
+  }, []);
+
+  useEffect(() => {
     const loadPsgc = async () => {
       try {
         const regionRows = await fetchPsgcRegions();
@@ -192,18 +203,32 @@ export function EnrollmentFormPage() {
     const loadLearnerByLrn = async () => {
       setLrnLookupState({ status: 'checking', message: 'Checking learner record by LRN...' });
       try {
-        const { data, error } = await supabase
-          .from('registrar_learners')
-          .select('id,lrn,first_name,last_name,middle_name,birth_date,gender,address,contact_number,guardian_name,father_name,mother_name,is_4ps,email,enrollment_history')
-          .eq('lrn', normalizedLrn)
-          .maybeSingle();
+        const [{ data, error }, duplicateSubmission] = await Promise.all([
+          supabase
+            .from('registrar_learners')
+            .select('id,lrn,first_name,last_name,middle_name,birth_date,gender,address,contact_number,guardian_name,father_name,mother_name,is_4ps,email,enrollment_history')
+            .eq('lrn', normalizedLrn)
+            .maybeSingle(),
+          draft.schoolYear ? findDuplicateEnrollmentSubmission(normalizedLrn, draft.schoolYear) : Promise.resolve(null),
+        ]);
         if (isCancelled) return;
         if (error) {
           setLrnLookupState({ status: 'invalid', message: 'Unable to validate LRN right now. Please try again.' });
           return;
         }
+        const duplicateMessage = duplicateSubmission?.id ? buildDuplicateEnrollmentSubmissionMessage(normalizedLrn, draft.schoolYear) : '';
 
         if (!data) {
+          if (duplicateMessage) {
+            setLrnLookupState({ status: 'duplicate', message: duplicateMessage });
+            setModalNotice({
+              type: 'error',
+              title: 'Duplicate Submission',
+              message: duplicateMessage,
+            });
+            lastDuplicateAlertKeyRef.current = `${normalizedLrn}|${String(draft.schoolYear || '').trim()}`;
+            return;
+          }
           setLrnLookupState({
             status: 'not_found',
             message: 'New Enrollment - No existing learner record found. Continue by completing the form.',
@@ -286,6 +311,13 @@ export function EnrollmentFormPage() {
           status: 'matched',
           message: 'Continuing Student - Record Update (For Updating Existing Records). Review and confirm existing information.',
         });
+
+        if (duplicateMessage) {
+          setLrnLookupState({
+            status: 'duplicate',
+            message: 'Duplicate submission detected.',
+          });
+        }
       } catch {
         if (!isCancelled) setLrnLookupState({ status: 'invalid', message: 'Unable to validate LRN right now. Please try again.' });
       }
@@ -294,7 +326,7 @@ export function EnrollmentFormPage() {
     return () => {
       isCancelled = true;
     };
-  }, [draft.lrn]);
+  }, [draft.lrn, draft.schoolYear]);
 
   useEffect(() => {
     const loadPermanentProvinces = async () => {
@@ -585,6 +617,21 @@ export function EnrollmentFormPage() {
     setDraft((current) => ({ ...current, semester: '1st Sem' }));
   }, [isSeniorHighTargetGrade, draft.semester]);
 
+  useEffect(() => {
+    if (lrnLookupState.status !== 'duplicate') {
+      lastDuplicateAlertKeyRef.current = '';
+      return;
+    }
+    const duplicateKey = `${digitsOnly(draft.lrn || '')}|${String(draft.schoolYear || '').trim()}`;
+    if (lastDuplicateAlertKeyRef.current === duplicateKey) return;
+    lastDuplicateAlertKeyRef.current = duplicateKey;
+    setModalNotice({
+      type: 'error',
+      title: 'Duplicate Submission',
+      message: buildDuplicateEnrollmentSubmissionMessage(draft.lrn, draft.schoolYear),
+    });
+  }, [draft.lrn, draft.schoolYear, lrnLookupState.status]);
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setModalNotice(null);
@@ -592,6 +639,7 @@ export function EnrollmentFormPage() {
       setModalNotice({ type: 'error', title: 'Validation Notice', message: 'Please enter and validate a 12-digit LRN before continuing.' });
       return;
     }
+    if (lrnLookupState.status === 'duplicate') return;
     if (!draft.consent) {
       setModalNotice({ type: 'error', title: 'Validation Notice', message: 'Please validate the privacy consent before continuing.' });
       return;
@@ -622,6 +670,13 @@ export function EnrollmentFormPage() {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const goToSubmissionStatus = () => {
+    const lrn = digitsOnly(draft.lrn || '');
+    setModalNotice(null);
+    if (!lrn) return;
+    navigate(`/submission-status?q=${encodeURIComponent(lrn)}`);
   };
 
   if (isFormAvailabilityLoading) {
@@ -744,12 +799,14 @@ export function EnrollmentFormPage() {
                         ? 'var(--deped-blue)'
                         : lrnLookupState.status === 'invalid'
                           ? 'var(--deped-red)'
+                          : lrnLookupState.status === 'duplicate'
+                            ? 'var(--deped-red)'
                           : 'var(--deped-muted)',
                     fontSize: '13px',
                     fontWeight: lrnLookupState.status === 'matched' ? 700 : 400,
                   }}
                 >
-                  {lrnLookupState.message}
+                  {lrnLookupState.status === 'duplicate' ? 'Duplicate submission detected.' : lrnLookupState.message}
                 </p>
               </section>
               <fieldset
@@ -825,9 +882,39 @@ export function EnrollmentFormPage() {
                   <TextField label="Weight (kg)" value={draft.weight} onChange={(value) => updateField('weight', value)} inputMode="decimal" />
                   <SelectField label="Gender" value={draft.gender} onChange={(value) => updateField('gender', value)} options={['Male', 'Female']} />
                   <TextField label="Place of Birth" value={draft.placeOfBirth} onChange={(value) => updateField('placeOfBirth', value)} />
-                  <TextField label="Learner Contact Number" value={draft.learnerContact} onChange={(value) => updateField('learnerContact', digitsOnly(value).slice(0, 11))} inputMode="numeric" maxLength={11} pattern="[0-9]{11}" />
-                  <TextField label="Mother Tongue" value={draft.motherTongue} onChange={(value) => updateField('motherTongue', value)} />
-                  <SelectField label="Religion" value={draft.religion} onChange={(value) => updateField('religion', value)} options={religionOptions as unknown as string[]} />
+                  <TextField
+                    label="Learner Contact Number"
+                    value={draft.learnerContact}
+                    onChange={(value) => updateField('learnerContact', digitsOnly(value).slice(0, 11))}
+                    onFocus={() => {
+                      if (!draft.learnerContact.trim()) updateField('learnerContact', '09');
+                    }}
+                    inputMode="numeric"
+                    maxLength={11}
+                    pattern="09[0-9]{9}"
+                  />
+                  <UsisSearchableSelect
+                    ariaLabel="Mother Tongue"
+                    label="Mother Tongue"
+                    floatingLabel
+                    showLabel={false}
+                    value={draft.motherTongue}
+                    onChange={(value) => updateField('motherTongue', value)}
+                    options={MOTHER_TONGUE_OPTIONS.map((option) => ({ value: option, label: option }))}
+                    allowCustomValue
+                    placeholder="Type or select mother tongue"
+                  />
+                  <UsisSearchableSelect
+                    ariaLabel="Religion"
+                    label="Religion"
+                    floatingLabel
+                    showLabel={false}
+                    value={draft.religion}
+                    onChange={(value) => updateField('religion', value)}
+                    options={(religionOptions as unknown as string[]).map((option) => ({ value: option, label: option }))}
+                    allowCustomValue
+                    placeholder="Type or select religion"
+                  />
                   <SelectField label="4Ps Beneficiary" value={draft.is4Ps} onChange={(value) => updateField('is4Ps', value)} options={['Yes', 'No']} />
                   <TextField label="4Ps Household ID" value={draft.fourPsHouseholdId} onChange={(value) => updateField('fourPsHouseholdId', value)} />
                 </div>
@@ -863,11 +950,41 @@ export function EnrollmentFormPage() {
                 <h3>4. Parent and Guardian Information</h3>
                 <div className="floating-field-grid">
                   <TextField label="Father's Full Name" value={draft.fatherName} onChange={(value) => updateField('fatherName', value)} />
-                  <TextField label="Father's Contact Number" value={draft.fatherContact} onChange={(value) => updateField('fatherContact', digitsOnly(value).slice(0, 11))} inputMode="numeric" maxLength={11} pattern="[0-9]{11}" />
+                  <TextField
+                    label="Father's Contact Number"
+                    value={draft.fatherContact}
+                    onChange={(value) => updateField('fatherContact', digitsOnly(value).slice(0, 11))}
+                    onFocus={() => {
+                      if (!draft.fatherContact.trim()) updateField('fatherContact', '09');
+                    }}
+                    inputMode="numeric"
+                    maxLength={11}
+                    pattern="09[0-9]{9}"
+                  />
                   <TextField label="Mother's Maiden Name" value={draft.motherName} onChange={(value) => updateField('motherName', value)} />
-                  <TextField label="Mother's Contact Number" value={draft.motherContact} onChange={(value) => updateField('motherContact', digitsOnly(value).slice(0, 11))} inputMode="numeric" maxLength={11} pattern="[0-9]{11}" />
+                  <TextField
+                    label="Mother's Contact Number"
+                    value={draft.motherContact}
+                    onChange={(value) => updateField('motherContact', digitsOnly(value).slice(0, 11))}
+                    onFocus={() => {
+                      if (!draft.motherContact.trim()) updateField('motherContact', '09');
+                    }}
+                    inputMode="numeric"
+                    maxLength={11}
+                    pattern="09[0-9]{9}"
+                  />
                   <TextField label="Legal Guardian's Name" value={draft.guardianName} onChange={(value) => updateField('guardianName', value)} />
-                  <TextField label="Guardian's Contact Number" value={draft.guardianContact} onChange={(value) => updateField('guardianContact', digitsOnly(value).slice(0, 11))} inputMode="numeric" maxLength={11} pattern="[0-9]{11}" />
+                  <TextField
+                    label="Guardian's Contact Number"
+                    value={draft.guardianContact}
+                    onChange={(value) => updateField('guardianContact', digitsOnly(value).slice(0, 11))}
+                    onFocus={() => {
+                      if (!draft.guardianContact.trim()) updateField('guardianContact', '09');
+                    }}
+                    inputMode="numeric"
+                    maxLength={11}
+                    pattern="09[0-9]{9}"
+                  />
                 </div>
               </section>
               <section className="enrollment-public-enrollment__section">
@@ -903,7 +1020,15 @@ export function EnrollmentFormPage() {
               <p>{modalNotice.message}</p>
             </div>
             <div className="alert-modal__actions">
-              <button type="button" className="alert-modal__blue" onClick={() => setModalNotice(null)}>OK</button>
+              {modalNotice.title === 'Duplicate Submission' ? (
+                <button type="button" className="alert-modal__blue" onClick={goToSubmissionStatus}>
+                  Check Status
+                </button>
+              ) : (
+                <button type="button" className="alert-modal__blue" onClick={() => setModalNotice(null)}>
+                  OK
+                </button>
+              )}
             </div>
           </div>
         </div>

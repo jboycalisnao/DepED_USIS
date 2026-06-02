@@ -1,5 +1,6 @@
-import { FormEvent, useState } from 'react';
-import { useEffect } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { supabase } from '../../../lib/supabase';
 import { lookupSubmissionStatus, type SubmissionLookupResult } from '../../enrollment-form/services/submissionLookup';
 
 const normalizeStatus = (value: string) => String(value || '').trim().toLowerCase();
@@ -7,6 +8,7 @@ const normalizeStatus = (value: string) => String(value || '').trim().toLowerCas
 const resolveStatusTone = (value: string): 'info' | 'success' | 'warning' | 'danger' => {
   const normalized = normalizeStatus(value);
   if (normalized.includes('approved') || normalized.includes('enrolled') || normalized.includes('complete')) return 'success';
+  if (normalized.includes('existing learner') || normalized.includes('previous learner')) return 'info';
   if (normalized.includes('review') || normalized.includes('pending')) return 'warning';
   if (normalized.includes('reject') || normalized.includes('cancel') || normalized.includes('deny')) return 'danger';
   return 'info';
@@ -17,6 +19,54 @@ export function SubmissionStatusPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<SubmissionLookupResult | null>(null);
+  const [activeSchoolYear, setActiveSchoolYear] = useState('');
+  const currentStatusTone = result ? resolveStatusTone(result.currentStatus) : 'info';
+  const currentStatusLabel = result ? normalizeStatus(result.currentStatus) : '';
+  const hasCurrentSubmission = Boolean(result?.hasCurrentSubmission);
+  const hasCurrentSchoolYearSection = Boolean(
+    result?.history.some((row) => String(row.schoolYear || '').trim() === activeSchoolYear && String(row.section || '').trim()),
+  );
+  const hasPreviousSchoolYearHistory = Boolean(
+    result &&
+      activeSchoolYear &&
+      result.history.some((row) => String(row.schoolYear || '').trim() && String(row.schoolYear || '').trim() !== activeSchoolYear) &&
+      result.history.some((row) => /grade\s*(7|8|9|10|11)\b/i.test(String(row.gradeLevel || '').trim())),
+  );
+  const showEnrollmentBanner =
+    Boolean(result) &&
+    hasPreviousSchoolYearHistory &&
+    !hasCurrentSubmission &&
+    !hasCurrentSchoolYearSection;
+  const currentStatusNote = result
+    ? currentStatusLabel === 'graduated'
+      ? 'You completed Grade 12 in a previous school year. Please enroll online for the current active school year.'
+      : currentStatusLabel === 'previous learner'
+        ? 'You have a previous enrollment record, but no section is assigned for the current school year.'
+        : currentStatusLabel === 'submission received'
+          ? 'Your enrollment submission was received and is waiting for section assignment.'
+          : currentStatusLabel === 'information updated'
+            ? 'Your learner information was updated and is waiting for section assignment.'
+        : currentStatusTone === 'success'
+          ? 'You are linked to an assigned section and are treated as enrolled.'
+          : currentStatusTone === 'warning'
+            ? 'Your submission is still under review.'
+            : currentStatusTone === 'danger'
+              ? 'Your submission was rejected or cancelled.'
+              : 'Your record has been captured in the system.'
+    : '';
+
+  useEffect(() => {
+    const run = async () => {
+      const { data } = await supabase
+        .from('registrar_school_years')
+        .select('label')
+        .eq('is_active', true)
+        .limit(1)
+        .maybeSingle();
+      setActiveSchoolYear(String((data as any)?.label || '').trim());
+    };
+    void run();
+  }, []);
 
   useEffect(() => {
     const search = new URLSearchParams(window.location.search);
@@ -64,7 +114,7 @@ export function SubmissionStatusPage() {
   };
 
   return (
-    <main className="page-frame enrollment-public-enrollment">
+    <main className="page-frame enrollment-public-enrollment enrollment-status-page">
       <div className="content-width">
         <section className="section-shell">
           <div className="portal-panel">
@@ -72,8 +122,8 @@ export function SubmissionStatusPage() {
               <h2>Submission Status Lookup</h2>
               <p>Enter LRN or Submission Reference ID to view current status and enrollment history.</p>
             </div>
-            <div className="portal-panel__body" style={{ display: 'grid', gap: 12 }}>
-              <form className="form-grid" style={{ gridTemplateColumns: 'minmax(280px, 1fr) auto' }} onSubmit={onSubmit}>
+            <div className="portal-panel__body enrollment-status-page__body">
+              <form className="form-grid enrollment-status-page__lookup-form" onSubmit={onSubmit}>
                 <label className="floating-field">
                   <div className="floating-field__control">
                     <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder=" " />
@@ -85,64 +135,90 @@ export function SubmissionStatusPage() {
                 </button>
               </form>
 
+              {showEnrollmentBanner && result ? (
+                <div className="enrollment-lookup__handoff-banner" role="status" aria-live="polite">
+                  <div className="enrollment-lookup__handoff-banner-copy">
+                    <strong>{currentStatusLabel === 'graduated' ? 'Graduated learner detected' : 'Previous learner detected'}</strong>
+                    <p>
+                      {currentStatusLabel === 'graduated'
+                        ? 'You completed Grade 12 in a previous school year. Please continue by submitting the online enrollment form.'
+                        : 'You have a previous enrollment record, but not for the current active school year. Please continue by submitting the online enrollment form.'}
+                    </p>
+                  </div>
+                  <Link to={`/enrollment-form?q=${encodeURIComponent(result.lrn)}`} className="primary-button enrollment-lookup__handoff-banner-action">
+                    Open Enrollment Form
+                  </Link>
+                </div>
+              ) : null}
+
               {result ? (
                 <div className="portal-panel enrollment-lookup__result-panel" style={{ marginTop: 4 }}>
                   <div className="portal-panel__body enrollment-lookup__result-body">
                     {(() => {
-                      const bestHistory = result.history.length ? [result.history[0]] : [];
+                      const historyRows = result.history;
                       return (
                         <>
-                    <div className="enrollment-lookup__legend">
-                      <span className="enrollment-status-tag enrollment-status-tag--success">Approved / Enrolled</span>
-                      <span className="enrollment-status-tag enrollment-status-tag--warning">For Review / Pending</span>
-                      <span className="enrollment-status-tag enrollment-status-tag--danger">Rejected / Cancelled</span>
-                      <span className="enrollment-status-tag enrollment-status-tag--info">Recorded / Other</span>
-                    </div>
-                    <div className="form-grid" style={{ gridTemplateColumns: 'repeat(2, minmax(220px, 1fr))' }}>
-                      <div className="notice-box enrollment-lookup__metric-card enrollment-lookup__metric-card--ref"><strong>Submission Ref</strong><span className="enrollment-lookup__mono">{result.submissionReferenceId || '--'}</span></div>
-                      <div className="notice-box enrollment-lookup__metric-card enrollment-lookup__metric-card--lrn"><strong>LRN</strong><span className="enrollment-lookup__mono">{result.lrn || '--'}</span></div>
-                      <div className="notice-box enrollment-lookup__metric-card enrollment-lookup__metric-card--name"><strong>Learner Name</strong><span>{result.fullName || '--'}</span></div>
-                      <div className="notice-box enrollment-lookup__metric-card enrollment-lookup__metric-card--date"><strong>Date Submitted</strong><span>{result.submittedAt ? new Date(result.submittedAt).toLocaleString() : '--'}</span></div>
-                      <div className="notice-box enrollment-lookup__metric-card enrollment-lookup__metric-card--sy"><strong>School Year</strong><span>{result.schoolYear}</span></div>
-                      <div className="notice-box enrollment-lookup__metric-card enrollment-lookup__metric-card--status">
-                        <strong>Current Status</strong>
-                        <span className={`enrollment-status-tag enrollment-status-tag--${resolveStatusTone(result.currentStatus)}`}>{result.currentStatus}</span>
-                      </div>
-                    </div>
+                          <div className="enrollment-lookup__legend enrollment-lookup__legend--soft">
+                            <span className="enrollment-status-tag enrollment-status-tag--success">Approved / Enrolled</span>
+                            <span className="enrollment-status-tag enrollment-status-tag--warning">For Review / Pending</span>
+                            <span className="enrollment-status-tag enrollment-status-tag--danger">Rejected / Cancelled</span>
+                            <span className="enrollment-status-tag enrollment-status-tag--info">Recorded / Other</span>
+                          </div>
+                          <div className={`enrollment-lookup__status-summary enrollment-lookup__status-summary--${currentStatusTone}`}>
+                            <div className="enrollment-lookup__status-summary-label">
+                              <strong>Current Status</strong>
+                              <span>{currentStatusNote}</span>
+                            </div>
+                            <span className={`enrollment-status-tag enrollment-status-tag--${currentStatusTone}`}>
+                              <span className="enrollment-lookup__status-dot" aria-hidden="true" />
+                              {result.currentStatus}
+                            </span>
+                          </div>
+                          <div className="form-grid enrollment-status-page__metrics-grid">
+                            <div className="notice-box enrollment-lookup__metric-card enrollment-lookup__metric-card--ref"><strong>Submission Ref</strong><span className="enrollment-lookup__mono">{result.submissionReferenceId || '--'}</span></div>
+                            <div className="notice-box enrollment-lookup__metric-card enrollment-lookup__metric-card--lrn"><strong>LRN</strong><span className="enrollment-lookup__mono">{result.lrn || '--'}</span></div>
+                            <div className="notice-box enrollment-lookup__metric-card enrollment-lookup__metric-card--name"><strong>Learner Name</strong><span>{result.fullName || '--'}</span></div>
+                            <div className="notice-box enrollment-lookup__metric-card enrollment-lookup__metric-card--date"><strong>Date Submitted</strong><span>{result.submittedAt ? new Date(result.submittedAt).toLocaleString() : '--'}</span></div>
+                            <div className="notice-box enrollment-lookup__metric-card enrollment-lookup__metric-card--sy"><strong>School Year</strong><span>{result.schoolYear}</span></div>
+                            <div className="notice-box enrollment-lookup__metric-card enrollment-lookup__metric-card--status">
+                              <strong>Lookup Result</strong>
+                              <span className="enrollment-lookup__metric-status-copy">{result.currentStatus}</span>
+                            </div>
+                          </div>
 
-                    <div className="portal-panel enrollment-lookup__history-panel" style={{ marginTop: 4 }}>
-                      <div className="portal-panel__header enrollment-lookup__history-header"><h3>Previous Enrollment History (Best Match)</h3></div>
-                      <div className="portal-panel__body" style={{ padding: 0 }}>
-                        <table className="usis-table">
-                          <thead>
-                            <tr>
-                              <th>Date</th>
-                              <th>School Year</th>
-                              <th>Grade Level</th>
-                              <th>Section</th>
-                              <th>Status</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {bestHistory.length ? (
-                              bestHistory.map((row) => (
-                                <tr key={row.id}>
-                                  <td>{row.enrollmentDate ? new Date(row.enrollmentDate).toLocaleString() : '--'}</td>
-                                  <td>{row.schoolYear}</td>
-                                  <td>{row.gradeLevel}</td>
-                                  <td>{row.section}</td>
-                                  <td><span className={`enrollment-status-tag enrollment-status-tag--${resolveStatusTone(row.status)}`}>{row.status}</span></td>
-                                </tr>
-                              ))
-                            ) : (
-                              <tr>
-                                <td colSpan={5}>No enrollment history found yet.</td>
-                              </tr>
-                            )}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
+                          <div className="portal-panel enrollment-lookup__history-panel" style={{ marginTop: 4 }}>
+                            <div className="portal-panel__header enrollment-lookup__history-header"><h3>Enrollment History</h3></div>
+                            <div className="portal-panel__body enrollment-status-page__history-body">
+                              <table className="usis-table">
+                                <thead>
+                                  <tr>
+                                    <th>Date</th>
+                                    <th>School Year</th>
+                                    <th>Grade Level</th>
+                                    <th>Section</th>
+                                    <th>Status</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {historyRows.length ? (
+                                    historyRows.map((row) => (
+                                      <tr key={row.id}>
+                                        <td>{row.enrollmentDate ? new Date(row.enrollmentDate).toLocaleString() : '--'}</td>
+                                        <td>{row.schoolYear}</td>
+                                        <td>{row.gradeLevel}</td>
+                                        <td>{row.section}</td>
+                                        <td><span className={`enrollment-status-tag enrollment-status-tag--${resolveStatusTone(row.status)}`}>{row.status}</span></td>
+                                      </tr>
+                                    ))
+                                  ) : (
+                                    <tr>
+                                      <td colSpan={5}>No enrollment history found yet.</td>
+                                    </tr>
+                                  )}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
                         </>
                       );
                     })()}

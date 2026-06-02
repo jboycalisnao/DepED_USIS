@@ -4,6 +4,26 @@ import type { EnrollmentDraft } from '../types';
 const REGISTRAR_PUBLIC_ENROLLMENT_TABLE = 'registrar_public_enrollment_submissions';
 const REGISTRAR_EMAIL_API_BASE = String((import.meta as any)?.env?.VITE_REGISTRAR_EMAIL_API_BASE_URL || '').trim();
 
+export const buildDuplicateEnrollmentSubmissionMessage = (lrn: string, schoolYear: string) =>
+  `A submission for LRN ${String(lrn || '').trim()} already exists for School Year ${String(schoolYear || '').trim()}. Please approach the enrollment help desk for assistance.`;
+
+export async function findDuplicateEnrollmentSubmission(lrn: string, schoolYear: string) {
+  const normalizedLrn = String(lrn || '').trim();
+  const normalizedSchoolYear = String(schoolYear || '').trim();
+  if (!normalizedLrn || !normalizedSchoolYear) return null;
+
+  const { data: existingSubmission, error } = await supabase
+    .from(REGISTRAR_PUBLIC_ENROLLMENT_TABLE)
+    .select('id,submission_reference_id,created_at')
+    .eq('lrn', normalizedLrn)
+    .eq('school_year', normalizedSchoolYear)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+  return existingSubmission || null;
+}
+
 const buildSubmissionReferenceId = () => {
   const now = new Date();
   const yyyy = String(now.getFullYear());
@@ -19,19 +39,9 @@ export async function createPublicEnrollmentSubmission(draft: EnrollmentDraft): 
   const normalizedSchoolYear = String(draft.schoolYear || '').trim();
 
   if (normalizedLrn && normalizedSchoolYear) {
-    const { data: existingSubmission, error: duplicateCheckError } = await supabase
-      .from(REGISTRAR_PUBLIC_ENROLLMENT_TABLE)
-      .select('id')
-      .eq('lrn', normalizedLrn)
-      .eq('school_year', normalizedSchoolYear)
-      .limit(1)
-      .maybeSingle();
-
-    if (duplicateCheckError) throw duplicateCheckError;
+    const existingSubmission = await findDuplicateEnrollmentSubmission(normalizedLrn, normalizedSchoolYear);
     if (existingSubmission?.id) {
-      throw new Error(
-        `A submission for LRN ${normalizedLrn} already exists for School Year ${normalizedSchoolYear}. Please approach the enrollment help desk for assistance.`,
-      );
+      throw new Error(buildDuplicateEnrollmentSubmissionMessage(normalizedLrn, normalizedSchoolYear));
     }
   }
 

@@ -179,7 +179,6 @@ export default function PublicEnrollmentSubmissionsPage() {
   const [enrollError, setEnrollError] = useState<string | null>(null);
   const [topAlert, setTopAlert] = useState<{ title: string; message: string } | null>(null);
   const [existingLearnerLrns, setExistingLearnerLrns] = useState<Set<string>>(new Set());
-  const [learnerEnrollmentYearsByLrn, setLearnerEnrollmentYearsByLrn] = useState<Record<string, Set<string>>>({});
   const [collapsedGrades, setCollapsedGrades] = useState<Record<string, boolean>>({});
   const [pendingDeleteSubmissionId, setPendingDeleteSubmissionId] = useState<string | null>(null);
   const [isDeletingSubmission, setIsDeletingSubmission] = useState(false);
@@ -195,6 +194,7 @@ export default function PublicEnrollmentSubmissionsPage() {
   const [sectioningGradeLevels, setSectioningGradeLevels] = useState<string[]>([]);
   const [isGeneratingCode, setIsGeneratingCode] = useState<string | null>(null);
   const [sendingEmailSubmissionId, setSendingEmailSubmissionId] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const isEditorSeniorHighTargetGrade = SHS_GRADES.has(draftEditor.gradeToEnroll);
   const activeYearNormalized = normalizeSchoolYear(activeSchoolYearLabel);
 
@@ -228,46 +228,20 @@ export default function PublicEnrollmentSubmissionsPage() {
       );
       if (!lrns.length) {
         setExistingLearnerLrns(new Set());
-        setLearnerEnrollmentYearsByLrn({});
         return;
       }
 
-      const { data, error } = await supabase.from('registrar_learners').select('id,lrn').in('lrn', lrns);
+      const { data, error } = await supabase.from('registrar_learners').select('lrn').in('lrn', lrns);
       if (error) return;
 
       const allExistingLrns = new Set<string>();
-      const yearsByLrn: Record<string, Set<string>> = {};
-      const learnerIds: string[] = [];
       for (const row of data || []) {
         const lrn = String((row as any).lrn || '').trim();
         if (!lrn) continue;
         allExistingLrns.add(lrn);
-        yearsByLrn[lrn] = new Set();
-        const learnerId = String((row as any).id || '').trim();
-        if (learnerId) learnerIds.push(learnerId);
-      }
-
-      if (learnerIds.length > 0) {
-        const { data: historyRows } = await supabase
-          .from('registrar_enrollment_history')
-          .select('learner_id,school_year')
-          .in('learner_id', learnerIds);
-        const lrnByLearnerId = new Map<string, string>();
-        for (const row of data || []) {
-          const learnerId = String((row as any).id || '').trim();
-          const lrn = String((row as any).lrn || '').trim();
-          if (learnerId && lrn) lrnByLearnerId.set(learnerId, lrn);
-        }
-        for (const historyRow of historyRows || []) {
-          const learnerId = String((historyRow as any).learner_id || '').trim();
-          const schoolYear = normalizeSchoolYear(String((historyRow as any).school_year || '').trim());
-          const lrn = lrnByLearnerId.get(learnerId);
-          if (lrn && schoolYear) yearsByLrn[lrn]?.add(schoolYear);
-        }
       }
 
       setExistingLearnerLrns(allExistingLrns);
-      setLearnerEnrollmentYearsByLrn(yearsByLrn);
     };
     loadExistingLearners();
   }, [activeSchoolYearSubmissions]);
@@ -1091,7 +1065,29 @@ export default function PublicEnrollmentSubmissionsPage() {
           <button type="button" className="secondary-button" style={{ minHeight: 56 }} onClick={() => void openSectioningAccessModal()}>
             Sectioning Access
           </button>
-          <button type="button" className="secondary-button" style={{ minHeight: 56 }} onClick={() => refresh()} disabled={isLoading}>Refresh</button>
+          <button
+            type="button"
+            className="secondary-button"
+            style={{ minHeight: 56 }}
+            onClick={async () => {
+              setIsRefreshing(true);
+              try {
+                await refresh({ silent: true });
+              } finally {
+                setIsRefreshing(false);
+              }
+            }}
+            disabled={isLoading || isRefreshing}
+          >
+            {isRefreshing ? (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                <span className="registrar-public-enrollment-submissions__refresh-spinner" aria-hidden="true" />
+                Refreshing...
+              </span>
+            ) : (
+              'Refresh'
+            )}
+          </button>
           <div className="status-badge status-badge--open" style={{ minHeight: 56, display: 'flex', alignItems: 'center' }} aria-label="Submission count">{filtered.length} shown</div>
         </div>
         <div className="form-grid" style={{ gridTemplateColumns: 'minmax(420px, 1fr) minmax(220px, auto)', alignItems: 'stretch' }}>
@@ -1145,12 +1141,14 @@ export default function PublicEnrollmentSubmissionsPage() {
                     const displayName = [row.last_name, row.first_name, row.middle_name].filter(Boolean).join(', ') || '--';
                     const rowLrn = (row.lrn || row.payload?.lrn || '').trim();
                     const rowSchoolYear = (row.school_year || row.payload?.schoolYear || '').trim();
-                    const normalizedRowSchoolYear = normalizeSchoolYear(rowSchoolYear);
+                    const hasAssignedSection = Boolean((row.payload as any)?.assignedSectionId || (row.payload as any)?.assignedSectionName);
                     const isExistingLearner = rowLrn ? existingLearnerLrns.has(rowLrn) : false;
-                    const enrolledYears = learnerEnrollmentYearsByLrn[rowLrn] || new Set<string>();
-                    const isExistingForSubmissionYear = normalizedRowSchoolYear
-                      ? enrolledYears.has(normalizedRowSchoolYear)
-                      : false;
+                    const learnerSectionStatus = hasAssignedSection
+                      ? 'Enrolled'
+                      : isExistingLearner
+                        ? 'Existing Learner'
+                        : 'Pending';
+                    const statusTone = hasAssignedSection ? 'success' : isExistingLearner ? 'info' : 'warning';
                     return (
                       <tr
                         key={row.id}
@@ -1162,12 +1160,11 @@ export default function PublicEnrollmentSubmissionsPage() {
                         <td>{displayName}</td>
                         <td>{row.lrn || '--'}</td>
                         <td>
-                          <span className={`status-badge ${isExistingForSubmissionYear ? 'status-badge--open' : ''}`}>
-                            {isExistingForSubmissionYear
-                              ? `Already in Learners (${rowSchoolYear || 'This S.Y.'})`
-                              : isExistingLearner
-                                ? `Existing Learner (${Array.from(enrolledYears).join(', ') || 'No S.Y. history'})`
-                                : 'New Applicant'}
+                          <span className={`registrar-public-enrollment-submissions__status-pill registrar-public-enrollment-submissions__status-pill--${statusTone}`}>
+                            <span className="registrar-public-enrollment-submissions__status-dot" aria-hidden="true" />
+                            <span>
+                              {learnerSectionStatus}
+                            </span>
                           </span>
                         </td>
                         <td>{row.guardian_contact || '--'}</td>
@@ -1191,19 +1188,19 @@ export default function PublicEnrollmentSubmissionsPage() {
                               className="secondary-button"
                               onClick={(event) => {
                                 event.stopPropagation();
-                                if (isExistingForSubmissionYear) return;
+                                if (hasAssignedSection) return;
                                 void openEnrollModal(row);
                               }}
-                              disabled={isExistingForSubmissionYear}
+                              disabled={hasAssignedSection}
                               title={
-                                isExistingForSubmissionYear
+                                hasAssignedSection
                                   ? `Already enrolled for ${rowSchoolYear || 'this school year'}`
                                   : isExistingLearner
                                     ? 'Re-enroll learner'
                                     : 'Enroll to school'
                               }
                               aria-label={
-                                isExistingForSubmissionYear
+                                hasAssignedSection
                                   ? 'Already enrolled in learners for this school year'
                                   : isExistingLearner
                                     ? 'Re-enroll learner'
@@ -1212,7 +1209,7 @@ export default function PublicEnrollmentSubmissionsPage() {
                               style={{ minHeight: 40, padding: '0 10px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
                             >
                               <span className="material-symbols-outlined" aria-hidden="true">
-                                {isExistingForSubmissionYear ? 'check_circle' : 'school'}
+                                {hasAssignedSection ? 'check_circle' : 'school'}
                               </span>
                               <span>{isExistingLearner ? 'Re-enroll' : 'Enroll'}</span>
                             </button>

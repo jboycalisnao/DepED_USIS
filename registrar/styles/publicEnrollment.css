@@ -238,6 +238,249 @@
   font-size: 14px;
 }
 
+.registrar-public-enrollment-submissions .usis-table .registrar-public-enrollment-submissions__status-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: 32px;
+  height: 32px;
+  padding: 0 10px;
+  width: auto;
+  border-radius: 999px;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.registrar-public-enrollment-submissions .usis-table .registrar-public-enrollment-submissions__status-dot {
+  width: 7px;
+  height: 7px;
+  flex-basis: 7px;
+}
+
+.registrar-public-enrollment-submissions__status-card {
+  display: grid;
+  gap: 12px;
+}
+
+.registrar-public-enrollment-submissions__status-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(260px, 1.15fr) max-content;
+  gap: 12px;
+  align-items: stretch;
+}
+
+.registrar-public-enrollment-submissions__status-field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.registrar-public-enrollment-submissions__status-field .searchable-select {
+  width: 100%;
+}
+
+.registrar-public-enrollment-submissions__status-field .searchable-select--floating .floating-field__control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  height: 56px;
+}
+
+.registrar-public-enrollment-submissions__status-field .searchable-select--floating .floating-field__control input {
+  min-height: 56px;
+  height: 56px;
+  box-sizing: border-box;
+  padding: 18px 16px 8px;
+  line-height: 1.2;
+  padding-right: 14px;
+}
+
+.registrar-public-enrollment-submissions__status-field .searchable-select--floating .searchable-select__toggle {
+  min-height: 56px;
+  height: 56px;
+  width: 56px;
+  box-sizing: border-box;
+}
+
+.registrar-public-enrollment-submissions__status-action {
+  min-height: 56px;
+  height: 56px;
+  min-width: 180px;
+  padding-inline: 18px;
+  font-weight: 700;
+}
+
+.registrar-public-enrollment-submissions__status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 56px;
+  height: 56px;
+  border: 1px solid var(--deped-line);
+  border-radius: var(--usis-radius-control);
+  padding: 0 16px;
+  background: #fff;
+  color: var(--deped-blue);
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  width: 100%;
+}
+
+.registrar-public-enrollment-submissions__status-pill--enrolled {
+  color: #0f5132;
+  background: #d1e7dd;
+  border-color: #badbcc;
+}
+
+.registrar-public-enrollment-submissions__status-pill--success {
+  color: #0f5132;
+  background: #d1e7dd;
+  border-color: #badbcc;
+}
+
+.registrar-public-enrollment-submissions__status-pill--pending {
+  color: #664d03;
+  background: #fff3cd;
+  border-color: #ffecb5;
+}
+
+.registrar-public-enrollment-submissions__status-pill--warning {
+  color: #664d03;
+  background: #fff3cd;
+  border-color: #ffecb5;
+}
+
+.registrar-public-enrollment-submissions__status-pill--withdrawn {
+  color: #842029;
+  background: #f8d7da;
+  border-color: #f5c2c7;
+}
+
+.registrar-public-enrollment-submissions__status-pill--danger {
+  color: #842029;
+  background: #f8d7da;
+  border-color: #f5c2c7;
+}
+
+.registrar-public-enrollment-submissions__status-pill--graduated {
+  color: #084298;
+  background: #cfe2ff;
+  border-color: #b6d4fe;
+}
+
+.registrar-public-enrollment-submissions__status-pill--info {
+  color: #084298;
+  background: #cfe2ff;
+  border-color: #b6d4fe;
+}
+
+.registrar-public-enrollment-submissions__status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: currentColor;
+  box-shadow: 0 0 0 3px rgba(16, 35, 61, 0.04);
+  flex: 0 0 10px;
+}
+
+.registrar-public-enrollment-submissions__status-note,
+.registrar-public-enrollment-submissions__status-feedback {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.registrar-public-enrollment-submissions__status-note {
+  color: var(--deped-muted);
+}
+
+.registrar-public-enrollment-submissions__status-feedback {
+  color: var(--deped-blue);
+  font-weight: 700;
+}
+
+.registrar-public-enrollment-submissions__history-table .registrar-public-enrollment-submissions__status-pill {
+  min-height: 30px;
+  height: 30px;
+  padding: 0 10px;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.registrar-public-enrollment-submissions__history-table .registrar-public-enrollment-submissions__status-pill span:last-child {
+  font-size: 12px;
+  line-height: 1;
+}
+
+.registrar-public-enrollment-submissions__history-table .registrar-public-enrollment-submissions__status-dot {
+  width: 7px;
+  height: 7px;
+  flex-basis: 7px;
+}
+
+.registrar-public-enrollment-submissions__history-delete {
+  min-height: 32px;
+  height: 32px;
+  padding: 0 10px;
+  font-size: 13px;
+}
+
+.registrar-public-enrollment-submissions__audit-trail-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.registrar-public-enrollment-submissions__audit-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: start;
+  border: 1px solid rgba(18, 35, 61, 0.14);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: #fbfcff;
+}
+
+.registrar-public-enrollment-submissions__audit-copy {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.registrar-public-enrollment-submissions__audit-title {
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.registrar-public-enrollment-submissions__audit-date {
+  margin: 0;
+  font-size: 12px;
+  color: var(--deped-muted);
+}
+
+.registrar-public-enrollment-submissions__audit-detail {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.registrar-public-enrollment-submissions__audit-side {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+}
+
+.registrar-public-enrollment-submissions__refresh-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(0, 56, 168, 0.18);
+  border-top-color: var(--deped-blue);
+  border-radius: 999px;
+  animation: spin 0.8s linear infinite;
+  flex: 0 0 14px;
+}
+
 .registrar-public-enrollment-submissions .modal-dialog__body {
   padding-right: 28px;
 }
@@ -301,6 +544,22 @@
   .year-pair-field {
     grid-column: span 1;
   }
+
+  .registrar-public-enrollment-submissions__status-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .registrar-public-enrollment-submissions__status-action {
+    width: 100%;
+  }
+
+  .registrar-public-enrollment-submissions__audit-item {
+    grid-template-columns: 1fr;
+  }
+
+  .registrar-public-enrollment-submissions__audit-side {
+    justify-content: flex-start;
+  }
 }
 
 /* Normalize floating input/select heights across submission and learner edit modals */
@@ -312,8 +571,8 @@
 .registrar-learners-page .floating-field__control select,
 .registrar-learners-page .searchable-select--floating .floating-field__control input,
 .registrar-learners-page .searchable-select--floating .searchable-select__toggle {
-  min-height: 64px;
-  height: 64px;
+  min-height: 56px;
+  height: 56px;
   font-family: "Segoe UI", "Segoe UI Variable", Tahoma, Arial, sans-serif !important;
 }
 
@@ -337,7 +596,7 @@
   right: auto;
   width: 56px;
   min-width: 56px;
-  min-height: 64px;
+  min-height: 56px;
   display: inline-flex;
   align-items: center;
   justify-content: center;

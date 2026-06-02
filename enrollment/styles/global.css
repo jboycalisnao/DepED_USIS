@@ -147,6 +147,10 @@ body {
   gap: 8px;
 }
 
+.enrollment-lookup__legend--soft {
+  padding: 2px 0 6px;
+}
+
 .enrollment-lookup__result-panel {
   border-color: rgba(0, 56, 168, 0.2);
   background: linear-gradient(180deg, #f8fbff 0%, #ffffff 28%);
@@ -154,7 +158,124 @@ body {
 
 .enrollment-lookup__result-body {
   display: grid;
-  gap: 14px;
+  gap: 12px;
+}
+
+.enrollment-lookup__status-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border: 1px solid rgba(18, 35, 61, 0.12);
+  border-radius: 12px;
+  background: #ffffff;
+  padding: 12px 14px;
+  box-shadow: 0 1px 0 rgba(18, 35, 61, 0.04);
+}
+
+.enrollment-lookup__status-summary--success {
+  border-color: #badbcc;
+  background: #f2fbf6;
+  box-shadow: 0 0 0 1px rgba(15, 81, 50, 0.06);
+}
+
+.enrollment-lookup__status-summary--warning {
+  border-color: #ffecb5;
+  background: #fffdf2;
+  box-shadow: 0 0 0 1px rgba(102, 77, 3, 0.06);
+}
+
+.enrollment-lookup__status-summary--danger {
+  border-color: #f5c2c7;
+  background: #fff7f8;
+  box-shadow: 0 0 0 1px rgba(132, 32, 41, 0.06);
+}
+
+.enrollment-lookup__status-summary--info {
+  border-color: #b6d4fe;
+  background: #f4f8ff;
+  box-shadow: 0 0 0 1px rgba(8, 66, 152, 0.06);
+}
+
+.enrollment-lookup__status-summary-label {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.enrollment-lookup__status-summary-label strong {
+  color: #0b2a57;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.enrollment-lookup__status-summary-label span {
+  color: #2a446a;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.enrollment-lookup__status-summary .enrollment-status-tag {
+  gap: 8px;
+  min-height: 28px;
+  padding: 0 10px;
+  font-size: 13px;
+}
+
+.enrollment-lookup__handoff-banner {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px 16px;
+  padding: 16px 18px;
+  border: 2px solid #ffecb5;
+  border-left-width: 6px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #fffef4 0%, #fff8df 100%);
+  box-shadow: 0 10px 24px rgba(102, 77, 3, 0.12);
+}
+
+.enrollment-lookup__handoff-banner-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.enrollment-lookup__handoff-banner-copy strong {
+  color: #664d03;
+  font-size: 14px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.enrollment-lookup__handoff-banner-copy p {
+  margin: 0;
+  color: #664d03;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.enrollment-lookup__handoff-banner-action {
+  width: auto;
+  min-width: 180px;
+  min-height: 40px;
+  height: 40px;
+  padding: 0 14px;
+  font-size: 13px;
+  white-space: nowrap;
+  align-self: center;
+  flex: 0 0 auto;
+}
+
+.enrollment-lookup__status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: currentColor;
+  flex: 0 0 8px;
 }
 
 .enrollment-lookup__mono {
@@ -167,11 +288,11 @@ body {
   position: relative;
   background: #ffffff;
   border: 1px solid rgba(18, 35, 61, 0.12);
-  border-radius: 12px;
-  padding: 16px 16px 14px 16px;
+  border-radius: 10px;
+  padding: 12px 12px 10px 14px;
   display: grid;
-  gap: 8px;
-  box-shadow: 0 1px 0 rgba(18, 35, 61, 0.04);
+  gap: 6px;
+  box-shadow: 0 1px 0 rgba(18, 35, 61, 0.03);
 }
 
 .enrollment-lookup__metric-card::before {
@@ -180,25 +301,35 @@ body {
   left: 0;
   top: 0;
   bottom: 0;
-  width: 4px;
-  border-radius: 12px 0 0 12px;
+  width: 3px;
+  border-radius: 10px 0 0 10px;
   background: rgba(0, 56, 168, 0.3);
 }
 
 .enrollment-lookup__metric-card strong {
   margin: 0;
   color: #0b2a57;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.03em;
 }
 
 .enrollment-lookup__metric-card span {
   margin: 0;
   color: #2a446a;
-  font-size: 16px;
-  line-height: 1.35;
+  font-size: 15px;
+  line-height: 1.3;
   font-weight: 400;
+}
+
+.enrollment-lookup__metric-status-copy {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0;
+  color: #2a446a;
+  font-size: 14px;
+  font-weight: 700;
 }
 
 .enrollment-lookup__metric-card--ref::before,
@@ -219,6 +350,14 @@ body {
   background: #1f5fbf;
 }
 
+.enrollment-lookup__metric-card--status {
+  background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+}
+
+.enrollment-lookup__metric-card--status span {
+  font-size: 15px;
+}
+
 .enrollment-lookup__history-panel {
   overflow: hidden;
 }
@@ -230,6 +369,70 @@ body {
 
 .enrollment-lookup__history-header h3 {
   color: #0b2a57;
+}
+
+.enrollment-status-page__body {
+  display: grid;
+  gap: 12px;
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+.enrollment-status-page__lookup-form {
+  grid-template-columns: minmax(280px, 1fr) auto;
+  align-items: end;
+  max-width: 100%;
+}
+
+.enrollment-status-page__metrics-grid {
+  grid-template-columns: repeat(2, minmax(220px, 1fr));
+  gap: 10px;
+  max-width: 100%;
+}
+
+.enrollment-status-page__history-body {
+  padding: 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.enrollment-status-page__history-body .usis-table {
+  min-width: 640px;
+}
+
+.enrollment-status-page .content-width,
+.enrollment-status-page .section-shell,
+.enrollment-status-page .portal-panel {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.enrollment-status-page .portal-panel__body {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.enrollment-status-page .floating-field,
+.enrollment-status-page .floating-field__control {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.enrollment-status-page .floating-field__control input {
+  width: 100%;
+  min-width: 0;
+}
+
+.enrollment-status-page .primary-button {
+  width: 100%;
+}
+
+.enrollment-lookup__metric-card,
+.enrollment-lookup__metric-card span,
+.enrollment-lookup__metric-card strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .enrollment-status-tag {
@@ -335,7 +538,66 @@ body {
   }
 
   .enrollment-lookup__metric-card {
-    padding: 14px 14px 12px 14px;
+    padding: 11px 12px 10px 13px;
+  }
+
+  .enrollment-status-page__lookup-form,
+  .enrollment-status-page__metrics-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .enrollment-lookup__status-summary {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .enrollment-lookup__handoff-banner {
+    grid-template-columns: 1fr;
+  }
+
+  .enrollment-lookup__handoff-banner-action {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .enrollment-status-page__history-body .usis-table {
+    min-width: 560px;
+  }
+}
+
+@media (max-width: 480px) {
+  .enrollment-status-page .portal-panel__header h2 {
+    font-size: 20px;
+  }
+
+  .enrollment-status-page .portal-panel__header p {
+    font-size: 13px;
+  }
+
+  .enrollment-lookup__metric-card {
+    padding: 10px 11px 9px 12px;
+  }
+
+  .enrollment-lookup__metric-card strong {
+    font-size: 11px;
+  }
+
+  .enrollment-lookup__metric-card span {
+    font-size: 14px;
+  }
+
+  .enrollment-status-tag {
+    font-size: 11px;
+    min-height: 24px;
+    padding: 0 8px;
+  }
+
+  .enrollment-status-page__history-body .usis-table {
+    min-width: 520px;
+  }
+
+  .enrollment-lookup__status-summary .enrollment-status-tag {
+    width: fit-content;
   }
 }
 

@@ -28,7 +28,6 @@ export const religionOptions = [
   'Seventh-day Adventist',
   "Jehovah's Witnesses",
   'None',
-  'Others',
 ] as const;
 
 export const modalityOptions = [
