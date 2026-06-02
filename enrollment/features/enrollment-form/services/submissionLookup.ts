@@ -105,7 +105,10 @@ export async function lookupSubmissionStatus(queryValue: string): Promise<Submis
         schoolYear: normalize(row.school_year) || '--',
         gradeLevel: normalize(row.grade_level) || '--',
         section: normalize(row.section) || '--',
-        status: normalizeHistoryStatus(String(row.status || ''), true),
+        status:
+          normalize(row.school_year) && activeSchoolYear && normalize(row.school_year) !== activeSchoolYear
+            ? 'Previously Enrolled'
+            : normalizeHistoryStatus(String(row.status || ''), true),
         enrollmentDate: normalize(row.enrollment_date || row.created_at),
       }));
       const filteredCanonicalHistory = currentSubmissionHistoryRow

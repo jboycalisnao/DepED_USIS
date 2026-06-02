@@ -8,7 +8,7 @@ const normalizeStatus = (value: string) => String(value || '').trim().toLowerCas
 const resolveStatusTone = (value: string): 'info' | 'success' | 'warning' | 'danger' => {
   const normalized = normalizeStatus(value);
   if (normalized.includes('approved') || normalized.includes('enrolled') || normalized.includes('complete')) return 'success';
-  if (normalized.includes('existing learner') || normalized.includes('previous learner')) return 'info';
+  if (normalized.includes('existing learner') || normalized.includes('previous learner') || normalized.includes('previously enrolled')) return 'info';
   if (normalized.includes('review') || normalized.includes('pending')) return 'warning';
   if (normalized.includes('reject') || normalized.includes('cancel') || normalized.includes('deny')) return 'danger';
   return 'info';
@@ -42,7 +42,7 @@ export function SubmissionStatusPage() {
       ? 'You completed Grade 12 in a previous school year. Please enroll online for the current active school year.'
       : currentStatusLabel === 'previous learner'
         ? 'You have a previous enrollment record, but no section is assigned for the current school year.'
-        : currentStatusLabel === 'submission received'
+      : currentStatusLabel === 'submission received'
           ? 'Your enrollment submission was received and is waiting for section assignment.'
           : currentStatusLabel === 'information updated'
             ? 'Your learner information was updated and is waiting for section assignment.'
