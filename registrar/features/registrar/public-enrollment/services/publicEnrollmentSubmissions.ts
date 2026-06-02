@@ -69,18 +69,33 @@ export async function createPublicEnrollmentSubmission(draft: EnrollmentDraft): 
   return { id: createdId, submissionReferenceId: String((data as any).submission_reference_id || submissionReferenceId) };
 }
 
-export async function fetchPublicEnrollmentSubmissions(limit = 500): Promise<PublicEnrollmentSubmission[]> {
-  const { data, error } = await supabase
-    .from(REGISTRAR_PUBLIC_ENROLLMENT_TABLE)
-    .select('id,submission_reference_id,created_at,school_id,school_year,lrn,last_name,first_name,middle_name,grade_to_enroll,guardian_contact,payload')
-    .order('created_at', { ascending: false })
-    .limit(limit);
+export async function fetchPublicEnrollmentSubmissions(limit?: number): Promise<PublicEnrollmentSubmission[]> {
+  const pageSize = 1000;
+  const rows: PublicEnrollmentSubmission[] = [];
+  let from = 0;
 
-  if (error) {
-    throw error;
+  while (true) {
+    const to = from + pageSize - 1;
+    const { data, error } = await supabase
+      .from(REGISTRAR_PUBLIC_ENROLLMENT_TABLE)
+      .select('id,submission_reference_id,created_at,school_id,school_year,lrn,last_name,first_name,middle_name,grade_to_enroll,guardian_contact,payload')
+      .order('created_at', { ascending: false })
+      .range(from, to);
+
+    if (error) {
+      throw error;
+    }
+
+    const batch = (data || []) as PublicEnrollmentSubmission[];
+    rows.push(...batch);
+
+    if (batch.length < pageSize) break;
+    if (typeof limit === 'number' && Number.isFinite(limit) && rows.length >= limit) break;
+
+    from += pageSize;
   }
 
-  return (data || []) as PublicEnrollmentSubmission[];
+  return typeof limit === 'number' && Number.isFinite(limit) ? rows.slice(0, limit) : rows;
 }
 
 export async function fetchPublicEnrollmentSubmissionById(id: string): Promise<PublicEnrollmentSubmission | null> {
