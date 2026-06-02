@@ -5,6 +5,7 @@ import ConfirmationModal from '../components/ConfirmationModal';
 import LearnerDetailsModal from '../components/LearnerDetailsModal';
 import { openLearnerInformationPrintWindow } from '../features/registrar/learners/utils/printLearnerInformation';
 import LearnerEditModal from './learners/LearnerEditModal';
+import { getActiveLearnersForYear } from '../services/dashboardService';
 
 const LearnerList: React.FC = () => {
   const { learners, sections, activeSchoolYear, availableStrands, removeLearner, clearSectionLearners, updateLearner, loading } = useStore();
@@ -21,25 +22,16 @@ const LearnerList: React.FC = () => {
   const isLocked = activeSchoolYear.isLocked;
 
   const activeLearnersForYear = useMemo(() => {
-    const activeSectionIds = new Set(sections.filter((s) => s.schoolYearId === activeSchoolYear.id).map((s) => s.id));
-
-    return learners.filter((l) => {
-      const studentSid = String(l.sectionId || '').trim();
-      const currentEnrol = l.enrollments?.find((e) => e.schoolYear === activeSchoolYear.label);
-      const hasActiveSection = studentSid && activeSectionIds.has(studentSid);
-      const hasMatchingEnrollment = !!currentEnrol;
-      const hasNoSectionAssignment = !studentSid;
-      const query = searchTerm.toLowerCase();
+    const activeRows = getActiveLearnersForYear(learners, sections, activeSchoolYear);
+    const query = searchTerm.toLowerCase();
+    return activeRows.filter((l) => {
       const fullName = `${l.lastName}, ${l.firstName} ${l.middleName || ''}`.toLowerCase();
-      const matchesSearch =
+      return (
         fullName.includes(query) ||
         l.lrn.includes(query) ||
         String(l.loginUsername || '').toLowerCase().includes(query) ||
-        String(l.loginStatus || '').toLowerCase().includes(query);
-
-      // Only include learners assigned to an active-year section.
-      // Fallback to enrollment-history match only when learner has no section assignment yet.
-      return (hasActiveSection || (hasNoSectionAssignment && hasMatchingEnrollment)) && matchesSearch;
+        String(l.loginStatus || '').toLowerCase().includes(query)
+      );
     });
   }, [learners, sections, activeSchoolYear, searchTerm]);
 

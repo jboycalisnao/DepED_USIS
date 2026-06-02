@@ -196,23 +196,32 @@ export default function PublicEnrollmentSubmissionsPage() {
   const [isGeneratingCode, setIsGeneratingCode] = useState<string | null>(null);
   const [sendingEmailSubmissionId, setSendingEmailSubmissionId] = useState<string | null>(null);
   const isEditorSeniorHighTargetGrade = SHS_GRADES.has(draftEditor.gradeToEnroll);
+  const activeYearNormalized = normalizeSchoolYear(activeSchoolYearLabel);
+
+  const activeSchoolYearSubmissions = useMemo(() => {
+    if (!activeYearNormalized) return [];
+    return submissions.filter((row) => {
+      const rowSchoolYear = normalizeSchoolYear(String(row.school_year || row.payload?.schoolYear || '').trim());
+      return rowSchoolYear === activeYearNormalized;
+    });
+  }, [submissions, activeYearNormalized]);
 
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
-    if (!normalized) return submissions;
-    return submissions.filter((row) => {
+    if (!normalized) return activeSchoolYearSubmissions;
+    return activeSchoolYearSubmissions.filter((row) => {
       const fullName = [row.last_name, row.first_name, row.middle_name].filter(Boolean).join(' ').toLowerCase();
       const lrn = (row.lrn || '').toLowerCase();
       const grade = (row.grade_to_enroll || '').toLowerCase();
       return fullName.includes(normalized) || lrn.includes(normalized) || grade.includes(normalized);
     });
-  }, [query, submissions]);
+  }, [query, activeSchoolYearSubmissions]);
 
   useEffect(() => {
     const loadExistingLearners = async () => {
       const lrns = Array.from(
         new Set(
-          submissions
+          activeSchoolYearSubmissions
             .map((row) => (row.lrn || row.payload?.lrn || '').trim())
             .filter(Boolean)
         )
@@ -261,7 +270,7 @@ export default function PublicEnrollmentSubmissionsPage() {
       setLearnerEnrollmentYearsByLrn(yearsByLrn);
     };
     loadExistingLearners();
-  }, [submissions]);
+  }, [activeSchoolYearSubmissions]);
 
   useEffect(() => {
     if (!errorMessage) return;

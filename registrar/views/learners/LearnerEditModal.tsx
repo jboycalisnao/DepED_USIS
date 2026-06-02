@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { SearchableSelect } from '../../components/ui/SearchableSelect';
 import type { Student } from '../../types';
 import { supabase } from '../../lib/supabase';
@@ -64,7 +64,7 @@ type Props = {
   onClose: () => void;
   onError: (message: string) => void;
   onSuccess?: (message: string) => void;
-  onSubmit: (id: string, updates: Partial<Student>) => Promise<{ error?: string }>;
+  onSubmit: (id: string, updates: Partial<Student> & { schoolYear?: string }) => Promise<{ error?: string }>;
 };
 
 const firstNonEmpty = (...values: Array<string | undefined | null>) =>
@@ -81,7 +81,7 @@ const buildDraft = (student: Student, activeSchoolYearLabel: string, latestSubmi
 
   return {
     schoolId: firstNonEmpty(submissionPayload.schoolId, payload.schoolId, '302522'),
-    schoolYear: firstNonEmpty(submissionPayload.schoolYear, payload.schoolYear, activeSchoolYearLabel),
+    schoolYear: firstNonEmpty(student.schoolYear, submissionPayload.schoolYear, payload.schoolYear, activeSchoolYearLabel),
     schoolToEnroll: firstNonEmpty(submissionPayload.schoolToEnroll, payload.schoolToEnroll),
     studentType: normalizeLearnerType(firstNonEmpty(submissionPayload.studentType, submissionPayload.student_type, payload.studentType, payload.student_type, payload.learnerType, payload.learner_type)) || studentTypeOptions[0],
     learnerCategory: firstNonEmpty(submissionPayload.learnerCategory, payload.learnerCategory, learnerCategoryOptions[0]),
@@ -149,22 +149,36 @@ const buildDraft = (student: Student, activeSchoolYearLabel: string, latestSubmi
 
 export default function LearnerEditModal({ student, activeSchoolYearLabel, strandOptions, loading, onClose, onError, onSuccess, onSubmit }: Props) {
   const [draft, setDraft] = useState<LearnerModalDraft | null>(null);
+  const draftRef = useRef<LearnerModalDraft | null>(null);
   const [isLoadingRecord, setIsLoadingRecord] = useState(false);
   const [availableSchoolYears, setAvailableSchoolYears] = useState<Array<{ id: string; label: string }>>([]);
   const [availableSections, setAvailableSections] = useState<Array<{ id: string; name: string; gradeLevel: string; strand?: string; schoolYearId: string }>>([]);
   const [selectedSchoolYearLabel, setSelectedSchoolYearLabel] = useState('');
   const [selectedSectionId, setSelectedSectionId] = useState('');
+  const selectedSchoolYearLabelRef = useRef('');
+  const selectedSectionIdRef = useRef('');
+
+  const applyDraftChange = (updater: (current: LearnerModalDraft) => LearnerModalDraft) => {
+    const current = draftRef.current || draft;
+    if (!current) return;
+    const next = updater(current);
+    draftRef.current = next;
+    setDraft(next);
+  };
 
   useEffect(() => {
     let cancelled = false;
     const hydrate = async () => {
       if (!student) {
         setDraft(null);
+        draftRef.current = null;
         return;
       }
 
       // Immediate fallback so modal can render while fetching canonical record.
-      setDraft(buildDraft(student, activeSchoolYearLabel));
+      const initialDraft = buildDraft(student, activeSchoolYearLabel);
+      draftRef.current = initialDraft;
+      setDraft(initialDraft);
       setIsLoadingRecord(true);
       try {
         const [{ data, error }, { data: schoolYearRows }, { data: sectionRows }, { data: submissionRows }] = await Promise.all([
@@ -199,6 +213,7 @@ export default function LearnerEditModal({ student, activeSchoolYearLabel, stran
           father_name: String((data as any).father_name || ''),
           mother_name: String((data as any).mother_name || ''),
           sectionId: String((data as any).section_id || ''),
+          schoolYear: String((data as any).school_year || ''),
           enrollments: Array.isArray((data as any).enrollment_history) ? (data as any).enrollment_history : [],
           status: student.status,
           is4Ps: !!(data as any).is_4ps,
@@ -207,6 +222,7 @@ export default function LearnerEditModal({ student, activeSchoolYearLabel, stran
           ? (submissionRows[0].payload as Record<string, any>)
           : undefined;
         const nextDraft = buildDraft(dbStudent, activeSchoolYearLabel, latestSubmissionPayload);
+        draftRef.current = nextDraft;
         setDraft(nextDraft);
         const mappedSchoolYears = (schoolYearRows || []).map((row: any) => ({ id: String(row.id || ''), label: String(row.label || '') })).filter((row) => row.id && row.label);
         const mappedSections = (sectionRows || []).map((row: any) => ({
@@ -220,6 +236,8 @@ export default function LearnerEditModal({ student, activeSchoolYearLabel, stran
         setAvailableSections(mappedSections);
         setSelectedSchoolYearLabel(nextDraft.schoolYear || activeSchoolYearLabel);
         setSelectedSectionId(String((data as any).section_id || student.sectionId || ''));
+        selectedSchoolYearLabelRef.current = nextDraft.schoolYear || activeSchoolYearLabel;
+        selectedSectionIdRef.current = String((data as any).section_id || student.sectionId || '');
       } catch {
         // Keep fallback values if fetch fails.
       } finally {
@@ -240,15 +258,40 @@ export default function LearnerEditModal({ student, activeSchoolYearLabel, stran
     const isIncomingGrade7 = String(draft.gradeToEnroll || '').trim() === 'Grade 7';
     const hasLastGrade = String(draft.lastGradeLevel || '').trim().length > 0;
     if (!isNewLearner || !isIncomingGrade7 || hasLastGrade) return;
-    setDraft((current) => (current ? { ...current, lastGradeLevel: 'Grade 6' } : current));
+    applyDraftChange((current) => ({ ...current, lastGradeLevel: 'Grade 6' }));
   }, [draft]);
 
   if (!student || !draft) return null;
+  draftRef.current = draft;
   const isJuniorHighTargetGrade = ['Grade 7', 'Grade 8', 'Grade 9', 'Grade 10'].includes(String(draft.gradeToEnroll || '').trim());
   const lastGradeLevelOptions = ['Grade 6', ...gradeLevelOptions];
+  const normalizeSchoolYearValue = (value: string) => String(value || '').trim();
+  const resolveSchoolYearLabel = (schoolYearValue: string) => {
+    const normalized = normalizeSchoolYearValue(schoolYearValue);
+    if (!normalized) return '';
+    const match = availableSchoolYears.find((row) => {
+      const rowId = normalizeSchoolYearValue(row.id);
+      const rowLabel = normalizeSchoolYearValue(row.label);
+      return rowId === normalized || rowLabel === normalized;
+    });
+    if (match) return match.label;
+    if (/^sy\d+$/i.test(normalized)) {
+      const digits = normalized.replace(/^sy/i, '');
+      const inferred = digits.length === 4
+        ? `20${digits.slice(0, 2)}-20${digits.slice(2)}`
+        : digits;
+      const labelMatch = availableSchoolYears.find((row) => normalizeSchoolYearValue(row.label) === inferred);
+      if (labelMatch) return labelMatch.label;
+      return inferred;
+    }
+    return normalized;
+  };
 
   const selectedSchoolYearId =
-    availableSchoolYears.find((row) => row.label === (selectedSchoolYearLabel || draft.schoolYear))?.id || '';
+    availableSchoolYears.find((row) => {
+      const currentValue = normalizeSchoolYearValue(selectedSchoolYearLabelRef.current || selectedSchoolYearLabel || draft.schoolYear);
+      return normalizeSchoolYearValue(row.id) === currentValue || normalizeSchoolYearValue(row.label) === currentValue;
+    })?.id || '';
   const sectionOptions = availableSections
     .filter((section) => section.schoolYearId === selectedSchoolYearId)
     .map((section) => ({
@@ -274,8 +317,8 @@ export default function LearnerEditModal({ student, activeSchoolYearLabel, stran
             <section className="registrar-public-enrollment__section">
               <h3>Enrollment Context</h3>
               <div className="floating-field-grid">
-                <InputField label="School ID" value={draft.schoolId} onChange={(value) => setDraft((current) => (current ? { ...current, schoolId: value } : current))} readOnly />
-                <InputField label="School Year" value={draft.schoolYear} onChange={(value) => setDraft((current) => (current ? { ...current, schoolYear: value } : current))} />
+                <InputField label="School ID" value={draft.schoolId} onChange={(value) => applyDraftChange((current) => ({ ...current, schoolId: value }))} readOnly />
+                <InputField label="School Year" value={draft.schoolYear} onChange={(value) => applyDraftChange((current) => ({ ...current, schoolYear: value }))} />
                 <SearchableSelect
                   label="Edit School Year Scope"
                   placeholder="Edit School Year Scope"
@@ -283,9 +326,11 @@ export default function LearnerEditModal({ student, activeSchoolYearLabel, stran
                   showLabel={false}
                   value={selectedSchoolYearLabel || draft.schoolYear}
                   onChange={(value) => {
+                    selectedSchoolYearLabelRef.current = value;
                     setSelectedSchoolYearLabel(value);
-                    setDraft((current) => (current ? { ...current, schoolYear: value } : current));
+                    applyDraftChange((current) => ({ ...current, schoolYear: value }));
                     setSelectedSectionId('');
+                    selectedSectionIdRef.current = '';
                   }}
                   options={availableSchoolYears.map((row) => ({ value: row.label, label: row.label }))}
                 />
@@ -294,78 +339,98 @@ export default function LearnerEditModal({ student, activeSchoolYearLabel, stran
                   placeholder="Section (Selected School Year)"
                   floatingLabel
                   showLabel={false}
-                  value={selectedSectionId}
-                  onChange={setSelectedSectionId}
+                  value={selectedSectionIdRef.current || selectedSectionId}
+                  onChange={(value) => {
+                    selectedSectionIdRef.current = value;
+                    setSelectedSectionId(value);
+                    const chosenSection = availableSections.find((section) => section.id === value);
+                    if (chosenSection) {
+                      const resolvedSchoolYearLabel = resolveSchoolYearLabel(chosenSection.schoolYearId);
+                      if (resolvedSchoolYearLabel) {
+                        selectedSchoolYearLabelRef.current = resolvedSchoolYearLabel;
+                        setSelectedSchoolYearLabel(resolvedSchoolYearLabel);
+                        applyDraftChange((current) => ({ ...current, schoolYear: resolvedSchoolYearLabel }));
+                      }
+                    }
+                  }}
                   options={sectionOptions}
                   disabled={!selectedSchoolYearId}
                 />
-                <SelectField label="Learner Type" value={draft.studentType} onChange={(value) => setDraft((current) => (current ? { ...current, studentType: value } : current))} options={studentTypeOptions as unknown as string[]} />
-                <SelectField label="Learner Category" value={draft.learnerCategory} onChange={(value) => setDraft((current) => (current ? { ...current, learnerCategory: value } : current))} options={learnerCategoryOptions as unknown as string[]} />
-                <InputField label="School to Enroll" value={draft.schoolToEnroll} onChange={(value) => setDraft((current) => (current ? { ...current, schoolToEnroll: value } : current))} />
-                <InputField label="Previous School Attended" value={draft.previousSchool} onChange={(value) => setDraft((current) => (current ? { ...current, previousSchool: value } : current))} />
-                <InputField label="Last S.Y. Attended" value={draft.previousSchoolYear} onChange={(value) => setDraft((current) => (current ? { ...current, previousSchoolYear: value } : current))} inputMode="numeric" maxLength={9} pattern="\\d{4}-\\d{4}" />
-                <SelectField label="Last Grade Level Attended" value={draft.lastGradeLevel} onChange={(value) => setDraft((current) => (current ? { ...current, lastGradeLevel: value } : current))} options={lastGradeLevelOptions as unknown as string[]} />
-                <SelectField label="Grade Level to Enroll" value={draft.gradeToEnroll} onChange={(value) => setDraft((current) => (current ? { ...current, gradeToEnroll: value } : current))} options={gradeLevelOptions as unknown as string[]} />
-                <SelectField label="Track" value={draft.track} onChange={(value) => setDraft((current) => (current ? { ...current, track: value } : current))} options={trackOptions as unknown as string[]} disabled={isJuniorHighTargetGrade} />
-                <SelectField label="Preferred Strand" value={draft.strand} onChange={(value) => setDraft((current) => (current ? { ...current, strand: value } : current))} options={strandOptions} disabled={isJuniorHighTargetGrade} />
-                <SelectField label="Semester" value={draft.semester} onChange={(value) => setDraft((current) => (current ? { ...current, semester: value } : current))} options={semesterOptions as unknown as string[]} disabled={isJuniorHighTargetGrade} />
+                <SelectField label="Learner Type" value={draft.studentType} onChange={(value) => applyDraftChange((current) => ({ ...current, studentType: value }))} options={studentTypeOptions as unknown as string[]} />
+                <SelectField label="Learner Category" value={draft.learnerCategory} onChange={(value) => applyDraftChange((current) => ({ ...current, learnerCategory: value }))} options={learnerCategoryOptions as unknown as string[]} />
+                <InputField label="School to Enroll" value={draft.schoolToEnroll} onChange={(value) => applyDraftChange((current) => ({ ...current, schoolToEnroll: value }))} />
+                <InputField label="Previous School Attended" value={draft.previousSchool} onChange={(value) => applyDraftChange((current) => ({ ...current, previousSchool: value }))} />
+                <InputField label="Last S.Y. Attended" value={draft.previousSchoolYear} onChange={(value) => applyDraftChange((current) => ({ ...current, previousSchoolYear: value }))} inputMode="numeric" maxLength={9} pattern="\\d{4}-\\d{4}" />
+                <SelectField label="Last Grade Level Attended" value={draft.lastGradeLevel} onChange={(value) => applyDraftChange((current) => ({ ...current, lastGradeLevel: value }))} options={lastGradeLevelOptions as unknown as string[]} />
+                <SelectField label="Grade Level to Enroll" value={draft.gradeToEnroll} onChange={(value) => applyDraftChange((current) => ({ ...current, gradeToEnroll: value }))} options={gradeLevelOptions as unknown as string[]} />
+                <SelectField label="Track" value={draft.track} onChange={(value) => applyDraftChange((current) => ({ ...current, track: value }))} options={trackOptions as unknown as string[]} disabled={isJuniorHighTargetGrade} />
+                <SelectField label="Preferred Strand" value={draft.strand} onChange={(value) => applyDraftChange((current) => ({ ...current, strand: value }))} options={strandOptions} disabled={isJuniorHighTargetGrade} />
+                <SelectField label="Semester" value={draft.semester} onChange={(value) => applyDraftChange((current) => ({ ...current, semester: value }))} options={semesterOptions as unknown as string[]} disabled={isJuniorHighTargetGrade} />
               </div>
             </section>
             <section className="registrar-public-enrollment__section">
               <h3>Learner Personal Information</h3>
               <div className="floating-field-grid">
-                <InputField label="PSA Birth Certificate No." value={draft.birthCertificateNo} onChange={(value) => setDraft((current) => (current ? { ...current, birthCertificateNo: value } : current))} />
-                <InputField label="LRN" value={draft.lrn} onChange={(value) => setDraft((current) => (current ? { ...current, lrn: value.replace(/\D/g, '').slice(0, 12) } : current))} inputMode="numeric" maxLength={12} pattern="\\d{12}" />
-                <InputField label="Email Address" value={draft.email} onChange={(value) => setDraft((current) => (current ? { ...current, email: value } : current))} type="email" />
-                <InputField label="Last Name" value={draft.lastName} onChange={(value) => setDraft((current) => (current ? { ...current, lastName: value } : current))} />
-                <InputField label="First Name" value={draft.firstName} onChange={(value) => setDraft((current) => (current ? { ...current, firstName: value } : current))} />
-                <InputField label="Middle Name" value={draft.middleName} onChange={(value) => setDraft((current) => (current ? { ...current, middleName: value } : current))} />
-                <InputField label="Extension Name" value={draft.extensionName} onChange={(value) => setDraft((current) => (current ? { ...current, extensionName: value } : current))} />
-                <InputField label="Date of Birth" value={draft.birthDate} onChange={(value) => setDraft((current) => (current ? { ...current, birthDate: value } : current))} type="date" />
-                <SelectField label="Gender" value={draft.gender} onChange={(value) => setDraft((current) => (current ? { ...current, gender: value } : current))} options={['Male', 'Female']} />
-                <InputField label="Place of Birth" value={draft.placeOfBirth} onChange={(value) => setDraft((current) => (current ? { ...current, placeOfBirth: value } : current))} />
-                <InputField label="Learner Contact Number" value={draft.learnerContact} onChange={(value) => setDraft((current) => (current ? { ...current, learnerContact: value.replace(/\D/g, '').slice(0, 11) } : current))} inputMode="numeric" maxLength={11} />
-                <InputField label="Mother Tongue" value={draft.motherTongue} onChange={(value) => setDraft((current) => (current ? { ...current, motherTongue: value } : current))} />
-                <SelectField label="Religion" value={draft.religion} onChange={(value) => setDraft((current) => (current ? { ...current, religion: value } : current))} options={religionOptions as unknown as string[]} />
-                <SelectField label="4Ps Beneficiary" value={draft.is4Ps} onChange={(value) => setDraft((current) => (current ? { ...current, is4Ps: value } : current))} options={['Yes', 'No']} />
-                <InputField label="4Ps Household ID" value={draft.fourPsHouseholdId} onChange={(value) => setDraft((current) => (current ? { ...current, fourPsHouseholdId: value } : current))} />
+                <InputField label="PSA Birth Certificate No." value={draft.birthCertificateNo} onChange={(value) => applyDraftChange((current) => ({ ...current, birthCertificateNo: value }))} />
+                <InputField label="LRN" value={draft.lrn} onChange={(value) => applyDraftChange((current) => ({ ...current, lrn: value.replace(/\D/g, '').slice(0, 12) }))} inputMode="numeric" maxLength={12} pattern="\\d{12}" />
+                <InputField label="Email Address" value={draft.email} onChange={(value) => applyDraftChange((current) => ({ ...current, email: value }))} type="email" />
+                <InputField label="Last Name" value={draft.lastName} onChange={(value) => applyDraftChange((current) => ({ ...current, lastName: value }))} />
+                <InputField label="First Name" value={draft.firstName} onChange={(value) => applyDraftChange((current) => ({ ...current, firstName: value }))} />
+                <InputField label="Middle Name" value={draft.middleName} onChange={(value) => applyDraftChange((current) => ({ ...current, middleName: value }))} />
+                <InputField label="Extension Name" value={draft.extensionName} onChange={(value) => applyDraftChange((current) => ({ ...current, extensionName: value }))} />
+                <InputField label="Date of Birth" value={draft.birthDate} onChange={(value) => applyDraftChange((current) => ({ ...current, birthDate: value }))} type="date" />
+                <SelectField label="Gender" value={draft.gender} onChange={(value) => applyDraftChange((current) => ({ ...current, gender: value }))} options={['Male', 'Female']} />
+                <InputField label="Place of Birth" value={draft.placeOfBirth} onChange={(value) => applyDraftChange((current) => ({ ...current, placeOfBirth: value }))} />
+                <InputField label="Learner Contact Number" value={draft.learnerContact} onChange={(value) => applyDraftChange((current) => ({ ...current, learnerContact: value.replace(/\D/g, '').slice(0, 11) }))} inputMode="numeric" maxLength={11} />
+                <InputField label="Mother Tongue" value={draft.motherTongue} onChange={(value) => applyDraftChange((current) => ({ ...current, motherTongue: value }))} />
+                <SelectField label="Religion" value={draft.religion} onChange={(value) => applyDraftChange((current) => ({ ...current, religion: value }))} options={religionOptions as unknown as string[]} />
+                <SelectField label="4Ps Beneficiary" value={draft.is4Ps} onChange={(value) => applyDraftChange((current) => ({ ...current, is4Ps: value }))} options={['Yes', 'No']} />
+                <InputField label="4Ps Household ID" value={draft.fourPsHouseholdId} onChange={(value) => applyDraftChange((current) => ({ ...current, fourPsHouseholdId: value }))} />
               </div>
             </section>
             <section className="registrar-public-enrollment__section">
               <h3>Address Information</h3>
               <div className="floating-field-grid">
-                <InputField label="Current Address" value={draft.currentAddress} onChange={(value) => setDraft((current) => (current ? { ...current, currentAddress: value } : current))} />
-                <InputField label="Permanent Address" value={draft.permanentAddress} onChange={(value) => setDraft((current) => (current ? { ...current, permanentAddress: value } : current))} />
+                <InputField label="Current Address" value={draft.currentAddress} onChange={(value) => applyDraftChange((current) => ({ ...current, currentAddress: value }))} />
+                <InputField label="Permanent Address" value={draft.permanentAddress} onChange={(value) => applyDraftChange((current) => ({ ...current, permanentAddress: value }))} />
               </div>
             </section>
             <section className="registrar-public-enrollment__section">
               <h3>Parent, Guardian, and Access</h3>
               <div className="floating-field-grid">
-                <InputField label="Father's Full Name" value={draft.fatherName} onChange={(value) => setDraft((current) => (current ? { ...current, fatherName: value } : current))} />
-                <InputField label="Father's Contact Number" value={draft.fatherContact} onChange={(value) => setDraft((current) => (current ? { ...current, fatherContact: value.replace(/[^\d+]/g, '').slice(0, 15) } : current))} inputMode="tel" maxLength={15} />
-                <InputField label="Mother's Maiden Name" value={draft.motherName} onChange={(value) => setDraft((current) => (current ? { ...current, motherName: value } : current))} />
-                <InputField label="Mother's Contact Number" value={draft.motherContact} onChange={(value) => setDraft((current) => (current ? { ...current, motherContact: value.replace(/[^\d+]/g, '').slice(0, 15) } : current))} inputMode="tel" maxLength={15} />
-                <InputField label="Legal Guardian's Name" value={draft.guardianName} onChange={(value) => setDraft((current) => (current ? { ...current, guardianName: value } : current))} />
-                <InputField label="Guardian's Contact Number" value={draft.guardianContact} onChange={(value) => setDraft((current) => (current ? { ...current, guardianContact: value.replace(/[^\d+]/g, '').slice(0, 15) } : current))} inputMode="tel" maxLength={15} />
-                <SelectField label="SPED Need" value={draft.hasSpedNeed} onChange={(value) => setDraft((current) => (current ? { ...current, hasSpedNeed: value } : current))} options={['Yes', 'No']} />
-                <SelectField label="Preferred Learning Modality" value={draft.preferredModality} onChange={(value) => setDraft((current) => (current ? { ...current, preferredModality: value } : current))} options={modalityOptions as unknown as string[]} />
-                <SelectField label="Preferred Device" value={draft.deviceAccess} onChange={(value) => setDraft((current) => (current ? { ...current, deviceAccess: value } : current))} options={deviceOptions as unknown as string[]} />
-                <SelectField label="Internet Access" value={draft.hasInternet} onChange={(value) => setDraft((current) => (current ? { ...current, hasInternet: value } : current))} options={['Yes', 'No']} />
+                <InputField label="Father's Full Name" value={draft.fatherName} onChange={(value) => applyDraftChange((current) => ({ ...current, fatherName: value }))} />
+                <InputField label="Father's Contact Number" value={draft.fatherContact} onChange={(value) => applyDraftChange((current) => ({ ...current, fatherContact: value.replace(/[^\d+]/g, '').slice(0, 15) }))} inputMode="tel" maxLength={15} />
+                <InputField label="Mother's Maiden Name" value={draft.motherName} onChange={(value) => applyDraftChange((current) => ({ ...current, motherName: value }))} />
+                <InputField label="Mother's Contact Number" value={draft.motherContact} onChange={(value) => applyDraftChange((current) => ({ ...current, motherContact: value.replace(/[^\d+]/g, '').slice(0, 15) }))} inputMode="tel" maxLength={15} />
+                <InputField label="Legal Guardian's Name" value={draft.guardianName} onChange={(value) => applyDraftChange((current) => ({ ...current, guardianName: value }))} />
+                <InputField label="Guardian's Contact Number" value={draft.guardianContact} onChange={(value) => applyDraftChange((current) => ({ ...current, guardianContact: value.replace(/[^\d+]/g, '').slice(0, 15) }))} inputMode="tel" maxLength={15} />
+                <SelectField label="SPED Need" value={draft.hasSpedNeed} onChange={(value) => applyDraftChange((current) => ({ ...current, hasSpedNeed: value }))} options={['Yes', 'No']} />
+                <SelectField label="Preferred Learning Modality" value={draft.preferredModality} onChange={(value) => applyDraftChange((current) => ({ ...current, preferredModality: value }))} options={modalityOptions as unknown as string[]} />
+                <SelectField label="Preferred Device" value={draft.deviceAccess} onChange={(value) => applyDraftChange((current) => ({ ...current, deviceAccess: value }))} options={deviceOptions as unknown as string[]} />
+                <SelectField label="Internet Access" value={draft.hasInternet} onChange={(value) => applyDraftChange((current) => ({ ...current, hasInternet: value }))} options={['Yes', 'No']} />
               </div>
             </section>
           </div>
         </div>
         <div className="modal-dialog__actions">
           <button type="button" className="modal-dialog__primary" onClick={onClose}>Cancel</button>
-          <button
+            <button
             type="button"
             className="modal-dialog__blue"
             onClick={async () => {
+              const latestDraft = draftRef.current || draft;
+              if (!latestDraft) return;
               const currentHistory = Array.isArray(student.enrollments) ? [...student.enrollments] : [];
-              const scopedSchoolYear = selectedSchoolYearLabel || draft.schoolYear || activeSchoolYearLabel;
-              const selectedSection = availableSections.find((section) => section.id === selectedSectionId);
+              const selectedSectionIdValue = selectedSectionIdRef.current || selectedSectionId;
+              const selectedSchoolYearLabelValue = selectedSchoolYearLabelRef.current || selectedSchoolYearLabel || latestDraft.schoolYear;
+              const selectedSection = availableSections.find((section) => section.id === selectedSectionIdValue);
+              const scopedSchoolYear =
+                resolveSchoolYearLabel(selectedSection?.schoolYearId || '') ||
+                selectedSchoolYearLabelValue ||
+                latestDraft.schoolYear ||
+                activeSchoolYearLabel;
               const submissionPayload = {
-                ...draft,
+                ...latestDraft,
                 consent: true,
               };
               let matched = false;
@@ -376,18 +441,18 @@ export default function LearnerEditModal({ student, activeSchoolYearLabel, stran
                     return {
                       ...entry,
                       schoolYear: scopedSchoolYear,
-                      gradeLevel: selectedSection?.gradeLevel || draft.gradeToEnroll || entry?.gradeLevel || draft.lastGradeLevel || '',
+                      gradeLevel: selectedSection?.gradeLevel || latestDraft.gradeToEnroll || entry?.gradeLevel || latestDraft.lastGradeLevel || '',
                       section: selectedSection?.name || entry?.section || '',
                       submissionPayload,
                     };
-                  })
+                })
                 : [];
 
               if (!matched) {
                 nextHistory.push({
                   id: crypto.randomUUID(),
                   schoolYear: scopedSchoolYear,
-                  gradeLevel: selectedSection?.gradeLevel || draft.gradeToEnroll || draft.lastGradeLevel || '',
+                  gradeLevel: selectedSection?.gradeLevel || latestDraft.gradeToEnroll || latestDraft.lastGradeLevel || '',
                   section: selectedSection?.name || '',
                   enrollmentDate: new Date().toISOString(),
                   status: 'Information Updated',
@@ -396,20 +461,21 @@ export default function LearnerEditModal({ student, activeSchoolYearLabel, stran
               }
 
               const result = await onSubmit(student.id, {
-                lrn: draft.lrn.trim(),
-                firstName: draft.firstName.trim(),
-                lastName: draft.lastName.trim(),
-                middleName: draft.middleName.trim(),
-                email: draft.email.trim(),
-                birthDate: draft.birthDate.trim(),
-                gender: draft.gender.trim(),
-                address: (draft.currentAddress || draft.permanentAddress || '').trim(),
-                contactNumber: draft.learnerContact.trim(),
-                guardian_name: draft.guardianName.trim(),
-                father_name: draft.fatherName.trim(),
-                mother_name: draft.motherName.trim(),
-                is4Ps: draft.is4Ps === 'Yes',
-                sectionId: selectedSectionId || undefined,
+                lrn: latestDraft.lrn.trim(),
+                firstName: latestDraft.firstName.trim(),
+                lastName: latestDraft.lastName.trim(),
+                middleName: latestDraft.middleName.trim(),
+                email: latestDraft.email.trim(),
+                birthDate: latestDraft.birthDate.trim(),
+                gender: latestDraft.gender.trim(),
+                address: (latestDraft.currentAddress || latestDraft.permanentAddress || '').trim(),
+                contactNumber: latestDraft.learnerContact.trim(),
+                guardian_name: latestDraft.guardianName.trim(),
+                father_name: latestDraft.fatherName.trim(),
+                mother_name: latestDraft.motherName.trim(),
+                is4Ps: latestDraft.is4Ps === 'Yes',
+                schoolYear: scopedSchoolYear,
+                sectionId: selectedSectionIdValue || undefined,
                 enrollments: nextHistory as any,
               });
               if (result?.error) {

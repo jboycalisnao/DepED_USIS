@@ -206,7 +206,7 @@ export function EnrollmentFormPage() {
         if (!data) {
           setLrnLookupState({
             status: 'not_found',
-            message: 'New Enrollment â€“ No existing learner record found. Continue by completing the form.',
+            message: 'New Enrollment - No existing learner record found. Continue by completing the form.',
           });
           setDraft((current) => ({
             ...initialDraft,

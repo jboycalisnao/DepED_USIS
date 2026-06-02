@@ -67,6 +67,7 @@ export interface Student {
   mother_name?: string;
   status: EnrollmentStatus;
   sectionId?: string;
+  schoolYear?: string;
   isSSLG?: boolean;
   isClubOfficer?: boolean;
   isAthlete?: boolean;

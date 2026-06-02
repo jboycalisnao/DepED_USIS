@@ -15,5 +15,4 @@ alter table public.attendance_records
   foreign key (learner_id)
   references public.registrar_learners(id)
   on update cascade
-  on delete restrict;
-
+  on delete cascade;

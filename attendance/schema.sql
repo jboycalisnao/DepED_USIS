@@ -70,7 +70,7 @@ alter table public.attendance_records
 
 alter table public.attendance_records
   add constraint attendance_records_learner_id_fkey
-  foreign key (learner_id) references public.registrar_learners(id) on update cascade on delete restrict;
+  foreign key (learner_id) references public.registrar_learners(id) on update cascade on delete cascade;
 
 alter table public.attendance_records
   alter column learner_id set not null;

@@ -104,6 +104,7 @@ const mapLearnerToDb = (data: Partial<Student>) => {
     mother_name: data.mother_name || null,
     status: data.status || EnrollmentStatus.ENROLLED,
     section_id: sId,
+    school_year: data.schoolYear ? String(data.schoolYear).trim() : null,
     is_sslg: !!data.isSSLG,
     is_club_officer: !!data.isClubOfficer,
     is_athlete: !!data.isAthlete,
@@ -153,6 +154,7 @@ const mapDbToLearner = (l: any): Student => ({
   mother_name: l.mother_name,
   status: l.status,
   sectionId: String(l.section_id || l.sectionId || '').trim(),
+  schoolYear: String(l.school_year || l.schoolYear || '').trim(),
   isSSLG: !!(l.is_sslg ?? l.isSSLG),
   isClubOfficer: !!(l.is_club_officer ?? l.isClubOfficer),
   isAthlete: !!(l.is_athlete ?? l.isAthlete),
@@ -539,10 +541,25 @@ export const useStore = () => {
         const existing = learners.find(l => l.id === id);
         if (!existing) return { error: "Not Found" };
 
-        const payload = mapLearnerToDb({ ...existing, ...updates });
-        const { error } = await supabase.from(REGISTRAR_TABLES.learners).update(payload).eq('id', id);
-        if (!error) await fetchLearners();
-        return { error: error?.message };
+        const merged = { ...existing, ...updates };
+        const payload = mapLearnerToDb(merged);
+        const schoolYear = merged.schoolYear ? String(merged.schoolYear).trim() : '';
+        const basePayload = { ...payload };
+        delete (basePayload as any).school_year;
+
+        const { error: baseUpdateError } = await supabase.from(REGISTRAR_TABLES.learners).update(basePayload).eq('id', id);
+        if (baseUpdateError) return { error: baseUpdateError.message };
+
+        if (schoolYear) {
+          const { error: schoolYearError } = await supabase
+            .from(REGISTRAR_TABLES.learners)
+            .update({ school_year: schoolYear })
+            .eq('id', id);
+          if (schoolYearError) return { error: schoolYearError.message };
+        }
+
+        await fetchLearners();
+        return { error: undefined };
       } finally {
         setGlobalLoading(false);
       }
@@ -553,6 +570,7 @@ export const useStore = () => {
       try {
         const targetLearner = learners.find((entry) => entry.id === id);
         const targetLrn = String(targetLearner?.lrn || '').trim();
+        await supabase.from('attendance_records').delete().eq('learner_id', id);
         const { error } = await supabase.from(REGISTRAR_TABLES.learners).delete().eq('id', id);
 
         if (!error && targetLrn) {
