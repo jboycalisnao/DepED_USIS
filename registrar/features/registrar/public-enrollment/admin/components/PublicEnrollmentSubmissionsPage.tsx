@@ -219,29 +219,72 @@ export default function PublicEnrollmentSubmissionsPage() {
 
   useEffect(() => {
     const loadExistingLearners = async () => {
-      const lrns = Array.from(
-        new Set(
-          activeSchoolYearSubmissions
-            .map((row) => (row.lrn || row.payload?.lrn || '').trim())
-            .filter(Boolean)
-        )
-      );
-      if (!lrns.length) {
+      const lrns = Array.from(new Set(activeSchoolYearSubmissions.map((row) => (row.lrn || row.payload?.lrn || '').trim()).filter(Boolean)));
+      if (!lrns.length || !activeYearNormalized) {
         setExistingLearnerLrns(new Set());
         return;
       }
 
-      const { data, error } = await supabase.from('registrar_learners').select('lrn').in('lrn', lrns);
-      if (error) return;
+      const { data: learnerRows, error: learnerError } = await supabase.from('registrar_learners').select('id,lrn,section_id').in('lrn', lrns);
+      if (learnerError) return;
 
-      const allExistingLrns = new Set<string>();
-      for (const row of data || []) {
-        const lrn = String((row as any).lrn || '').trim();
-        if (!lrn) continue;
-        allExistingLrns.add(lrn);
+      const learnerIds = Array.from(new Set((learnerRows || []).map((row: any) => String(row.id || '').trim()).filter(Boolean)));
+      if (!learnerIds.length) {
+        setExistingLearnerLrns(new Set());
+        return;
       }
 
-      setExistingLearnerLrns(allExistingLrns);
+      const learnersWithSectionAssigned = new Set(
+        (learnerRows || [])
+          .map((row: any) => ({
+            lrn: String(row.lrn || '').trim(),
+            sectionId: String(row.section_id || '').trim(),
+          }))
+          .filter((row) => Boolean(row.lrn) && Boolean(row.sectionId))
+          .map((row) => row.lrn),
+      );
+
+      const { data: historyRows, error: historyError } = await supabase
+        .from('registrar_enrollment_history')
+        .select('learner_id,school_year')
+        .in('learner_id', learnerIds);
+      if (historyError) return;
+
+      const { data: priorSubmissionRows, error: priorSubmissionError } = await supabase
+        .from('registrar_public_enrollment_submissions')
+        .select('lrn,school_year,payload,created_at')
+        .in('lrn', lrns);
+      if (priorSubmissionError) return;
+
+      const learnersWithPriorHistory = new Set<string>();
+      const learnerIdByLrn = new Map<string, string>();
+      for (const row of learnerRows || []) {
+        const lrn = String((row as any).lrn || '').trim();
+        const learnerId = String((row as any).id || '').trim();
+        if (lrn && learnerId) learnerIdByLrn.set(lrn, learnerId);
+      }
+
+      const learnerIdsWithHistory = new Set<string>();
+      for (const row of historyRows || []) {
+        const learnerId = String((row as any).learner_id || '').trim();
+        const schoolYear = normalizeSchoolYear(String((row as any).school_year || '').trim());
+        if (!learnerId || !schoolYear) continue;
+        if (schoolYear !== activeYearNormalized) learnerIdsWithHistory.add(learnerId);
+      }
+
+      const lrnsWithPriorSubmission = new Set<string>();
+      for (const row of priorSubmissionRows || []) {
+        const lrn = String((row as any).lrn || (row as any).payload?.lrn || '').trim();
+        const schoolYear = normalizeSchoolYear(String((row as any).school_year || (row as any).payload?.schoolYear || '').trim());
+        if (!lrn || !schoolYear) continue;
+        if (schoolYear !== activeYearNormalized) lrnsWithPriorSubmission.add(lrn);
+      }
+
+      for (const [lrn, learnerId] of learnerIdByLrn.entries()) {
+        if (learnerIdsWithHistory.has(learnerId) || learnersWithSectionAssigned.has(lrn) || lrnsWithPriorSubmission.has(lrn)) learnersWithPriorHistory.add(lrn);
+      }
+
+      setExistingLearnerLrns(learnersWithPriorHistory);
     };
     loadExistingLearners();
   }, [activeSchoolYearSubmissions]);
@@ -1146,7 +1189,7 @@ export default function PublicEnrollmentSubmissionsPage() {
                     const learnerSectionStatus = hasAssignedSection
                       ? 'Enrolled'
                       : isExistingLearner
-                        ? 'Existing Learner'
+                        ? 'Previous Learner'
                         : 'Pending';
                     const statusTone = hasAssignedSection ? 'success' : isExistingLearner ? 'info' : 'warning';
                     return (
