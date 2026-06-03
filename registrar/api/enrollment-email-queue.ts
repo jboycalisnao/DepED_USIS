@@ -5,7 +5,7 @@ import {
   getSupabaseAdmin,
   normalize,
   type RegistrarEnrollmentEmailSettings,
-} from './enrollment-email-shared';
+} from './enrollment-email-shared.js';
 
 const json = (res: VercelResponse, statusCode: number, payload: unknown) => {
   res.status(statusCode).setHeader('Content-Type', 'application/json');
