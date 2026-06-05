@@ -1,0 +1,36 @@
+.enrollment-public-enrollment .enrollment-announcements {
+  margin-bottom: 4px;
+}
+
+.enrollment-status-page__identity-lookup {
+  display: grid;
+  gap: 10px;
+  border: 1px solid rgba(18, 35, 61, 0.12);
+  border-radius: 12px;
+  background: #fbfcff;
+  padding: 16px;
+}
+
+.enrollment-status-page__identity-lookup h3 {
+  margin: 0;
+  color: var(--deped-blue);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.enrollment-status-page__identity-lookup p {
+  margin: 0;
+  color: var(--deped-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.enrollment-status-page__identity-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+@media (max-width: 720px) {
+  .enrollment-status-page__identity-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -7,7 +7,9 @@ import UsisPageLoader from '../../../../../../common/components/UsisPageLoader';
 import { SearchableSelect } from '../../../../../components/ui/SearchableSelect';
 import ConfirmationModal from '../../../../../components/ConfirmationModal';
 import TopCenterAlert from '../../../../../components/TopCenterAlert';
+import PrintEnrollmentGradeModal from './PrintEnrollmentGradeModal';
 import type { EnrollmentDraft, PublicEnrollmentSubmission } from '../../types';
+import { openEnrollmentEnrolleesPrintWindow, type EnrollmentEnrolleePrintRow } from '../utils/printEnrollmentEnrolleesList';
 import {
   createPublicEnrollmentSubmissionRecord,
   deletePublicEnrollmentSubmissionRecord,
@@ -190,6 +192,8 @@ export default function PublicEnrollmentSubmissionsPage() {
   const [editorMode, setEditorMode] = useState<'submission' | 'priorLearner'>('submission');
   const [editingPriorLearner, setEditingPriorLearner] = useState<PriorLearnerEditorRecord | null>(null);
   const [isSectioningAccessModalOpen, setIsSectioningAccessModalOpen] = useState(false);
+  const [isPrintEnrolleesModalOpen, setIsPrintEnrolleesModalOpen] = useState(false);
+  const [selectedPrintGrade, setSelectedPrintGrade] = useState('');
   const [sectioningCodes, setSectioningCodes] = useState<SectioningAccessCodeRow[]>([]);
   const [sectioningGradeLevels, setSectioningGradeLevels] = useState<string[]>([]);
   const [isGeneratingCode, setIsGeneratingCode] = useState<string | null>(null);
@@ -469,6 +473,50 @@ export default function PublicEnrollmentSubmissionsPage() {
     return Array.from(groups.entries()).sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric: true }));
   }, [filtered]);
 
+  const printableRowsByGrade = useMemo(() => {
+    const rowsMap = new Map<string, EnrollmentEnrolleePrintRow[]>();
+
+    activeSchoolYearSubmissions.forEach((row) => {
+      const grade = String(row.grade_to_enroll || row.payload?.gradeToEnroll || '').trim();
+      if (!grade) return;
+
+      const lrn = String(row.lrn || row.payload?.lrn || '').trim();
+      const fullName = `${String(row.last_name || row.payload?.lastName || '').trim()}, ${String(row.first_name || row.payload?.firstName || '').trim()} ${String(row.middle_name || row.payload?.middleName || '').trim()}`
+        .replace(/\s+/g, ' ')
+        .trim();
+      const assignedSection = String((row.payload as any)?.assignedSectionName || '').trim();
+      const hasAssignedSection = Boolean(String((row.payload as any)?.assignedSectionId || '').trim() || assignedSection);
+      const status = hasAssignedSection ? 'Enrolled' : lrn && existingLearnerLrns.has(lrn) ? 'Previous Learner' : 'Pending';
+
+      const rows = rowsMap.get(grade) || [];
+      rows.push({
+        id: row.id,
+        lrn: lrn || '--',
+        fullName: fullName || '--',
+        section: assignedSection || '--',
+        gradeLevel: grade,
+        status,
+      });
+      rowsMap.set(grade, rows);
+    });
+
+    rowsMap.forEach((rows, grade) => {
+      rows.sort((left, right) => {
+        const sectionCompare = left.section.localeCompare(right.section);
+        if (sectionCompare !== 0) return sectionCompare;
+        return left.fullName.toUpperCase().localeCompare(right.fullName.toUpperCase());
+      });
+      rowsMap.set(grade, rows);
+    });
+
+    return rowsMap;
+  }, [activeSchoolYearSubmissions, existingLearnerLrns]);
+
+  const printableGradeOptions = useMemo(
+    () => Array.from(printableRowsByGrade.keys()).sort((left, right) => left.localeCompare(right, undefined, { numeric: true })),
+    [printableRowsByGrade],
+  );
+
   useEffect(() => {
     setCollapsedGrades((current) => {
       const next = { ...current };
@@ -511,6 +559,34 @@ export default function PublicEnrollmentSubmissionsPage() {
       `popup=yes,width=${popupWidth},height=${popupHeight},left=${left},top=${top},resizable=yes,scrollbars=yes`,
     );
     kioskWindow?.focus();
+  };
+
+  const openPrintEnrolleesModal = () => {
+    setSelectedPrintGrade((current) => current || printableGradeOptions[0] || '');
+    setIsPrintEnrolleesModalOpen(true);
+  };
+
+  const printEnrolleesList = () => {
+    if (!selectedPrintGrade) return;
+    const rows = printableRowsByGrade.get(selectedPrintGrade) || [];
+    if (!rows.length) {
+      setActionError('No enrollees found for the selected grade level.');
+      setIsPrintEnrolleesModalOpen(false);
+      return;
+    }
+
+    const ok = openEnrollmentEnrolleesPrintWindow({
+      gradeLevel: selectedPrintGrade,
+      rows,
+      schoolYearLabel: activeSchoolYearLabel || 'Active School Year',
+    });
+
+    if (!ok) {
+      setActionError('Popup blocked. Allow popups for this site to print the enrollees list.');
+      return;
+    }
+
+    setIsPrintEnrolleesModalOpen(false);
   };
 
   const openSectioningAccessModal = async () => {
@@ -1010,6 +1086,8 @@ export default function PublicEnrollmentSubmissionsPage() {
           {
             ...payload,
             consent: true,
+            assignedSectionId: selectedSectionId,
+            assignedSectionName: String(sectionInfo.name || '').trim(),
           } as EnrollmentDraft,
           {
             action: existingLearner?.id ? 'Learner Re-enrolled' : 'Learner Enrolled',
@@ -1095,7 +1173,7 @@ export default function PublicEnrollmentSubmissionsPage() {
       </header>
 
       <div className="portal-panel__body" style={{ display: 'grid', gap: 16 }}>
-        <div className="form-grid" style={{ gridTemplateColumns: 'minmax(240px, 1fr) auto auto auto auto', alignItems: 'stretch' }}>
+        <div className="form-grid" style={{ gridTemplateColumns: 'minmax(240px, 1fr) auto auto auto auto auto', alignItems: 'stretch' }}>
           <label className="floating-field">
             <div className="floating-field__control">
               <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder=" " />
@@ -1107,6 +1185,9 @@ export default function PublicEnrollmentSubmissionsPage() {
           </button>
           <button type="button" className="secondary-button" style={{ minHeight: 56 }} onClick={() => void openSectioningAccessModal()}>
             Sectioning Access
+          </button>
+          <button type="button" className="secondary-button" style={{ minHeight: 56 }} onClick={openPrintEnrolleesModal} disabled={!printableGradeOptions.length}>
+            Print Enrollees List
           </button>
           <button
             type="button"
@@ -1299,6 +1380,14 @@ export default function PublicEnrollmentSubmissionsPage() {
           <div className="table-card"><table className="usis-table"><tbody><tr><td>No submissions found.</td></tr></tbody></table></div>
         )}
       </div>
+      <PrintEnrollmentGradeModal
+        isOpen={isPrintEnrolleesModalOpen}
+        gradeOptions={printableGradeOptions}
+        selectedGrade={selectedPrintGrade}
+        onGradeChange={setSelectedPrintGrade}
+        onClose={() => setIsPrintEnrolleesModalOpen(false)}
+        onPrint={printEnrolleesList}
+      />
 
       {isEditorOpen && (
         <div className="modal-overlay modal-overlay--high" role="presentation">

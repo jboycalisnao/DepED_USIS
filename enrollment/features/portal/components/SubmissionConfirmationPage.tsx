@@ -1,5 +1,7 @@
-﻿import { Link, useLocation } from 'react-router-dom';
-import { useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { EnrollmentAnnouncementsModal } from '../../../../common/components/enrollment/EnrollmentAnnouncementsModal';
+import { useEnrollmentAnnouncements } from '../hooks/useEnrollmentAnnouncements';
 
 type ConfirmationState = {
   submissionReferenceId?: string;
@@ -9,11 +11,25 @@ type ConfirmationState = {
 
 export function SubmissionConfirmationPage() {
   const [showEnrollmentAdvisory, setShowEnrollmentAdvisory] = useState(true);
+  const [showAnnouncementsModal, setShowAnnouncementsModal] = useState(false);
+  const [shouldOpenAnnouncementsModal, setShouldOpenAnnouncementsModal] = useState(false);
+  const { announcements, isLoading: areAnnouncementsLoading } = useEnrollmentAnnouncements();
   const location = useLocation();
   const state = (location.state || {}) as ConfirmationState;
   const submissionReferenceId = String(state.submissionReferenceId || '').trim();
   const lrn = String(state.lrn || '').trim();
   const fullName = String(state.fullName || '').trim();
+  const hasEnrollmentAnnouncements = announcements.length > 0;
+
+  useEffect(() => {
+    if (!shouldOpenAnnouncementsModal || showEnrollmentAdvisory || areAnnouncementsLoading) return;
+    if (!hasEnrollmentAnnouncements) {
+      setShouldOpenAnnouncementsModal(false);
+      return;
+    }
+    setShowAnnouncementsModal(true);
+    setShouldOpenAnnouncementsModal(false);
+  }, [areAnnouncementsLoading, hasEnrollmentAnnouncements, shouldOpenAnnouncementsModal, showEnrollmentAdvisory]);
 
   const CheckIcon = () => (
     <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -41,52 +57,64 @@ export function SubmissionConfirmationPage() {
       <div className="content-width">
         <section className="section-shell">
           {!showEnrollmentAdvisory ? (
-          <div className="portal-panel enrollment-confirmation">
-            <header className="portal-panel__header enrollment-confirmation__header">
-              <div className="enrollment-confirmation__hero-icon"><CheckIcon /></div>
-              <div>
-                <h2>Submission Confirmation</h2>
-                <p>Your enrollment form was received successfully.</p>
-              </div>
-            </header>
-            <div className="portal-panel__body enrollment-confirmation__body">
-              {!submissionReferenceId ? (
-                <p className="enrollment-confirmation__error">
-                  Submission reference details are unavailable. Please submit through the enrollment form again.
+            <div className="portal-panel enrollment-confirmation">
+              <header className="portal-panel__header enrollment-confirmation__header">
+                <div className="enrollment-confirmation__hero-icon">
+                  <CheckIcon />
+                </div>
+                <div>
+                  <h2>Submission Confirmation</h2>
+                  <p>Your enrollment form was received successfully.</p>
+                </div>
+              </header>
+              <div className="portal-panel__body enrollment-confirmation__body">
+                {!submissionReferenceId ? (
+                  <p className="enrollment-confirmation__error">
+                    Submission reference details are unavailable. Please submit through the enrollment form again.
+                  </p>
+                ) : null}
+                <div className="enrollment-confirmation__details" role="group" aria-label="Submission details">
+                  <article className="enrollment-confirmation__item">
+                    <span className="enrollment-confirmation__item-icon">
+                      <IdIcon />
+                    </span>
+                    <div className="enrollment-confirmation__item-body">
+                      <p className="enrollment-confirmation__label">Submission Reference ID</p>
+                      <p className="enrollment-confirmation__value enrollment-confirmation__value--reference">{submissionReferenceId || '--'}</p>
+                    </div>
+                  </article>
+                  <article className="enrollment-confirmation__item">
+                    <span className="enrollment-confirmation__item-icon">
+                      <IdIcon />
+                    </span>
+                    <div className="enrollment-confirmation__item-body">
+                      <p className="enrollment-confirmation__label">LRN</p>
+                      <p className="enrollment-confirmation__value">{lrn || '--'}</p>
+                    </div>
+                  </article>
+                  <article className="enrollment-confirmation__item">
+                    <span className="enrollment-confirmation__item-icon">
+                      <PersonIcon />
+                    </span>
+                    <div className="enrollment-confirmation__item-body">
+                      <p className="enrollment-confirmation__label">Learner Full Name</p>
+                      <p className="enrollment-confirmation__value">{fullName || '--'}</p>
+                    </div>
+                  </article>
+                </div>
+                <p className="enrollment-confirmation__instruction">
+                  Please take a screenshot or write down the Submission Reference ID and present it as proof of submission when requested by the school.
                 </p>
-              ) : null}
-              <div className="enrollment-confirmation__details" role="group" aria-label="Submission details">
-                <article className="enrollment-confirmation__item">
-                  <span className="enrollment-confirmation__item-icon"><IdIcon /></span>
-                  <div className="enrollment-confirmation__item-body">
-                    <p className="enrollment-confirmation__label">Submission Reference ID</p>
-                    <p className="enrollment-confirmation__value enrollment-confirmation__value--reference">{submissionReferenceId || '--'}</p>
-                  </div>
-                </article>
-                <article className="enrollment-confirmation__item">
-                  <span className="enrollment-confirmation__item-icon"><IdIcon /></span>
-                  <div className="enrollment-confirmation__item-body">
-                    <p className="enrollment-confirmation__label">LRN</p>
-                    <p className="enrollment-confirmation__value">{lrn || '--'}</p>
-                  </div>
-                </article>
-                <article className="enrollment-confirmation__item">
-                  <span className="enrollment-confirmation__item-icon"><PersonIcon /></span>
-                  <div className="enrollment-confirmation__item-body">
-                    <p className="enrollment-confirmation__label">Learner Full Name</p>
-                    <p className="enrollment-confirmation__value">{fullName || '--'}</p>
-                  </div>
-                </article>
-              </div>
-              <p className="enrollment-confirmation__instruction">
-                Please take a screenshot or write down the Submission Reference ID and present it as proof of submission when requested by the school.
-              </p>
-              <div className="enrollment-confirmation__actions">
-                <Link to="/submission-status" className="primary-button">Check Submission Status</Link>
-                <Link to="/enrollment-form" className="secondary-button">Back to Enrollment Form</Link>
+                <div className="enrollment-confirmation__actions">
+                  <Link to="/submission-status" className="primary-button">
+                    Check Submission Status
+                  </Link>
+                  <Link to="/enrollment-form" className="secondary-button">
+                    Back to Enrollment Form
+                  </Link>
+                </div>
               </div>
             </div>
-          </div>
           ) : null}
         </section>
       </div>
@@ -104,13 +132,26 @@ export function SubmissionConfirmationPage() {
               </p>
             </div>
             <div className="alert-modal__actions">
-              <button type="button" className="alert-modal__blue" onClick={() => setShowEnrollmentAdvisory(false)}>
+              <button
+                type="button"
+                className="alert-modal__blue"
+                onClick={() => {
+                  setShowEnrollmentAdvisory(false);
+                  setShouldOpenAnnouncementsModal(true);
+                }}
+              >
                 I Understand
               </button>
             </div>
           </div>
         </div>
       ) : null}
+      <EnrollmentAnnouncementsModal
+        open={showAnnouncementsModal}
+        announcements={announcements}
+        continueLabel="Continue to Confirmation"
+        onClose={() => setShowAnnouncementsModal(false)}
+      />
     </main>
   );
 }

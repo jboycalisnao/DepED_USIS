@@ -1,0 +1,234 @@
+.registrar-enrollment-announcements {
+  display: grid;
+  gap: 16px;
+}
+
+.registrar-enrollment-announcements__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.registrar-enrollment-announcements__header h2 {
+  margin: 0;
+  color: var(--deped-blue);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.registrar-enrollment-announcements__header p {
+  margin: 6px 0 0;
+  color: var(--deped-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.registrar-enrollment-announcements__body {
+  display: grid;
+  gap: 16px;
+}
+
+.registrar-enrollment-announcements__notice {
+  margin: 0;
+}
+
+.registrar-enrollment-announcements__preview-card .section-card__content {
+  display: grid;
+  gap: 12px;
+}
+
+.registrar-enrollment-announcements__preview-card .section-card__content h3,
+.registrar-enrollment-announcements__list .section-card__content h3,
+.registrar-enrollment-announcements__editor .section-card__content h3 {
+  margin: 0;
+  color: var(--deped-blue);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.registrar-enrollment-announcements__preview-card .section-card__content p,
+.registrar-enrollment-announcements__list .section-card__content p,
+.registrar-enrollment-announcements__editor .section-card__content p {
+  margin: 0;
+  color: var(--deped-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.registrar-enrollment-announcements__preview {
+  border-radius: 12px;
+  background: #f8fbff;
+  padding: 0;
+}
+
+.registrar-enrollment-announcements__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(360px, 0.9fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.registrar-enrollment-announcements__list .section-card__content,
+.registrar-enrollment-announcements__editor .section-card__content {
+  display: grid;
+  gap: 16px;
+}
+
+.registrar-enrollment-announcements__editor-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(200px, 0.6fr);
+  gap: 16px;
+}
+
+.registrar-enrollment-announcements__editor-grid .registrar-enrollment-announcements__message-field {
+  grid-column: 1 / -1;
+}
+
+.registrar-enrollment-announcements__cards {
+  display: grid;
+  gap: 12px;
+}
+
+.registrar-enrollment-announcements__card {
+  border: 1px solid rgba(18, 35, 61, 0.14);
+  border-radius: 12px;
+  background: #ffffff;
+  padding: 14px;
+  box-shadow: 0 1px 0 rgba(18, 35, 61, 0.04);
+}
+
+.registrar-enrollment-announcements__card.is-highlighted {
+  border-color: rgba(0, 56, 168, 0.22);
+  background: linear-gradient(180deg, #f4f8ff 0%, #ffffff 100%);
+}
+
+.registrar-enrollment-announcements__card.is-pinned {
+  box-shadow: 0 0 0 1px rgba(0, 56, 168, 0.08), 0 1px 0 rgba(18, 35, 61, 0.04);
+}
+
+.registrar-enrollment-announcements__card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.registrar-enrollment-announcements__card-label {
+  margin: 0 0 4px;
+  color: var(--deped-muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.registrar-enrollment-announcements__card h4 {
+  margin: 0;
+  color: var(--deped-ink);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.registrar-enrollment-announcements__pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.registrar-enrollment-announcements__pill.is-active {
+  background: rgba(15, 81, 50, 0.08);
+  color: #0f5132;
+}
+
+.registrar-enrollment-announcements__pill.is-inactive {
+  background: rgba(102, 77, 3, 0.08);
+  color: #664d03;
+}
+
+.registrar-enrollment-announcements__message {
+  margin: 10px 0 0;
+  color: var(--deped-ink);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.registrar-enrollment-announcements__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.registrar-enrollment-announcements__toggles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.registrar-enrollment-announcements__toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 12px 14px;
+  border: 1px solid rgba(18, 35, 61, 0.14);
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 1px 0 rgba(18, 35, 61, 0.04);
+}
+
+.registrar-enrollment-announcements__toggle input {
+  inline-size: 18px;
+  block-size: 18px;
+  accent-color: var(--deped-blue);
+  flex: 0 0 auto;
+}
+
+.registrar-enrollment-announcements__toggle span {
+  color: var(--deped-ink);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.registrar-enrollment-announcements__loading {
+  padding: 0 2px 2px;
+  color: var(--deped-muted);
+  font-size: 13px;
+}
+
+@media (max-width: 1024px) {
+  .registrar-enrollment-announcements__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .registrar-enrollment-announcements__editor-grid,
+  .registrar-enrollment-announcements__toggles {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .registrar-enrollment-announcements__header {
+    flex-direction: column;
+  }
+
+  .registrar-enrollment-announcements__actions {
+    flex-direction: column;
+  }
+
+  .registrar-enrollment-announcements__actions .secondary-button,
+  .registrar-enrollment-announcements__actions .primary-button {
+    width: 100%;
+  }
+
+  .registrar-enrollment-announcements__editor-grid {
+    gap: 12px;
+  }
+}

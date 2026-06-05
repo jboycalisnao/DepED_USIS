@@ -3,10 +3,11 @@ import { BrowserRouter, Navigate, NavLink, Route, Routes, useLocation } from 're
 import { UsisUnifiedHeader } from '../common/header/UsisUnifiedHeader';
 import { UsisGlobalFooter } from '../common/footer/UsisGlobalFooter';
 import { EnrollmentFormPage } from './features/enrollment-form/components/EnrollmentFormPage';
-import { RequirementsPage } from './features/portal/components/RequirementsPage';
+import InformationVerificationUpdatePage from './features/enrollment-form/components/verification/InformationVerificationUpdatePage';
 import { SubmissionConfirmationPage } from './features/portal/components/SubmissionConfirmationPage';
 import { SubmissionStatusPage } from './features/portal/components/SubmissionStatusPage';
 import { UsisPortalGate } from '../common/components/UsisPortalGate';
+import '../registrar/styles/publicEnrollment.css';
 const ENROLLMENT_BASENAME = '/enrollment';
 
 function resolveEnrollmentBasename(pathname: string): string {
@@ -17,7 +18,6 @@ function resolveEnrollmentBasename(pathname: string): string {
 
 const navItems: Array<{ path: string; label: string; matchPrefix?: string }> = [
   { path: '/enrollment-form', label: 'Enrollment Form' },
-  { path: '/requirements', label: 'Requirements' },
   { path: '/submission-status', label: 'Submission Status', matchPrefix: '/submission-status' },
 ];
 
@@ -61,7 +61,8 @@ function EnrollmentShell() {
       <Routes>
         <Route path="/" element={<Navigate to="/enrollment-form" replace />} />
         <Route path="/enrollment-form" element={<EnrollmentFormPage />} />
-        <Route path="/requirements" element={<RequirementsPage />} />
+        <Route path="/enrollment-form/verify/:submissionId" element={<InformationVerificationUpdatePage />} />
+        <Route path="/requirements" element={<Navigate to="/enrollment-form" replace />} />
         <Route path="/submission-confirmation" element={<SubmissionConfirmationPage />} />
         <Route path="/submission-status/login" element={<Navigate to="/submission-status" replace />} />
         <Route path="/submission-status" element={<SubmissionStatusPage />} />

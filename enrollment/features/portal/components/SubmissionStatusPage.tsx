@@ -1,7 +1,10 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { EnrollmentAnnouncementsModal } from '../../../../common/components/enrollment/EnrollmentAnnouncementsModal';
 import { supabase } from '../../../lib/supabase';
-import { lookupSubmissionStatus, type SubmissionLookupResult } from '../../enrollment-form/services/submissionLookup';
+import { lookupSubmissionStatus, lookupSubmissionStatusByIdentity, type SubmissionLookupResult } from '../../enrollment-form/services/submissionLookup';
+import { useEnrollmentAnnouncements } from '../hooks/useEnrollmentAnnouncements';
+import { fetchEnrollmentSchoolYear } from '../../../lib/enrollmentSchoolYear';
 
 const normalizeStatus = (value: string) => String(value || '').trim().toLowerCase();
 
@@ -16,10 +19,17 @@ const resolveStatusTone = (value: string): 'info' | 'success' | 'warning' | 'dan
 
 export function SubmissionStatusPage() {
   const [query, setQuery] = useState('');
+  const [firstNameQuery, setFirstNameQuery] = useState('');
+  const [lastNameQuery, setLastNameQuery] = useState('');
+  const [birthDateQuery, setBirthDateQuery] = useState('');
+  const [showAnnouncementsModal, setShowAnnouncementsModal] = useState(false);
+  const [hasOpenedAnnouncementsModal, setHasOpenedAnnouncementsModal] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<SubmissionLookupResult | null>(null);
   const [activeSchoolYear, setActiveSchoolYear] = useState('');
+  const [isVerificationEnabled, setIsVerificationEnabled] = useState(false);
+  const { announcements, isLoading: areAnnouncementsLoading } = useEnrollmentAnnouncements();
   const currentStatusTone = result ? resolveStatusTone(result.currentStatus) : 'info';
   const currentStatusLabel = result ? normalizeStatus(result.currentStatus) : '';
   const hasCurrentSubmission = Boolean(result?.hasCurrentSubmission);
@@ -57,13 +67,30 @@ export function SubmissionStatusPage() {
 
   useEffect(() => {
     const run = async () => {
-      const { data } = await supabase
-        .from('registrar_school_years')
-        .select('label')
-        .eq('is_active', true)
-        .limit(1)
-        .maybeSingle();
-      setActiveSchoolYear(String((data as any)?.label || '').trim());
+      const resolvedSchoolYear = await fetchEnrollmentSchoolYear();
+      setActiveSchoolYear(String(resolvedSchoolYear.label || '').trim());
+    };
+    void run();
+  }, []);
+
+  useEffect(() => {
+    if (hasOpenedAnnouncementsModal || areAnnouncementsLoading || !announcements.length) return;
+    setShowAnnouncementsModal(true);
+    setHasOpenedAnnouncementsModal(true);
+  }, [announcements.length, areAnnouncementsLoading, hasOpenedAnnouncementsModal]);
+
+  useEffect(() => {
+    const run = async () => {
+      try {
+        const { data } = await supabase
+          .from('registrar_enrollment_form_schedule')
+          .select('information_verification_and_update_enabled')
+          .eq('id', 1)
+          .maybeSingle();
+        setIsVerificationEnabled(Boolean((data as any)?.information_verification_and_update_enabled));
+      } catch {
+        setIsVerificationEnabled(false);
+      }
     };
     void run();
   }, []);
@@ -98,10 +125,26 @@ export function SubmissionStatusPage() {
     setIsLoading(true);
     setError(null);
     try {
-      const row = await lookupSubmissionStatus(query);
+      const hasIdentityLookup = Boolean(
+        isVerificationEnabled && firstNameQuery.trim() && lastNameQuery.trim() && birthDateQuery.trim(),
+      );
+      const hasPartialIdentityLookup =
+        isVerificationEnabled && (firstNameQuery.trim() || lastNameQuery.trim() || birthDateQuery.trim()) && !hasIdentityLookup;
+      if (hasPartialIdentityLookup) {
+        setResult(null);
+        setError('Enter first name, last name, and birth date to use the alternative lookup.');
+        return;
+      }
+      const row = hasIdentityLookup
+        ? await lookupSubmissionStatusByIdentity(firstNameQuery, lastNameQuery, birthDateQuery)
+        : await lookupSubmissionStatus(query);
       if (!row) {
         setResult(null);
-        setError('No submission found. Check your LRN or Submission Reference ID.');
+        setError(
+          hasIdentityLookup
+            ? 'No submission found. Check the learner name and birth date.'
+            : 'No submission found. Check your LRN or Submission Reference ID.',
+        );
         return;
       }
       setResult(row);
@@ -120,7 +163,7 @@ export function SubmissionStatusPage() {
           <div className="portal-panel">
             <div className="portal-panel__header">
               <h2>Submission Status Lookup</h2>
-              <p>Enter LRN or Submission Reference ID to view current status and enrollment history.</p>
+              <p>Enter LRN or Submission Reference ID to view current status and enrollment history. When enabled, you may also look up by learner name and birth date.</p>
             </div>
             <div className="portal-panel__body enrollment-status-page__body">
               <form className="form-grid enrollment-status-page__lookup-form" onSubmit={onSubmit}>
@@ -134,6 +177,33 @@ export function SubmissionStatusPage() {
                   {isLoading ? 'Checking...' : 'Lookup'}
                 </button>
               </form>
+
+              {isVerificationEnabled ? (
+                <section className="enrollment-status-page__identity-lookup">
+                  <h3>Alternative Lookup</h3>
+                  <p>Use learner name and birth date when the registrar enables Information Verification and Update.</p>
+                  <div className="form-grid enrollment-status-page__identity-grid">
+                    <label className="floating-field">
+                      <div className="floating-field__control">
+                        <input value={firstNameQuery} onChange={(event) => setFirstNameQuery(event.target.value)} placeholder=" " />
+                        <span>First Name</span>
+                      </div>
+                    </label>
+                    <label className="floating-field">
+                      <div className="floating-field__control">
+                        <input value={lastNameQuery} onChange={(event) => setLastNameQuery(event.target.value)} placeholder=" " />
+                        <span>Last Name</span>
+                      </div>
+                    </label>
+                    <label className="floating-field">
+                      <div className="floating-field__control">
+                        <input value={birthDateQuery} onChange={(event) => setBirthDateQuery(event.target.value)} type="date" placeholder=" " />
+                        <span>Birth Date</span>
+                      </div>
+                    </label>
+                  </div>
+                </section>
+              ) : null}
 
               {showEnrollmentBanner && result ? (
                 <div className="enrollment-lookup__handoff-banner" role="status" aria-live="polite">
@@ -194,25 +264,38 @@ export function SubmissionStatusPage() {
                                   <tr>
                                     <th>Date</th>
                                     <th>School Year</th>
-                                    <th>Grade Level</th>
-                                    <th>Section</th>
-                                    <th>Status</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {historyRows.length ? (
-                                    historyRows.map((row) => (
-                                      <tr key={row.id}>
+                                <th>Grade Level</th>
+                                <th>Section</th>
+                                <th>Status</th>
+                                <th>Action</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {historyRows.length ? (
+                                historyRows.map((row) => (
+                                  <tr key={row.id}>
                                         <td>{row.enrollmentDate ? new Date(row.enrollmentDate).toLocaleString() : '--'}</td>
                                         <td>{row.schoolYear}</td>
                                         <td>{row.gradeLevel}</td>
                                         <td>{row.section}</td>
                                         <td><span className={`enrollment-status-tag enrollment-status-tag--${resolveStatusTone(row.status)}`}>{row.status}</span></td>
+                                        <td>
+                                          {isVerificationEnabled &&
+                                          row.source === 'submission' &&
+                                          String(row.schoolYear || '').trim() === activeSchoolYear &&
+                                          row.id ? (
+                                            <Link to={`/enrollment-form/verify/${encodeURIComponent(row.id)}`} className="secondary-button">
+                                              Verify
+                                            </Link>
+                                          ) : (
+                                            '--'
+                                          )}
+                                        </td>
                                       </tr>
                                     ))
                                   ) : (
                                     <tr>
-                                      <td colSpan={5}>No enrollment history found yet.</td>
+                                      <td colSpan={6}>No enrollment history found yet.</td>
                                     </tr>
                                   )}
                                 </tbody>
@@ -245,6 +328,16 @@ export function SubmissionStatusPage() {
           </div>
         </div>
       ) : null}
+      <EnrollmentAnnouncementsModal
+        open={showAnnouncementsModal}
+        announcements={announcements}
+        continueLabel="Continue to Submission Status"
+        onClose={() => setShowAnnouncementsModal(false)}
+      />
     </main>
   );
 }
+
+
+
+

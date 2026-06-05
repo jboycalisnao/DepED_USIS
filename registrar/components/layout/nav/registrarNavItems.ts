@@ -8,6 +8,7 @@ export const registrarNavItems: RegistrarNavItem[] = [
   { label: 'Dashboard', path: '/', icon: 'home' },
   { label: 'Learners', path: '/learners', icon: 'school' },
   { label: 'Enrollment', path: '/enroll', icon: 'widgets' },
+  { label: 'Announcements', path: '/announcements', icon: 'campaign' },
   { label: 'Section/s', path: '/sections', icon: 'group' },
   { label: 'Bulk Import', path: '/import', icon: 'upload_file' },
   { label: 'Credentials', path: '/credentials', icon: 'badge' },

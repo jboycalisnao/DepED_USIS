@@ -8,10 +8,18 @@ type PortalSchedule = {
   use_date_range: boolean;
   start_date: string | null;
   end_date: string | null;
+  information_verification_and_update_enabled: boolean;
   updated_at?: string;
 };
 
-const DEFAULT_SCHEDULE: PortalSchedule = { id: 1, enabled: true, use_date_range: false, start_date: null, end_date: null };
+const DEFAULT_SCHEDULE: PortalSchedule = {
+  id: 1,
+  enabled: true,
+  use_date_range: false,
+  start_date: null,
+  end_date: null,
+  information_verification_and_update_enabled: false,
+};
 
 function ToggleSwitch({ checked, disabled = false, onClick, ariaLabel }: { checked: boolean; disabled?: boolean; onClick: () => void; ariaLabel: string }) {
   return (
@@ -39,6 +47,7 @@ const EnrollmentPortalControls: React.FC = () => {
             use_date_range: !!(data as any).use_date_range,
             start_date: ((data as any).start_date as string | null) || null,
             end_date: ((data as any).end_date as string | null) || null,
+            information_verification_and_update_enabled: !!(data as any).information_verification_and_update_enabled,
             updated_at: (data as any).updated_at || undefined,
           });
           return;
@@ -62,7 +71,15 @@ const EnrollmentPortalControls: React.FC = () => {
         return;
       }
 
-      const payload = { id: 1, enabled: next.enabled, use_date_range: next.use_date_range, start_date: next.start_date || null, end_date: next.end_date || null, updated_at: new Date().toISOString() };
+      const payload = {
+        id: 1,
+        enabled: next.enabled,
+        use_date_range: next.use_date_range,
+        start_date: next.start_date || null,
+        end_date: next.end_date || null,
+        information_verification_and_update_enabled: next.information_verification_and_update_enabled,
+        updated_at: new Date().toISOString(),
+      };
       const { error } = await supabase.from('registrar_enrollment_form_schedule').upsert(payload, { onConflict: 'id' });
       if (error) throw error;
 
@@ -99,6 +116,27 @@ const EnrollmentPortalControls: React.FC = () => {
             <small>Only allow form access within the configured start and end dates.</small>
           </div>
           <ToggleSwitch checked={schedule.use_date_range} disabled={isLoading} onClick={() => saveSchedule({ ...schedule, use_date_range: !schedule.use_date_range }, `Date-range control is now ${!schedule.use_date_range ? 'enabled' : 'disabled'}.`)} ariaLabel="Toggle date range control" />
+        </div>
+
+        <div className="settings-enrollment-controls__row">
+          <div>
+            <p>Information Verification and Update</p>
+            <small>Allow learners to verify the current school-year submission and update editable details.</small>
+          </div>
+          <ToggleSwitch
+            checked={schedule.information_verification_and_update_enabled}
+            disabled={isLoading}
+            onClick={() =>
+              saveSchedule(
+                {
+                  ...schedule,
+                  information_verification_and_update_enabled: !schedule.information_verification_and_update_enabled,
+                },
+                `Information Verification and Update is now ${!schedule.information_verification_and_update_enabled ? 'enabled' : 'disabled'}.`,
+              )
+            }
+            ariaLabel="Toggle information verification and update"
+          />
         </div>
 
         <div className="settings-enrollment-controls__dates">

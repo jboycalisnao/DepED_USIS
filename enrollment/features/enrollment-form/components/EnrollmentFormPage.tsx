@@ -1,4 +1,4 @@
-﻿import { FormEvent, useMemo, useRef, useState } from 'react';
+import { FormEvent, useMemo, useRef, useState } from 'react';
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { UsisSearchableSelect } from '../../../../common/components/ui/UsisSearchableSelect';
@@ -26,6 +26,7 @@ import {
 } from '../services/psgcApiClient';
 import {
   buildAddressLine,
+  buildInitialEnrollmentDraft,
   depedSchoolToOption,
   digitsOnly,
   initialAddressSelection,
@@ -41,7 +42,10 @@ import {
 } from '../utils/enrollmentFormUtils';
 import { DateField, SelectField, TextField } from './form/FormFields';
 import UsisPageLoader from '../../../../common/components/UsisPageLoader';
+import { EnrollmentAnnouncementsModal } from '../../../../common/components/enrollment/EnrollmentAnnouncementsModal';
+import { useEnrollmentAnnouncements } from '../../portal/hooks/useEnrollmentAnnouncements';
 import { buildDuplicateEnrollmentSubmissionMessage, findDuplicateEnrollmentSubmission } from '../services/publicEnrollmentSubmissions';
+import { fetchEnrollmentSchoolYear } from '../../../lib/enrollmentSchoolYear';
 
 const gradeLevelOrder = gradeLevelOptions.map((level) => ({ label: level, value: Number(level.replace(/\D/g, '')) }));
 const SHS_GRADES = new Set(['Grade 11', 'Grade 12']);
@@ -70,6 +74,7 @@ export function EnrollmentFormPage() {
   const [isFormEnabled, setIsFormEnabled] = useState(true);
   const [formAvailabilityMessage, setFormAvailabilityMessage] = useState<string>('The online enrollment form is currently unavailable.');
   const [isFormAvailabilityLoading, setIsFormAvailabilityLoading] = useState(true);
+  const [isSchoolYearLoading, setIsSchoolYearLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [previousSchoolOptions, setPreviousSchoolOptions] = useState<SchoolDirectoryEntry[]>([]);
   const [previousSchoolQuery, setPreviousSchoolQuery] = useState('');
@@ -83,15 +88,29 @@ export function EnrollmentFormPage() {
   const [currentBarangays, setCurrentBarangays] = useState<PsgcLocation[]>([]);
   const [modalNotice, setModalNotice] = useState<{ type: 'success' | 'error' | 'info'; title: string; message: string } | null>(null);
   const [showEnrollmentAdvisory, setShowEnrollmentAdvisory] = useState(true);
+  const { announcements, isLoading: areAnnouncementsLoading } = useEnrollmentAnnouncements();
   const [permanentAddress, setPermanentAddress] = useState<AddressSelection>(initialAddressSelection);
   const [currentAddress, setCurrentAddress] = useState<AddressSelection>(initialAddressSelection);
   const [sameAsPermanent, setSameAsPermanent] = useState(false);
+  const [showAnnouncementsModal, setShowAnnouncementsModal] = useState(false);
+  const [shouldOpenAnnouncementsModal, setShouldOpenAnnouncementsModal] = useState(false);
   const lastDuplicateAlertKeyRef = useRef('');
   const [lrnLookupState, setLrnLookupState] = useState<LrnLookupState>({
     status: 'empty',
     message: 'Enter a 12-digit LRN to unlock and continue the form.',
   });
   const isSeniorHighTargetGrade = SHS_GRADES.has(draft.gradeToEnroll);
+  const hasEnrollmentAnnouncements = announcements.length > 0;
+
+  useEffect(() => {
+    if (!shouldOpenAnnouncementsModal || showEnrollmentAdvisory || areAnnouncementsLoading) return;
+    if (!hasEnrollmentAnnouncements) {
+      setShouldOpenAnnouncementsModal(false);
+      return;
+    }
+    setShowAnnouncementsModal(true);
+    setShouldOpenAnnouncementsModal(false);
+  }, [areAnnouncementsLoading, hasEnrollmentAnnouncements, shouldOpenAnnouncementsModal, showEnrollmentAdvisory]);
 
   useEffect(() => {
     const loadFormAvailability = async () => {
@@ -159,10 +178,20 @@ export function EnrollmentFormPage() {
 
   useEffect(() => {
     const loadActiveSchoolYear = async () => {
-      const { data, error } = await supabase.from('registrar_school_years').select('label').eq('is_active', true).limit(1).maybeSingle();
-      if (!error && data?.label) setDraft((current) => ({ ...current, schoolYear: String(data.label), schoolId: LEON_NHS_ID, schoolToEnroll: LEON_NHS_NAME }));
+      setIsSchoolYearLoading(true);
+      try {
+        const resolvedSchoolYear = await fetchEnrollmentSchoolYear();
+        setDraft((current) => ({
+          ...current,
+          schoolYear: resolvedSchoolYear.label,
+          schoolId: LEON_NHS_ID,
+          schoolToEnroll: LEON_NHS_NAME,
+        }));
+      } finally {
+        setIsSchoolYearLoading(false);
+      }
     };
-    loadActiveSchoolYear();
+    void loadActiveSchoolYear();
   }, []);
 
   useEffect(() => {
@@ -234,7 +263,7 @@ export function EnrollmentFormPage() {
             message: 'New Enrollment - No existing learner record found. Continue by completing the form.',
           });
           setDraft((current) => ({
-            ...initialDraft,
+            ...buildInitialEnrollmentDraft(current.schoolYear),
             schoolYear: current.schoolYear,
             schoolId: current.schoolId || LEON_NHS_ID,
             schoolToEnroll: current.schoolToEnroll || LEON_NHS_NAME,
@@ -648,6 +677,10 @@ export function EnrollmentFormPage() {
       setModalNotice({ type: 'error', title: 'Validation Notice', message: 'School ID is required before submitting the enrollment form.' });
       return;
     }
+    if (!draft.schoolYear) {
+      setModalNotice({ type: 'error', title: 'Validation Notice', message: 'Enrollment school year is still loading. Please wait a moment and try again.' });
+      return;
+    }
     const commonValidationError = validateCommonFields(draft, gradeLevelOrder);
     if (commonValidationError) {
       setModalNotice({ type: 'error', title: 'Validation Notice', message: commonValidationError });
@@ -679,7 +712,7 @@ export function EnrollmentFormPage() {
     navigate(`/submission-status?q=${encodeURIComponent(lrn)}`);
   };
 
-  if (isFormAvailabilityLoading) {
+  if (isFormAvailabilityLoading || isSchoolYearLoading) {
     return <UsisPageLoader message="Loading public enrollment form..." />;
   }
 
@@ -734,7 +767,6 @@ export function EnrollmentFormPage() {
                     {formAvailabilityMessage}
                   </p>
                   <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center', marginTop: 6 }}>
-                    <a href="/requirements" className="secondary-button">View Requirements</a>
                     <a href="/submission-status" className="primary-button">Submission Status Login</a>
                   </div>
                   <p
@@ -1047,13 +1079,27 @@ export function EnrollmentFormPage() {
               </p>
             </div>
             <div className="alert-modal__actions">
-              <button type="button" className="alert-modal__blue" onClick={() => setShowEnrollmentAdvisory(false)}>
+              <button
+                type="button"
+                className="alert-modal__blue"
+                onClick={() => {
+                  setShowEnrollmentAdvisory(false);
+                  setShouldOpenAnnouncementsModal(true);
+                }}
+              >
                 I Understand
               </button>
             </div>
           </div>
         </div>
       ) : null}
+      <EnrollmentAnnouncementsModal
+        open={showAnnouncementsModal}
+        announcements={announcements}
+        continueLabel="I Understand"
+        onClose={() => setShowAnnouncementsModal(false)}
+      />
     </main>
   );
 }
+

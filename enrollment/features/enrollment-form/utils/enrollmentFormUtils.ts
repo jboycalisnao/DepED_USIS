@@ -26,9 +26,9 @@ export const initialAddressSelection: AddressSelection = {
   streetLine: '',
 };
 
-export const initialDraft: EnrollmentDraft = {
+export const buildInitialEnrollmentDraft = (schoolYear = ''): EnrollmentDraft => ({
   schoolId: LEON_NHS_ID,
-  schoolYear: '2026-2027',
+  schoolYear,
   schoolToEnroll: LEON_NHS_NAME,
   studentType: 'New Student',
   learnerCategory: SAME_SCHOOL_LABEL,
@@ -69,7 +69,9 @@ export const initialDraft: EnrollmentDraft = {
   deviceAccess: 'Smart Phone',
   hasInternet: 'Yes',
   consent: false,
-};
+});
+
+export const initialDraft: EnrollmentDraft = buildInitialEnrollmentDraft();
 
 export const digitsOnly = (value: string) => value.replace(/\D/g, '');
 export const isValidEmailAddress = (value: string) => {
@@ -107,10 +109,50 @@ export const uniqueSchoolEntries = (rows: SchoolDirectoryEntry[]) => {
 const locationNameByCode = (rows: PsgcLocation[], code: string) => rows.find((row) => row.code === code)?.name || '';
 
 export const buildAddressLine = (selection: AddressSelection, regions: PsgcLocation[], provinces: PsgcLocation[], cities: PsgcLocation[]) =>
-  [selection.streetLine, selection.barangayName, locationNameByCode(cities, selection.cityCode), locationNameByCode(provinces, selection.provinceCode), locationNameByCode(regions, selection.regionCode)]
-    .map((part) => String(part || '').replace(/\b0{6}\b/g, '').trim())
+  Array.from(
+    new Set(
+      [selection.streetLine, selection.barangayName, locationNameByCode(cities, selection.cityCode), locationNameByCode(provinces, selection.provinceCode), locationNameByCode(regions, selection.regionCode)]
+        .map((part) => String(part || '').replace(/\b0{6}\b/g, '').trim())
+        .filter(Boolean)
+        .map((part) => part.toLowerCase())
+    )
+  )
+    .map((normalizedPart) =>
+      [selection.streetLine, selection.barangayName, locationNameByCode(cities, selection.cityCode), locationNameByCode(provinces, selection.provinceCode), locationNameByCode(regions, selection.regionCode)]
+        .map((part) => String(part || '').replace(/\b0{6}\b/g, '').trim())
+        .find((part) => part.toLowerCase() === normalizedPart) || '',
+    )
     .filter(Boolean)
     .join(', ');
+
+const findBestMatch = (value: string, rows: PsgcLocation[]) => {
+  const normalizedValue = String(value || '').toLowerCase();
+  return [...rows]
+    .filter((row) => normalizedValue.includes(String(row.name || '').toLowerCase()))
+    .sort((a, b) => b.name.length - a.name.length)[0] || null;
+};
+
+export const inferAddressSelectionFromText = (
+  value: string,
+  regions: PsgcLocation[],
+  provinces: PsgcLocation[],
+  cities: PsgcLocation[],
+  barangays: PsgcLocation[] = [],
+): AddressSelection => {
+  const normalizedValue = String(value || '').trim();
+  const region = findBestMatch(normalizedValue, regions);
+  const province = findBestMatch(normalizedValue, provinces);
+  const city = findBestMatch(normalizedValue, cities);
+  const barangay = findBestMatch(normalizedValue, barangays);
+
+  return {
+    regionCode: region?.code || '',
+    provinceCode: province?.code || '',
+    cityCode: city?.code || '',
+    barangayName: barangay?.name || '',
+    streetLine: normalizedValue,
+  };
+};
 
 export const normalizeSchoolYearPair = (startYear: string, endYear: string) => {
   if (!/^\d{4}$/.test(startYear) || !/^\d{4}$/.test(endYear)) return null;

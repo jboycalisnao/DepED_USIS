@@ -17,6 +17,7 @@ import PublicEnrollmentPriorLearnerEditPage from './features/registrar/public-en
 import PublicEnrollmentSectioningPage from './features/registrar/public-enrollment/admin/components/PublicEnrollmentSectioningPage';
 import EnrollmentKioskPage from './features/registrar/public-enrollment/kiosk/EnrollmentKioskPage';
 import PublicEnrollmentPage from './features/registrar/public-enrollment/components/PublicEnrollmentPage';
+import EnrollmentAnnouncementsPage from './features/registrar/enrollment-announcements/pages/EnrollmentAnnouncementsPage';
 import { useStore } from './store';
 import { UsisPortalGate } from '../common/components/UsisPortalGate';
 
@@ -64,6 +65,7 @@ const AuthenticatedRouter: React.FC = () => {
         <Route path="/enroll/:id/edit" element={<PublicEnrollmentSubmissionEditPage />} />
         <Route path="/enroll/sectioning" element={<PublicEnrollmentSectioningPage />} />
         <Route path="/enroll/prior-learner/:learnerId/edit" element={<PublicEnrollmentPriorLearnerEditPage />} />
+        <Route path="/announcements" element={<EnrollmentAnnouncementsPage />} />
         <Route path="/sections" element={<SectionManagement />} />
         <Route path="/import" element={<BulkImport />} />
         <Route path="/settings" element={<Settings />} />

@@ -1,4 +1,5 @@
 import { supabase } from '../../../lib/supabase';
+import { fetchEnrollmentSchoolYear } from '../../../lib/enrollmentSchoolYear';
 
 const normalize = (value: unknown) => String(value ?? '').trim();
 const normalizeHistoryStatus = (value: string, isCurrentLearner: boolean) => {
@@ -26,6 +27,7 @@ export type SubmissionLookupResult = {
     section: string;
     status: string;
     enrollmentDate: string;
+    source?: 'submission' | 'learner-history';
   }>;
 };
 
@@ -57,13 +59,8 @@ export async function lookupSubmissionStatus(queryValue: string): Promise<Submis
   let currentSubmissionStatus = '';
   let currentSubmissionHistoryRow: SubmissionLookupResult['history'][number] | null = null;
 
-  const { data: activeSchoolYearRow } = await supabase
-    .from('registrar_school_years')
-    .select('label')
-    .eq('is_active', true)
-    .limit(1)
-    .maybeSingle();
-  activeSchoolYear = normalize((activeSchoolYearRow as any)?.label);
+  const activeSchoolYearResult = await fetchEnrollmentSchoolYear();
+  activeSchoolYear = normalize(activeSchoolYearResult.label);
   const submissionSchoolYear = normalize((submissionRow as any)?.school_year || payload.schoolYear);
 
   if (submissionRow && activeSchoolYear && submissionSchoolYear === activeSchoolYear) {
@@ -71,12 +68,13 @@ export async function lookupSubmissionStatus(queryValue: string): Promise<Submis
     const currentGradeLevel = normalize((submissionRow as any)?.grade_to_enroll || payload.gradeToEnroll) || '--';
     const currentStatusLabel = currentAssignedSection ? 'Enrolled' : normalize(payload.status || (submissionRow as any)?.status || 'Submission Received') || 'Submission Received';
     currentSubmissionHistoryRow = {
-      id: `current-submission-${normalize((submissionRow as any)?.id) || lrn}`,
+      id: normalize((submissionRow as any)?.id) || `current-submission-${lrn}`,
       schoolYear: submissionSchoolYear || activeSchoolYear,
       gradeLevel: currentGradeLevel,
       section: currentAssignedSection || '--',
       status: currentStatusLabel,
       enrollmentDate: normalize((submissionRow as any)?.created_at) || new Date().toISOString(),
+      source: 'submission',
     };
     hasCurrentSubmission = true;
     currentSubmissionStatus = currentStatusLabel;
@@ -100,17 +98,18 @@ export async function lookupSubmissionStatus(queryValue: string): Promise<Submis
         .order('enrollment_date', { ascending: false, nullsFirst: false })
         .order('created_at', { ascending: false });
       if (historyError) throw historyError;
-      const canonicalHistory = (historyRows || []).map((row: any) => ({
-        id: normalize(row.id),
-        schoolYear: normalize(row.school_year) || '--',
-        gradeLevel: normalize(row.grade_level) || '--',
-        section: normalize(row.section) || '--',
-        status:
-          normalize(row.school_year) && activeSchoolYear && normalize(row.school_year) !== activeSchoolYear
-            ? 'Previously Enrolled'
-            : normalizeHistoryStatus(String(row.status || ''), true),
-        enrollmentDate: normalize(row.enrollment_date || row.created_at),
-      }));
+        const canonicalHistory = (historyRows || []).map((row: any) => ({
+          id: normalize(row.id),
+          schoolYear: normalize(row.school_year) || '--',
+          gradeLevel: normalize(row.grade_level) || '--',
+          section: normalize(row.section) || '--',
+          status:
+            normalize(row.school_year) && activeSchoolYear && normalize(row.school_year) !== activeSchoolYear
+              ? 'Previously Enrolled'
+              : normalizeHistoryStatus(String(row.status || ''), true),
+          enrollmentDate: normalize(row.enrollment_date || row.created_at),
+          source: 'learner-history' as const,
+        }));
       const filteredCanonicalHistory = currentSubmissionHistoryRow
         ? canonicalHistory.filter((row) => normalize(row.schoolYear) !== normalize(activeSchoolYear))
         : canonicalHistory;
@@ -175,4 +174,41 @@ export async function lookupSubmissionStatus(queryValue: string): Promise<Submis
     currentSubmissionStatus,
     history,
   };
+}
+
+export async function lookupSubmissionStatusByIdentity(firstName: string, lastName: string, birthDate: string): Promise<SubmissionLookupResult | null> {
+  const normalizedFirstName = normalize(firstName);
+  const normalizedLastName = normalize(lastName);
+  const normalizedBirthDate = normalize(birthDate);
+
+  if (!normalizedFirstName || !normalizedLastName || !normalizedBirthDate) return null;
+
+  const { data, error } = await supabase
+    .from('registrar_public_enrollment_submissions')
+    .select('submission_reference_id,lrn,first_name,last_name,payload,created_at')
+    .ilike('first_name', normalizedFirstName)
+    .ilike('last_name', normalizedLastName)
+    .order('created_at', { ascending: false })
+    .limit(20);
+
+  if (error) throw error;
+
+  const matchedRow = (data || []).find((row: any) => {
+    const rowBirthDate = normalize((row?.payload && typeof row.payload === 'object' ? row.payload.birthDate || row.payload.birth_date : '') || row.birth_date);
+    return rowBirthDate === normalizedBirthDate;
+  }) as any | undefined;
+
+  if (!matchedRow) return null;
+
+  const submissionReferenceId = normalize(matchedRow.submission_reference_id);
+  if (submissionReferenceId) {
+    return lookupSubmissionStatus(submissionReferenceId);
+  }
+
+  const lrn = normalize(matchedRow.lrn);
+  if (lrn) {
+    return lookupSubmissionStatus(lrn);
+  }
+
+  return null;
 }

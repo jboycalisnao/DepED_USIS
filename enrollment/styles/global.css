@@ -1,5 +1,6 @@
 @import "../../common/css/index.css";
 @import "./enrollmentForm.css";
+@import "./enrollmentAnnouncements.css";
 
 :root {
   --usis-module-label: "School Enrollment Portal";

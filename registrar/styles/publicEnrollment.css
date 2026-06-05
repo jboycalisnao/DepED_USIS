@@ -608,6 +608,20 @@
   color: var(--deped-blue);
 }
 
+.registrar-print-enrollees-modal {
+  width: min(100%, 560px);
+}
+
+.registrar-print-enrollees-modal .modal-dialog__body {
+  display: grid;
+  gap: 16px;
+}
+
+.registrar-print-enrollees-modal .floating-field__control select {
+  min-height: 56px;
+  height: 56px;
+}
+
 /* Sectioning page uses compact in-table selects; keep toggle inside field and prevent split overflow. */
 .registrar-sectioning-page .searchable-select {
   width: 100%;

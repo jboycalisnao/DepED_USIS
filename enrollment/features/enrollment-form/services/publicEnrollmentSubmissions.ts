@@ -111,3 +111,38 @@ export async function createPublicEnrollmentSubmission(draft: EnrollmentDraft): 
     submissionReferenceId: String((data as any).submission_reference_id || submissionReferenceId),
   };
 }
+
+export async function fetchPublicEnrollmentSubmissionById(id: string): Promise<PublicEnrollmentSubmission | null> {
+  const { data, error } = await supabase
+    .from(REGISTRAR_PUBLIC_ENROLLMENT_TABLE)
+    .select('id,submission_reference_id,created_at,school_id,school_year,lrn,last_name,first_name,middle_name,grade_to_enroll,guardian_contact,payload')
+    .eq('id', id)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return (data || null) as PublicEnrollmentSubmission | null;
+}
+
+export async function fetchPublicEnrollmentSubmissionByReferenceId(submissionReferenceId: string): Promise<PublicEnrollmentSubmission | null> {
+  const { data, error } = await supabase
+    .from(REGISTRAR_PUBLIC_ENROLLMENT_TABLE)
+    .select('id,submission_reference_id,created_at,school_id,school_year,lrn,last_name,first_name,middle_name,grade_to_enroll,guardian_contact,payload')
+    .eq('submission_reference_id', submissionReferenceId)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return (data || null) as PublicEnrollmentSubmission | null;
+}
+
+export async function updatePublicEnrollmentSubmissionRecord(id: string, input: PublicEnrollmentSubmissionMutation): Promise<void> {
+  const { error } = await supabase.from(REGISTRAR_PUBLIC_ENROLLMENT_TABLE).update(input).eq('id', id);
+  if (error) {
+    throw error;
+  }
+}

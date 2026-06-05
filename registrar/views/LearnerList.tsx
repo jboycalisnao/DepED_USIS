@@ -21,10 +21,31 @@ const LearnerList: React.FC = () => {
 
   const isLocked = activeSchoolYear.isLocked;
 
+  const baseActiveLearnersForYear = useMemo(() => getActiveLearnersForYear(learners, sections, activeSchoolYear), [learners, sections, activeSchoolYear]);
+
+  const resolvePlacement = (student: Student) => {
+    const studentSid = String(student.sectionId || '').trim();
+    const section = sections.find((sec) => String(sec.id).trim() === studentSid);
+
+    if (section && section.schoolYearId === activeSchoolYear.id) {
+      return {
+        gradeLevel: section.gradeLevel,
+        sectionLabel: `${section.name}${section.strand ? ` [${section.strand}]` : ''}`,
+        sectionId: section.id,
+      };
+    }
+
+    const currentEnrollment = student.enrollments?.find((entry) => entry.schoolYear === activeSchoolYear.label);
+    return {
+      gradeLevel: currentEnrollment?.gradeLevel || ('Unassigned Registry' as GradeLevel | 'Unassigned Registry'),
+      sectionLabel: currentEnrollment?.section || 'Pending Placement',
+      sectionId: undefined,
+    };
+  };
+
   const activeLearnersForYear = useMemo(() => {
-    const activeRows = getActiveLearnersForYear(learners, sections, activeSchoolYear);
     const query = searchTerm.toLowerCase();
-    return activeRows.filter((l) => {
+    return baseActiveLearnersForYear.filter((l) => {
       const fullName = `${l.lastName}, ${l.firstName} ${l.middleName || ''}`.toLowerCase();
       return (
         fullName.includes(query) ||
@@ -33,7 +54,7 @@ const LearnerList: React.FC = () => {
         String(l.loginStatus || '').toLowerCase().includes(query)
       );
     });
-  }, [learners, sections, activeSchoolYear, searchTerm]);
+  }, [baseActiveLearnersForYear, searchTerm]);
 
   const derivedHistory = useMemo(() => {
     if (!selectedStudent) return [];
@@ -70,25 +91,10 @@ const LearnerList: React.FC = () => {
     const groups: Record<string, Record<string, { students: Student[]; sectionId?: string }>> = {};
 
     activeLearnersForYear.forEach((student) => {
-      const studentSid = String(student.sectionId || '').trim();
-      const section = sections.find((sec) => String(sec.id).trim() === studentSid);
-
-      let gradeLabel = 'Unassigned Registry';
-      let sectionLabel = 'Pending Placement';
-      let actualSectionId: string | undefined;
-
-      if (section && section.schoolYearId === activeSchoolYear.id) {
-        gradeLabel = section.gradeLevel;
-        const progSuffix = section.strand ? ` [${section.strand}]` : '';
-        sectionLabel = `${section.name}${progSuffix}`;
-        actualSectionId = section.id;
-      } else {
-        const currentEnrollment = student.enrollments?.find((e) => e.schoolYear === activeSchoolYear.label);
-        if (currentEnrollment) {
-          gradeLabel = currentEnrollment.gradeLevel;
-          sectionLabel = currentEnrollment.section || 'Unassigned Registry';
-        }
-      }
+      const placement = resolvePlacement(student);
+      const gradeLabel = placement.gradeLevel;
+      const sectionLabel = placement.sectionLabel;
+      const actualSectionId = placement.sectionId;
 
       if (!groups[gradeLabel]) groups[gradeLabel] = {};
       if (!groups[gradeLabel][sectionLabel]) groups[gradeLabel][sectionLabel] = { students: [], sectionId: actualSectionId };
@@ -136,7 +142,7 @@ const LearnerList: React.FC = () => {
           <span className="material-symbols-outlined registrar-learners-page__search-icon">search</span>
           <input
             type="text"
-            placeholder={`Search ${activeLearnersForYear.length} learners in ${activeSchoolYear.label}...`}
+            placeholder={`Search ${baseActiveLearnersForYear.length} learners in ${activeSchoolYear.label}...`}
             className="registrar-learners-page__search-input"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -155,7 +161,7 @@ const LearnerList: React.FC = () => {
         </div>
         <div className="registrar-learners-page__meta-box">
           <span className="registrar-learners-page__meta-label">Active Registry</span>
-          <span className="registrar-learners-page__meta-value">{activeLearnersForYear.length}</span>
+          <span className="registrar-learners-page__meta-value">{baseActiveLearnersForYear.length}</span>
         </div>
       </div>
 

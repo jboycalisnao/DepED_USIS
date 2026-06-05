@@ -3,6 +3,7 @@ import AcademicClassifications from '../components/settings/AcademicClassificati
 import AcademicCycles from '../components/settings/AcademicCycles';
 import EnrollmentEmailSettings from '../components/settings/EnrollmentEmailSettings';
 import EnrollmentPortalControls from '../components/settings/EnrollmentPortalControls';
+import EnrollmentSchoolYearSettings from '../components/settings/EnrollmentSchoolYearSettings';
 import GradeLevelManagement from '../components/settings/GradeLevelManagement';
 
 const Settings: React.FC = () => {
@@ -23,6 +24,8 @@ const Settings: React.FC = () => {
           <GradeLevelManagement />
           <hr />
           <AcademicClassifications />
+          <hr />
+          <EnrollmentSchoolYearSettings />
           <hr />
           <EnrollmentPortalControls />
           <hr />

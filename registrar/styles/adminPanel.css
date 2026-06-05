@@ -109,6 +109,7 @@
   line-height: 1.1;
 }
 
+
 .registrar-learners-page__groups {
   display: grid;
   gap: 14px;
@@ -1315,7 +1316,8 @@
   justify-content: flex-start;
 }
 
-.settings-enrollment-controls .floating-field__control input {
+.settings-enrollment-controls .floating-field__control input,
+.settings-enrollment-controls .floating-field__control select {
   min-height: 56px;
 }
 
@@ -1403,6 +1405,7 @@
 .settings-enrollment-controls__toggle-knob { display:block; width:26px; height:26px; border-radius:999px; background:#fff; transition:transform .2s ease; }
 .settings-enrollment-controls__toggle.is-on .settings-enrollment-controls__toggle-knob { transform:translateX(30px); }
 .settings-enrollment-controls__dates { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.settings-enrollment-controls__dates--single { grid-template-columns:1fr; }
 .settings-enrollment-controls__actions { display:flex; justify-content:flex-start; }
 
 @media (max-width: 920px) {

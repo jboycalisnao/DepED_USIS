@@ -225,6 +225,102 @@ create index if not exists idx_registrar_public_enroll_submission_reference_id
   on public.registrar_public_enrollment_submissions using btree (submission_reference_id);
 
 -- =========================================================
+-- Registrar Enrollment Module School Year Settings
+-- =========================================================
+create table if not exists registrar_enrollment_module_settings (
+  id integer primary key default 1,
+  use_manual_school_year_override boolean not null default false,
+  manual_school_year_id text references registrar_school_years(id) on update cascade on delete set null,
+  updated_at timestamptz not null default now(),
+  check (id = 1)
+);
+
+alter table if exists registrar_enrollment_module_settings
+  add column if not exists use_manual_school_year_override boolean not null default false;
+
+alter table if exists registrar_enrollment_module_settings
+  add column if not exists manual_school_year_id text;
+
+create index if not exists idx_registrar_enrollment_module_settings_override
+  on registrar_enrollment_module_settings(use_manual_school_year_override);
+
+alter table registrar_enrollment_module_settings
+  drop constraint if exists registrar_enrollment_module_settings_manual_school_year_id_fkey;
+
+alter table registrar_enrollment_module_settings
+  add constraint registrar_enrollment_module_settings_manual_school_year_id_fkey
+  foreign key (manual_school_year_id) references registrar_school_years(id) on update cascade on delete set null;
+
+-- =========================================================
+-- Registrar Enrollment Form Schedule
+-- =========================================================
+create table if not exists registrar_enrollment_form_schedule (
+  id integer primary key default 1,
+  enabled boolean not null default true,
+  use_date_range boolean not null default false,
+  start_date date,
+  end_date date,
+  information_verification_and_update_enabled boolean not null default false,
+  updated_at timestamptz not null default now()
+);
+
+alter table if exists registrar_enrollment_form_schedule
+  add column if not exists information_verification_and_update_enabled boolean not null default false;
+
+create index if not exists idx_registrar_enrollment_form_schedule_enabled
+  on registrar_enrollment_form_schedule(enabled);
+
+-- =========================================================
+-- Registrar Enrollment Announcements
+-- =========================================================
+create table if not exists registrar_enrollment_announcements (
+  id uuid primary key default gen_random_uuid(),
+  announcement_key text not null unique,
+  title text not null,
+  message text not null,
+  audience text not null default 'enrollment' check (audience = 'enrollment'),
+  is_active boolean not null default true,
+  is_pinned boolean not null default false,
+  is_highlighted boolean not null default true,
+  sort_order integer not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_registrar_enrollment_announcements_active
+  on registrar_enrollment_announcements(is_active, is_pinned, sort_order);
+
+insert into registrar_enrollment_announcements (
+  announcement_key,
+  title,
+  message,
+  audience,
+  is_active,
+  is_pinned,
+  is_highlighted,
+  sort_order
+)
+select
+  'information-verification-and-update-default',
+  'Information Verification and Update',
+  'All learners who submitted their enrolment online shall check the information submitted and update if needed.',
+  'enrollment',
+  true,
+  true,
+  true,
+  0
+where not exists (
+  select 1
+  from registrar_enrollment_announcements
+  where announcement_key = 'information-verification-and-update-default'
+);
+
+drop trigger if exists trg_registrar_enrollment_announcements_updated_at on registrar_enrollment_announcements;
+create trigger trg_registrar_enrollment_announcements_updated_at
+before update on registrar_enrollment_announcements
+for each row execute function set_updated_at();
+
+-- =========================================================
 -- Registrar Enrollment Confirmation Email Settings and Queue
 -- =========================================================
 create table if not exists registrar_enrollment_email_settings (
@@ -549,6 +645,16 @@ begin
   return new;
 end;
 $$ language plpgsql;
+
+drop trigger if exists trg_registrar_enrollment_form_schedule_updated_at on registrar_enrollment_form_schedule;
+create trigger trg_registrar_enrollment_form_schedule_updated_at
+before update on registrar_enrollment_form_schedule
+for each row execute function set_updated_at();
+
+drop trigger if exists trg_registrar_enrollment_module_settings_updated_at on registrar_enrollment_module_settings;
+create trigger trg_registrar_enrollment_module_settings_updated_at
+before update on registrar_enrollment_module_settings
+for each row execute function set_updated_at();
 
 drop trigger if exists trg_merch_categories_updated_at on merch_categories;
 create trigger trg_merch_categories_updated_at
