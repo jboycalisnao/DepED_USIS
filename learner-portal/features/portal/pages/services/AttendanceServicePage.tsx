@@ -2,16 +2,21 @@ import { useEffect, useState } from 'react';
 import type { LearnerPortalAccessRecord } from '../../../auth/services/learnerAccess';
 import {
   fetchLearnerAttendanceSnapshot,
-  formatAttendanceDateTime,
   type LearnerAttendanceSnapshot,
 } from '../../services/attendanceService';
+import { MonthlyAttendanceTable } from './attendance/components/MonthlyAttendanceTable';
 
 type AttendanceServicePageProps = {
   session: LearnerPortalAccessRecord;
 };
 
 export function AttendanceServicePage({ session }: AttendanceServicePageProps) {
-  const [snapshot, setSnapshot] = useState<LearnerAttendanceSnapshot>({ records: [], total: 0 });
+  const [snapshot, setSnapshot] = useState<LearnerAttendanceSnapshot>({
+    months: [],
+    totalMonths: 0,
+    totalDays: 0,
+    totalTaps: 0,
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -42,51 +47,28 @@ export function AttendanceServicePage({ session }: AttendanceServicePageProps) {
       <div className="portal-panel learner-tab-panel">
         <header className="portal-panel__header learner-tab-header">
           <h2>Attendance Service</h2>
-          <p>Review all recorded attendance logs linked to your learner account.</p>
+          <p>Consolidated monthly attendance with kiosk tap times for each day.</p>
         </header>
       </div>
 
-      <section className="learner-services-history" aria-label="Attendance records list">
+      <section className="learner-services-history" aria-label="Monthly attendance records">
         <header className="learner-services-history__header">
-          <h3>Attendance Records</h3>
-          <p>
-            Total Entries: <strong>{snapshot.total}</strong>
-          </p>
+          <div>
+            <h3>Monthly Attendance Matrix</h3>
+            <p>
+              Total Months: <strong>{snapshot.totalMonths}</strong> | Total Tap Entries: <strong>{snapshot.totalTaps}</strong>
+            </p>
+          </div>
         </header>
 
-        {isLoading ? <p className="learner-services-history__state">Loading attendance records.</p> : null}
+        {isLoading ? <p className="learner-services-history__state">Loading consolidated attendance history.</p> : null}
         {error ? <p className="learner-services-history__state">{error}</p> : null}
-        {!isLoading && !error && snapshot.records.length === 0 ? (
-          <p className="learner-services-history__state">No attendance records found for this learner yet.</p>
+        {!isLoading && !error && snapshot.months.length === 0 ? (
+          <p className="learner-services-history__state">No consolidated attendance history found for this learner yet.</p>
         ) : null}
 
-        {!isLoading && !error && snapshot.records.length > 0 ? (
-          <div className="learner-services-history__list">
-            {snapshot.records.map((item) => (
-              <article key={item.id} className="learner-services-history__item">
-                <p>
-                  <span>Type</span>
-                  <strong>{item.attendanceType || 'N/A'}</strong>
-                </p>
-                <p>
-                  <span>Logged At</span>
-                  <strong>{formatAttendanceDateTime(item.loggedAt)}</strong>
-                </p>
-                <p>
-                  <span>Station</span>
-                  <strong>{item.stationNo || 'N/A'}</strong>
-                </p>
-                <p>
-                  <span>Source</span>
-                  <strong>{item.source || 'rfid'}</strong>
-                </p>
-                <p>
-                  <span>UID</span>
-                  <strong>{item.scannedUid || 'N/A'}</strong>
-                </p>
-              </article>
-            ))}
-          </div>
+        {!isLoading && !error && snapshot.months.length > 0 ? (
+          <MonthlyAttendanceTable months={snapshot.months} />
         ) : null}
       </section>
     </section>

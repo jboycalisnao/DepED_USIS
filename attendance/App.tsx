@@ -24,6 +24,16 @@ import {
   type AttendanceAccessRecord,
 } from './features/auth/utils/attendanceAccess';
 
+const ATTENDANCE_LAST_PATH_KEY = 'attendance:last-path';
+
+function resolveAttendancePath(pathname: string, fallback: string) {
+  if (pathname === '/registrar') return '/registrar';
+  if (pathname.startsWith('/records')) return '/records';
+  if (pathname.startsWith('/summary')) return '/summary';
+  if (pathname.startsWith('/settings')) return '/settings';
+  return fallback;
+}
+
 const extractUid = (text: string): string | null => {
   const clean = text.trim().toUpperCase();
   if (clean.startsWith('UID:')) {
@@ -106,6 +116,11 @@ function App() {
   const idleTimers = useRef<(number | null)[]>([null, null, null]);
   const usbRfidBufferRef = useRef('');
   const usbRfidTimerRef = useRef<number | null>(null);
+  const restoredAttendancePath = useMemo(() => {
+    if (typeof window === 'undefined') return '/registrar';
+    const savedPath = window.localStorage.getItem(ATTENDANCE_LAST_PATH_KEY) || '/registrar';
+    return resolveAttendancePath(savedPath, '/registrar');
+  }, []);
 
   const clearIdleTimer = (index: number) => {
     if (idleTimers.current[index]) {
@@ -431,6 +446,11 @@ function App() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isProfileOpen]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(ATTENDANCE_LAST_PATH_KEY, resolveAttendancePath(location.pathname, '/registrar'));
+  }, [location.pathname]);
+
   if (isStandbyMode) {
     return (
       <>
@@ -680,8 +700,8 @@ function App() {
                   element={<AttendanceSummaryPage onQuerySummaryRange={querySummaryByDateRange} />}
                 />
                 <Route path="/settings" element={<Settings settings={settings} onUpdate={updateSettings} />} />
-                <Route path="/" element={<Navigate to="/registrar" replace />} />
-                <Route path="*" element={<Navigate to="/registrar" replace />} />
+                <Route path="/" element={<Navigate to={restoredAttendancePath} replace />} />
+                <Route path="*" element={<Navigate to={restoredAttendancePath} replace />} />
               </Routes>
             </main>
           </div>
