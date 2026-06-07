@@ -9,6 +9,8 @@ type UsisLoginModalProps = {
   password: string;
   usernameLabel?: string;
   passwordLabel?: string;
+  usernamePattern?: string;
+  usernameMaxLength?: number;
   usernameInputMode?: React.HTMLAttributes<HTMLInputElement>['inputMode'];
   passwordInputMode?: React.HTMLAttributes<HTMLInputElement>['inputMode'];
   usernameAutoComplete?: string;
@@ -31,6 +33,8 @@ export function UsisLoginModal({
   password,
   usernameLabel = 'Username',
   passwordLabel = 'Password',
+  usernamePattern,
+  usernameMaxLength,
   usernameInputMode,
   passwordInputMode,
   usernameAutoComplete = 'username',
@@ -48,8 +52,14 @@ export function UsisLoginModal({
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [isPortalBlocked, setIsPortalBlocked] = useState(false);
   const canUsePortal = typeof document !== 'undefined' && !!document.body;
+  const allowPortalGateBypass = import.meta.env.VITE_ALLOW_PORTAL_GATE_BYPASS === 'true';
 
   React.useEffect(() => {
+    if (allowPortalGateBypass) {
+      setIsPortalBlocked(false);
+      return;
+    }
+
     let isMounted = true;
     const loadGateState = async () => {
       if (!moduleKey) {
@@ -74,7 +84,7 @@ export function UsisLoginModal({
     return () => {
       isMounted = false;
     };
-  }, [moduleKey]);
+  }, [allowPortalGateBypass, moduleKey]);
 
   const isFormDisabled = isSubmitting || isPortalBlocked;
 
@@ -101,6 +111,8 @@ export function UsisLoginModal({
                 name="username"
                 autoComplete={usernameAutoComplete}
                 inputMode={usernameInputMode}
+                pattern={usernamePattern}
+                maxLength={usernameMaxLength}
                 disabled={isFormDisabled}
                 required
                 placeholder=" "

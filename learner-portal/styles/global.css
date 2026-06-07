@@ -705,6 +705,210 @@ body {
   }
 }
 
+@media (max-width: 720px) {
+  .learner-portal-chrome .kit-nav__grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    padding: 10px 0 12px;
+  }
+
+  .learner-portal-chrome .kit-nav__link {
+    justify-content: center;
+    min-height: 42px;
+  }
+
+  .learner-portal-main > .content-width {
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .learner-page-intro {
+    margin-top: 6px;
+  }
+
+  .learner-page-intro .usis-breadcrumb-bar {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .learner-page-intro .usis-breadcrumb-bar__row,
+  .learner-page-intro .usis-breadcrumb-bar__left-group {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .learner-page-intro .usis-breadcrumb-bar__row {
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .learner-page-intro .usis-breadcrumb-bar__left-group {
+    gap: 8px;
+  }
+
+  .learner-page-intro .usis-profile-trigger {
+    margin-left: auto;
+  }
+
+  .learner-page-intro .usis-profile-trigger__button {
+    width: 40px;
+    height: 40px;
+  }
+
+  .learner-page-intro .usis-profile-trigger__avatar {
+    width: 32px;
+    height: 32px;
+    font-size: 12px;
+  }
+
+  .learner-page-intro .usis-breadcrumb {
+    display: flex;
+    flex-wrap: wrap;
+    row-gap: 2px;
+  }
+
+  .learner-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .learner-side-nav {
+    padding: 10px 12px 12px;
+  }
+
+  .learner-side-nav__menu {
+    grid-template-columns: 1fr;
+  }
+
+  .learner-side-nav__link,
+  .learner-side-nav__logout {
+    width: 100%;
+    min-height: 44px;
+    justify-content: flex-start;
+    font-size: 15px;
+  }
+
+  .learner-content {
+    padding: 16px 14px 20px;
+  }
+
+  .learner-tab-panel {
+    margin-bottom: 10px;
+  }
+
+  .learner-tab-header {
+    padding-top: 16px;
+    padding-bottom: 14px;
+  }
+
+  .learner-tab-header h2 {
+    font-size: 20px;
+  }
+
+  .learner-tab-header p {
+    font-size: 14px;
+  }
+
+  .learner-services-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .learner-services-card--link {
+    min-height: 0;
+  }
+
+  .learner-services-card__body {
+    padding: 0 14px 14px;
+  }
+
+  .learner-services-card h3 {
+    font-size: 20px;
+  }
+
+  .learner-services-card p {
+    font-size: 14px;
+  }
+
+  .learner-services-card__action {
+    width: 100%;
+    justify-content: center;
+    min-height: 42px;
+    margin-top: 18px;
+  }
+
+  .learner-portal-welcome {
+    width: 100%;
+    padding: 16px;
+  }
+
+  .learner-portal-welcome h2,
+  .enrollment-status-hero h2 {
+    font-size: 20px;
+  }
+
+  .learner-portal-welcome p,
+  .enrollment-status-hero p {
+    font-size: 14px;
+  }
+
+  .enrollment-status-breadcrumb {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+
+  .enrollment-status-hero {
+    margin-top: 12px;
+    padding: 24px 18px;
+  }
+
+  .enrollment-status-hero__shape--left {
+    width: 170px;
+    height: 80px;
+    left: -20px;
+  }
+
+  .enrollment-status-hero__shape--right {
+    width: 240px;
+    height: 130px;
+    right: -30px;
+  }
+
+  .learner-profile-hero {
+    padding: 12px;
+  }
+
+  .learner-profile-hero__identity h3 {
+    font-size: 20px;
+  }
+
+  .learner-profile-hero__status strong {
+    font-size: 14px;
+  }
+
+  .learner-profile-sections {
+    grid-template-columns: 1fr;
+  }
+
+  .learner-profile-card,
+  .learner-profile-fields article {
+    padding: 10px;
+  }
+
+  .learner-services-history {
+    padding: 10px;
+  }
+
+  .learner-services-history__header h3 {
+    font-size: 15px;
+  }
+
+  .learner-services-history__header p,
+  .learner-services-history__state {
+    font-size: 12px;
+  }
+}
+
 .learner-services-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));

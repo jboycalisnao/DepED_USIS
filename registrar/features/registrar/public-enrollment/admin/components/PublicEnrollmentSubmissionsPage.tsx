@@ -73,6 +73,40 @@ function normalizeSchoolYear(value: string) {
   return normalized.toLowerCase();
 }
 
+function mergeLearnerHistory(existingHistory: any, nextRow: Record<string, any>) {
+  const rows = Array.isArray(existingHistory) ? [...existingHistory] : [];
+  const targetSchoolYear = normalizeSchoolYear(String(nextRow.schoolYear || nextRow.school_year || ''));
+  const filteredRows = rows.filter((row: any) => {
+    const rowSchoolYear = normalizeSchoolYear(String(row?.schoolYear || row?.school_year || ''));
+    return !targetSchoolYear || rowSchoolYear !== targetSchoolYear;
+  });
+
+  filteredRows.push({
+    id: crypto.randomUUID(),
+    enrollmentDate: new Date().toISOString(),
+    ...nextRow,
+    schoolYear: String(nextRow.schoolYear || nextRow.school_year || '').trim(),
+  });
+  return filteredRows;
+}
+
+function buildContinuingLearnerFields(existingLearner: any, mergedHistory: any[]) {
+  return {
+    enrollment_history: mergedHistory,
+    login_username: existingLearner?.login_username ?? existingLearner?.loginUsername ?? null,
+    login_password_plain: existingLearner?.login_password_plain ?? existingLearner?.loginPassword ?? null,
+    login_status: existingLearner?.login_status ?? existingLearner?.loginStatus ?? null,
+    last_login_at: existingLearner?.last_login_at ?? existingLearner?.lastLoginAt ?? null,
+    microsoft_user_id: existingLearner?.microsoft_user_id ?? existingLearner?.microsoftUserId ?? null,
+    microsoft_upn: existingLearner?.microsoft_upn ?? existingLearner?.microsoftUpn ?? null,
+    microsoft_mail_nickname: existingLearner?.microsoft_mail_nickname ?? existingLearner?.microsoftMailNickname ?? null,
+    microsoft_account_status: existingLearner?.microsoft_account_status ?? existingLearner?.microsoftAccountStatus ?? null,
+    microsoft_license_sku_id: existingLearner?.microsoft_license_sku_id ?? existingLearner?.microsoftLicenseSkuId ?? null,
+    microsoft_created_at: existingLearner?.microsoft_created_at ?? existingLearner?.microsoftCreatedAt ?? null,
+    microsoft_last_synced_at: existingLearner?.microsoft_last_synced_at ?? existingLearner?.microsoftLastSyncedAt ?? null,
+  };
+}
+
 const insertEnrollmentHistoryRow = async (input: {
   learnerId: string;
   schoolYear: string;
@@ -1043,7 +1077,7 @@ export default function PublicEnrollmentSubmissionsPage() {
 
       const { data: existingLearner } = await supabase
         .from('registrar_learners')
-        .select('id')
+        .select('id,enrollment_history,login_username,login_password_plain,login_status,last_login_at,microsoft_user_id,microsoft_upn,microsoft_mail_nickname,microsoft_account_status,microsoft_license_sku_id,microsoft_created_at,microsoft_last_synced_at')
         .eq('lrn', lrn)
         .maybeSingle();
 
@@ -1065,6 +1099,16 @@ export default function PublicEnrollmentSubmissionsPage() {
         school_id: (enrollingSubmission.school_id || payload.schoolId || schoolId).trim(),
         email: (payload.email || '').trim() || null,
       };
+
+      const learnerHistory = mergeLearnerHistory((existingLearner as any)?.enrollment_history, {
+        schoolYear: enrolledSchoolYear,
+        gradeLevel: gradeToEnroll,
+        section: String(sectionInfo.name || ''),
+        status: 'Enrolled',
+        submissionPayload: payload as unknown as Record<string, any>,
+      });
+
+      Object.assign(upsertPayload, buildContinuingLearnerFields(existingLearner, learnerHistory));
 
       const { error: upsertError } = await supabase.from('registrar_learners').upsert(upsertPayload, { onConflict: 'lrn' });
       if (upsertError) throw upsertError;

@@ -27,6 +27,11 @@ export function LearnerLoginPage({
       <UsisLoginModal
         moduleKey="learner_portal"
         title="Learner's Portal"
+        usernameLabel="LRN (Learner Reference Number)"
+        usernameInputMode="numeric"
+        usernamePattern="[0-9]{12}"
+        usernameMaxLength={12}
+        usernameAutoComplete="off"
         username={username}
         password={password}
         isSubmitting={isSubmitting}

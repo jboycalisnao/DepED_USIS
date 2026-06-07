@@ -29,7 +29,6 @@ const SYNC_BATCH_SIZE = 50;
 const REMOTE_FETCH_LIMIT = 5000;
 const RAW_RETENTION_DAYS = 90;
 const MANILA_TIME_ZONE = 'Asia/Manila';
-const MONTHLY_TAP_COLUMNS = Array.from({ length: 31 }, (_, index) => `day_${String(index + 1).padStart(2, '0')}` as const);
 
 const mapRemoteRowToAttendanceRecord = (row: any): AttendanceRecord | null => {
   const id = String(row?.id || '').trim();
@@ -88,202 +87,8 @@ const formatDateInManila = (timestamp: string) => {
   return `${year}-${month}-${day}`;
 };
 
-const formatTimeInManila = (timestamp: string) => {
-  const date = new Date(timestamp);
-  if (Number.isNaN(date.getTime())) return '';
-  return new Intl.DateTimeFormat('en-PH', {
-    timeZone: MANILA_TIME_ZONE,
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
-};
-
-const getMonthlyDayColumn = (timestamp: string) => {
-  const dateKey = formatDateInManila(timestamp);
-  if (!dateKey) return null;
-  const dayNumber = Number(dateKey.slice(8, 10));
-  if (!Number.isFinite(dayNumber) || dayNumber < 1 || dayNumber > 31) return null;
-  return `day_${String(dayNumber).padStart(2, '0')}` as const;
-};
-
-const getMonthlyAttendanceMonth = (timestamp: string) => {
-  const dateKey = formatDateInManila(timestamp);
-  if (!dateKey) return null;
-  return `${dateKey.slice(0, 7)}-01`;
-};
-
-const createManualMonthlyTap = (type: AttendanceType, timestamp: string): ParsedMonthlyTap => ({
-  type,
-  loggedAt: timestamp,
-  displayTime: formatTimeInManila(timestamp),
-  source: 'manual',
-  stationNo: '',
-  scannedUid: '',
-});
-
-type MonthlyTapsRow = Record<string, unknown> & {
-  learner_id?: unknown;
-  attendance_month?: unknown;
-};
-
-type ParsedMonthlyTap = {
-  type: AttendanceType;
-  loggedAt: string;
-  displayTime: string;
-  source: string;
-  stationNo: string;
-  scannedUid: string;
-};
-
-const MONTHLY_TAP_TYPE_ORDER: AttendanceType[] = ['AM_IN', 'AM_OUT', 'PM_IN', 'PM_OUT', 'UNSCHEDULED'];
-
-const getMonthStart = (dateString: string) => `${dateString.slice(0, 7)}-01`;
-
-const getMonthEnd = (dateString: string) => {
-  const [year, month] = dateString.slice(0, 7).split('-').map((value) => Number(value));
-  if (!Number.isFinite(year) || !Number.isFinite(month)) {
-    return `${dateString.slice(0, 7)}-31`;
-  }
-  const lastDay = new Date(year, month, 0).getDate();
-  return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
-};
-
-const normalizeMonthlyTapType = (value: unknown): AttendanceType => {
-  const candidate = String(value || '').trim().toUpperCase();
-  return MONTHLY_TAP_TYPE_ORDER.includes(candidate as AttendanceType)
-    ? (candidate as AttendanceType)
-    : 'UNSCHEDULED';
-};
-
-const tryParseMonthlyTapJson = (value: string) => {
-  const trimmed = value.trim();
-  if (!(trimmed.startsWith('[') || trimmed.startsWith('{'))) return null;
-  try {
-    return JSON.parse(trimmed);
-  } catch {
-    return null;
-  }
-};
-
-const parseMonthlyTapEntries = (entry: unknown): ParsedMonthlyTap[] => {
-  if (!entry) return [];
-
-  if (typeof entry === 'string') {
-    const parsed = tryParseMonthlyTapJson(entry);
-    if (parsed !== null) return parseMonthlyTapEntries(parsed);
-    return [];
-  }
-
-  if (Array.isArray(entry)) {
-    return entry.flatMap((value) => parseMonthlyTapEntries(value));
-  }
-
-  if (typeof entry !== 'object') {
-    return [];
-  }
-
-  const record = entry as Record<string, unknown>;
-  const nestedCollections = [record.taps, record.entries, record.records, record.items].filter(Boolean);
-  if (nestedCollections.length > 0) {
-    const nested = nestedCollections.flatMap((value) => parseMonthlyTapEntries(value));
-    if (nested.length > 0) return nested;
-  }
-
-  const loggedAt = String(record.loggedAt || record.logged_at || record.time || record.timestamp || record.value || '').trim();
-  if (!loggedAt) return [];
-
-  return [{
-    type: normalizeMonthlyTapType(record.type || record.attendanceType || record.attendance_type),
-    loggedAt,
-    displayTime: String(record.displayTime || record.display_time || ''),
-    source: String(record.source || 'rfid'),
-    stationNo: String(record.stationNo || record.station_no || ''),
-    scannedUid: String(record.scannedUid || record.scanned_uid || ''),
-  }];
-};
-
 const isWithinDateRange = (dateKey: string, fromDate: string, toDate: string) =>
   dateKey >= fromDate && dateKey <= toDate;
-
-const buildMonthlyTapRecordId = (
-  learnerId: string,
-  attendanceMonth: string,
-  dayNumber: number,
-  tap: ParsedMonthlyTap,
-  tapIndex: number,
-) =>
-  [
-    'monthly',
-    learnerId,
-    attendanceMonth,
-    `day${String(dayNumber).padStart(2, '0')}`,
-    tap.type,
-    tapIndex,
-    tap.loggedAt.replace(/[^0-9a-z]/gi, ''),
-  ].join('|');
-
-const parseMonthlyTapRecordId = (recordId: string) => {
-  const parts = String(recordId || '').split('|');
-  if (parts.length < 7 || parts[0] !== 'monthly') {
-    return null;
-  }
-
-  const [, learnerId, attendanceMonth, dayToken, typeToken, tapIndexToken] = parts;
-  const dayNumber = Number(dayToken.replace(/^day/, ''));
-  const tapIndex = Number(tapIndexToken);
-  const type = String(typeToken || '').trim().toUpperCase() as AttendanceType;
-
-  if (
-    !learnerId ||
-    !attendanceMonth ||
-    !Number.isFinite(dayNumber) ||
-    dayNumber < 1 ||
-    dayNumber > 31 ||
-    !Number.isFinite(tapIndex)
-  ) {
-    return null;
-  }
-
-  return {
-    learnerId,
-    attendanceMonth,
-    dayNumber,
-    type: (MONTHLY_TAP_TYPE_ORDER.includes(type) ? type : 'UNSCHEDULED') as AttendanceType,
-    tapIndex,
-  };
-};
-
-const flattenMonthlyTapRows = (
-  rows: MonthlyTapsRow[],
-  fromDate: string,
-  toDate: string,
-): AttendanceRecord[] => {
-  const records: AttendanceRecord[] = [];
-
-  rows.forEach((row) => {
-    const learnerId = String(row.learner_id || '').trim();
-    const attendanceMonth = String(row.attendance_month || '').trim().slice(0, 7);
-    if (!learnerId || !attendanceMonth) return;
-
-    for (let day = 1; day <= 31; day += 1) {
-      const dayKey = `${attendanceMonth}-${String(day).padStart(2, '0')}`;
-      if (!isWithinDateRange(dayKey, fromDate, toDate)) continue;
-
-      const taps = parseMonthlyTapEntries(row[`day_${String(day).padStart(2, '0')}`]);
-      taps.forEach((tap, tapIndex) => {
-        records.push({
-          id: buildMonthlyTapRecordId(learnerId, attendanceMonth, day, tap, tapIndex),
-          learnerId,
-          type: tap.type,
-          timestamp: tap.loggedAt,
-          synced: true,
-        });
-      });
-    }
-  });
-
-  return records.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-};
 
 export const useAttendance = () => {
   const [uidMappings, setUidMappings] = useState<Record<string, string>>({});
@@ -415,81 +220,7 @@ export const useAttendance = () => {
     return !!data?.id;
   }, []);
 
-  const hasMonthlyTapForDay = useCallback(async (learnerId: string, type: AttendanceType, timestamp: string) => {
-    const attendanceMonth = getMonthlyAttendanceMonth(timestamp);
-    const dayColumn = getMonthlyDayColumn(timestamp);
-    if (!attendanceMonth || !dayColumn) return false;
-
-    const { data, error } = await supabase
-      .from('attendance_monthly_taps')
-      .select(
-        [
-          'attendance_month',
-          dayColumn,
-        ].join(','),
-      )
-      .eq('learner_id', learnerId)
-      .eq('attendance_month', attendanceMonth)
-      .maybeSingle();
-
-    if (error && error.code !== 'PGRST116') {
-      throw error;
-    }
-
-    const existingDay = Array.isArray((data as any)?.[dayColumn]) ? (data as any)[dayColumn] : [];
-    return existingDay.some((entry: any) => {
-      const existingType = String(entry?.type || entry?.attendance_type || '').trim();
-      return existingType === type;
-    });
-  }, []);
-
-  const persistMonthlyTapRecord = useCallback(async (learnerId: string, type: AttendanceType, timestamp: string) => {
-    const attendanceMonth = getMonthlyAttendanceMonth(timestamp);
-    const dayColumn = getMonthlyDayColumn(timestamp);
-    if (!attendanceMonth || !dayColumn) {
-      throw new Error('Unable to resolve attendance month for manual record.');
-    }
-
-    const { data, error } = await supabase
-      .from('attendance_monthly_taps')
-      .select(
-        [
-          'attendance_month',
-          ...MONTHLY_TAP_COLUMNS,
-        ].join(','),
-      )
-      .eq('learner_id', learnerId)
-      .eq('attendance_month', attendanceMonth)
-      .maybeSingle();
-
-    if (error && error.code !== 'PGRST116') {
-      throw error;
-    }
-
-    const currentTap = createManualMonthlyTap(type, timestamp);
-    const existingDayValue = (data as any)?.[dayColumn];
-    const existingDayTaps = Array.isArray(existingDayValue)
-      ? existingDayValue
-      : existingDayValue
-        ? [existingDayValue]
-        : [];
-
-    const nextDayTaps = [...existingDayTaps, currentTap];
-    const payload: Record<string, unknown> = {
-      learner_id: learnerId,
-      attendance_month: attendanceMonth,
-      [dayColumn]: nextDayTaps,
-      updated_at: new Date().toISOString(),
-    };
-
-    const { error: upsertError } = await supabase
-      .from('attendance_monthly_taps')
-      .upsert(payload, { onConflict: 'learner_id,attendance_month' });
-
-    if (upsertError) throw upsertError;
-  }, []);
-
-  const persistAttendanceRecord = useCallback(async (record: AttendanceRecord) => {
+  const persistAttendanceRecord = useCallback(async (record: AttendanceRecord, source = 'rfid') => {
     const existing = await hasAttendanceRecordForDay(record.learnerId, record.type, record.timestamp);
     if (existing) {
       return;
@@ -499,7 +230,7 @@ export const useAttendance = () => {
       learner_id: record.learnerId,
       attendance_type: record.type,
       logged_at: record.timestamp,
-      source: 'rfid',
+      source,
     };
 
     if (isUuid(record.id)) {
@@ -545,12 +276,6 @@ export const useAttendance = () => {
     // Local-first write for offline safety.
     setAttendanceLogs(prev => [...prev, record]);
 
-    // Write the monthly tap immediately so the records page can reflect the scan
-    // without waiting for the raw-record sync cycle.
-    void persistMonthlyTapRecord(record.learnerId, record.type, record.timestamp).catch((error) => {
-      console.error('Monthly tap persistence failed:', error);
-    });
-
     // Cloud write is pooled and pushed on interval/reconnect/page-hide.
   };
 
@@ -563,9 +288,9 @@ export const useAttendance = () => {
       }
 
       try {
-        const monthlyExists = await hasMonthlyTapForDay(normalizedLearnerId, type, normalizedTimestamp);
-        if (monthlyExists) {
-          return { ok: false, error: 'A monthly attendance record already exists for that learner and day.' };
+        const dailyExists = await hasAttendanceRecordForDay(normalizedLearnerId, type, normalizedTimestamp);
+        if (dailyExists) {
+          return { ok: false, error: 'An attendance record already exists for that learner and day.' };
         }
 
         const record: AttendanceRecord = {
@@ -573,11 +298,12 @@ export const useAttendance = () => {
           learnerId: normalizedLearnerId,
           type,
           timestamp: normalizedTimestamp,
-          synced: true,
+          synced: false,
         };
 
-        await persistMonthlyTapRecord(normalizedLearnerId, type, normalizedTimestamp);
-        setAttendanceLogs((prev) => [...prev, record]);
+        setAttendanceLogs((prev) => [record, ...prev]);
+        await persistAttendanceRecord(record, 'manual');
+        markAsSynced(record.id);
 
         return { ok: true, error: null };
       } catch (error: any) {
@@ -587,7 +313,7 @@ export const useAttendance = () => {
         };
       }
     },
-    [hasAttendanceRecordForDay, hasMonthlyTapForDay, persistMonthlyTapRecord],
+    [hasAttendanceRecordForDay, persistAttendanceRecord],
   );
 
   const syncPendingLogs = useCallback(async () => {
@@ -629,73 +355,6 @@ export const useAttendance = () => {
       .eq('logged_at', record.timestamp);
   };
 
-  const deleteMonthlyTapRecord = useCallback(async (recordId: string) => {
-    const parsed = parseMonthlyTapRecordId(recordId);
-    if (!parsed) {
-      return { ok: false, error: 'Invalid monthly tap record.' };
-    }
-
-    try {
-      const { data, error } = await supabase
-        .from('attendance_monthly_taps')
-        .select(
-          [
-            'learner_id',
-            'attendance_month',
-            ...MONTHLY_TAP_COLUMNS,
-          ].join(','),
-        )
-        .eq('learner_id', parsed.learnerId)
-        .eq('attendance_month', `${parsed.attendanceMonth}-01`)
-        .maybeSingle();
-
-      if (error && error.code !== 'PGRST116') {
-        throw error;
-      }
-
-      if (!data) {
-        return { ok: false, error: 'Monthly tap record not found.' };
-      }
-
-      const dayColumn = `day_${String(parsed.dayNumber).padStart(2, '0')}`;
-      const dayValue = (data as any)?.[dayColumn];
-      const dayTaps = Array.isArray(dayValue)
-        ? dayValue
-        : dayValue
-          ? [dayValue]
-          : [];
-
-      const nextDayTaps = dayTaps
-        .flatMap((entry: unknown) => parseMonthlyTapEntries(entry))
-        .filter((tap, tapIndex) =>
-          buildMonthlyTapRecordId(parsed.learnerId, parsed.attendanceMonth, parsed.dayNumber, tap, tapIndex) !== recordId
-        );
-
-      const payload: Record<string, unknown> = {
-        learner_id: parsed.learnerId,
-        attendance_month: `${parsed.attendanceMonth}-01`,
-        [dayColumn]: nextDayTaps,
-        updated_at: new Date().toISOString(),
-      };
-
-      const { error: updateError } = await supabase
-        .from('attendance_monthly_taps')
-        .upsert(payload, { onConflict: 'learner_id,attendance_month' });
-
-      if (updateError) {
-        throw updateError;
-      }
-
-      setAttendanceLogs((prev) => prev.filter((log) => log.id !== recordId));
-      return { ok: true, error: null };
-    } catch (error: any) {
-      return {
-        ok: false,
-        error: error?.message || 'Unable to delete monthly tap record.',
-      };
-    }
-  }, []);
-
   const removeMapping = (learnerId: string) => {
     setUidMappings(prev => {
       const next = { ...prev };
@@ -715,23 +374,20 @@ export const useAttendance = () => {
     const shouldUseSummary = normalizedTo < cutoffDate;
 
     if (!shouldUseSummary) {
-      const monthStart = getMonthStart(normalizedFrom);
-      const monthEnd = getMonthEnd(normalizedTo);
       const { data, error } = await supabase
-        .from('attendance_monthly_taps')
-        .select(
-          [
-            'learner_id',
-            'attendance_month',
-            ...MONTHLY_TAP_COLUMNS,
-          ].join(','),
-        )
-        .gte('attendance_month', monthStart)
-        .lte('attendance_month', monthEnd)
-        .order('attendance_month', { ascending: false })
+        .from('attendance_records')
+        .select('id,learner_id,attendance_type,logged_at')
+        .order('logged_at', { ascending: false })
         .limit(REMOTE_FETCH_LIMIT);
       if (error) throw error;
-      const rawRecords = flattenMonthlyTapRows((data || []) as MonthlyTapsRow[], normalizedFrom, normalizedTo);
+      const rawRecords = (data || [])
+        .map(mapRemoteRowToAttendanceRecord)
+        .filter(Boolean)
+        .filter((record): record is AttendanceRecord => {
+          if (!record) return false;
+          const dateKey = formatDateInManila(record.timestamp);
+          return !!dateKey && isWithinDateRange(dateKey, normalizedFrom, normalizedTo);
+        });
       return { mode: 'raw', rawRecords, summaryRows: [] };
     }
 
@@ -906,7 +562,6 @@ export const useAttendance = () => {
     logAttendance,
     addManualAttendanceRecord,
     deleteRecord,
-    deleteMonthlyTapRecord,
     queryRecordsByDateRange,
     querySummaryByDateRange,
   };

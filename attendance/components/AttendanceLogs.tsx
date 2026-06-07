@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   AttendanceDailySummaryRow,
   AttendanceRecord,
@@ -15,39 +15,12 @@ interface AttendanceLogsProps {
   logs: AttendanceRecord[];
   learners: Learner[];
   onDelete: (record: AttendanceRecord) => void;
-  onDeleteMonthlyTap: (recordId: string) => Promise<{ ok: boolean; error: string | null }>;
   onQueryRange: (fromDate: string, toDate: string) => Promise<AttendanceReportResult>;
   onAddManualRecord: (learnerId: string, type: AttendanceType, timestamp: string) => Promise<{ ok: boolean; error: string | null }>;
 }
 
-const MONTHLY_TAP_ORDER: AttendanceType[] = ['AM_IN', 'AM_OUT', 'PM_IN', 'PM_OUT', 'UNSCHEDULED'];
-const MANILA_TIME_ZONE = 'Asia/Manila';
-
-const formatDateKeyInManila = (timestamp: string) => {
-  const date = new Date(timestamp);
-  if (Number.isNaN(date.getTime())) return '';
-
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: MANILA_TIME_ZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(date);
-
-  const year = parts.find((part) => part.type === 'year')?.value || '';
-  const month = parts.find((part) => part.type === 'month')?.value || '';
-  const day = parts.find((part) => part.type === 'day')?.value || '';
-  return year && month && day ? `${year}-${month}-${day}` : '';
-};
-
-const getTapOrder = (type: AttendanceType) => {
-  const index = MONTHLY_TAP_ORDER.indexOf(type);
-  return index === -1 ? MONTHLY_TAP_ORDER.length : index;
-};
-
-const AttendanceLogs: React.FC<AttendanceLogsProps> = ({ logs, learners, onDelete, onDeleteMonthlyTap, onQueryRange, onAddManualRecord }) => {
+const AttendanceLogs: React.FC<AttendanceLogsProps> = ({ logs, learners, onDelete, onQueryRange, onAddManualRecord }) => {
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [deleteTapId, setDeleteTapId] = useState<string | null>(null);
   const getDefaultRange = () => {
     const now = new Date();
     const yyyy = now.getFullYear();
@@ -76,75 +49,8 @@ const AttendanceLogs: React.FC<AttendanceLogsProps> = ({ logs, learners, onDelet
   );
   const activeRawLogs = reportRawRecords !== null ? reportRawRecords : sortedLogs;
   const activeSummaryRows = reportSummaryRows ?? [];
-  const isMonthlyTapView = reportRawRecords !== null && reportMode === 'raw';
   const syncedCount = activeRawLogs.filter((row) => row.synced).length;
   const pendingCount = activeRawLogs.length - syncedCount;
-  const [expandedLearners, setExpandedLearners] = useState<Record<string, boolean>>({});
-
-  const monthlyLearnerGroups = useMemo(() => {
-    if (!isMonthlyTapView) return [];
-
-    const learnerMap = new Map<string, {
-      learner: Learner | null;
-      latestTimestamp: number;
-      days: Map<string, AttendanceRecord[]>;
-    }>();
-
-    activeRawLogs.forEach((record) => {
-      const learner = learners.find((entry) => entry.id === record.learnerId) || null;
-      const dateKey = formatDateKeyInManila(record.timestamp);
-      if (!dateKey) return;
-
-      const existing = learnerMap.get(record.learnerId) || {
-        learner,
-        latestTimestamp: 0,
-        days: new Map<string, AttendanceRecord[]>(),
-      };
-
-      existing.learner = learner;
-      existing.latestTimestamp = Math.max(existing.latestTimestamp, new Date(record.timestamp).getTime());
-      const dayList = existing.days.get(dateKey) || [];
-      dayList.push(record);
-      existing.days.set(dateKey, dayList);
-      learnerMap.set(record.learnerId, existing);
-    });
-
-    return Array.from(learnerMap.entries())
-      .map(([learnerId, entry]) => {
-        const days = Array.from(entry.days.entries())
-          .map(([dateKey, taps]) => ({
-            dateKey,
-            taps: taps.sort((left, right) => {
-              const orderDelta = getTapOrder(left.type) - getTapOrder(right.type);
-              if (orderDelta !== 0) return orderDelta;
-              return new Date(left.timestamp).getTime() - new Date(right.timestamp).getTime();
-            }),
-          }))
-          .sort((left, right) => (left.dateKey < right.dateKey ? 1 : -1));
-
-        return {
-          learnerId,
-          learner: entry.learner,
-          latestTimestamp: entry.latestTimestamp,
-          totalTaps: days.reduce((sum, day) => sum + day.taps.length, 0),
-          days,
-        };
-      })
-      .sort((left, right) => {
-        const leftName = `${left.learner?.last_name || ''} ${left.learner?.first_name || ''}`.trim().toLowerCase();
-        const rightName = `${right.learner?.last_name || ''} ${right.learner?.first_name || ''}`.trim().toLowerCase();
-        if (leftName !== rightName) return leftName.localeCompare(rightName);
-        return right.latestTimestamp - left.latestTimestamp;
-      });
-  }, [activeRawLogs, isMonthlyTapView, learners]);
-
-  useEffect(() => {
-    if (!isMonthlyTapView || monthlyLearnerGroups.length === 0) return;
-    setExpandedLearners((current) => {
-      if (Object.keys(current).length > 0) return current;
-      return Object.fromEntries(monthlyLearnerGroups.map((group) => [group.learnerId, true]));
-    });
-  }, [isMonthlyTapView, monthlyLearnerGroups]);
 
   const formatDate = (dateStr: string) => {
     const d = new Date(dateStr);
@@ -248,7 +154,7 @@ const AttendanceLogs: React.FC<AttendanceLogsProps> = ({ logs, learners, onDelet
         return;
       }
       setIsManualModalOpen(false);
-      setArchiveStatus('Manual attendance record saved to monthly taps.');
+      setArchiveStatus('Manual attendance record saved to attendance records.');
     } finally {
       setIsManualSubmitting(false);
     }
@@ -256,8 +162,6 @@ const AttendanceLogs: React.FC<AttendanceLogsProps> = ({ logs, learners, onDelet
 
   useEffect(() => {
     void loadRange(fromDate, toDate);
-    // Load the monthly-taps-backed records as soon as the page opens.
-    // The selected date range still remains editable for ad hoc reporting.
   }, []);
 
   useEffect(() => {
@@ -266,17 +170,6 @@ const AttendanceLogs: React.FC<AttendanceLogsProps> = ({ logs, learners, onDelet
   }, [logs.length]);
 
   const handleConfirmDelete = async () => {
-    if (deleteTapId) {
-      const result = await onDeleteMonthlyTap(deleteTapId);
-      if (!result.ok) {
-        setArchiveStatus(result.error || 'Unable to delete tap.');
-        return;
-      }
-      setReportRawRecords((prev) => prev ? prev.filter((record) => record.id !== deleteTapId) : prev);
-      setDeleteTapId(null);
-      return;
-    }
-
     if (deleteId) {
       const record = activeRawLogs.find((entry) => entry.id === deleteId);
       if (record) {
@@ -327,7 +220,7 @@ const AttendanceLogs: React.FC<AttendanceLogsProps> = ({ logs, learners, onDelet
           <div className="section-card__content attendance-records-page__filters-content">
             <div className="attendance-records-page__filter-copy">
               <h3>Range Filter</h3>
-              <p>Load monthly tap records or historical summaries using a selected date window.</p>
+              <p>Load attendance records or historical summaries using a selected date window.</p>
             </div>
 
             <div className="form-grid attendance-records-page__filter-grid">
@@ -382,15 +275,13 @@ const AttendanceLogs: React.FC<AttendanceLogsProps> = ({ logs, learners, onDelet
               </button>
             </div>
 
-            {reportRawRecords || reportSummaryRows ? (
+            {reportRawRecords !== null || reportSummaryRows !== null ? (
               <span
                 className={`attendance-records-page__mode-badge ${reportMode === 'summary' ? 'is-summary' : 'is-raw'}`}
               >
                 {reportMode === 'summary'
                   ? 'Summary Mode (Historical)'
-                  : isMonthlyTapView
-                    ? 'Monthly Taps Mode (Detailed)'
-                    : 'Raw Mode (Detailed)'}
+                  : 'Raw Mode (Detailed)'}
               </span>
             ) : null}
           </div>
@@ -531,96 +422,6 @@ const AttendanceLogs: React.FC<AttendanceLogsProps> = ({ logs, learners, onDelet
                 </tbody>
               </table>
             </div>
-          ) : isMonthlyTapView ? (
-            <div className="attendance-records-page__group-list">
-              {monthlyLearnerGroups.length === 0 ? (
-                <div className="notice-box attendance-records-page__empty-state">
-                  <strong>No monthly taps</strong>
-                  <span>No attendance records were found for the selected range.</span>
-                </div>
-              ) : (
-                monthlyLearnerGroups.map((group) => {
-                  const learner = group.learner;
-                  const isExpanded = expandedLearners[group.learnerId] !== false;
-                  const learnerName = learner ? `${learner.last_name}, ${learner.first_name}` : group.learnerId;
-                  return (
-                    <section key={group.learnerId} className="section-card attendance-records-page__learner-card">
-                      <div className="section-card__bar" />
-                      <button
-                        type="button"
-                        className="attendance-records-page__learner-toggle"
-                        onClick={() => setExpandedLearners((current) => ({ ...current, [group.learnerId]: !isExpanded }))}
-                        aria-expanded={isExpanded}
-                      >
-                        <div className="attendance-records-page__learner-meta">
-                          <div className="attendance-records-page__learner-name">{learnerName}</div>
-                          <div className="attendance-records-page__learner-submeta">
-                            <span>LRN: {learner?.lrn || 'INTERNAL'}</span>
-                            <span>{learner?.grade_level || 'Unknown Grade'} | {learner?.section_name || 'No Section'}</span>
-                          </div>
-                        </div>
-                        <div className="attendance-records-page__learner-summary">
-                          <span className="attendance-records-page__learner-summary-item">
-                            {group.days.length} day{group.days.length === 1 ? '' : 's'}
-                          </span>
-                          <span className="attendance-records-page__learner-summary-item">
-                            {group.totalTaps} tap{group.totalTaps === 1 ? '' : 's'}
-                          </span>
-                          <span className="material-symbols-outlined" aria-hidden="true">
-                            {isExpanded ? 'expand_less' : 'expand_more'}
-                          </span>
-                        </div>
-                      </button>
-
-                      {isExpanded ? (
-                        <div className="attendance-records-page__learner-days">
-                          {group.days.map((day) => (
-                            <article key={`${group.learnerId}-${day.dateKey}`} className="attendance-records-page__day-card">
-                              <div className="attendance-records-page__day-header">
-                                <div>
-                                  <h3 className="attendance-records-page__day-title">{formatDate(day.dateKey)}</h3>
-                                  <p className="attendance-records-page__day-subtitle">
-                                    {day.taps.length} tap{day.taps.length === 1 ? '' : 's'} for this day
-                                  </p>
-                                </div>
-                                <span className="attendance-records-page__day-badge">{day.dateKey}</span>
-                              </div>
-
-                              <div className="attendance-records-page__tap-list">
-                                {day.taps.map((tap, tapIndex) => {
-                                  const { label, color } = getLabelAndColor(tap.type);
-                                  return (
-                                    <div key={tap.id} className="attendance-records-page__tap-row">
-                                      <div className="attendance-records-page__tap-row-main">
-                                        <span className={`inline-flex px-3 py-1 rounded-md text-[12px] font-semibold border ${color}`}>
-                                          {label}
-                                        </span>
-                                        <span className="attendance-records-page__tap-time">{formatTime(tap.timestamp)}</span>
-                                        <span className="attendance-records-page__tap-sync">
-                                          {tap.synced ? 'Synced' : 'Pending'}
-                                        </span>
-                                      </div>
-                                      <button
-                                        type="button"
-                                        onClick={() => setDeleteTapId(tap.id)}
-                                        className="attendance-records-page__tap-delete"
-                                        title={`Delete ${label} tap ${tapIndex + 1}`}
-                                      >
-                                        <span className="material-symbols-outlined text-[18px] leading-none">delete</span>
-                                      </button>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </article>
-                          ))}
-                        </div>
-                      ) : null}
-                    </section>
-                  );
-                })
-              )}
-            </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
@@ -711,17 +512,14 @@ const AttendanceLogs: React.FC<AttendanceLogsProps> = ({ logs, learners, onDelet
       </div>
 
       <ConfirmationModal
-        isOpen={!!deleteId || !!deleteTapId}
+        isOpen={!!deleteId}
         onClose={() => {
           setDeleteId(null);
-          setDeleteTapId(null);
         }}
         onConfirm={() => void handleConfirmDelete()}
         title="Delete Record"
         message={
-          deleteTapId
-            ? 'Are you sure you want to permanently remove this tap from the monthly taps record? This action cannot be undone.'
-            : 'Are you sure you want to permanently remove this attendance log? This action cannot be undone.'
+          'Are you sure you want to permanently remove this attendance log? This action cannot be undone.'
         }
         confirmLabel="Delete Record"
       />

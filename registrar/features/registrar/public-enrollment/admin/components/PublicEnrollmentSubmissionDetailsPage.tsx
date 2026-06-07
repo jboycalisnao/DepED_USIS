@@ -119,11 +119,11 @@ export default function PublicEnrollmentSubmissionDetailsPage() {
 
         const lrn = String(row.lrn || row.payload?.lrn || '').trim();
         if (lrn) {
-          const { data, error: learnerError } = await supabase
-            .from('registrar_learners')
-            .select('id,status,section_id,enrollment_history')
-            .eq('lrn', lrn)
-            .maybeSingle();
+        const { data, error: learnerError } = await supabase
+          .from('registrar_learners')
+          .select('id,status,section_id')
+          .eq('lrn', lrn)
+          .maybeSingle();
           if (!cancelled && !learnerError && data) {
             const sectionId = String((data as any).section_id || '').trim();
             let sectionName = '';
@@ -145,7 +145,7 @@ export default function PublicEnrollmentSubmissionDetailsPage() {
               sectionName,
             });
             setStatusDraft(resolvedStatus);
-            setLearnerHistory(Array.isArray((data as any).enrollment_history) ? (data as any).enrollment_history : []);
+            setLearnerHistory([]);
             const learnerIdValue = String((data as any).id || '').trim();
             const { data: historyRows } = await supabase
               .from('registrar_enrollment_history')
@@ -189,20 +189,6 @@ export default function PublicEnrollmentSubmissionDetailsPage() {
                 }
               }
 
-              const legacyHistory = Array.isArray((data as any).enrollment_history) ? (data as any).enrollment_history : [];
-              const legacyMapped: EnrollmentHistoryTableRow[] = legacyHistory
-                .filter((entry) => entry && typeof entry === 'object')
-                .map((entry, index) => ({
-                  id: String(entry.id || `legacy-${index}`),
-                  schoolYear: String(entry.schoolYear || '--').trim() || '--',
-                  gradeLevel: String(entry.gradeLevel || '--').trim() || '--',
-                  section: String(entry.section || '--').trim() || '--',
-                  status: String(entry.status || 'Recorded').trim() || 'Recorded',
-                  enrolledAt: String(entry.enrollmentDate || entry.created_at || '').trim(),
-                  deletable: false,
-                  source: 'legacy',
-                }));
-
               const submissionMapped: EnrollmentHistoryTableRow[] = (allSubmissionRows || []).map((row: any, index) => {
                 const rowPayload = row?.payload && typeof row.payload === 'object' ? (row.payload as Record<string, any>) : {};
                 return {
@@ -224,7 +210,7 @@ export default function PublicEnrollmentSubmissionDetailsPage() {
               }));
 
               const dedupe = new Map<string, EnrollmentHistoryTableRow>();
-              for (const row of [...learnerHistoryMapped, ...legacyMapped, ...submissionMapped]) {
+              for (const row of [...learnerHistoryMapped, ...submissionMapped]) {
                 const key = `${row.schoolYear}|${row.gradeLevel}|${row.section}|${row.enrolledAt}|${row.status}`;
                 if (!dedupe.has(key)) dedupe.set(key, row);
               }

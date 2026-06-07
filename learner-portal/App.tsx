@@ -127,6 +127,9 @@ export default function App() {
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
+  const handleUsernameChange = (value: string) => {
+    setUsername(value.replace(/\D/g, '').slice(0, 12));
+  };
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -170,11 +173,11 @@ export default function App() {
             isSubmitting={isSubmitting}
             loginError={loginError}
             onDismissNotice={() => setLoginError(null)}
-            onUsernameChange={setUsername}
+            onUsernameChange={handleUsernameChange}
             onPasswordChange={setPassword}
             onSubmit={handleSubmit}
             onPrefillLogin={(nextUsername, nextPassword) => {
-              setUsername(nextUsername);
+              setUsername(nextUsername.replace(/\D/g, '').slice(0, 12));
               setPassword(nextPassword);
               setLoginError(null);
             }}

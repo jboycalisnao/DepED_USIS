@@ -17,8 +17,14 @@ interface UsisPortalGateProps {
 
 export function UsisPortalGate({ moduleKey }: UsisPortalGateProps) {
   const [config, setConfig] = useState<PortalGateConfig | null>(null);
+  const allowPortalGateBypass = import.meta.env.VITE_ALLOW_PORTAL_GATE_BYPASS === 'true';
 
   useEffect(() => {
+    if (allowPortalGateBypass) {
+      setConfig(null);
+      return;
+    }
+
     let isMounted = true;
 
     const load = async () => {
@@ -42,11 +48,11 @@ export function UsisPortalGate({ moduleKey }: UsisPortalGateProps) {
     return () => {
       isMounted = false;
     };
-  }, [moduleKey]);
+  }, [allowPortalGateBypass, moduleKey]);
 
   const shouldBlock = useMemo(
-    () => Boolean(config?.is_enabled && config.mode !== 'live'),
-    [config],
+    () => !allowPortalGateBypass && Boolean(config?.is_enabled && config.mode !== 'live'),
+    [allowPortalGateBypass, config],
   );
 
   if (!shouldBlock || !config) return null;

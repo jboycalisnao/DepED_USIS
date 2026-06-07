@@ -27,7 +27,7 @@ export interface SystemUser {
 const STORAGE_KEY_GL = 'leon_nhs_active_gls';
 const STORAGE_KEY_STRANDS = 'leon_nhs_strands';
 const STORAGE_KEY_PROGRAMS = 'leon_nhs_special_programs';
-const CACHE_PREFIX = 'registrar_table_cache_v1';
+const CACHE_PREFIX = 'registrar_table_cache_v2';
 const CACHE_TTL_MS = 10 * 60 * 1000;
 const REGISTRAR_TABLES = {
   users: 'usis_core_coordinators',
@@ -132,6 +132,72 @@ const notifyPrograms = () => {
 const notifyLoading = () => loadingListeners.forEach(l => l(isGlobalLoading));
 const setGlobalLoading = (val: boolean) => { isGlobalLoading = val; notifyLoading(); };
 const createId = () => Math.random().toString(36).substr(2, 9);
+const normalizeLrnKey = (value: string | undefined | null) => String(value || '').trim();
+const mergeLearnerForBulkImport = (incoming: Student) => {
+  const incomingLrn = normalizeLrnKey(incoming.lrn);
+  if (!incomingLrn) return incoming;
+
+  const existing = learners.find((entry) => normalizeLrnKey(entry.lrn) === incomingLrn);
+  if (!existing) return incoming;
+
+  return {
+    ...existing,
+    ...incoming,
+    id: existing.id,
+    loginUsername: normalizeLrnKey(incoming.loginUsername) ? incoming.loginUsername : existing.loginUsername,
+    loginPassword: normalizeLrnKey(incoming.loginPassword) ? incoming.loginPassword : existing.loginPassword,
+    loginStatus: normalizeLrnKey(incoming.loginStatus) ? incoming.loginStatus : existing.loginStatus,
+    lastLoginAt: normalizeLrnKey(incoming.lastLoginAt) ? incoming.lastLoginAt : existing.lastLoginAt,
+    microsoftUserId: normalizeLrnKey(incoming.microsoftUserId) ? incoming.microsoftUserId : existing.microsoftUserId,
+    microsoftUpn: normalizeLrnKey(incoming.microsoftUpn) ? incoming.microsoftUpn : existing.microsoftUpn,
+    microsoftMailNickname: normalizeLrnKey(incoming.microsoftMailNickname) ? incoming.microsoftMailNickname : existing.microsoftMailNickname,
+    microsoftAccountStatus: normalizeLrnKey(incoming.microsoftAccountStatus) ? incoming.microsoftAccountStatus : existing.microsoftAccountStatus,
+    microsoftLicenseSkuId: normalizeLrnKey(incoming.microsoftLicenseSkuId) ? incoming.microsoftLicenseSkuId : existing.microsoftLicenseSkuId,
+    microsoftCreatedAt: normalizeLrnKey(incoming.microsoftCreatedAt) ? incoming.microsoftCreatedAt : existing.microsoftCreatedAt,
+    microsoftLastSyncedAt: normalizeLrnKey(incoming.microsoftLastSyncedAt) ? incoming.microsoftLastSyncedAt : existing.microsoftLastSyncedAt,
+    orgAffiliations: Array.isArray(incoming.orgAffiliations) && incoming.orgAffiliations.length > 0 ? incoming.orgAffiliations : existing.orgAffiliations,
+    enrollments: Array.isArray(incoming.enrollments) && incoming.enrollments.length > 0 ? incoming.enrollments : existing.enrollments,
+  };
+};
+const normalizeEnrollmentRecord = (entry: any) => ({
+  id: String(entry?.id || createId()).trim(),
+  schoolYear: String(entry?.schoolYear || entry?.school_year || '').trim(),
+  gradeLevel: String(entry?.gradeLevel || entry?.grade_level || '').trim() as GradeLevel,
+  section: String(entry?.section || '').trim(),
+  enrollmentDate: String(entry?.enrollmentDate || entry?.enrollment_date || entry?.created_at || '').trim(),
+  status: String(entry?.status || EnrollmentStatus.ENROLLED).trim() as EnrollmentStatus,
+});
+const commitLearners = (nextLearners: Student[]) => {
+  learners = nextLearners;
+  isFirstLoad = false;
+  writeCachedRows(REGISTRAR_TABLES.learners, nextLearners.map((learner) => mapLearnerToDb(learner)));
+  learnersListeners.forEach((listener) => listener([...learners]));
+};
+
+const patchLearnerInCache = (id: string, patch: Partial<Student>) => {
+  const trimmedId = String(id || '').trim();
+  if (!trimmedId) return;
+  if (!learners.some((entry) => String(entry.id || '').trim() === trimmedId)) return;
+
+  commitLearners(learners.map((entry) => (
+    String(entry.id || '').trim() === trimmedId
+      ? { ...entry, ...patch, id: trimmedId }
+      : entry
+  )));
+};
+
+const commitSections = (nextSections: Section[]) => {
+  sections = nextSections;
+  writeCachedRows(REGISTRAR_TABLES.sections, nextSections.map((section) => ({
+    id: section.id,
+    name: section.name,
+    grade_level: section.gradeLevel,
+    adviser_name: section.adviserName,
+    strand: section.strand,
+    school_year_id: section.schoolYearId,
+  })));
+  sectionsListeners.forEach((listener) => listener([...sections]));
+};
 
 const mapLearnerToDb = (data: Partial<Student>) => {
   const sId = data.sectionId ? String(data.sectionId).trim() : null;
@@ -178,7 +244,7 @@ const mapDbToLearner = (l: any): Student => ({
   id: String(l.id).trim(),
   lrn: l.lrn,
   loginUsername: l.login_username || l.portal_username || l.username || l.lrn || '',
-  loginPassword: l.login_password_plain || l.portal_password_plain || l.login_password || l.portal_password || '',
+  loginPassword: l.login_password_plain || l.portal_password_plain || l.login_password || l.portal_password || l.password_plain || l.password || '',
   loginStatus: l.login_status || (l.is_login_active === false ? 'Disabled' : 'Active'),
   lastLoginAt: l.last_login_at || '',
   microsoftUserId: l.microsoft_user_id || '',
@@ -209,7 +275,11 @@ const mapDbToLearner = (l: any): Student => ({
   is4Ps: !!(l.is_4ps ?? l.is4Ps),
   isIndigent: !!(l.is_indigent ?? l.isIndigent),
   orgAffiliations: l.org_affiliations || l.orgAffiliations || [],
-  enrollments: l.enrollment_history || l.enrollments || []
+  enrollments: Array.isArray(l.enrollment_history)
+    ? l.enrollment_history.map(normalizeEnrollmentRecord)
+    : Array.isArray(l.enrollments)
+      ? l.enrollments.map(normalizeEnrollmentRecord)
+      : [],
 });
 
 const mapDbToSection = (s: any): Section => ({
@@ -374,7 +444,7 @@ const fetchUsers = async (forceRefresh = false) => {
 
     const { data, error } = await supabase
       .from(REGISTRAR_TABLES.users)
-      .select('id,username,password_plain,password_hash,first_name,middle_name,last_name,display_name')
+      .select('id,username,password_hash,first_name,middle_name,last_name')
       .eq('school_id', registrarAccess.schoolUuid)
       .order('created_at', { ascending: false });
 
@@ -393,17 +463,14 @@ const fetchUsers = async (forceRefresh = false) => {
 };
 
 const fetchLearners = (forceRefresh = false) => fetchAllFromTable(REGISTRAR_TABLES.learners, (data) => {
-  learners = data.map(mapDbToLearner);
-  isFirstLoad = false;
-  learnersListeners.forEach(l => l(learners));
+  commitLearners(data.map(mapDbToLearner));
 }, {
   forceRefresh,
-  selectColumns: 'id,lrn,login_username,portal_username,username,login_password_plain,portal_password_plain,login_password,portal_password,login_status,is_login_active,last_login_at,microsoft_user_id,microsoft_upn,microsoft_mail_nickname,microsoft_account_status,microsoft_license_sku_id,microsoft_created_at,microsoft_last_synced_at,first_name,last_name,middle_name,birth_date,gender,address,contact_number,email,guardian_name,father_name,mother_name,status,section_id,school_year,is_sslg,is_club_officer,is_athlete,is_artist,is_4ps,is_indigent,org_affiliations,enrollment_history',
+  selectColumns: 'id,lrn,first_name,last_name,middle_name,birth_date,gender,address,contact_number,guardian_name,father_name,mother_name,status,section_id,is_sslg,is_club_officer,is_athlete,is_artist,is_4ps,is_indigent,org_affiliations,enrollment_history,login_username,login_password_plain,login_status,last_login_at,microsoft_user_id,microsoft_upn,microsoft_mail_nickname,microsoft_account_status,microsoft_license_sku_id,microsoft_created_at,microsoft_last_synced_at,created_at',
 });
 
 const fetchSections = (forceRefresh = false) => fetchAllFromTable(REGISTRAR_TABLES.sections, (data) => {
-  sections = data.map(mapDbToSection);
-  sectionsListeners.forEach(l => l(sections));
+  commitSections(data.map(mapDbToSection));
 }, {
   forceRefresh,
   selectColumns: 'id,name,grade_level,adviser_name,strand,school_year_id',
@@ -450,7 +517,7 @@ const fetchStrands = (forceRefresh = false) => fetchAllFromTable(REGISTRAR_TABLE
   notifyStrands();
 }, {
   forceRefresh,
-  selectColumns: 'id,acronym,full_name,description,name',
+  selectColumns: 'id,acronym,full_name',
 });
 
 const fetchPrograms = (forceRefresh = false) => fetchAllFromTable(REGISTRAR_TABLES.specialPrograms, (data) => {
@@ -458,7 +525,7 @@ const fetchPrograms = (forceRefresh = false) => fetchAllFromTable(REGISTRAR_TABL
   notifyPrograms();
 }, {
   forceRefresh,
-  selectColumns: 'id,acronym,full_name,description,name',
+  selectColumns: 'id,acronym,full_name',
 });
 
 // Parallel Hydration on startup
@@ -690,7 +757,10 @@ export const useStore = () => {
       setGlobalLoading(true);
       try {
         const { error } = await supabase.from(REGISTRAR_TABLES.learners).insert([mapLearnerToDb(learner)]);
-        if (!error) await fetchLearners(true);
+        if (!error) {
+          const nextLearner = mapDbToLearner(mapLearnerToDb(learner));
+          commitLearners([...learners, nextLearner]);
+        }
         return { error: error?.message };
       } finally {
         setGlobalLoading(false);
@@ -720,7 +790,10 @@ export const useStore = () => {
           if (schoolYearError) return { error: schoolYearError.message };
         }
 
-        await fetchLearners(true);
+        commitLearners(learners.map((entry) => {
+          if (entry.id !== id) return entry;
+          return mapDbToLearner({ ...payload, id });
+        }));
         return { error: undefined };
       } finally {
         setGlobalLoading(false);
@@ -757,7 +830,7 @@ export const useStore = () => {
           }
         }
 
-        if (!error) await fetchLearners(true);
+        if (!error) commitLearners(learners.filter((entry) => String(entry.id || '').trim() !== String(id || '').trim()));
         return { error: error?.message };
       } finally {
         setGlobalLoading(false);
@@ -767,10 +840,21 @@ export const useStore = () => {
       if (activeSchoolYear.isLocked) return { error: "Locked" };
       setGlobalLoading(true);
       try {
-        const payload = newLearners.map(l => mapLearnerToDb(l));
+        const mergedLearners = newLearners.map((learner) => mergeLearnerForBulkImport(learner));
+        const payload = mergedLearners.map((learner) => mapLearnerToDb(learner));
         // Use upsert on LRN to handle duplicates at DB level too
         const { error } = await supabase.from(REGISTRAR_TABLES.learners).upsert(payload, { onConflict: 'lrn' });
-        if (!error) await fetchLearners(true);
+        if (!error) {
+          const incomingLearners = mergedLearners.map((learner) => mapDbToLearner(mapLearnerToDb(learner)));
+          const incomingKeys = new Set(
+            incomingLearners.map((learner) => String(learner.lrn || learner.id || '').trim()).filter(Boolean),
+          );
+          const retainedLearners = learners.filter((learner) => {
+            const key = String(learner.lrn || learner.id || '').trim();
+            return !key || !incomingKeys.has(key);
+          });
+          commitLearners([...retainedLearners, ...incomingLearners]);
+        }
         return { error: error?.message };
       } finally {
         setGlobalLoading(false);
@@ -795,7 +879,16 @@ export const useStore = () => {
         const results = await Promise.all(updates);
         const failed = results.find((result) => result.error);
         if (failed?.error) return { error: failed.error.message };
-        await fetchLearners(true);
+        commitLearners(learners.map((entry) => {
+          const update = payload.find((row) => row.id === entry.id);
+          if (!update) return entry;
+          return {
+            ...entry,
+            loginUsername: update.loginUsername ?? entry.loginUsername,
+            loginPassword: update.loginPassword ?? entry.loginPassword,
+            loginStatus: update.loginStatus ?? entry.loginStatus,
+          };
+        }));
         return { error: undefined };
       } finally {
         setGlobalLoading(false);
@@ -806,8 +899,9 @@ export const useStore = () => {
       setGlobalLoading(true);
       const id = createId();
       try {
-        const { error } = await supabase.from(REGISTRAR_TABLES.sections).insert([{ id, name, grade_level: gradeLevel, adviser_name: adviserName, strand, school_year_id: activeSchoolYear.id }]);
-        if (!error) await fetchSections(true);
+        const sectionRow = { id, name, grade_level: gradeLevel, adviser_name: adviserName, strand, school_year_id: activeSchoolYear.id };
+        const { error } = await supabase.from(REGISTRAR_TABLES.sections).insert([sectionRow]);
+        if (!error) commitSections([...sections, mapDbToSection(sectionRow)]);
         return { error: error?.message };
       } finally {
         setGlobalLoading(false);
@@ -823,7 +917,20 @@ export const useStore = () => {
         if (updates.adviserName !== undefined) dbPayload.adviser_name = updates.adviserName;
         if (updates.strand !== undefined) dbPayload.strand = updates.strand;
         const { error } = await supabase.from(REGISTRAR_TABLES.sections).update(dbPayload).eq('id', id);
-        if (!error) await fetchSections(true);
+        if (!error) {
+          commitSections(sections.map((entry) => (
+            entry.id === id
+              ? mapDbToSection({
+                  id,
+                  name: dbPayload.name ?? entry.name,
+                  grade_level: dbPayload.grade_level ?? entry.gradeLevel,
+                  adviser_name: dbPayload.adviser_name ?? entry.adviserName,
+                  strand: dbPayload.strand ?? entry.strand,
+                  school_year_id: entry.schoolYearId,
+                })
+              : entry
+          )));
+        }
         return { error: error?.message };
       } finally {
         setGlobalLoading(false);
@@ -836,7 +943,8 @@ export const useStore = () => {
         const { error } = await supabase.from(REGISTRAR_TABLES.sections).delete().eq('id', id);
         if (!error) { 
           await supabase.from(REGISTRAR_TABLES.learners).delete().eq('section_id', id); 
-          await Promise.all([fetchLearners(true), fetchSections(true)]); 
+          commitSections(sections.filter((entry) => entry.id !== id));
+          commitLearners(learners.filter((entry) => String(entry.sectionId || '').trim() !== id));
         }
         return { error: error?.message };
       } finally {
@@ -848,7 +956,7 @@ export const useStore = () => {
       setGlobalLoading(true);
       try {
         const { error } = await supabase.from(REGISTRAR_TABLES.learners).delete().eq('section_id', sectionId);
-        if (!error) await fetchLearners(true);
+        if (!error) commitLearners(learners.filter((entry) => String(entry.sectionId || '').trim() !== sectionId));
         return { error: error?.message };
       } finally {
         setGlobalLoading(false);
@@ -915,6 +1023,10 @@ export const useStore = () => {
       } finally {
         setGlobalLoading(false);
       }
+    },
+    patchLearnerInCache: async (id: string, patch: Partial<Student>) => {
+      patchLearnerInCache(id, patch);
+      return { error: undefined };
     },
     addSchoolYear: async (label: string) => {
       setGlobalLoading(true);

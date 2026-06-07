@@ -1,5 +1,11 @@
 import { supabase } from '@deped-usis/shared-supabase';
-import { getCachedLearnerData, resolveLearnerCacheKey, setCachedLearnerData } from './learnerPortalCache';
+import {
+  getCachedLearnerData,
+  getPersistentCachedLearnerData,
+  resolveLearnerCacheKey,
+  setCachedLearnerData,
+  setPersistentCachedLearnerData,
+} from './learnerPortalCache';
 
 const ATTENDANCE_TAP_ORDER = ['AM_IN', 'AM_OUT', 'PM_IN', 'PM_OUT', 'UNSCHEDULED'] as const;
 
@@ -34,42 +40,22 @@ export type LearnerAttendanceSnapshot = {
   totalTaps: number;
 };
 
-type MonthlyTapsRow = {
-  attendance_month: string;
-  day_01: unknown;
-  day_02: unknown;
-  day_03: unknown;
-  day_04: unknown;
-  day_05: unknown;
-  day_06: unknown;
-  day_07: unknown;
-  day_08: unknown;
-  day_09: unknown;
-  day_10: unknown;
-  day_11: unknown;
-  day_12: unknown;
-  day_13: unknown;
-  day_14: unknown;
-  day_15: unknown;
-  day_16: unknown;
-  day_17: unknown;
-  day_18: unknown;
-  day_19: unknown;
-  day_20: unknown;
-  day_21: unknown;
-  day_22: unknown;
-  day_23: unknown;
-  day_24: unknown;
-  day_25: unknown;
-  day_26: unknown;
-  day_27: unknown;
-  day_28: unknown;
-  day_29: unknown;
-  day_30: unknown;
-  day_31: unknown;
+type RawAttendanceRecordRow = {
+  id: string;
+  attendance_type: string;
+  logged_at: string;
+  source: string | null;
+  station_no: number | string | null;
+  scanned_uid: string | null;
 };
 
-const CACHE_SCOPE = 'attendance-history-monthly-v2';
+type AttendanceCachePayload = {
+  rows: RawAttendanceRecordRow[];
+  snapshot: LearnerAttendanceSnapshot;
+  latestLoggedAt: string;
+};
+
+const CACHE_SCOPE = 'attendance-history-records-v1';
 const MANILA_TIME_ZONE = 'Asia/Manila';
 
 const toText = (value: unknown) => String(value || '').trim();
@@ -85,6 +71,24 @@ const formatTimeInManila = (value: string) => {
   }).format(date);
 };
 
+const formatDateKeyInManila = (value: string) => {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: MANILA_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+
+  const year = parts.find((part) => part.type === 'year')?.value || '';
+  const month = parts.find((part) => part.type === 'month')?.value || '';
+  const day = parts.find((part) => part.type === 'day')?.value || '';
+  return year && month && day ? `${year}-${month}-${day}` : '';
+};
+
 const formatMonthLabel = (monthKey: string) => {
   const candidate = new Date(`${monthKey}-01T00:00:00Z`);
   if (Number.isNaN(candidate.getTime())) return monthKey;
@@ -95,11 +99,12 @@ const formatMonthLabel = (monthKey: string) => {
   }).format(candidate);
 };
 
-const getMonthKey = (dateKey: string) => dateKey.slice(0, 7);
-
-const getDateKeyForMonthDay = (monthKey: string, day: number) => `${monthKey}-${String(day).padStart(2, '0')}`;
-
-const getDayColumnName = (day: number) => `day_${String(day).padStart(2, '0')}` as const;
+const normalizeAttendanceType = (value: string): LearnerAttendanceTapType => {
+  const candidate = toText(value).toUpperCase();
+  return ATTENDANCE_TAP_ORDER.includes(candidate as LearnerAttendanceTapType)
+    ? (candidate as LearnerAttendanceTapType)
+    : 'UNSCHEDULED';
+};
 
 const tapTypeLabelMap: Record<LearnerAttendanceTapType, string> = {
   AM_IN: 'AM In',
@@ -109,7 +114,13 @@ const tapTypeLabelMap: Record<LearnerAttendanceTapType, string> = {
   UNSCHEDULED: 'Unscheduled',
 };
 
-const createTap = (type: LearnerAttendanceTapType, loggedAt: string, source = 'rfid', stationNo = '', scannedUid = ''): LearnerAttendanceTap => ({
+const createTap = (
+  type: LearnerAttendanceTapType,
+  loggedAt: string,
+  source = 'rfid',
+  stationNo = '',
+  scannedUid = '',
+): LearnerAttendanceTap => ({
   type,
   loggedAt,
   displayTime: formatTimeInManila(loggedAt),
@@ -117,29 +128,6 @@ const createTap = (type: LearnerAttendanceTapType, loggedAt: string, source = 'r
   stationNo: toText(stationNo),
   scannedUid: toText(scannedUid),
 });
-
-const createTapFromRecord = (
-  type: LearnerAttendanceTapType,
-  loggedAt: string,
-  source = 'rfid',
-  stationNo = '',
-  scannedUid = '',
-  displayTime = '',
-): LearnerAttendanceTap => ({
-  type,
-  loggedAt,
-  displayTime: toText(displayTime) || formatTimeInManila(loggedAt),
-  source: toText(source) || 'rfid',
-  stationNo: toText(stationNo),
-  scannedUid: toText(scannedUid),
-});
-
-const normalizeAttendanceType = (value: string): LearnerAttendanceTapType | null => {
-  const candidate = toText(value).toUpperCase();
-  return ATTENDANCE_TAP_ORDER.includes(candidate as LearnerAttendanceTapType)
-    ? (candidate as LearnerAttendanceTapType)
-    : null;
-};
 
 const sortTaps = (taps: LearnerAttendanceTap[]) =>
   [...taps].sort((left, right) => {
@@ -149,72 +137,45 @@ const sortTaps = (taps: LearnerAttendanceTap[]) =>
     return new Date(left.loggedAt).getTime() - new Date(right.loggedAt).getTime();
   });
 
-const isTapRecordLike = (value: unknown): value is Record<string, unknown> =>
-  !!value && typeof value === 'object' && !Array.isArray(value);
-
-const tryParseJsonString = (value: string): unknown => {
-  const text = value.trim();
-  if (!text) return null;
-  if (!(text.startsWith('[') || text.startsWith('{'))) return null;
-  try {
-    return JSON.parse(text);
-  } catch {
-    return null;
-  }
+const mergeRows = (existingRows: RawAttendanceRecordRow[], incomingRows: RawAttendanceRecordRow[]) => {
+  const merged = new Map<string, RawAttendanceRecordRow>();
+  for (const row of existingRows) merged.set(row.id, row);
+  for (const row of incomingRows) merged.set(row.id, row);
+  return Array.from(merged.values()).sort((left, right) => new Date(left.logged_at).getTime() - new Date(right.logged_at).getTime());
 };
 
-const createTapFromValue = (entry: unknown): LearnerAttendanceTap[] => {
-  if (!entry) return [];
+const buildSnapshot = (rows: RawAttendanceRecordRow[]): LearnerAttendanceSnapshot => {
+  const monthMap = new Map<string, Map<number, LearnerAttendanceTap[]>>();
 
-  if (typeof entry === 'string') {
-    const parsed = tryParseJsonString(entry);
-    if (parsed !== null) return parseTapArray(parsed);
-    const loggedAt = entry.trim();
-    return loggedAt ? [createTap('UNSCHEDULED', loggedAt)] : [];
-  }
+  rows.forEach((row) => {
+    const dateKey = formatDateKeyInManila(row.logged_at);
+    if (!dateKey) return;
 
-  if (Array.isArray(entry)) {
-    return entry.flatMap((item) => createTapFromValue(item));
-  }
+    const monthKey = dateKey.slice(0, 7);
+    const day = Number(dateKey.slice(8, 10));
+    if (!monthKey || !Number.isFinite(day) || day < 1 || day > 31) return;
 
-  if (!isTapRecordLike(entry)) return [];
+    const tapsByDay = monthMap.get(monthKey) || new Map<number, LearnerAttendanceTap[]>();
+    const taps = tapsByDay.get(day) || [];
+    taps.push(
+      createTap(
+        normalizeAttendanceType(row.attendance_type),
+        row.logged_at,
+        row.source || 'rfid',
+        row.station_no == null ? '' : String(row.station_no),
+        row.scanned_uid || '',
+      ),
+    );
+    tapsByDay.set(day, taps);
+    monthMap.set(monthKey, tapsByDay);
+  });
 
-  const record = entry as Record<string, unknown>;
-  const nestedTapCollections = [record.taps, record.entries, record.records, record.items].filter(Boolean);
-  if (nestedTapCollections.length > 0) {
-    const nested = nestedTapCollections.flatMap((collection) => createTapFromValue(collection));
-    if (nested.length > 0) return nested;
-  }
-
-  const loggedAt = toText(record.loggedAt || record.logged_at || record.time || record.timestamp || record.value);
-  if (!loggedAt) return [];
-  const type = normalizeAttendanceType(toText(record.type || record.attendanceType || record.attendance_type)) || 'UNSCHEDULED';
-
-  return [createTapFromRecord(
-    type,
-    loggedAt,
-    toText(record.source || 'rfid'),
-    toText(record.stationNo || record.station_no),
-    toText(record.scannedUid || record.scanned_uid),
-    toText(record.displayTime || record.display_time),
-  )];
-};
-
-const parseTapArray = (value: unknown): LearnerAttendanceTap[] => createTapFromValue(value);
-
-const flattenDayColumn = (row: MonthlyTapsRow, day: number): LearnerAttendanceTap[] => {
-  const column = row[getDayColumnName(day)];
-  return sortTaps(parseTapArray(column));
-};
-
-const buildSnapshot = (rows: MonthlyTapsRow[]): LearnerAttendanceSnapshot => {
-  const months = rows
-    .map((row) => {
-      const monthKey = toText(row.attendance_month).slice(0, 7);
+  const months = Array.from(monthMap.entries())
+    .map(([monthKey, daysByNumber]) => {
       const days = Array.from({ length: 31 }, (_, index) => {
         const day = index + 1;
-        const dateKey = getDateKeyForMonthDay(monthKey, day);
-        const taps = flattenDayColumn(row, day);
+        const dateKey = `${monthKey}-${String(day).padStart(2, '0')}`;
+        const taps = sortTaps(daysByNumber.get(day) || []);
         return {
           day,
           dateKey,
@@ -229,14 +190,14 @@ const buildSnapshot = (rows: MonthlyTapsRow[]): LearnerAttendanceSnapshot => {
         days,
       };
     })
-    .filter((row) => row.monthKey)
     .sort((left, right) => (left.monthKey < right.monthKey ? 1 : -1));
 
-  const totalDays = months.reduce((sum, month) => sum + month.days.filter((day) => day.taps.length > 0 || day.unscheduledCount > 0).length, 0);
+  const totalDays = months.reduce(
+    (sum, month) => sum + month.days.filter((day) => day.taps.length > 0 || day.unscheduledCount > 0).length,
+    0,
+  );
   const totalTaps = months.reduce(
-    (sum, month) =>
-      sum +
-      month.days.reduce((daySum, day) => daySum + day.taps.length, 0),
+    (sum, month) => sum + month.days.reduce((daySum, day) => daySum + day.taps.length, 0),
     0,
   );
 
@@ -248,6 +209,41 @@ const buildSnapshot = (rows: MonthlyTapsRow[]): LearnerAttendanceSnapshot => {
   };
 };
 
+const fetchAllAttendanceRows = async (learnerId: string) => {
+  const { data, error } = await supabase
+    .from('attendance_records')
+    .select('id,attendance_type,logged_at,source,station_no,scanned_uid')
+    .eq('learner_id', learnerId)
+    .order('logged_at', { ascending: true });
+
+  if (error) {
+    throw new Error(error.message || 'Unable to load attendance records.');
+  }
+
+  return (data || []) as RawAttendanceRecordRow[];
+};
+
+const fetchAttendanceRowsSince = async (learnerId: string, sinceLoggedAt: string) => {
+  const { data, error } = await supabase
+    .from('attendance_records')
+    .select('id,attendance_type,logged_at,source,station_no,scanned_uid')
+    .eq('learner_id', learnerId)
+    .gte('logged_at', sinceLoggedAt)
+    .order('logged_at', { ascending: true });
+
+  if (error) {
+    throw new Error(error.message || 'Unable to refresh attendance records.');
+  }
+
+  return (data || []) as RawAttendanceRecordRow[];
+};
+
+const buildCachePayload = (rows: RawAttendanceRecordRow[]): AttendanceCachePayload => ({
+  rows,
+  snapshot: buildSnapshot(rows),
+  latestLoggedAt: rows.length > 0 ? rows[rows.length - 1].logged_at : '',
+});
+
 export async function fetchLearnerAttendanceSnapshot(
   input: { learnerId?: string; lrn?: string },
   options: { forceRefresh?: boolean } = {},
@@ -255,63 +251,41 @@ export async function fetchLearnerAttendanceSnapshot(
   const learnerId = toText(input.learnerId);
   const lrn = toText(input.lrn);
   const cacheKey = resolveLearnerCacheKey({ learnerId, lrn });
-  if (!options.forceRefresh) {
-    const cached = getCachedLearnerData<LearnerAttendanceSnapshot>(CACHE_SCOPE, cacheKey);
-    if (cached) return cached;
-  }
 
   if (!learnerId) {
     throw new Error('Learner attendance lookup requires learner ID.');
   }
 
-  const { data, error } = await supabase
-    .from('attendance_monthly_taps')
-    .select(
-      [
-        'attendance_month',
-        'day_01',
-        'day_02',
-        'day_03',
-        'day_04',
-        'day_05',
-        'day_06',
-        'day_07',
-        'day_08',
-        'day_09',
-        'day_10',
-        'day_11',
-        'day_12',
-        'day_13',
-        'day_14',
-        'day_15',
-        'day_16',
-        'day_17',
-        'day_18',
-        'day_19',
-        'day_20',
-        'day_21',
-        'day_22',
-        'day_23',
-        'day_24',
-        'day_25',
-        'day_26',
-        'day_27',
-        'day_28',
-        'day_29',
-        'day_30',
-        'day_31',
-      ].join(',')
-    )
-    .eq('learner_id', learnerId)
-    .order('attendance_month', { ascending: true });
+  if (!options.forceRefresh) {
+    const persistentCached = await getPersistentCachedLearnerData<AttendanceCachePayload>(CACHE_SCOPE, cacheKey);
+    if (persistentCached?.snapshot) return persistentCached.snapshot;
 
-  if (error) {
-    throw new Error(error.message || 'Unable to load monthly attendance data.');
+    const cached = getCachedLearnerData<AttendanceCachePayload>(CACHE_SCOPE, cacheKey);
+    if (cached?.snapshot) {
+      void setPersistentCachedLearnerData(CACHE_SCOPE, cacheKey, cached);
+      return cached.snapshot;
+    }
   }
 
-  const snapshot = buildSnapshot((data || []) as MonthlyTapsRow[]);
-  setCachedLearnerData(CACHE_SCOPE, cacheKey, snapshot);
-  return snapshot;
+  const persistentCached = await getPersistentCachedLearnerData<AttendanceCachePayload>(CACHE_SCOPE, cacheKey);
+  if (persistentCached?.rows?.length && persistentCached.latestLoggedAt) {
+    const newRows = await fetchAttendanceRowsSince(learnerId, persistentCached.latestLoggedAt);
+    if (newRows.length === 0) {
+      return persistentCached.snapshot;
+    }
+
+    const mergedRows = mergeRows(persistentCached.rows, newRows);
+    const nextCache = buildCachePayload(mergedRows);
+    await setPersistentCachedLearnerData(CACHE_SCOPE, cacheKey, nextCache);
+    setCachedLearnerData(CACHE_SCOPE, cacheKey, nextCache);
+    return nextCache.snapshot;
+  }
+
+  const rows = await fetchAllAttendanceRows(learnerId);
+  const nextCache = buildCachePayload(rows);
+  await setPersistentCachedLearnerData(CACHE_SCOPE, cacheKey, nextCache);
+  setCachedLearnerData(CACHE_SCOPE, cacheKey, nextCache);
+  return nextCache.snapshot;
 }
 
 export function formatAttendanceDateTime(value: string) {

@@ -59,12 +59,19 @@ export const storeLearnerAccess = (record: LearnerPortalAccessRecord) => {
 };
 
 export const resolveLearnerAccess = async (username: string, password: string) => {
-  const normalizedUsername = username.trim().toLowerCase();
+  const normalizedUsername = username.replace(/\D/g, '').trim();
   const normalizedPassword = password.trim();
 
   if (!normalizedUsername || !normalizedPassword) {
     return {
-      error: 'Username and password are required.',
+      error: 'LRN and password are required.',
+      record: null as LearnerPortalAccessRecord | null,
+    };
+  }
+
+  if (!/^\d{12}$/.test(normalizedUsername)) {
+    return {
+      error: 'LRN must contain exactly 12 digits.',
       record: null as LearnerPortalAccessRecord | null,
     };
   }

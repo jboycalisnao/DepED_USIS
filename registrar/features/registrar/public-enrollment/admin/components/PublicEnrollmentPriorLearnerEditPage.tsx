@@ -100,7 +100,7 @@ const emptyDraft = (schoolId: string): EnrollmentDraft => ({
 export default function PublicEnrollmentPriorLearnerEditPage() {
   const { learnerId = '' } = useParams();
   const navigate = useNavigate();
-  const { registrarAccess, availableStrands, refreshData } = useStore();
+  const { registrarAccess, availableStrands, patchLearnerInCache } = useStore();
   const schoolId = registrarAccess?.schoolId || '302522';
   const [activeSchoolYearLabel, setActiveSchoolYearLabel] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -399,8 +399,46 @@ export default function PublicEnrollmentPriorLearnerEditPage() {
         email: draft.email.trim() || null,
       };
 
+      const nextEnrollmentHistory = [
+        ...enrollmentHistoryRows.map((row) => ({
+          id: row.id,
+          schoolYear: row.schoolYear,
+          gradeLevel: row.gradeLevel,
+          section: row.section,
+          enrollmentDate: row.enrolledAt,
+          status: row.status,
+        })),
+        {
+          id: crypto.randomUUID(),
+          schoolYear: draft.schoolYear || '',
+          gradeLevel: draft.gradeToEnroll || '',
+          section: '',
+          enrollmentDate: new Date().toISOString(),
+          status: 'Information Updated',
+          submissionPayload: draft as unknown as Record<string, any>,
+        },
+      ];
+
+      updatePayload.enrollment_history = nextEnrollmentHistory;
+
       const { error: updateError } = await supabase.from('registrar_learners').update(updatePayload).eq('id', resolvedLearnerId);
       if (updateError) throw updateError;
+      await patchLearnerInCache(resolvedLearnerId, {
+        schoolYear: draft.schoolYear || undefined,
+        lrn: draft.lrn.trim() || undefined,
+        firstName: draft.firstName.trim() || undefined,
+        middleName: draft.middleName.trim() || undefined,
+        lastName: draft.lastName.trim() || undefined,
+        birthDate: draft.birthDate.trim() || undefined,
+        gender: draft.gender.trim() || undefined,
+        address: (draft.currentAddress || draft.permanentAddress).trim() || undefined,
+        contactNumber: draft.learnerContact.trim() || undefined,
+        guardian_name: draft.guardianName.trim() || undefined,
+        father_name: draft.fatherName.trim() || undefined,
+        mother_name: draft.motherName.trim() || undefined,
+        email: draft.email.trim() || undefined,
+        enrollments: nextEnrollmentHistory as any,
+      });
       await insertEnrollmentHistoryRow({
         learnerId: resolvedLearnerId,
         schoolYear: draft.schoolYear || '',
@@ -410,7 +448,6 @@ export default function PublicEnrollmentPriorLearnerEditPage() {
         submissionPayload: draft as unknown as Record<string, any>,
       });
 
-      await refreshData(true);
       navigate('/enroll');
     } catch (e: any) {
       setError(e?.message || 'Unable to update learner information.');

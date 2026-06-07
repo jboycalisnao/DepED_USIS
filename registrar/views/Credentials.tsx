@@ -9,6 +9,7 @@ import { CredentialsActions } from './credentials/CredentialsActions';
 import { CredentialsFilters } from './credentials/CredentialsFilters';
 import { CredentialsSectionTable } from './credentials/CredentialsSectionTable';
 import { buildMicrosoftUsername, createPolicyPassword, createUniquePolicyPassword } from './credentials/credentialsHelpers';
+import { getActiveLearnersForYear } from '../services/dashboardService';
 
 const Credentials: React.FC = () => {
   const navigate = useNavigate();
@@ -40,19 +41,20 @@ const Credentials: React.FC = () => {
     return map;
   }, [sectionsForGrade]);
 
-  const targetLearners = useMemo(() => {
-    const hasEnrollmentInActiveSchoolYear = (learner: Student) =>
-      (Array.isArray(learner.enrollments) ? learner.enrollments : []).some((entry) => String(entry?.schoolYear || '').trim() === activeSchoolYear.label);
+  const activeLearnersForYear = useMemo(
+    () => getActiveLearnersForYear(learners, sections, activeSchoolYear),
+    [learners, sections, activeSchoolYear],
+  );
 
+  const targetLearners = useMemo(() => {
     const activeSectionIds = new Set(sectionsForGrade.map((section) => section.id));
     const scopeFiltered = selectedSectionId === 'all'
-      ? learners.filter((learner) => activeSectionIds.has(String(learner.sectionId || '').trim()))
-      : learners.filter((learner) => String(learner.sectionId || '').trim() === selectedSectionId);
-    const historyFiltered = scopeFiltered.filter(hasEnrollmentInActiveSchoolYear);
+      ? activeLearnersForYear.filter((learner) => activeSectionIds.has(String(learner.sectionId || '').trim()))
+      : activeLearnersForYear.filter((learner) => String(learner.sectionId || '').trim() === selectedSectionId);
     const query = searchTerm.trim().toLowerCase();
 
     const filtered = query
-      ? historyFiltered.filter((learner) =>
+      ? scopeFiltered.filter((learner) =>
           [
             learner.lrn,
             learner.lastName,
@@ -62,12 +64,12 @@ const Credentials: React.FC = () => {
             learner.loginStatus || '',
             sectionMap[String(learner.sectionId || '').trim()] || '',
           ].join(' ').toLowerCase().includes(query))
-      : historyFiltered;
+      : scopeFiltered;
 
     return filtered.sort((a, b) =>
       `${a.lastName}, ${a.firstName}`.toUpperCase().localeCompare(`${b.lastName}, ${b.firstName}`.toUpperCase()),
     );
-  }, [learners, sectionsForGrade, selectedSectionId, searchTerm, sectionMap, activeSchoolYear.label]);
+  }, [activeLearnersForYear, sectionsForGrade, selectedSectionId, searchTerm, sectionMap]);
 
   useEffect(() => {
     setSelectedLearnerIds((prev) => {

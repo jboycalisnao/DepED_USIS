@@ -4,11 +4,6 @@ import {
   fetchLearnerAttendanceSnapshot,
   type LearnerAttendanceSnapshot,
 } from '../../services/attendanceService';
-import {
-  fetchLearnerAttendanceArchiveSnapshot,
-  type LearnerAttendanceArchiveSnapshot,
-} from '../../services/attendanceArchiveService';
-import { ArchivedAttendanceSection } from './attendance/components/ArchivedAttendanceSection';
 import { MonthlyAttendanceTable } from './attendance/components/MonthlyAttendanceTable';
 
 type AttendanceServicePageProps = {
@@ -22,19 +17,8 @@ export function AttendanceServicePage({ session }: AttendanceServicePageProps) {
     totalDays: 0,
     totalTaps: 0,
   });
-  const [archiveSnapshot, setArchiveSnapshot] = useState<LearnerAttendanceArchiveSnapshot>({
-    records: [],
-    totalBatches: 0,
-    totalRows: 0,
-    totalTaps: 0,
-    totalUnscheduled: 0,
-    latestArchivedAt: '',
-    latestArchivedRange: '',
-  });
   const [isLoading, setIsLoading] = useState(true);
-  const [isArchiveLoading, setIsArchiveLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [archiveError, setArchiveError] = useState<string | null>(null);
   const [refreshNonce, setRefreshNonce] = useState(0);
 
   useEffect(() => {
@@ -79,31 +63,6 @@ export function AttendanceServicePage({ session }: AttendanceServicePageProps) {
     };
   }, [session.learnerId, session.lrn, refreshNonce]);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    const run = async () => {
-      setIsArchiveLoading(true);
-      setArchiveError(null);
-      try {
-        const next = await fetchLearnerAttendanceArchiveSnapshot(
-          { learnerId: session.learnerId, lrn: session.lrn },
-          { forceRefresh: refreshNonce > 0 },
-        );
-        if (!cancelled) setArchiveSnapshot(next);
-      } catch (fetchError: any) {
-        if (!cancelled) setArchiveError(fetchError?.message || 'Unable to load archived attendance records.');
-      } finally {
-        if (!cancelled) setIsArchiveLoading(false);
-      }
-    };
-
-    run();
-    return () => {
-      cancelled = true;
-    };
-  }, [session.learnerId, session.lrn, refreshNonce]);
-
   return (
     <section className="section-shell">
       <div className="portal-panel learner-tab-panel">
@@ -131,8 +90,6 @@ export function AttendanceServicePage({ session }: AttendanceServicePageProps) {
 
         {!isLoading && !error && snapshot.months.length > 0 ? <MonthlyAttendanceTable months={snapshot.months} /> : null}
       </section>
-
-      <ArchivedAttendanceSection snapshot={archiveSnapshot} isLoading={isArchiveLoading} error={archiveError} />
     </section>
   );
 }

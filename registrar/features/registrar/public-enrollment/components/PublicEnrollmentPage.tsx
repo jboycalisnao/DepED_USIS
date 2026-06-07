@@ -296,7 +296,7 @@ export default function PublicEnrollmentPage() {
       try {
         const { data, error } = await supabase
           .from('registrar_learners')
-          .select('id,lrn,first_name,middle_name,last_name,birth_date,gender,address,contact_number,guardian_name,father_name,mother_name,email,is_4ps,enrollment_history')
+          .select('id,lrn,first_name,middle_name,last_name,birth_date,gender,address,contact_number,guardian_name,father_name,mother_name,email,is_4ps')
           .eq('lrn', normalizedLrn)
           .maybeSingle();
 
@@ -326,8 +326,7 @@ export default function PublicEnrollmentPage() {
               .maybeSingle()
           : { data: null as any };
 
-        const history = Array.isArray((data as any).enrollment_history) ? (data as any).enrollment_history : [];
-        const latestEntryLegacy = history[history.length - 1] || {};
+        const latestEntryLegacy = {};
         const payload =
           ((latestHistoryRow as any)?.submission_payload && typeof (latestHistoryRow as any).submission_payload === 'object'
             ? (latestHistoryRow as any).submission_payload
