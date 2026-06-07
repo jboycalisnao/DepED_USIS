@@ -82,9 +82,11 @@ function App() {
     removeMapping,
     toggleAdmin,
     logAttendance,
+    addManualAttendanceRecord,
     deleteRecord,
     queryRecordsByDateRange,
     querySummaryByDateRange,
+    deleteMonthlyTapRecord,
   } = useAttendance();
   const { settings, updateSettings } = useSettings();
 
@@ -691,7 +693,9 @@ function App() {
                       logs={attendanceLogs}
                       learners={learners}
                       onDelete={deleteRecord}
+                      onDeleteMonthlyTap={deleteMonthlyTapRecord}
                       onQueryRange={queryRecordsByDateRange}
+                      onAddManualRecord={addManualAttendanceRecord}
                     />
                   }
                 />

@@ -18,11 +18,10 @@ function formatDate(value: string) {
 }
 
 export default function PublicEnrollmentSectioningPage() {
-  const { registrarAccess } = useStore();
+  const { registrarAccess, activeSchoolYear: storeActiveSchoolYear, sections: storeSections, learners: storeLearners } = useStore();
   const schoolId = String(registrarAccess?.schoolId || '302522').trim();
 
-  const [isLoading, setIsLoading] = useState(true);
-  const [activeSchoolYear, setActiveSchoolYear] = useState('');
+  const isLoading = false;
   const [accessCode, setAccessCode] = useState('');
   const [unlockedGradeLevel, setUnlockedGradeLevel] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -33,95 +32,37 @@ export default function PublicEnrollmentSectioningPage() {
   const [savingId, setSavingId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
 
-  const loadActiveSchoolYear = async () => {
-    setIsLoading(true);
-    const { data } = await supabase
-      .from('registrar_school_years')
-      .select('label')
-      .eq('is_active', true)
-      .limit(1)
-      .maybeSingle();
-    setActiveSchoolYear(String((data as any)?.label || '').trim());
-    setIsLoading(false);
-  };
-
-  useEffect(() => {
-    void loadActiveSchoolYear();
-  }, []);
-
   const loadGradeData = async (gradeLevel: string, schoolYear: string) => {
-    const [{ data: submissionRows }, { data: syRow }] = await Promise.all([
-      supabase
-        .from('registrar_public_enrollment_submissions')
-        .select('id,submission_reference_id,created_at,school_id,school_year,lrn,last_name,first_name,middle_name,grade_to_enroll,guardian_contact,payload')
-        .eq('school_year', schoolYear)
-        .eq('grade_to_enroll', gradeLevel)
-        .order('created_at', { ascending: false }),
-      supabase.from('registrar_school_years').select('id').eq('label', schoolYear).limit(1).maybeSingle(),
-    ]);
+    const { data: submissionRows } = await supabase
+      .from('registrar_public_enrollment_submissions')
+      .select('id,submission_reference_id,created_at,school_id,school_year,lrn,last_name,first_name,middle_name,grade_to_enroll,guardian_contact,payload')
+      .eq('school_year', schoolYear)
+      .eq('grade_to_enroll', gradeLevel)
+      .order('created_at', { ascending: false });
 
-    const schoolYearId = String((syRow as any)?.id || '').trim();
-    let nextSections: SectionOption[] = [];
-    if (schoolYearId) {
-      const { data: sectionRows } = await supabase
-        .from('registrar_sections')
-        .select('id,name')
-        .eq('school_year_id', schoolYearId)
-        .eq('grade_level', gradeLevel)
-        .order('name', { ascending: true });
-      nextSections = (sectionRows || []).map((row: any) => ({ id: String(row.id || ''), name: String(row.name || '') }));
-    }
+    const nextSections: SectionOption[] = storeSections
+      .filter((section) => section.schoolYearId === storeActiveSchoolYear.id && section.gradeLevel === gradeLevel)
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map((section) => ({ id: section.id, name: section.name }));
 
     const rows = (submissionRows || []) as PublicEnrollmentSubmission[];
-    const lrnList = Array.from(
-      new Set(
-        rows
-          .map((row) => String(row.lrn || '').trim())
-          .filter(Boolean),
-      ),
-    );
 
     const nextCurrentSectionBySubmission: Record<string, string> = {};
-    if (lrnList.length) {
-      const { data: learnerRows } = await supabase
-        .from('registrar_learners')
-        .select('lrn,section_id')
-        .in('lrn', lrnList);
+    const sectionNameById: Record<string, string> = storeSections.reduce((acc, section) => {
+      acc[section.id] = section.name;
+      return acc;
+    }, {} as Record<string, string>);
+    const learnerSectionByLrn: Record<string, string> = storeLearners.reduce((acc, learner) => {
+      const lrn = String(learner.lrn || '').trim();
+      const sectionId = String(learner.sectionId || '').trim();
+      if (!lrn) return acc;
+      acc[lrn] = sectionNameById[sectionId] || '--';
+      return acc;
+    }, {} as Record<string, string>);
 
-      const sectionIds = Array.from(
-        new Set(
-          (learnerRows || [])
-            .map((row: any) => String(row.section_id || '').trim())
-            .filter(Boolean),
-        ),
-      );
-
-      const sectionNameById: Record<string, string> = {};
-      if (sectionIds.length) {
-        const { data: sectionNameRows } = await supabase
-          .from('registrar_sections')
-          .select('id,name')
-          .in('id', sectionIds);
-        for (const sectionRow of sectionNameRows || []) {
-          const key = String((sectionRow as any).id || '').trim();
-          if (key) sectionNameById[key] = String((sectionRow as any).name || '').trim();
-        }
-      }
-
-      const learnerSectionByLrn: Record<string, string> = {};
-      for (const learnerRow of learnerRows || []) {
-        const lrn = String((learnerRow as any).lrn || '').trim();
-        const sectionId = String((learnerRow as any).section_id || '').trim();
-        if (!lrn) continue;
-        learnerSectionByLrn[lrn] = sectionNameById[sectionId] || '--';
-      }
-
-      for (const row of rows) {
-        const lrn = String(row.lrn || '').trim();
-        nextCurrentSectionBySubmission[row.id] = lrn ? learnerSectionByLrn[lrn] || '--' : '--';
-      }
-    } else {
-      for (const row of rows) nextCurrentSectionBySubmission[row.id] = '--';
+    for (const row of rows) {
+      const lrn = String(row.lrn || '').trim();
+      nextCurrentSectionBySubmission[row.id] = lrn ? learnerSectionByLrn[lrn] || '--' : '--';
     }
 
     setSubmissions(rows);
@@ -139,6 +80,7 @@ export default function PublicEnrollmentSectioningPage() {
 
   const unlock = async () => {
     setErrorMessage(null);
+    const activeSchoolYear = String(storeActiveSchoolYear.label || '').trim();
     if (!activeSchoolYear) {
       setErrorMessage('Active school year is unavailable.');
       return;
@@ -171,20 +113,8 @@ export default function PublicEnrollmentSectioningPage() {
     setSavingId(row.id);
     setErrorMessage(null);
     try {
-      const { data: sectionInfo, error: sectionInfoError } = await supabase
-        .from('registrar_sections')
-        .select('id,name,school_year_id,grade_level')
-        .eq('id', selectedSectionId)
-        .maybeSingle();
-      if (sectionInfoError || !sectionInfo) throw new Error('Selected section is invalid.');
-
-      const { data: schoolYearInfo } = await supabase
-        .from('registrar_school_years')
-        .select('label')
-        .eq('id', String((sectionInfo as any).school_year_id || '').trim())
-        .maybeSingle();
-
       const payload = (row.payload || {}) as EnrollmentDraft & Record<string, any>;
+      const activeSchoolYear = String(storeActiveSchoolYear.label || '').trim();
       const nextPayload = {
         ...payload,
         assignedSectionId: selectedSectionId,
@@ -196,14 +126,22 @@ export default function PublicEnrollmentSectioningPage() {
       const lrn = String(row.lrn || payload.lrn || '').trim();
       if (!lrn) throw new Error('LRN is required before assigning section.');
 
-      const { data: existingLearner } = await supabase
-        .from('registrar_learners')
-        .select('id')
-        .eq('lrn', lrn)
-        .maybeSingle();
+      const cachedLearner = storeLearners.find((entry) => String(entry.lrn || '').trim() === lrn);
+      let resolvedLearnerId = String(cachedLearner?.id || '').trim();
+      if (!resolvedLearnerId) {
+        const { data: existingLearner } = await supabase
+          .from('registrar_learners')
+          .select('id')
+          .eq('lrn', lrn)
+          .maybeSingle();
+        resolvedLearnerId = String((existingLearner as any)?.id || '').trim();
+      }
+      if (!resolvedLearnerId) {
+        resolvedLearnerId = crypto.randomUUID();
+      }
 
       const upsertPayload: Record<string, any> = {
-        id: existingLearner?.id || crypto.randomUUID(),
+        id: resolvedLearnerId || crypto.randomUUID(),
         lrn,
         first_name: String(row.first_name || payload.firstName || '').trim() || null,
         middle_name: String(row.middle_name || payload.middleName || '').trim() || null,
@@ -224,15 +162,11 @@ export default function PublicEnrollmentSectioningPage() {
       const { error: upsertError } = await supabase.from('registrar_learners').upsert(upsertPayload, { onConflict: 'lrn' });
       if (upsertError) throw upsertError;
 
-      const { data: resolvedLearner } = await supabase.from('registrar_learners').select('id').eq('lrn', lrn).maybeSingle();
-      const resolvedLearnerId = String((resolvedLearner as any)?.id || existingLearner?.id || '').trim();
-      if (!resolvedLearnerId) throw new Error('Unable to resolve learner id for enrollment history.');
-
       await supabase.from('registrar_enrollment_history').insert({
         learner_id: resolvedLearnerId,
-        school_year: String(schoolYearInfo?.label || row.school_year || payload.schoolYear || '').trim(),
-        grade_level: String(row.grade_to_enroll || payload.gradeToEnroll || (sectionInfo as any).grade_level || '').trim() || null,
-        section: String((sectionInfo as any).name || selectedSection.name || '').trim() || null,
+        school_year: activeSchoolYear || String(row.school_year || payload.schoolYear || '').trim(),
+        grade_level: String(unlockedGradeLevel || row.grade_to_enroll || payload.gradeToEnroll || '').trim() || null,
+        section: String(selectedSection.name || '').trim() || null,
         status: 'Enrolled',
         enrollment_date: new Date().toISOString(),
         submission_payload: nextPayload,
@@ -264,8 +198,8 @@ export default function PublicEnrollmentSectioningPage() {
 
   const gradeSummary = useMemo(() => {
     if (!unlockedGradeLevel) return '';
-    return `${unlockedGradeLevel} - ${activeSchoolYear}`;
-  }, [unlockedGradeLevel, activeSchoolYear]);
+    return `${unlockedGradeLevel} - ${String(storeActiveSchoolYear.label || '').trim()}`;
+  }, [unlockedGradeLevel, storeActiveSchoolYear.label]);
 
   const filteredSubmissions = useMemo(() => {
     const normalized = query.trim().toLowerCase();

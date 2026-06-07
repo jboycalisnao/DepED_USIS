@@ -2,20 +2,17 @@
 <img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
 </div>
 
-# Run and deploy your AI Studio app
+# DepED USIS Attendance Module
 
-This contains everything you need to run your app locally.
-
-View your app in AI Studio: https://ai.studio/apps/3f2efc89-d7fd-4876-9390-90cc4b9b6d51
+RFID attendance logging, kiosk sync, monthly learner views, and archive export for DepED USIS.
 
 ## Run Locally
 
-**Prerequisites:**  Node.js
-
+**Prerequisites:** Node.js
 
 1. Install dependencies:
    `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
+2. Set the required environment variables in `.env.local`
 3. Run the app:
    `npm run dev`
 
@@ -40,37 +37,89 @@ The normalization logic lives in [utils/rfid.ts](./utils/rfid.ts) and is used so
 - raw 7-byte RC522 hex input
 - 10-digit decimal reader-style input
 
-If this hardware mapping ever changes, re-verify it with real card samples before updating the conversion logic.
+If this hardware mapping changes, re-verify it with real card samples before updating the conversion logic.
+
+### Arduino kiosk sketch
+
+An Arduino sketch for the RC522 reader is included at:
+
+- [arduino/rc522_hid_decimal/rc522_hid_decimal.ino](./arduino/rc522_hid_decimal/rc522_hid_decimal.ino)
+
+Behavior:
+
+- reads the RC522 UID
+- converts it to the 10-digit HID-style decimal format used by USIS
+- sends the value to `Serial`
+- beeps twice on invalid taps or failed reads
+
+Hardware notes:
+
+- `SS_PIN` defaults to `10`
+- `RST_PIN` defaults to `9`
+- `BUZZER_PIN` defaults to `6`
+
+Optional allow-list:
+
+- populate `VALID_UIDS` inside the sketch if you want the buzzer to reject unknown tags
+- leave the list empty if you only want the sketch to beep on malformed reads
 
 ## Attendance Retention and Archiving
 
-This module now supports a 90-day raw retention model with historical summaries and CSV archiving.
+The attendance module keeps recent records in Supabase and archives older records into summary tables for historical reporting.
 
-### Schema
+### Storage model
 
-Run the SQL in [schema.sql](./schema.sql). It adds:
+- `attendance_records` remains the raw event source.
+- `attendance_daily_summary` and `attendance_monthly_summary` support historical reporting.
+- `attendance_archive_batches` stores archive batch metadata.
+- `attendance_archive_learner_summaries` stores learner-level archive summaries used by the learner portal.
 
-- `attendance_daily_summary`
-- `attendance_monthly_summary`
-- `attendance_archive_batches`
-- `attendance_refresh_summaries(p_start_date, p_end_date)`
+### Archive flow
 
-### Archive job
+Run the archive job from the repo root:
 
-Run from repo root:
+- Archive a selected date range:
+  `npm run archive:attendance --workspace ./attendance -- --from=2026-01-01 --to=2026-03-31`
 
-- `npm run archive:attendance --workspace ./attendance`
+- Archive the default retention window older than 3 months:
+  `npm run archive:attendance --workspace ./attendance -- --months=3`
 
-Required env vars:
+What the job does:
 
-- `SUPABASE_URL` (or `VITE_SUPABASE_URL`)
+1. Reads eligible rows from `attendance_records`.
+2. Groups them by month.
+3. Writes archive metadata into `attendance_archive_batches`.
+4. Writes learner summary rows into `attendance_archive_learner_summaries`.
+5. Refreshes the daily/monthly summary tables for the archived date window.
+6. Deletes the raw rows from `attendance_records` after the archive write succeeds.
+
+### Required env vars
+
+- `SUPABASE_URL` or `VITE_SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
 
-Optional env vars:
+### Optional env vars
 
-- `ATTENDANCE_RETENTION_DAYS` (default `90`)
-- `ATTENDANCE_ARCHIVE_BUCKET` (default `attendance-archives`)
+- `ATTENDANCE_ARCHIVE_MONTHS` (default `3`)
+- `ATTENDANCE_ARCHIVE_REASON` or `--reason=...` when you want a custom archive note
 
-Recommended schedule:
+### Example `.env.local`
 
-- Daily during off-hours (for example 11:30 PM).
+```env
+SUPABASE_URL=replace-with-your-supabase-url
+SUPABASE_SERVICE_ROLE_KEY=replace-with-your-service-role-key
+ATTENDANCE_ARCHIVE_MONTHS=3
+ATTENDANCE_ARCHIVE_REASON=older-than-3-months
+```
+
+### Learner portal archive display
+
+The learner portal attendance service now shows:
+
+- the current monthly tap matrix for live and recently retained records
+- an archived attendance section that lists date ranges already archived in the system
+- learner-level archive summaries, including tap counts and unscheduled counts
+
+Recommended archive schedule:
+
+- Daily during off-hours, or whenever the raw retention window should be cleared.

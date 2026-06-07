@@ -1,12 +1,9 @@
 #!/usr/bin/env node
-import fs from 'node:fs/promises';
-import path from 'node:path';
 import crypto from 'node:crypto';
-import { fileURLToPath } from 'node:url';
 import { createClient } from '@supabase/supabase-js';
 
-const RETENTION_DAYS = Number(process.env.ATTENDANCE_RETENTION_DAYS || 90);
-const BUCKET = process.env.ATTENDANCE_ARCHIVE_BUCKET || 'attendance-archives';
+const MANILA_TIME_ZONE = 'Asia/Manila';
+const DEFAULT_RETENTION_MONTHS = Number(process.env.ATTENDANCE_ARCHIVE_MONTHS || 3);
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -19,76 +16,130 @@ const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const tmpDir = path.resolve(__dirname, '../.tmp');
+const parseArgs = () => {
+  const result = {};
+  const argv = process.argv.slice(2);
+  for (let index = 0; index < argv.length; index += 1) {
+    const token = argv[index];
+    if (!token.startsWith('--')) continue;
+    const body = token.slice(2);
+    const equalsIndex = body.indexOf('=');
+    if (equalsIndex >= 0) {
+      result[body.slice(0, equalsIndex)] = body.slice(equalsIndex + 1);
+      continue;
+    }
 
-const csvEscape = (value) => {
-  if (value === null || value === undefined) return '';
-  const s = String(value);
-  if (s.includes('"') || s.includes(',') || s.includes('\n')) {
-    return `"${s.replaceAll('"', '""')}"`;
+    const nextToken = argv[index + 1];
+    if (nextToken && !nextToken.startsWith('--')) {
+      result[body] = nextToken;
+      index += 1;
+      continue;
+    }
+
+    result[body] = 'true';
   }
-  return s;
+  return result;
 };
 
-const startOfMonthUtc = (date) =>
-  new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1, 0, 0, 0, 0));
+const args = parseArgs();
 
-const nextMonthUtc = (date) =>
-  new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 1, 0, 0, 0, 0));
+const toText = (value) => String(value || '').trim();
 
-const yyyyMm = (date) => {
-  const y = date.getUTCFullYear();
-  const m = `${date.getUTCMonth() + 1}`.padStart(2, '0');
-  return `${y}-${m}`;
-};
-
-const isoDate = (date) => date.toISOString().slice(0, 10);
-
-const ensureArchiveBucket = async () => {
-  const { data: bucket } = await supabase.storage.getBucket(BUCKET);
-  if (bucket) return;
-  const { error } = await supabase.storage.createBucket(BUCKET, { public: false });
-  if (error && !String(error.message || '').toLowerCase().includes('already')) {
-    throw error;
+const chunk = (items, size) => {
+  const result = [];
+  for (let index = 0; index < items.length; index += size) {
+    result.push(items.slice(index, index + size));
   }
+  return result;
 };
 
-const fetchRangeCount = async (fromIso, toIso, cutoffIso) => {
-  const { count, error } = await supabase
-    .from('attendance_records')
-    .select('id', { head: true, count: 'exact' })
-    .gte('logged_at', fromIso)
-    .lt('logged_at', toIso)
-    .lt('logged_at', cutoffIso);
-  if (error) throw error;
-  return count || 0;
-};
-
-const refreshSummariesForRange = async (fromDate, toDate) => {
-  const { error } = await supabase.rpc('attendance_refresh_summaries', {
-    p_start_date: fromDate,
-    p_end_date: toDate,
+const formatManilaDateParts = (value) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: MANILA_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
   });
-  if (error) throw error;
+  const parts = formatter.formatToParts(date);
+  const lookup = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  if (!lookup.year || !lookup.month || !lookup.day) return null;
+  return {
+    year: lookup.year,
+    month: lookup.month,
+    day: lookup.day,
+  };
 };
 
-const exportMonthCsv = async (fromIso, toIso, cutoffIso, localCsvPath, hash) => {
-  const headers = [
-    'id',
-    'learner_id',
-    'attendance_type',
-    'station_no',
-    'scanned_uid',
-    'logged_at',
-    'source',
-    'created_at',
-  ];
-  await fs.writeFile(localCsvPath, `${headers.join(',')}\n`, 'utf8');
-  hash.update(`${headers.join(',')}\n`);
+const getManilaDateKey = (value) => {
+  const parts = formatManilaDateParts(value);
+  if (!parts) return '';
+  return `${parts.year}-${parts.month}-${parts.day}`;
+};
 
-  let exported = 0;
+const getManilaMonthKey = (value) => {
+  const parts = formatManilaDateParts(value);
+  if (!parts) return '';
+  return `${parts.year}-${parts.month}`;
+};
+
+const getManilaMonthLabel = (monthKey) => {
+  const date = new Date(`${monthKey}-01T00:00:00+08:00`);
+  if (Number.isNaN(date.getTime())) return monthKey;
+  return new Intl.DateTimeFormat('en-PH', {
+    timeZone: MANILA_TIME_ZONE,
+    month: 'long',
+    year: 'numeric',
+  }).format(date);
+};
+
+const formatDateRangeLabel = (fromValue, toValue) => {
+  const start = getManilaDateKey(fromValue);
+  const end = getManilaDateKey(toValue);
+  if (!start && !end) return 'N/A';
+  if (start === end) return start;
+  return `${start} to ${end}`;
+};
+
+const formatLearnerName = (row) => {
+  const firstName = toText(row.first_name);
+  const middleName = toText(row.middle_name);
+  const lastName = toText(row.last_name);
+  return [firstName, middleName, lastName].filter(Boolean).join(' ').trim();
+};
+
+const getEligibleBounds = async (windowStartIso, windowEndExclusiveIso) => {
+  const query = supabase
+    .from('attendance_records')
+    .select('id, logged_at')
+    .gte('logged_at', windowStartIso)
+    .lt('logged_at', windowEndExclusiveIso)
+    .order('logged_at', { ascending: true });
+
+  const { data: firstRows, error: firstError } = await query.limit(1);
+  if (firstError) throw firstError;
+  if (!firstRows || firstRows.length === 0) return null;
+
+  const { data: lastRows, error: lastError } = await supabase
+    .from('attendance_records')
+    .select('id, logged_at')
+    .gte('logged_at', windowStartIso)
+    .lt('logged_at', windowEndExclusiveIso)
+    .order('logged_at', { ascending: false })
+    .limit(1);
+  if (lastError) throw lastError;
+  if (!lastRows || lastRows.length === 0) return null;
+
+  return {
+    firstLoggedAt: String(firstRows[0].logged_at),
+    lastLoggedAt: String(lastRows[0].logged_at),
+  };
+};
+
+const fetchEligibleRecords = async (windowStartIso, windowEndExclusiveIso) => {
+  const records = [];
+  const learnerIds = new Set();
   const pageSize = 1000;
   let offset = 0;
 
@@ -96,174 +147,293 @@ const exportMonthCsv = async (fromIso, toIso, cutoffIso, localCsvPath, hash) => 
     const { data, error } = await supabase
       .from('attendance_records')
       .select('id, learner_id, attendance_type, station_no, scanned_uid, logged_at, source, created_at')
-      .gte('logged_at', fromIso)
-      .lt('logged_at', toIso)
-      .lt('logged_at', cutoffIso)
+      .gte('logged_at', windowStartIso)
+      .lt('logged_at', windowEndExclusiveIso)
       .order('logged_at', { ascending: true })
       .range(offset, offset + pageSize - 1);
 
     if (error) throw error;
     if (!data || data.length === 0) break;
 
-    const lines = data
-      .map((row) =>
-        [
-          row.id,
-          row.learner_id,
-          row.attendance_type,
-          row.station_no,
-          row.scanned_uid,
-          row.logged_at,
-          row.source,
-          row.created_at,
-        ]
-          .map(csvEscape)
-          .join(','),
-      )
-      .join('\n');
+    for (const row of data) {
+      records.push(row);
+      if (row.learner_id) learnerIds.add(String(row.learner_id));
+    }
 
-    const payload = `${lines}\n`;
-    await fs.appendFile(localCsvPath, payload, 'utf8');
-    hash.update(payload);
-
-    exported += data.length;
-    offset += pageSize;
+    offset += data.length;
+    if (data.length < pageSize) break;
   }
 
-  return exported;
+  return { records, learnerIds: [...learnerIds] };
 };
 
-const uploadArchiveCsv = async (storagePath, localCsvPath) => {
-  const fileBuffer = await fs.readFile(localCsvPath);
-  const { error } = await supabase.storage.from(BUCKET).upload(storagePath, fileBuffer, {
-    contentType: 'text/csv',
-    upsert: false,
-  });
-  if (error) throw error;
+const fetchLearnerDirectory = async (learnerIds) => {
+  const directory = new Map();
+  for (const ids of chunk(learnerIds, 200)) {
+    const { data, error } = await supabase
+      .from('registrar_learners')
+      .select('id, lrn, first_name, middle_name, last_name')
+      .in('id', ids);
+    if (error) throw error;
+    for (const row of data || []) {
+      directory.set(String(row.id), {
+        id: String(row.id),
+        lrn: toText(row.lrn),
+        name: formatLearnerName(row),
+      });
+    }
+  }
+  return directory;
 };
 
-const deleteRange = async (fromIso, toIso, cutoffIso) => {
-  const { error } = await supabase
-    .from('attendance_records')
-    .delete()
-    .gte('logged_at', fromIso)
-    .lt('logged_at', toIso)
-    .lt('logged_at', cutoffIso);
-  if (error) throw error;
+const groupRecordsByMonth = (records, learnerDirectory) => {
+  const groups = new Map();
+
+  for (const record of records) {
+    const monthKey = getManilaMonthKey(record.logged_at);
+    if (!monthKey) continue;
+
+    if (!groups.has(monthKey)) {
+      groups.set(monthKey, {
+        monthKey,
+        records: [],
+        learnerSummaries: new Map(),
+      });
+    }
+
+    const group = groups.get(monthKey);
+    group.records.push(record);
+
+    const learnerId = String(record.learner_id || '');
+    if (!learnerId) continue;
+
+    if (!group.learnerSummaries.has(learnerId)) {
+      const learner = learnerDirectory.get(learnerId) || { id: learnerId, lrn: '', name: '' };
+      group.learnerSummaries.set(learnerId, {
+        archive_batch_id: '',
+        learner_id: learnerId,
+        learner_name: learner.name || '',
+        learner_lrn: learner.lrn || '',
+        archive_month: `${monthKey}-01`,
+        from_logged_at: String(record.logged_at),
+        to_logged_at: String(record.logged_at),
+        row_count: 0,
+        am_in_count: 0,
+        am_out_count: 0,
+        pm_in_count: 0,
+        pm_out_count: 0,
+        unscheduled_count: 0,
+        first_logged_at: String(record.logged_at),
+        last_logged_at: String(record.logged_at),
+        notes: '',
+      });
+    }
+
+    const summary = group.learnerSummaries.get(learnerId);
+    summary.row_count += 1;
+    summary.first_logged_at = summary.row_count === 1 || String(record.logged_at) < summary.first_logged_at ? String(record.logged_at) : summary.first_logged_at;
+    summary.last_logged_at = summary.row_count === 1 || String(record.logged_at) > summary.last_logged_at ? String(record.logged_at) : summary.last_logged_at;
+    summary.from_logged_at = summary.first_logged_at;
+    summary.to_logged_at = summary.last_logged_at;
+
+    switch (String(record.attendance_type || '').toUpperCase()) {
+      case 'AM_IN':
+        summary.am_in_count += 1;
+        break;
+      case 'AM_OUT':
+        summary.am_out_count += 1;
+        break;
+      case 'PM_IN':
+        summary.pm_in_count += 1;
+        break;
+      case 'PM_OUT':
+        summary.pm_out_count += 1;
+        break;
+      default:
+        summary.unscheduled_count += 1;
+        break;
+    }
+  }
+
+  return [...groups.values()].sort((left, right) => (left.monthKey > right.monthKey ? 1 : -1));
 };
 
-const insertManifest = async (payload) => {
-  const { data, error } = await supabase
-    .from('attendance_archive_batches')
-    .insert(payload)
-    .select('id')
-    .single();
+const insertArchiveBatch = async (payload) => {
+  const { data, error } = await supabase.from('attendance_archive_batches').insert(payload).select('id').single();
   if (error) throw error;
   return data.id;
 };
 
-const markPurged = async (id) => {
-  const { error } = await supabase
-    .from('attendance_archive_batches')
-    .update({ purged_at: new Date().toISOString() })
-    .eq('id', id);
+const insertLearnerSummaries = async (rows) => {
+  if (rows.length === 0) return;
+  const { error } = await supabase.from('attendance_archive_learner_summaries').insert(rows);
   if (error) throw error;
 };
 
-const run = async () => {
-  await fs.mkdir(tmpDir, { recursive: true });
-  await ensureArchiveBucket();
-
-  const now = new Date();
-  const cutoff = new Date(now.getTime() - RETENTION_DAYS * 24 * 60 * 60 * 1000);
-  const cutoffIso = cutoff.toISOString();
-  const cutoffDay = isoDate(cutoff);
-
-  const { data: firstRow, error: firstError } = await supabase
-    .from('attendance_records')
-    .select('logged_at')
-    .lt('logged_at', cutoffIso)
-    .order('logged_at', { ascending: true })
-    .limit(1)
-    .maybeSingle();
-
-  if (firstError) throw firstError;
-  if (!firstRow) {
-    console.log('No records eligible for archive/purge.');
-    return;
-  }
-
-  const { data: lastRow, error: lastError } = await supabase
-    .from('attendance_records')
-    .select('logged_at')
-    .lt('logged_at', cutoffIso)
-    .order('logged_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (lastError) throw lastError;
-
-  let cursor = startOfMonthUtc(new Date(firstRow.logged_at));
-  const endMonth = startOfMonthUtc(new Date(lastRow.logged_at));
-
-  while (cursor <= endMonth) {
-    const monthStart = cursor;
-    const monthEnd = nextMonthUtc(monthStart);
-    const fromIso = monthStart.toISOString();
-    const toIso = monthEnd.toISOString();
-    const monthLabel = yyyyMm(monthStart);
-
-    const monthCount = await fetchRangeCount(fromIso, toIso, cutoffIso);
-    if (monthCount === 0) {
-      cursor = monthEnd;
-      continue;
-    }
-
-    const summaryStart = isoDate(monthStart);
-    const summaryEndDate = new Date(Math.min(monthEnd.getTime(), cutoff.getTime()) - 1);
-    const summaryEnd = isoDate(summaryEndDate);
-    await refreshSummariesForRange(summaryStart, summaryEnd);
-
-    const hash = crypto.createHash('sha256');
-    const filename = `attendance-records-${monthLabel}.csv`;
-    const localCsvPath = path.join(tmpDir, filename);
-    const storagePath = `${monthLabel}/${filename}`;
-
-    const exportedCount = await exportMonthCsv(fromIso, toIso, cutoffIso, localCsvPath, hash);
-    const checksumSha256 = hash.digest('hex');
-
-    if (exportedCount !== monthCount) {
-      throw new Error(`Row count mismatch for ${monthLabel}: counted ${monthCount}, exported ${exportedCount}`);
-    }
-
-    await uploadArchiveCsv(storagePath, localCsvPath);
-
-    const manifestId = await insertManifest({
-      archive_month: `${monthLabel}-01`,
-      from_logged_at: fromIso,
-      to_logged_at: toIso,
-      row_count: exportedCount,
-      file_path: `${BUCKET}/${storagePath}`,
-      checksum_sha256: checksumSha256,
-      exported_at: new Date().toISOString(),
-      notes: `retention_days=${RETENTION_DAYS}; cutoff_day=${cutoffDay}`,
-    });
-
-    await deleteRange(fromIso, toIso, cutoffIso);
-
-    const remaining = await fetchRangeCount(fromIso, toIso, cutoffIso);
-    if (remaining !== 0) {
-      throw new Error(`Purge failed for ${monthLabel}: ${remaining} rows remain`);
-    }
-
-    await markPurged(manifestId);
-    await fs.unlink(localCsvPath).catch(() => undefined);
-
-    console.log(`Archived and purged ${exportedCount} rows for ${monthLabel}`);
-    cursor = monthEnd;
+const deleteRecordsById = async (recordIds) => {
+  for (const ids of chunk(recordIds, 500)) {
+    const { error } = await supabase.from('attendance_records').delete().in('id', ids);
+    if (error) throw error;
   }
 };
 
-run().catch((error) => {
+const refreshSummariesForGroup = async (groupRecords) => {
+  if (groupRecords.length === 0) return;
+  const firstDate = getManilaDateKey(groupRecords[0].logged_at);
+  const lastDate = getManilaDateKey(groupRecords[groupRecords.length - 1].logged_at);
+  if (!firstDate || !lastDate) return;
+  const { error } = await supabase.rpc('attendance_refresh_summaries', {
+    p_start_date: firstDate,
+    p_end_date: lastDate,
+  });
+  if (error) throw error;
+};
+
+const main = async () => {
+  const retentionMonths = Number(args.months || DEFAULT_RETENTION_MONTHS || 3);
+  const selectedFrom = toText(args.from);
+  const selectedTo = toText(args.to);
+  const archiveReason =
+    toText(args.reason) ||
+    toText(process.env.ATTENDANCE_ARCHIVE_REASON) ||
+    (selectedFrom && selectedTo ? 'manual-selected-range' : `older-than-${retentionMonths}-months`);
+
+  let windowStartIso = '';
+  let windowEndExclusiveIso = '';
+
+  if (selectedFrom || selectedTo) {
+    if (!selectedFrom || !selectedTo) {
+      throw new Error('Archive range requires both --from and --to.');
+    }
+    windowStartIso = `${selectedFrom}T00:00:00+08:00`;
+    const endExclusive = new Date(`${selectedTo}T00:00:00+08:00`);
+    endExclusive.setUTCDate(endExclusive.getUTCDate() + 1);
+    windowEndExclusiveIso = endExclusive.toISOString();
+  } else {
+    const cutoff = new Date();
+    cutoff.setUTCMonth(cutoff.getUTCMonth() - retentionMonths);
+    windowEndExclusiveIso = cutoff.toISOString();
+  }
+
+  const bounds = await getEligibleBounds(windowStartIso || '0001-01-01T00:00:00Z', windowEndExclusiveIso);
+  if (!bounds) {
+    console.log('No records eligible for archive.');
+    return;
+  }
+
+  if (!windowStartIso) {
+    windowStartIso = String(bounds.firstLoggedAt);
+  }
+
+  const { records, learnerIds } = await fetchEligibleRecords(windowStartIso, windowEndExclusiveIso);
+  if (records.length === 0) {
+    console.log('No records eligible for archive.');
+    return;
+  }
+
+  const learnerDirectory = await fetchLearnerDirectory(learnerIds);
+
+  const groups = groupRecordsByMonth(records, learnerDirectory);
+  for (const group of groups) {
+    const archiveBatchId = crypto.randomUUID();
+    const groupLearnerSummaries = [...group.learnerSummaries.values()].map((summary) => ({
+      ...summary,
+      archive_batch_id: archiveBatchId,
+      notes: archiveReason,
+    }));
+
+    const monthRecords = group.records;
+    const rowCount = monthRecords.length;
+    const learnerCount = groupLearnerSummaries.length;
+    const archiveMonth = `${group.monthKey}-01`;
+    const firstLoggedAt = String(monthRecords[0].logged_at);
+    const lastLoggedAt = String(monthRecords[monthRecords.length - 1].logged_at);
+
+    const summaryPayload = groupLearnerSummaries.map((summary) => ({
+      learner_id: summary.learner_id,
+      learner_name: summary.learner_name,
+      learner_lrn: summary.learner_lrn,
+      archive_month: summary.archive_month,
+      from_logged_at: summary.from_logged_at,
+      to_logged_at: summary.to_logged_at,
+      row_count: summary.row_count,
+      am_in_count: summary.am_in_count,
+      am_out_count: summary.am_out_count,
+      pm_in_count: summary.pm_in_count,
+      pm_out_count: summary.pm_out_count,
+      unscheduled_count: summary.unscheduled_count,
+    }));
+
+    const filePath = `archive://attendance/${group.monthKey}/${archiveBatchId}`;
+
+    await insertArchiveBatch({
+      id: archiveBatchId,
+      archive_month: archiveMonth,
+      from_logged_at: firstLoggedAt,
+      to_logged_at: lastLoggedAt,
+      row_count: rowCount,
+      file_path: filePath,
+      checksum_sha256: crypto.createHash('sha256').update(JSON.stringify(monthRecords)).digest('hex'),
+      sheet_id: null,
+      sheet_url: null,
+      sheet_tab: 'Archive',
+      archive_source: selectedFrom && selectedTo ? 'selected_range' : 'retention_window',
+      archive_reason: archiveReason,
+      learner_count: learnerCount,
+      source_row_count: rowCount,
+      summary_payload: summaryPayload,
+      exported_at: new Date().toISOString(),
+      notes: `range=${formatDateRangeLabel(firstLoggedAt, lastLoggedAt)}`,
+    });
+
+    await insertLearnerSummaries(
+      groupLearnerSummaries.map((summary) => ({
+        archive_batch_id: archiveBatchId,
+        learner_id: summary.learner_id,
+        learner_name: summary.learner_name,
+        learner_lrn: summary.learner_lrn,
+        archive_month: summary.archive_month,
+        from_logged_at: summary.from_logged_at,
+        to_logged_at: summary.to_logged_at,
+        row_count: summary.row_count,
+        am_in_count: summary.am_in_count,
+        am_out_count: summary.am_out_count,
+        pm_in_count: summary.pm_in_count,
+        pm_out_count: summary.pm_out_count,
+        unscheduled_count: summary.unscheduled_count,
+        first_logged_at: summary.first_logged_at,
+        last_logged_at: summary.last_logged_at,
+        sheet_id: null,
+        sheet_url: null,
+        sheet_tab: 'Archive',
+        archived_at: new Date().toISOString(),
+        notes: archiveReason,
+      })),
+    );
+
+    await refreshSummariesForGroup(monthRecords);
+
+    await deleteRecordsById(monthRecords.map((record) => String(record.id)));
+
+    const { count: remainingCount, error: remainingError } = await supabase
+      .from('attendance_records')
+      .select('id', { head: true, count: 'exact' })
+      .in('id', monthRecords.map((record) => String(record.id)));
+    if (remainingError) throw remainingError;
+    if (remainingCount && remainingCount > 0) {
+      throw new Error(`Purge failed for ${group.monthKey}: ${remainingCount} rows remain`);
+    }
+
+    await supabase
+      .from('attendance_archive_batches')
+      .update({ purged_at: new Date().toISOString() })
+      .eq('id', archiveBatchId);
+
+    console.log(`Archived ${rowCount} attendance records for ${getManilaMonthLabel(group.monthKey)} into archive summaries.`);
+  }
+};
+
+main().catch((error) => {
   console.error('Attendance archive job failed:', error);
   process.exit(1);
 });

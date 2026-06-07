@@ -34,25 +34,42 @@ export type LearnerAttendanceSnapshot = {
   totalTaps: number;
 };
 
-type RawAttendanceRow = {
-  id: string;
-  attendance_type: string;
-  logged_at: string;
-  source: string;
-  station_no: string | number | null;
-  scanned_uid: string | null;
+type MonthlyTapsRow = {
+  attendance_month: string;
+  day_01: unknown;
+  day_02: unknown;
+  day_03: unknown;
+  day_04: unknown;
+  day_05: unknown;
+  day_06: unknown;
+  day_07: unknown;
+  day_08: unknown;
+  day_09: unknown;
+  day_10: unknown;
+  day_11: unknown;
+  day_12: unknown;
+  day_13: unknown;
+  day_14: unknown;
+  day_15: unknown;
+  day_16: unknown;
+  day_17: unknown;
+  day_18: unknown;
+  day_19: unknown;
+  day_20: unknown;
+  day_21: unknown;
+  day_22: unknown;
+  day_23: unknown;
+  day_24: unknown;
+  day_25: unknown;
+  day_26: unknown;
+  day_27: unknown;
+  day_28: unknown;
+  day_29: unknown;
+  day_30: unknown;
+  day_31: unknown;
 };
 
-type SummaryAttendanceRow = {
-  attendance_date: string;
-  am_in: string | null;
-  am_out: string | null;
-  pm_in: string | null;
-  pm_out: string | null;
-  unscheduled_count: number;
-};
-
-const CACHE_SCOPE = 'attendance-history-monthly';
+const CACHE_SCOPE = 'attendance-history-monthly-v2';
 const MANILA_TIME_ZONE = 'Asia/Manila';
 
 const toText = (value: unknown) => String(value || '').trim();
@@ -78,26 +95,11 @@ const formatMonthLabel = (monthKey: string) => {
   }).format(candidate);
 };
 
-const toManilaDateKey = (value: string) => {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value.slice(0, 10);
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: MANILA_TIME_ZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(date);
-  const year = parts.find((part) => part.type === 'year')?.value || '';
-  const month = parts.find((part) => part.type === 'month')?.value || '';
-  const day = parts.find((part) => part.type === 'day')?.value || '';
-  return year && month && day ? `${year}-${month}-${day}` : value.slice(0, 10);
-};
-
 const getMonthKey = (dateKey: string) => dateKey.slice(0, 7);
 
-const getDayNumber = (dateKey: string) => Number(dateKey.slice(8, 10));
-
 const getDateKeyForMonthDay = (monthKey: string, day: number) => `${monthKey}-${String(day).padStart(2, '0')}`;
+
+const getDayColumnName = (day: number) => `day_${String(day).padStart(2, '0')}` as const;
 
 const tapTypeLabelMap: Record<LearnerAttendanceTapType, string> = {
   AM_IN: 'AM In',
@@ -111,6 +113,22 @@ const createTap = (type: LearnerAttendanceTapType, loggedAt: string, source = 'r
   type,
   loggedAt,
   displayTime: formatTimeInManila(loggedAt),
+  source: toText(source) || 'rfid',
+  stationNo: toText(stationNo),
+  scannedUid: toText(scannedUid),
+});
+
+const createTapFromRecord = (
+  type: LearnerAttendanceTapType,
+  loggedAt: string,
+  source = 'rfid',
+  stationNo = '',
+  scannedUid = '',
+  displayTime = '',
+): LearnerAttendanceTap => ({
+  type,
+  loggedAt,
+  displayTime: toText(displayTime) || formatTimeInManila(loggedAt),
   source: toText(source) || 'rfid',
   stationNo: toText(stationNo),
   scannedUid: toText(scannedUid),
@@ -131,96 +149,94 @@ const sortTaps = (taps: LearnerAttendanceTap[]) =>
     return new Date(left.loggedAt).getTime() - new Date(right.loggedAt).getTime();
   });
 
-const addTapToDay = (
-  dayMap: Map<string, { tapsByType: Partial<Record<LearnerAttendanceTapType, LearnerAttendanceTap>>; unscheduledCount: number }>,
-  dateKey: string,
-  tap: LearnerAttendanceTap,
-) => {
-  const current = dayMap.get(dateKey) || {
-    tapsByType: {},
-    unscheduledCount: 0,
-  };
+const isTapRecordLike = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
 
-  if (tap.type === 'UNSCHEDULED') {
-    current.unscheduledCount += 1;
-  } else if (!current.tapsByType[tap.type] || new Date(tap.loggedAt).getTime() < new Date(current.tapsByType[tap.type]!.loggedAt).getTime()) {
-    current.tapsByType[tap.type] = tap;
+const tryParseJsonString = (value: string): unknown => {
+  const text = value.trim();
+  if (!text) return null;
+  if (!(text.startsWith('[') || text.startsWith('{'))) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
   }
-
-  dayMap.set(dateKey, current);
 };
 
-const buildSnapshot = (rawRows: RawAttendanceRow[], summaryRows: SummaryAttendanceRow[]): LearnerAttendanceSnapshot => {
-  const dayMap = new Map<string, { tapsByType: Partial<Record<LearnerAttendanceTapType, LearnerAttendanceTap>>; unscheduledCount: number }>();
+const createTapFromValue = (entry: unknown): LearnerAttendanceTap[] => {
+  if (!entry) return [];
 
-  for (const row of rawRows) {
-    const type = normalizeAttendanceType(row.attendance_type);
-    if (!type) continue;
-    const dateKey = toManilaDateKey(row.logged_at);
-    addTapToDay(
-      dayMap,
-      dateKey,
-      createTap(type, row.logged_at, row.source, row.station_no, row.scanned_uid || ''),
-    );
+  if (typeof entry === 'string') {
+    const parsed = tryParseJsonString(entry);
+    if (parsed !== null) return parseTapArray(parsed);
+    const loggedAt = entry.trim();
+    return loggedAt ? [createTap('UNSCHEDULED', loggedAt)] : [];
   }
 
-  for (const row of summaryRows) {
-    const dateKey = toText(row.attendance_date).slice(0, 10);
-    if (!dateKey) continue;
-
-    if (row.am_in) addTapToDay(dayMap, dateKey, createTap('AM_IN', row.am_in));
-    if (row.am_out) addTapToDay(dayMap, dateKey, createTap('AM_OUT', row.am_out));
-    if (row.pm_in) addTapToDay(dayMap, dateKey, createTap('PM_IN', row.pm_in));
-    if (row.pm_out) addTapToDay(dayMap, dateKey, createTap('PM_OUT', row.pm_out));
-
-    const current = dayMap.get(dateKey) || {
-      tapsByType: {},
-      unscheduledCount: 0,
-    };
-    current.unscheduledCount = Math.max(current.unscheduledCount, Number(row.unscheduled_count || 0));
-    dayMap.set(dateKey, current);
+  if (Array.isArray(entry)) {
+    return entry.flatMap((item) => createTapFromValue(item));
   }
 
-  const monthMap = new Map<string, LearnerAttendanceMonthRow>();
+  if (!isTapRecordLike(entry)) return [];
 
-  for (const [dateKey, dayState] of dayMap.entries()) {
-    const monthKey = getMonthKey(dateKey);
-    const monthRow = monthMap.get(monthKey) || {
-      monthKey,
-      monthLabel: formatMonthLabel(monthKey),
-      days: Array.from({ length: 31 }, (_, index) => ({
-        day: index + 1,
-        dateKey: getDateKeyForMonthDay(monthKey, index + 1),
-        taps: [],
-        unscheduledCount: 0,
-      })),
-    };
+  const record = entry as Record<string, unknown>;
+  const nestedTapCollections = [record.taps, record.entries, record.records, record.items].filter(Boolean);
+  if (nestedTapCollections.length > 0) {
+    const nested = nestedTapCollections.flatMap((collection) => createTapFromValue(collection));
+    if (nested.length > 0) return nested;
+  }
 
-    const dayNumber = getDayNumber(dateKey);
-    if (dayNumber >= 1 && dayNumber <= 31) {
-      const taps = sortTaps(
-        ATTENDANCE_TAP_ORDER.flatMap((type) => {
-          const tap = dayState.tapsByType[type];
-          return tap ? [tap] : [];
-        })
-      );
-      monthRow.days[dayNumber - 1] = {
-        day: dayNumber,
-        dateKey,
-        taps,
-        unscheduledCount: dayState.unscheduledCount,
+  const loggedAt = toText(record.loggedAt || record.logged_at || record.time || record.timestamp || record.value);
+  if (!loggedAt) return [];
+  const type = normalizeAttendanceType(toText(record.type || record.attendanceType || record.attendance_type)) || 'UNSCHEDULED';
+
+  return [createTapFromRecord(
+    type,
+    loggedAt,
+    toText(record.source || 'rfid'),
+    toText(record.stationNo || record.station_no),
+    toText(record.scannedUid || record.scanned_uid),
+    toText(record.displayTime || record.display_time),
+  )];
+};
+
+const parseTapArray = (value: unknown): LearnerAttendanceTap[] => createTapFromValue(value);
+
+const flattenDayColumn = (row: MonthlyTapsRow, day: number): LearnerAttendanceTap[] => {
+  const column = row[getDayColumnName(day)];
+  return sortTaps(parseTapArray(column));
+};
+
+const buildSnapshot = (rows: MonthlyTapsRow[]): LearnerAttendanceSnapshot => {
+  const months = rows
+    .map((row) => {
+      const monthKey = toText(row.attendance_month).slice(0, 7);
+      const days = Array.from({ length: 31 }, (_, index) => {
+        const day = index + 1;
+        const dateKey = getDateKeyForMonthDay(monthKey, day);
+        const taps = flattenDayColumn(row, day);
+        return {
+          day,
+          dateKey,
+          taps,
+          unscheduledCount: taps.filter((tap) => tap.type === 'UNSCHEDULED').length,
+        };
+      });
+
+      return {
+        monthKey,
+        monthLabel: formatMonthLabel(monthKey),
+        days,
       };
-    }
+    })
+    .filter((row) => row.monthKey)
+    .sort((left, right) => (left.monthKey < right.monthKey ? 1 : -1));
 
-    monthMap.set(monthKey, monthRow);
-  }
-
-  const months = Array.from(monthMap.values()).sort((left, right) => (left.monthKey < right.monthKey ? 1 : -1));
   const totalDays = months.reduce((sum, month) => sum + month.days.filter((day) => day.taps.length > 0 || day.unscheduledCount > 0).length, 0);
   const totalTaps = months.reduce(
     (sum, month) =>
       sum +
-      month.days.reduce((daySum, day) => daySum + day.taps.length + day.unscheduledCount, 0),
+      month.days.reduce((daySum, day) => daySum + day.taps.length, 0),
     0,
   );
 
@@ -232,60 +248,68 @@ const buildSnapshot = (rawRows: RawAttendanceRow[], summaryRows: SummaryAttendan
   };
 };
 
-export async function fetchLearnerAttendanceSnapshot(input: { learnerId?: string; lrn?: string }): Promise<LearnerAttendanceSnapshot> {
+export async function fetchLearnerAttendanceSnapshot(
+  input: { learnerId?: string; lrn?: string },
+  options: { forceRefresh?: boolean } = {},
+): Promise<LearnerAttendanceSnapshot> {
   const learnerId = toText(input.learnerId);
   const lrn = toText(input.lrn);
   const cacheKey = resolveLearnerCacheKey({ learnerId, lrn });
-  const cached = getCachedLearnerData<LearnerAttendanceSnapshot>(CACHE_SCOPE, cacheKey);
-  if (cached) return cached;
+  if (!options.forceRefresh) {
+    const cached = getCachedLearnerData<LearnerAttendanceSnapshot>(CACHE_SCOPE, cacheKey);
+    if (cached) return cached;
+  }
 
   if (!learnerId) {
     throw new Error('Learner attendance lookup requires learner ID.');
   }
 
-  const [rawResult, summaryResult] = await Promise.allSettled([
-    supabase
-      .from('attendance_records')
-      .select('id,attendance_type,logged_at,source,station_no,scanned_uid')
-      .eq('learner_id', learnerId)
-      .order('logged_at', { ascending: true }),
-    supabase
-      .from('attendance_daily_summary')
-      .select('attendance_date,am_in,am_out,pm_in,pm_out,unscheduled_count')
-      .eq('learner_id', learnerId)
-      .order('attendance_date', { ascending: true }),
-  ]);
+  const { data, error } = await supabase
+    .from('attendance_monthly_taps')
+    .select(
+      [
+        'attendance_month',
+        'day_01',
+        'day_02',
+        'day_03',
+        'day_04',
+        'day_05',
+        'day_06',
+        'day_07',
+        'day_08',
+        'day_09',
+        'day_10',
+        'day_11',
+        'day_12',
+        'day_13',
+        'day_14',
+        'day_15',
+        'day_16',
+        'day_17',
+        'day_18',
+        'day_19',
+        'day_20',
+        'day_21',
+        'day_22',
+        'day_23',
+        'day_24',
+        'day_25',
+        'day_26',
+        'day_27',
+        'day_28',
+        'day_29',
+        'day_30',
+        'day_31',
+      ].join(',')
+    )
+    .eq('learner_id', learnerId)
+    .order('attendance_month', { ascending: true });
 
-  const rawError = rawResult.status === 'rejected' ? rawResult.reason : rawResult.value.error;
-  const summaryError = summaryResult.status === 'rejected' ? summaryResult.reason : summaryResult.value.error;
-  const rawSucceeded = rawResult.status === 'fulfilled' && !rawResult.value.error;
-  const summarySucceeded = summaryResult.status === 'fulfilled' && !summaryResult.value.error;
-
-  const rawRows = rawSucceeded ? (rawResult.value.data || []).map((row: any) => ({
-    id: toText(row.id),
-    attendance_type: toText(row.attendance_type),
-    logged_at: toText(row.logged_at),
-    source: toText(row.source || 'rfid'),
-    station_no: row.station_no,
-    scanned_uid: row.scanned_uid == null ? null : toText(row.scanned_uid),
-  })) as RawAttendanceRow[] : [];
-
-  const summaryRows = summarySucceeded ? (summaryResult.value.data || []).map((row: any) => ({
-    attendance_date: toText(row.attendance_date),
-    am_in: row.am_in ? toText(row.am_in) : null,
-    am_out: row.am_out ? toText(row.am_out) : null,
-    pm_in: row.pm_in ? toText(row.pm_in) : null,
-    pm_out: row.pm_out ? toText(row.pm_out) : null,
-    unscheduled_count: Number(row.unscheduled_count || 0),
-  })) as SummaryAttendanceRow[] : [];
-
-  if (!rawSucceeded && !summarySucceeded) {
-    const rawMessage = rawError instanceof Error ? rawError.message : 'Unable to load raw attendance data.';
-    const summaryMessage = summaryError instanceof Error ? summaryError.message : 'Unable to load attendance summaries.';
-    throw new Error(`${rawMessage} ${summaryMessage}`.trim());
+  if (error) {
+    throw new Error(error.message || 'Unable to load monthly attendance data.');
   }
 
-  const snapshot = buildSnapshot(rawRows, summaryRows);
+  const snapshot = buildSnapshot((data || []) as MonthlyTapsRow[]);
   setCachedLearnerData(CACHE_SCOPE, cacheKey, snapshot);
   return snapshot;
 }

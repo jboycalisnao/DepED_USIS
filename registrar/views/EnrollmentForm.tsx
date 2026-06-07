@@ -42,15 +42,25 @@ const EnrollmentForm: React.FC = () => {
   const [duplicateStudent, setDuplicateStudent] = useState<Student | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
 
+  const learnerCountBySection = useMemo(() => {
+    const counts = new Map<string, number>();
+    learners.forEach((learner) => {
+      const key = String(learner.sectionId || '').trim();
+      if (!key) return;
+      counts.set(key, (counts.get(key) || 0) + 1);
+    });
+    return counts;
+  }, [learners]);
+
   const availableSections = useMemo(() => {
     return sections
       .filter(s => s.gradeLevel === selectedGrade && s.schoolYearId === activeSchoolYear.id)
       .sort((a, b) => a.name.localeCompare(b.name))
       .map(s => {
-        const count = learners.filter(l => String(l.sectionId).trim() === String(s.id).trim()).length;
+        const count = learnerCountBySection.get(String(s.id).trim()) || 0;
         return { ...s, learnerCount: count };
       });
-  }, [sections, selectedGrade, activeSchoolYear.id, learners]);
+  }, [sections, selectedGrade, activeSchoolYear.id, learnerCountBySection]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
@@ -74,7 +84,7 @@ const EnrollmentForm: React.FC = () => {
     }
 
     // Duplicate Check Engine
-    const existing = learners.find(l => l.lrn === formData.lrn);
+    const existing = learners.find(l => String(l.lrn || '').trim() === String(formData.lrn || '').trim());
     if (existing) {
       setDuplicateStudent(existing);
       setShowDuplicateModal(true);

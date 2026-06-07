@@ -51,131 +51,173 @@ const AttendanceSummaryPage = ({ onQuerySummaryRange }: AttendanceSummaryPagePro
   };
 
   return (
-    <section className="bg-white rounded-md border border-gray-200 shadow-sm overflow-hidden">
-      <div className="px-8 py-6 border-b border-gray-200 bg-gray-50">
-        <h2 className="text-[24px] font-bold text-gray-900">Attendance Summary</h2>
-        <p className="text-[13px] text-gray-600 mt-1">Weekly and monthly attendance analytics.</p>
-        <div className="mt-4 flex flex-col md:flex-row md:items-end gap-3">
-          <label className="flex flex-col gap-1 text-[12px] text-gray-600">
-            <span>From Date</span>
-            <input
-              type="date"
-              value={fromDate}
-              onChange={(event) => setFromDate(event.target.value)}
-              className="h-10 rounded-md border border-gray-200 px-3 bg-white text-[13px]"
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-[12px] text-gray-600">
-            <span>To Date</span>
-            <input
-              type="date"
-              value={toDate}
-              onChange={(event) => setToDate(event.target.value)}
-              className="h-10 rounded-md border border-gray-200 px-3 bg-white text-[13px]"
-            />
-          </label>
-          <button
-            type="button"
-            onClick={() => void load()}
-            disabled={loading || !fromDate || !toDate}
-            className="h-10 px-4 rounded-md border border-primary-600 bg-primary-600 text-white text-[12px] font-semibold disabled:opacity-50"
-          >
-            {loading ? 'Loading...' : 'Load Summary'}
-          </button>
-        </div>
+    <section className="portal-panel attendance-summary-page">
+      <div className="portal-panel__header">
+        <h1>Attendance Summary</h1>
+        <p className="attendance-summary-page__subtitle">Weekly and monthly attendance analytics.</p>
       </div>
 
-      <div className="px-8 py-5 grid grid-cols-2 md:grid-cols-4 gap-3 border-b border-gray-200 bg-white">
-        <div className="rounded-md border border-gray-200 bg-gray-50 px-4 py-3">
-          <p className="text-[12px] text-gray-500">Expected Slots</p>
-          <p className="text-[18px] font-bold text-gray-900">{totals.expected}</p>
-        </div>
-        <div className="rounded-md border border-success-200 bg-success-50 px-4 py-3">
-          <p className="text-[12px] text-success-700">Present Slots</p>
-          <p className="text-[18px] font-bold text-success-700">{totals.present}</p>
-        </div>
-        <div className="rounded-md border border-accent-200 bg-accent-50 px-4 py-3">
-          <p className="text-[12px] text-accent-700">Missing Slots</p>
-          <p className="text-[18px] font-bold text-accent-700">{totals.missing}</p>
-        </div>
-        <div className="rounded-md border border-primary-200 bg-primary-50 px-4 py-3">
-          <p className="text-[12px] text-primary-700">Attendance Rate</p>
-          <p className="text-[18px] font-bold text-primary-700">{totals.rate}%</p>
-        </div>
-      </div>
+      <div className="portal-panel__body attendance-summary-page__body">
+        <section className="section-card attendance-summary-page__filters">
+          <div className="section-card__bar" />
+          <div className="section-card__content attendance-summary-page__filters-content">
+            <div className="attendance-summary-page__filters-copy">
+              <h3>Range Filter</h3>
+              <p>Select a date range to load weekly and monthly summary data.</p>
+            </div>
 
-      <div className="p-8 space-y-8">
-        <div>
-          <h3 className="text-[16px] font-bold text-gray-900 mb-3">Weekly Summary</h3>
-          <div className="overflow-x-auto border border-gray-200 rounded-md">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-gray-50 border-b border-gray-200">
-                  <th className="px-4 py-3 text-[12px] font-semibold text-gray-600">Week Start</th>
-                  <th className="px-4 py-3 text-[12px] font-semibold text-gray-600">Section</th>
-                  <th className="px-4 py-3 text-[12px] font-semibold text-gray-600">Grade</th>
-                  <th className="px-4 py-3 text-[12px] font-semibold text-gray-600 text-right">Expected</th>
-                  <th className="px-4 py-3 text-[12px] font-semibold text-gray-600 text-right">Present</th>
-                  <th className="px-4 py-3 text-[12px] font-semibold text-gray-600 text-right">Missing</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {weekly.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="px-4 py-10 text-center text-[13px] text-gray-500">No weekly summary data.</td>
-                  </tr>
-                ) : (
-                  weekly.map((row, index) => (
-                    <tr key={`${row.weekStart}-${row.sectionName}-${index}`} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}>
-                      <td className="px-4 py-3 text-[13px] text-gray-700">{row.weekStart}</td>
-                      <td className="px-4 py-3 text-[13px] font-semibold text-gray-900">{row.sectionName}</td>
-                      <td className="px-4 py-3 text-[13px] text-gray-700">{row.gradeLevel}</td>
-                      <td className="px-4 py-3 text-[13px] text-right">{row.expectedSlots}</td>
-                      <td className="px-4 py-3 text-[13px] text-right text-success-700 font-semibold">{row.presentSlots}</td>
-                      <td className="px-4 py-3 text-[13px] text-right text-accent-700 font-semibold">{row.missingSlots}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
+            <div className="form-grid attendance-summary-page__filter-grid">
+              <label className="usis-date-time-picker">
+                <small>From Date</small>
+                <div className="usis-date-time-picker__control floating-field__control">
+                  <input
+                    type="date"
+                    value={fromDate}
+                    data-has-value={Boolean(fromDate)}
+                    onChange={(event) => setFromDate(event.target.value)}
+                  />
+                  <span className="usis-date-time-picker__floating-label">From Date</span>
+                </div>
+              </label>
 
-        <div>
-          <h3 className="text-[16px] font-bold text-gray-900 mb-3">Monthly Summary</h3>
-          <div className="overflow-x-auto border border-gray-200 rounded-md">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-gray-50 border-b border-gray-200">
-                  <th className="px-4 py-3 text-[12px] font-semibold text-gray-600">Month</th>
-                  <th className="px-4 py-3 text-[12px] font-semibold text-gray-600">Section</th>
-                  <th className="px-4 py-3 text-[12px] font-semibold text-gray-600">Grade</th>
-                  <th className="px-4 py-3 text-[12px] font-semibold text-gray-600 text-right">Expected</th>
-                  <th className="px-4 py-3 text-[12px] font-semibold text-gray-600 text-right">Present</th>
-                  <th className="px-4 py-3 text-[12px] font-semibold text-gray-600 text-right">Missing</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {monthly.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="px-4 py-10 text-center text-[13px] text-gray-500">No monthly summary data.</td>
-                  </tr>
-                ) : (
-                  monthly.map((row, index) => (
-                    <tr key={`${row.summaryMonth}-${row.sectionName}-${index}`} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}>
-                      <td className="px-4 py-3 text-[13px] text-gray-700">{row.summaryMonth}</td>
-                      <td className="px-4 py-3 text-[13px] font-semibold text-gray-900">{row.sectionName}</td>
-                      <td className="px-4 py-3 text-[13px] text-gray-700">{row.gradeLevel}</td>
-                      <td className="px-4 py-3 text-[13px] text-right">{row.expectedSlots}</td>
-                      <td className="px-4 py-3 text-[13px] text-right text-success-700 font-semibold">{row.presentSlots}</td>
-                      <td className="px-4 py-3 text-[13px] text-right text-accent-700 font-semibold">{row.missingSlots}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+              <label className="usis-date-time-picker">
+                <small>To Date</small>
+                <div className="usis-date-time-picker__control floating-field__control">
+                  <input
+                    type="date"
+                    value={toDate}
+                    data-has-value={Boolean(toDate)}
+                    onChange={(event) => setToDate(event.target.value)}
+                  />
+                  <span className="usis-date-time-picker__floating-label">To Date</span>
+                </div>
+              </label>
+            </div>
+
+            <div className="form-actions attendance-summary-page__actions">
+              <button
+                type="button"
+                onClick={() => void load()}
+                disabled={loading || !fromDate || !toDate}
+                className="primary-button"
+              >
+                {loading ? 'Loading...' : 'Load Summary'}
+              </button>
+            </div>
           </div>
-        </div>
+        </section>
+
+        <section className="attendance-summary-page__stats-grid">
+          <div className="section-card attendance-summary-page__stat-card">
+            <div className="section-card__bar" />
+            <div className="section-card__content">
+              <h3>Expected Slots</h3>
+              <p className="attendance-summary-page__stat-value">{totals.expected}</p>
+            </div>
+          </div>
+
+          <div className="section-card attendance-summary-page__stat-card">
+            <div className="section-card__bar" />
+            <div className="section-card__content">
+              <h3>Present Slots</h3>
+              <p className="attendance-summary-page__stat-value attendance-summary-page__stat-value--success">{totals.present}</p>
+            </div>
+          </div>
+
+          <div className="section-card attendance-summary-page__stat-card">
+            <div className="section-card__bar" />
+            <div className="section-card__content">
+              <h3>Missing Slots</h3>
+              <p className="attendance-summary-page__stat-value attendance-summary-page__stat-value--warning">{totals.missing}</p>
+            </div>
+          </div>
+
+          <div className="section-card attendance-summary-page__stat-card">
+            <div className="section-card__bar" />
+            <div className="section-card__content">
+              <h3>Attendance Rate</h3>
+              <p className="attendance-summary-page__stat-value attendance-summary-page__stat-value--blue">{totals.rate}%</p>
+            </div>
+          </div>
+        </section>
+
+        <section className="section-card attendance-summary-page__table-section">
+          <div className="section-card__bar" />
+          <div className="section-card__content attendance-summary-page__table-block">
+            <h3>Weekly Summary</h3>
+            <div className="attendance-summary-page__table-shell">
+              <table className="attendance-summary-page__table">
+                <thead>
+                  <tr>
+                    <th>Week Start</th>
+                    <th>Section</th>
+                    <th>Grade</th>
+                    <th className="is-right">Expected</th>
+                    <th className="is-right">Present</th>
+                    <th className="is-right">Missing</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {weekly.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="attendance-summary-page__empty">No weekly summary data.</td>
+                    </tr>
+                  ) : (
+                    weekly.map((row, index) => (
+                      <tr key={`${row.weekStart}-${row.sectionName}-${index}`}>
+                        <td>{row.weekStart}</td>
+                        <td className="is-strong">{row.sectionName}</td>
+                        <td>{row.gradeLevel}</td>
+                        <td className="is-right">{row.expectedSlots}</td>
+                        <td className="is-right is-success">{row.presentSlots}</td>
+                        <td className="is-right is-warning">{row.missingSlots}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section className="section-card attendance-summary-page__table-section">
+          <div className="section-card__bar" />
+          <div className="section-card__content attendance-summary-page__table-block">
+            <h3>Monthly Summary</h3>
+            <div className="attendance-summary-page__table-shell">
+              <table className="attendance-summary-page__table">
+                <thead>
+                  <tr>
+                    <th>Month</th>
+                    <th>Section</th>
+                    <th>Grade</th>
+                    <th className="is-right">Expected</th>
+                    <th className="is-right">Present</th>
+                    <th className="is-right">Missing</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {monthly.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="attendance-summary-page__empty">No monthly summary data.</td>
+                    </tr>
+                  ) : (
+                    monthly.map((row, index) => (
+                      <tr key={`${row.summaryMonth}-${row.sectionName}-${index}`}>
+                        <td>{row.summaryMonth}</td>
+                        <td className="is-strong">{row.sectionName}</td>
+                        <td>{row.gradeLevel}</td>
+                        <td className="is-right">{row.expectedSlots}</td>
+                        <td className="is-right is-success">{row.presentSlots}</td>
+                        <td className="is-right is-warning">{row.missingSlots}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
       </div>
     </section>
   );

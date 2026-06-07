@@ -115,6 +115,52 @@ create table if not exists public.attendance_monthly_summary (
 create index if not exists idx_attendance_monthly_summary_month
   on public.attendance_monthly_summary (summary_month desc);
 
+-- Monthly learner tap archive used by the learner portal attendance service.
+create table if not exists public.attendance_monthly_taps (
+  id uuid primary key default gen_random_uuid(),
+  learner_id text not null references public.registrar_learners(id) on update cascade on delete cascade,
+  attendance_month date not null,
+  day_01 jsonb not null default '[]'::jsonb,
+  day_02 jsonb not null default '[]'::jsonb,
+  day_03 jsonb not null default '[]'::jsonb,
+  day_04 jsonb not null default '[]'::jsonb,
+  day_05 jsonb not null default '[]'::jsonb,
+  day_06 jsonb not null default '[]'::jsonb,
+  day_07 jsonb not null default '[]'::jsonb,
+  day_08 jsonb not null default '[]'::jsonb,
+  day_09 jsonb not null default '[]'::jsonb,
+  day_10 jsonb not null default '[]'::jsonb,
+  day_11 jsonb not null default '[]'::jsonb,
+  day_12 jsonb not null default '[]'::jsonb,
+  day_13 jsonb not null default '[]'::jsonb,
+  day_14 jsonb not null default '[]'::jsonb,
+  day_15 jsonb not null default '[]'::jsonb,
+  day_16 jsonb not null default '[]'::jsonb,
+  day_17 jsonb not null default '[]'::jsonb,
+  day_18 jsonb not null default '[]'::jsonb,
+  day_19 jsonb not null default '[]'::jsonb,
+  day_20 jsonb not null default '[]'::jsonb,
+  day_21 jsonb not null default '[]'::jsonb,
+  day_22 jsonb not null default '[]'::jsonb,
+  day_23 jsonb not null default '[]'::jsonb,
+  day_24 jsonb not null default '[]'::jsonb,
+  day_25 jsonb not null default '[]'::jsonb,
+  day_26 jsonb not null default '[]'::jsonb,
+  day_27 jsonb not null default '[]'::jsonb,
+  day_28 jsonb not null default '[]'::jsonb,
+  day_29 jsonb not null default '[]'::jsonb,
+  day_30 jsonb not null default '[]'::jsonb,
+  day_31 jsonb not null default '[]'::jsonb,
+  updated_at timestamptz not null default now(),
+  unique (learner_id, attendance_month)
+);
+
+create index if not exists idx_attendance_monthly_taps_learner_month
+  on public.attendance_monthly_taps (learner_id, attendance_month desc);
+
+create index if not exists idx_attendance_monthly_taps_month
+  on public.attendance_monthly_taps (attendance_month desc);
+
 -- Archive manifest for exported raw logs.
 create table if not exists public.attendance_archive_batches (
   id uuid primary key default gen_random_uuid(),
@@ -124,6 +170,14 @@ create table if not exists public.attendance_archive_batches (
   row_count integer not null,
   file_path text not null,
   checksum_sha256 text not null,
+  sheet_id text null,
+  sheet_url text null,
+  sheet_tab text not null default 'Archive',
+  archive_source text not null default 'selected_range',
+  archive_reason text null,
+  learner_count integer not null default 0,
+  source_row_count integer not null default 0,
+  summary_payload jsonb not null default '[]'::jsonb,
   exported_at timestamptz not null default now(),
   purged_at timestamptz null,
   notes text null
@@ -134,6 +188,37 @@ create index if not exists idx_attendance_archive_batches_month
 
 create unique index if not exists uq_attendance_archive_batches_file_path
   on public.attendance_archive_batches (file_path);
+
+create table if not exists public.attendance_archive_learner_summaries (
+  id uuid primary key default gen_random_uuid(),
+  archive_batch_id uuid not null references public.attendance_archive_batches(id) on update cascade on delete cascade,
+  learner_id text not null references public.registrar_learners(id) on update cascade on delete cascade,
+  learner_name text null,
+  learner_lrn text null,
+  archive_month date not null,
+  from_logged_at timestamptz not null,
+  to_logged_at timestamptz not null,
+  row_count integer not null,
+  am_in_count integer not null default 0,
+  am_out_count integer not null default 0,
+  pm_in_count integer not null default 0,
+  pm_out_count integer not null default 0,
+  unscheduled_count integer not null default 0,
+  first_logged_at timestamptz not null,
+  last_logged_at timestamptz not null,
+  sheet_id text null,
+  sheet_url text null,
+  sheet_tab text not null default 'Archive',
+  archived_at timestamptz not null default now(),
+  notes text null,
+  unique (archive_batch_id, learner_id)
+);
+
+create index if not exists idx_attendance_archive_learner_summaries_learner
+  on public.attendance_archive_learner_summaries (learner_id, archived_at desc);
+
+create index if not exists idx_attendance_archive_learner_summaries_batch
+  on public.attendance_archive_learner_summaries (archive_batch_id, learner_id);
 
 -- Refresh daily summary from raw records for the provided date window.
 create or replace function public.attendance_refresh_summaries(

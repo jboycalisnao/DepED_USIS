@@ -27,6 +27,8 @@ export interface SystemUser {
 const STORAGE_KEY_GL = 'leon_nhs_active_gls';
 const STORAGE_KEY_STRANDS = 'leon_nhs_strands';
 const STORAGE_KEY_PROGRAMS = 'leon_nhs_special_programs';
+const CACHE_PREFIX = 'registrar_table_cache_v1';
+const CACHE_TTL_MS = 10 * 60 * 1000;
 const REGISTRAR_TABLES = {
   users: 'usis_core_coordinators',
   learners: 'registrar_learners',
@@ -72,6 +74,51 @@ let loadingListeners: Array<(load: boolean) => void> = [];
 let registrarAccessListeners: Array<(access: RegistrarCoordinatorAccess | null) => void> = [];
 let registrarLoginDebug: RegistrarAuthDebug | null = null;
 let registrarLoginDebugListeners: Array<(debug: RegistrarAuthDebug | null) => void> = [];
+
+type TableCachePayload<T> = {
+  updatedAt: string;
+  rows: T[];
+};
+
+const readCachedRows = <T,>(cacheKey: string): TableCachePayload<T> | null => {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  try {
+    const raw = window.localStorage.getItem(`${CACHE_PREFIX}:${cacheKey}`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<TableCachePayload<T>>;
+    if (!Array.isArray(parsed.rows) || !parsed.updatedAt) return null;
+    return {
+      updatedAt: String(parsed.updatedAt),
+      rows: parsed.rows as T[],
+    };
+  } catch {
+    return null;
+  }
+};
+
+const writeCachedRows = <T,>(cacheKey: string, rows: T[]) => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(
+      `${CACHE_PREFIX}:${cacheKey}`,
+      JSON.stringify({ updatedAt: new Date().toISOString(), rows } satisfies TableCachePayload<T>),
+    );
+  } catch {
+    // Ignore quota and serialization failures; cache is only an optimization.
+  }
+};
+
+const isCacheFresh = (updatedAt: string) => {
+  const timestamp = new Date(updatedAt).getTime();
+  if (Number.isNaN(timestamp)) return false;
+  return Date.now() - timestamp < CACHE_TTL_MS;
+};
 
 const notifyGradeLevels = () => glListeners.forEach(l => l([...activeGradeLevels]));
 const notifyStrands = () => {
@@ -191,6 +238,72 @@ const mapDbToProgram = (p: any): AcademicProgram => ({
   fullName: p.full_name || p.fullName || p.description || 'Unknown'
 });
 
+const hydrateCachedBootstrapState = () => {
+  let latestCacheTimestamp = 0;
+  const cachedLearners = readCachedRows<any>(REGISTRAR_TABLES.learners);
+  if (cachedLearners?.rows?.length) {
+    learners = cachedLearners.rows.map(mapDbToLearner);
+    latestCacheTimestamp = Math.max(latestCacheTimestamp, new Date(cachedLearners.updatedAt).getTime() || 0);
+  }
+
+  const cachedSections = readCachedRows<any>(REGISTRAR_TABLES.sections);
+  if (cachedSections?.rows?.length) {
+    sections = cachedSections.rows.map(mapDbToSection);
+    latestCacheTimestamp = Math.max(latestCacheTimestamp, new Date(cachedSections.updatedAt).getTime() || 0);
+  }
+
+  const cachedUsers = readCachedRows<any>(REGISTRAR_TABLES.users);
+  if (cachedUsers?.rows?.length) {
+    users = cachedUsers.rows.map(mapDbToUser);
+    latestCacheTimestamp = Math.max(latestCacheTimestamp, new Date(cachedUsers.updatedAt).getTime() || 0);
+  }
+
+  const cachedSchoolYears = readCachedRows<any>(REGISTRAR_TABLES.schoolYears);
+  if (cachedSchoolYears?.rows?.length) {
+    const mappedSchoolYears = cachedSchoolYears.rows.map((sy) => ({
+      id: String(sy.id).trim(),
+      label: sy.label,
+      isActive: !!(sy.is_active ?? sy.isActive),
+      isLocked: !!(sy.is_locked ?? sy.isLocked)
+    })).sort((a, b) => b.label.localeCompare(a.label));
+
+    if (mappedSchoolYears.length > 0) {
+      schoolYears = mappedSchoolYears;
+      const active = schoolYears.find((sy) => sy.isActive);
+      if (active) {
+        activeSchoolYear = active;
+      }
+    }
+    latestCacheTimestamp = Math.max(latestCacheTimestamp, new Date(cachedSchoolYears.updatedAt).getTime() || 0);
+  }
+
+  const cachedGradeLevels = readCachedRows<any>(REGISTRAR_TABLES.gradeLevels);
+  if (cachedGradeLevels?.rows?.length) {
+    activeGradeLevels = cachedGradeLevels.rows
+      .filter((gl) => !!(gl.is_active ?? gl.isActive))
+      .map((gl) => gl.id as GradeLevel);
+    latestCacheTimestamp = Math.max(latestCacheTimestamp, new Date(cachedGradeLevels.updatedAt).getTime() || 0);
+  }
+
+  const cachedStrands = readCachedRows<any>(REGISTRAR_TABLES.strands);
+  if (cachedStrands?.rows?.length) {
+    availableStrands = cachedStrands.rows.map(mapDbToProgram).sort((a, b) => a.acronym.localeCompare(b.acronym));
+    latestCacheTimestamp = Math.max(latestCacheTimestamp, new Date(cachedStrands.updatedAt).getTime() || 0);
+  }
+
+  const cachedPrograms = readCachedRows<any>(REGISTRAR_TABLES.specialPrograms);
+  if (cachedPrograms?.rows?.length) {
+    availableSpecialPrograms = cachedPrograms.rows.map(mapDbToProgram).sort((a, b) => a.acronym.localeCompare(b.acronym));
+    latestCacheTimestamp = Math.max(latestCacheTimestamp, new Date(cachedPrograms.updatedAt).getTime() || 0);
+  }
+
+  if (latestCacheTimestamp > 0) {
+    lastSyncTime = latestCacheTimestamp;
+  }
+};
+
+hydrateCachedBootstrapState();
+
 const updateConnectionStatus = (err: boolean) => {
   hasConnectionError = err;
   connectionListeners.forEach(l => l(hasConnectionError));
@@ -199,26 +312,45 @@ const updateConnectionStatus = (err: boolean) => {
 const fetchAllFromTable = async (
   tableName: string,
   updateFn: (data: any[]) => void,
-  retryWhenOffline = false
+  options: {
+    cacheKey?: string;
+    retryWhenOffline?: boolean;
+    forceRefresh?: boolean;
+    selectColumns?: string;
+  } = {}
 ) => {
-  if (hasConnectionError && !retryWhenOffline) {
+  const cacheKey = options.cacheKey || tableName;
+  const cached = readCachedRows<any>(cacheKey);
+
+  if (cached?.rows?.length) {
+    updateFn(cached.rows);
+    if (!options.forceRefresh && isCacheFresh(cached.updatedAt)) {
+      return;
+    }
+  } else if (hasConnectionError && !options.retryWhenOffline) {
+    return;
+  }
+
+  if (hasConnectionError && !options.retryWhenOffline && !cached?.rows?.length) {
     return;
   }
 
   try {
-    const { data, error } = await supabase.from(tableName).select('*');
+    const { data, error } = await supabase.from(tableName).select(options.selectColumns || '*');
     if (error) {
       updateConnectionStatus(true);
       return;
     }
     updateConnectionStatus(false);
-    updateFn(data || []);
+    const rows = data || [];
+    writeCachedRows(cacheKey, rows);
+    updateFn(rows);
   } catch (err) {
     updateConnectionStatus(true);
   }
 };
 
-const fetchUsers = async () => {
+const fetchUsers = async (forceRefresh = false) => {
   if (!registrarAccess?.schoolUuid) {
     users = [];
     usersListeners.forEach((listener) => listener(users));
@@ -230,9 +362,19 @@ const fetchUsers = async () => {
   }
 
   try {
+    const cacheKey = `${REGISTRAR_TABLES.users}:${registrarAccess.schoolUuid}`;
+    const cached = readCachedRows<any>(cacheKey);
+    if (cached?.rows?.length) {
+      users = cached.rows.map(mapDbToUser);
+      usersListeners.forEach((listener) => listener(users));
+      if (!forceRefresh && isCacheFresh(cached.updatedAt)) {
+        return;
+      }
+    }
+
     const { data, error } = await supabase
       .from(REGISTRAR_TABLES.users)
-      .select('*')
+      .select('id,username,password_plain,password_hash,first_name,middle_name,last_name,display_name')
       .eq('school_id', registrarAccess.schoolUuid)
       .order('created_at', { ascending: false });
 
@@ -243,24 +385,31 @@ const fetchUsers = async () => {
 
     updateConnectionStatus(false);
     users = (data || []).map(mapDbToUser);
+    writeCachedRows(cacheKey, data || []);
     usersListeners.forEach((listener) => listener(users));
   } catch {
     updateConnectionStatus(true);
   }
 };
 
-const fetchLearners = () => fetchAllFromTable(REGISTRAR_TABLES.learners, (data) => {
+const fetchLearners = (forceRefresh = false) => fetchAllFromTable(REGISTRAR_TABLES.learners, (data) => {
   learners = data.map(mapDbToLearner);
   isFirstLoad = false;
   learnersListeners.forEach(l => l(learners));
+}, {
+  forceRefresh,
+  selectColumns: 'id,lrn,login_username,portal_username,username,login_password_plain,portal_password_plain,login_password,portal_password,login_status,is_login_active,last_login_at,microsoft_user_id,microsoft_upn,microsoft_mail_nickname,microsoft_account_status,microsoft_license_sku_id,microsoft_created_at,microsoft_last_synced_at,first_name,last_name,middle_name,birth_date,gender,address,contact_number,email,guardian_name,father_name,mother_name,status,section_id,school_year,is_sslg,is_club_officer,is_athlete,is_artist,is_4ps,is_indigent,org_affiliations,enrollment_history',
 });
 
-const fetchSections = () => fetchAllFromTable(REGISTRAR_TABLES.sections, (data) => {
+const fetchSections = (forceRefresh = false) => fetchAllFromTable(REGISTRAR_TABLES.sections, (data) => {
   sections = data.map(mapDbToSection);
   sectionsListeners.forEach(l => l(sections));
+}, {
+  forceRefresh,
+  selectColumns: 'id,name,grade_level,adviser_name,strand,school_year_id',
 });
 
-const fetchSchoolYears = (retryWhenOffline = false) => fetchAllFromTable(REGISTRAR_TABLES.schoolYears, (data) => {
+const fetchSchoolYears = (forceRefresh = false, retryWhenOffline = false) => fetchAllFromTable(REGISTRAR_TABLES.schoolYears, (data) => {
   const mapped = data.map(sy => ({
     id: String(sy.id).trim(),
     label: sy.label,
@@ -277,9 +426,13 @@ const fetchSchoolYears = (retryWhenOffline = false) => fetchAllFromTable(REGISTR
     }
   }
   syListListeners.forEach(l => l(schoolYears));
-}, retryWhenOffline);
+}, {
+  forceRefresh,
+  retryWhenOffline,
+  selectColumns: 'id,label,is_active,is_locked',
+});
 
-const fetchGradeLevels = () => fetchAllFromTable(REGISTRAR_TABLES.gradeLevels, (data) => {
+const fetchGradeLevels = (forceRefresh = false) => fetchAllFromTable(REGISTRAR_TABLES.gradeLevels, (data) => {
   if (data && data.length > 0) {
     activeGradeLevels = data
       .filter(gl => !!(gl.is_active ?? gl.isActive))
@@ -287,23 +440,32 @@ const fetchGradeLevels = () => fetchAllFromTable(REGISTRAR_TABLES.gradeLevels, (
     localStorage.setItem(STORAGE_KEY_GL, JSON.stringify(activeGradeLevels));
   }
   notifyGradeLevels();
+}, {
+  forceRefresh,
+  selectColumns: 'id,is_active',
 });
 
-const fetchStrands = () => fetchAllFromTable(REGISTRAR_TABLES.strands, (data) => {
+const fetchStrands = (forceRefresh = false) => fetchAllFromTable(REGISTRAR_TABLES.strands, (data) => {
   availableStrands = data.map(mapDbToProgram).sort((a, b) => a.acronym.localeCompare(b.acronym));
   notifyStrands();
+}, {
+  forceRefresh,
+  selectColumns: 'id,acronym,full_name,description,name',
 });
 
-const fetchPrograms = () => fetchAllFromTable(REGISTRAR_TABLES.specialPrograms, (data) => {
+const fetchPrograms = (forceRefresh = false) => fetchAllFromTable(REGISTRAR_TABLES.specialPrograms, (data) => {
   availableSpecialPrograms = data.map(mapDbToProgram).sort((a, b) => a.acronym.localeCompare(b.acronym));
   notifyPrograms();
+}, {
+  forceRefresh,
+  selectColumns: 'id,acronym,full_name,description,name',
 });
 
 // Parallel Hydration on startup
 const initializeStore = async () => {
   setGlobalLoading(true);
   try {
-    await fetchSchoolYears(true); // Probe backend first to avoid repeated DNS failures.
+    await fetchSchoolYears();
     if (hasConnectionError) {
       return;
     }
@@ -390,17 +552,17 @@ export const useStore = () => {
     
     setGlobalLoading(true);
     try {
-      await fetchSchoolYears(true);
+      await fetchSchoolYears(force);
       if (hasConnectionError) {
         return;
       }
       await Promise.allSettled([
-        fetchUsers(), 
-        fetchLearners(), 
-        fetchSections(), 
-        fetchStrands(), 
-        fetchPrograms(), 
-        fetchGradeLevels()
+        fetchUsers(force), 
+        fetchLearners(force), 
+        fetchSections(force), 
+        fetchStrands(force), 
+        fetchPrograms(force), 
+        fetchGradeLevels(force)
       ]);
       lastSyncTime = Date.now();
     } finally {
@@ -439,7 +601,7 @@ export const useStore = () => {
       registrarAccessListeners.forEach((listener) => listener(registrarAccess));
       isAuthenticated = true;
       authListeners.forEach(l => l(true));
-      await fetchUsers();
+      await fetchUsers(true);
       return { ok: true, error: null };
     },
     logout: () => {
@@ -475,7 +637,7 @@ export const useStore = () => {
           is_super_admin: false,
           is_active: true
         }]);
-        if (!error) await fetchUsers();
+        if (!error) await fetchUsers(true);
       } finally {
         setGlobalLoading(false);
       }
@@ -503,7 +665,7 @@ export const useStore = () => {
           .update(dbPayload)
           .eq('id', id)
           .eq('school_id', registrarAccess.schoolUuid);
-        if (!error) await fetchUsers();
+        if (!error) await fetchUsers(true);
       } finally {
         setGlobalLoading(false);
       }
@@ -518,7 +680,7 @@ export const useStore = () => {
           .delete()
           .eq('id', id)
           .eq('school_id', registrarAccess.schoolUuid);
-        if (!error) await fetchUsers();
+        if (!error) await fetchUsers(true);
       } finally {
         setGlobalLoading(false);
       }
@@ -528,7 +690,7 @@ export const useStore = () => {
       setGlobalLoading(true);
       try {
         const { error } = await supabase.from(REGISTRAR_TABLES.learners).insert([mapLearnerToDb(learner)]);
-        if (!error) await fetchLearners();
+        if (!error) await fetchLearners(true);
         return { error: error?.message };
       } finally {
         setGlobalLoading(false);
@@ -558,7 +720,7 @@ export const useStore = () => {
           if (schoolYearError) return { error: schoolYearError.message };
         }
 
-        await fetchLearners();
+        await fetchLearners(true);
         return { error: undefined };
       } finally {
         setGlobalLoading(false);
@@ -595,7 +757,7 @@ export const useStore = () => {
           }
         }
 
-        if (!error) await fetchLearners();
+        if (!error) await fetchLearners(true);
         return { error: error?.message };
       } finally {
         setGlobalLoading(false);
@@ -608,7 +770,7 @@ export const useStore = () => {
         const payload = newLearners.map(l => mapLearnerToDb(l));
         // Use upsert on LRN to handle duplicates at DB level too
         const { error } = await supabase.from(REGISTRAR_TABLES.learners).upsert(payload, { onConflict: 'lrn' });
-        if (!error) await fetchLearners();
+        if (!error) await fetchLearners(true);
         return { error: error?.message };
       } finally {
         setGlobalLoading(false);
@@ -633,7 +795,7 @@ export const useStore = () => {
         const results = await Promise.all(updates);
         const failed = results.find((result) => result.error);
         if (failed?.error) return { error: failed.error.message };
-        await fetchLearners();
+        await fetchLearners(true);
         return { error: undefined };
       } finally {
         setGlobalLoading(false);
@@ -645,7 +807,7 @@ export const useStore = () => {
       const id = createId();
       try {
         const { error } = await supabase.from(REGISTRAR_TABLES.sections).insert([{ id, name, grade_level: gradeLevel, adviser_name: adviserName, strand, school_year_id: activeSchoolYear.id }]);
-        if (!error) await fetchSections();
+        if (!error) await fetchSections(true);
         return { error: error?.message };
       } finally {
         setGlobalLoading(false);
@@ -661,7 +823,7 @@ export const useStore = () => {
         if (updates.adviserName !== undefined) dbPayload.adviser_name = updates.adviserName;
         if (updates.strand !== undefined) dbPayload.strand = updates.strand;
         const { error } = await supabase.from(REGISTRAR_TABLES.sections).update(dbPayload).eq('id', id);
-        if (!error) await fetchSections();
+        if (!error) await fetchSections(true);
         return { error: error?.message };
       } finally {
         setGlobalLoading(false);
@@ -674,7 +836,7 @@ export const useStore = () => {
         const { error } = await supabase.from(REGISTRAR_TABLES.sections).delete().eq('id', id);
         if (!error) { 
           await supabase.from(REGISTRAR_TABLES.learners).delete().eq('section_id', id); 
-          await Promise.all([fetchLearners(), fetchSections()]); 
+          await Promise.all([fetchLearners(true), fetchSections(true)]); 
         }
         return { error: error?.message };
       } finally {
@@ -686,7 +848,7 @@ export const useStore = () => {
       setGlobalLoading(true);
       try {
         const { error } = await supabase.from(REGISTRAR_TABLES.learners).delete().eq('section_id', sectionId);
-        if (!error) await fetchLearners();
+        if (!error) await fetchLearners(true);
         return { error: error?.message };
       } finally {
         setGlobalLoading(false);
@@ -697,7 +859,7 @@ export const useStore = () => {
       try {
         const id = createId();
         await supabase.from(REGISTRAR_TABLES.strands).insert([{ id, acronym, full_name: fullName }]);
-        await fetchStrands();
+        await fetchStrands(true);
       } finally {
         setGlobalLoading(false);
       }
@@ -709,7 +871,7 @@ export const useStore = () => {
         if (updates.acronym) dbPayload.acronym = updates.acronym;
         if (updates.fullName) dbPayload.full_name = updates.fullName;
         await supabase.from(REGISTRAR_TABLES.strands).update(dbPayload).eq('id', id);
-        await fetchStrands();
+        await fetchStrands(true);
       } finally {
         setGlobalLoading(false);
       }
@@ -718,7 +880,7 @@ export const useStore = () => {
       setGlobalLoading(true);
       try {
         await supabase.from(REGISTRAR_TABLES.strands).delete().eq('id', id);
-        await fetchStrands();
+        await fetchStrands(true);
       } finally {
         setGlobalLoading(false);
       }
@@ -728,7 +890,7 @@ export const useStore = () => {
       try {
         const id = createId();
         await supabase.from(REGISTRAR_TABLES.specialPrograms).insert([{ id, acronym, full_name: fullName }]);
-        await fetchPrograms();
+        await fetchPrograms(true);
       } finally {
         setGlobalLoading(false);
       }
@@ -740,7 +902,7 @@ export const useStore = () => {
         if (updates.acronym) dbPayload.acronym = updates.acronym;
         if (updates.fullName) dbPayload.full_name = updates.fullName;
         await supabase.from(REGISTRAR_TABLES.specialPrograms).update(dbPayload).eq('id', id);
-        await fetchPrograms();
+        await fetchPrograms(true);
       } finally {
         setGlobalLoading(false);
       }
@@ -749,7 +911,7 @@ export const useStore = () => {
       setGlobalLoading(true);
       try {
         await supabase.from(REGISTRAR_TABLES.specialPrograms).delete().eq('id', id);
-        await fetchPrograms();
+        await fetchPrograms(true);
       } finally {
         setGlobalLoading(false);
       }
@@ -759,7 +921,7 @@ export const useStore = () => {
       try {
         const id = 'sy' + label.replace(/[^0-9]/g, '');
         const { error } = await supabase.from(REGISTRAR_TABLES.schoolYears).insert([{ id, label, is_active: false, is_locked: false }]);
-        if (!error) await fetchSchoolYears();
+        if (!error) await fetchSchoolYears(true);
         return { error: error?.message };
       } finally {
         setGlobalLoading(false);
@@ -769,7 +931,7 @@ export const useStore = () => {
       setGlobalLoading(true);
       try {
         const { error } = await supabase.from(REGISTRAR_TABLES.schoolYears).delete().eq('id', id);
-        if (!error) await fetchSchoolYears();
+        if (!error) await fetchSchoolYears(true);
       } finally {
         setGlobalLoading(false);
       }
@@ -806,7 +968,7 @@ export const useStore = () => {
         if (copyError) {
           return { error: copyError.message };
         }
-        await fetchSections();
+        await fetchSections(true);
       } finally {
         setGlobalLoading(false);
       }
@@ -844,7 +1006,7 @@ export const useStore = () => {
         await supabase.from(REGISTRAR_TABLES.schoolYears).update({ is_active: false }).neq('id', id);
         const { error } = await supabase.from(REGISTRAR_TABLES.schoolYears).update({ is_active: true }).eq('id', id);
         if (!error) {
-          await Promise.all([fetchSchoolYears(), fetchSections()]);
+          await Promise.all([fetchSchoolYears(true), fetchSections(true)]);
         }
         if (error) {
           return { error: error.message };
@@ -858,7 +1020,7 @@ export const useStore = () => {
       setGlobalLoading(true);
       try {
         const { error } = await supabase.from(REGISTRAR_TABLES.schoolYears).update({ is_locked: lock }).eq('id', id);
-        if (!error) await fetchSchoolYears();
+        if (!error) await fetchSchoolYears(true);
       } finally {
         setGlobalLoading(false);
       }

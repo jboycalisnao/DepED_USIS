@@ -7,6 +7,14 @@ import './styles/global.css';
 import { applyDocumentBranding } from '../common/config/usisBranding';
 import { UsisAppLoaderGate } from '../common/components/UsisAppLoaderGate';
 
+const ATTENDANCE_BASENAME = '/attendance';
+
+function resolveAttendanceBasename(pathname: string): string {
+  return pathname === ATTENDANCE_BASENAME || pathname.startsWith(`${ATTENDANCE_BASENAME}/`)
+    ? ATTENDANCE_BASENAME
+    : '';
+}
+
 applyDocumentBranding({ moduleTitle: 'Attendance Portal' });
 
 const rootElement = document.getElementById('root');
@@ -18,7 +26,7 @@ const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
     <UsisAppLoaderGate label="Loading attendance subsystem">
-      <BrowserRouter>
+      <BrowserRouter basename={resolveAttendanceBasename(window.location.pathname)}>
         <App />
       </BrowserRouter>
     </UsisAppLoaderGate>

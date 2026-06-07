@@ -1098,6 +1098,241 @@ body {
   text-transform: uppercase;
 }
 
+.learner-attendance-table-scroll {
+  margin-top: 10px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.learner-attendance-table {
+  min-width: 880px;
+  table-layout: fixed;
+}
+
+.learner-attendance-table thead th {
+  text-align: center;
+  white-space: nowrap;
+}
+
+.learner-attendance-table__month-col {
+  width: 120px;
+}
+
+.learner-attendance-table__day-col {
+  width: 24px;
+}
+
+.learner-attendance-table__month-head {
+  text-align: left !important;
+  min-width: 120px;
+}
+
+.learner-attendance-table__day-head {
+  width: 24px;
+  padding-inline: 2px !important;
+  font-size: 10px;
+}
+
+.learner-attendance-table__month-cell {
+  min-width: 120px;
+  text-align: left;
+}
+
+.learner-attendance-table__month-name {
+  color: #1f2937;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.learner-attendance-table__month-key {
+  color: #667085;
+  font-size: 11px;
+  line-height: 1.2;
+  margin-top: 2px;
+}
+
+.learner-attendance-table__day-cell {
+  vertical-align: top;
+  padding: 3px 1px !important;
+  text-align: center;
+}
+
+.learner-attendance-table__day-number {
+  color: #475467;
+  font-size: 9px;
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+
+.learner-attendance-table__tap-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 3px;
+  justify-items: stretch;
+  min-height: 0;
+}
+
+.learner-attendance-table__tap-item,
+.learner-attendance-table__tap-unscheduled,
+.learner-attendance-table__tap-empty {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #d0d5dd;
+  border-radius: 6px;
+  background: #f8fafc;
+  color: #1f2937;
+  font-size: 7px;
+  font-weight: 700;
+  line-height: 1.2;
+  min-height: 22px;
+  padding: 2px 3px;
+  text-align: center;
+  word-break: break-word;
+}
+
+.learner-attendance-table__tap-item {
+  display: grid;
+  gap: 0;
+  min-height: 26px;
+}
+
+.learner-attendance-table__tap-type {
+  color: #475467;
+  font-size: 6px;
+  font-weight: 700;
+  text-transform: uppercase;
+  line-height: 1.1;
+}
+
+.learner-attendance-table__tap-time {
+  color: #101828;
+  font-size: 8px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.learner-attendance-table__tap-unscheduled {
+  border-color: #fdb022;
+  background: #fffaeb;
+  color: #b54708;
+}
+
+.learner-attendance-table__empty {
+  padding: 24px 16px;
+  text-align: center;
+  color: #667085;
+  font-size: 13px;
+}
+
+.learner-attendance-archive {
+  margin-top: 14px;
+}
+
+.learner-attendance-archive__badge {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid #c7d7fe;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 5px 12px;
+  white-space: nowrap;
+}
+
+.learner-attendance-archive__notice {
+  margin-top: 8px;
+  border: 1px solid #dbe4f0;
+  border-radius: var(--learner-radius-md);
+  background: #f8fbff;
+  color: #1f2937;
+  font-size: 14px;
+  line-height: 1.5;
+  padding: 10px 12px;
+}
+
+.learner-attendance-archive__stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.learner-attendance-archive__metric {
+  border: 1px solid #d9e1ec;
+  border-radius: var(--learner-radius-md);
+  background: #ffffff;
+  padding: 12px 14px;
+}
+
+.learner-attendance-archive__metric span {
+  display: block;
+  color: #667085;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+.learner-attendance-archive__metric strong {
+  display: block;
+  margin-top: 4px;
+  color: #101828;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.25;
+  word-break: break-word;
+}
+
+.learner-attendance-archive__metric--highlight strong {
+  color: #b42318;
+}
+
+.learner-attendance-archive__table-scroll {
+  margin-top: 12px;
+}
+
+.learner-attendance-archive__table {
+  min-width: 1180px;
+}
+
+.learner-attendance-archive__table thead th {
+  white-space: nowrap;
+}
+
+.learner-attendance-archive__range-cell,
+.learner-attendance-archive__month-cell,
+.learner-attendance-archive__archive-cell {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.learner-attendance-archive__range-cell strong,
+.learner-attendance-archive__month-cell strong,
+.learner-attendance-archive__archive-cell strong {
+  color: #101828;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.25;
+  word-break: break-word;
+}
+
+.learner-attendance-archive__range-cell span,
+.learner-attendance-archive__month-cell span,
+.learner-attendance-archive__archive-cell span {
+  color: #667085;
+  font-size: 11px;
+  line-height: 1.25;
+  word-break: break-word;
+}
+
+.learner-attendance-archive__error {
+  color: #b42318;
+}
+
 .pta-fee-chip {
   display: inline-flex;
   align-items: center;
@@ -1781,9 +2016,71 @@ body {
     min-width: 620px;
   }
 
+  .learner-attendance-table {
+    min-width: 1120px;
+  }
+
+  .learner-attendance-archive__stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .learner-merch-grid {
     grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
     justify-content: stretch;
+  }
+}
+
+@media (max-width: 720px) {
+  .learner-attendance-archive__stats {
+    grid-template-columns: 1fr;
+  }
+
+  .learner-attendance-table {
+    min-width: 860px;
+  }
+
+  .learner-attendance-table__month-head,
+  .learner-attendance-table__month-cell {
+    min-width: 104px;
+  }
+
+  .learner-attendance-table__day-head {
+    width: 22px;
+    padding-inline: 1px !important;
+    font-size: 9px;
+  }
+
+  .learner-attendance-table__day-cell {
+    padding: 2px 1px !important;
+  }
+
+  .learner-attendance-table__day-number {
+    font-size: 8px;
+    margin-bottom: 2px;
+  }
+
+  .learner-attendance-table__tap-list {
+    gap: 2px;
+  }
+
+  .learner-attendance-table__tap-item,
+  .learner-attendance-table__tap-unscheduled,
+  .learner-attendance-table__tap-empty {
+    min-height: 18px;
+    padding: 1px 2px;
+    font-size: 7px;
+  }
+
+  .learner-attendance-table__tap-item {
+    min-height: 22px;
+  }
+
+  .learner-attendance-table__tap-type {
+    font-size: 5px;
+  }
+
+  .learner-attendance-table__tap-time {
+    font-size: 7px;
   }
 }
 
