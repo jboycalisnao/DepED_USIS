@@ -69,7 +69,10 @@ export async function createPublicEnrollmentSubmission(draft: EnrollmentDraft): 
   return { id: createdId, submissionReferenceId: String((data as any).submission_reference_id || submissionReferenceId) };
 }
 
-export async function fetchPublicEnrollmentSubmissions(limit?: number): Promise<PublicEnrollmentSubmission[]> {
+export async function fetchPublicEnrollmentSubmissions(limit?: number, schoolYearLabel?: string): Promise<PublicEnrollmentSubmission[]> {
+  const normalizedSchoolYear = String(schoolYearLabel || '').trim();
+  if (!normalizedSchoolYear) return [];
+
   const pageSize = 1000;
   const rows: PublicEnrollmentSubmission[] = [];
   let from = 0;
@@ -79,6 +82,7 @@ export async function fetchPublicEnrollmentSubmissions(limit?: number): Promise<
     const { data, error } = await supabase
       .from(REGISTRAR_PUBLIC_ENROLLMENT_TABLE)
       .select('id,submission_reference_id,created_at,school_id,school_year,lrn,last_name,first_name,middle_name,grade_to_enroll,guardian_contact,payload')
+      .eq('school_year', normalizedSchoolYear)
       .order('created_at', { ascending: false })
       .range(from, to);
 

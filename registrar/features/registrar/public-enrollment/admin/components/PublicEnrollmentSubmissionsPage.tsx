@@ -201,6 +201,8 @@ export default function PublicEnrollmentSubmissionsPage() {
   const { registrarAccess, refreshData, availableStrands } = useStore();
   const schoolId = registrarAccess?.schoolId || '302522';
   const submissionsScopeKey = registrarAccess?.schoolUuid || schoolId;
+  const [activeSchoolYearId, setActiveSchoolYearId] = useState('');
+  const [activeSchoolYearLabel, setActiveSchoolYearLabel] = useState('');
   const {
     submissions,
     isLoading,
@@ -208,7 +210,7 @@ export default function PublicEnrollmentSubmissionsPage() {
     refresh,
     refreshSubmissionById,
     removeSubmissionById,
-  } = usePublicEnrollmentSubmissions(submissionsScopeKey);
+  } = usePublicEnrollmentSubmissions(submissionsScopeKey, activeSchoolYearLabel);
   const [query, setQuery] = useState('');
   const [actionError, setActionError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -226,7 +228,6 @@ export default function PublicEnrollmentSubmissionsPage() {
   const [pendingDeleteSubmissionId, setPendingDeleteSubmissionId] = useState<string | null>(null);
   const [isDeletingSubmission, setIsDeletingSubmission] = useState(false);
   const [draftEditor, setDraftEditor] = useState<EnrollmentDraft>(() => emptyDraft(schoolId));
-  const [activeSchoolYearLabel, setActiveSchoolYearLabel] = useState('');
   const [priorYearLearners, setPriorYearLearners] = useState<PriorYearLearner[]>([]);
   const [priorLearnerLookup, setPriorLearnerLookup] = useState('');
   const [selectedPriorLearnerId, setSelectedPriorLearnerId] = useState('');
@@ -274,9 +275,22 @@ export default function PublicEnrollmentSubmissionsPage() {
 
     if (error) throw error;
 
-    const hasActiveSection = Boolean(String((learnerRow as any)?.section_id || '').trim());
     const statusValue = String((learnerRow as any)?.status || '').trim().toLowerCase();
-    const isExistingLearner = hasActiveSection || statusValue === 'enrolled';
+    const learnerSectionId = String((learnerRow as any)?.section_id || '').trim();
+    let isExistingLearner = false;
+
+    if (learnerSectionId) {
+      const { data: sectionRow } = await supabase
+        .from('registrar_sections')
+        .select('id,school_year_id')
+        .eq('id', learnerSectionId)
+        .maybeSingle();
+
+      const sectionSchoolYearId = String((sectionRow as any)?.school_year_id || '').trim();
+      isExistingLearner = Boolean(activeSchoolYearId && sectionSchoolYearId && sectionSchoolYearId === activeSchoolYearId);
+    } else if (statusValue === 'enrolled') {
+      isExistingLearner = true;
+    }
 
     setExistingLearnerLrns((current) => {
       const next = new Set(current);
@@ -286,7 +300,7 @@ export default function PublicEnrollmentSubmissionsPage() {
     });
 
     return isExistingLearner;
-  }, []);
+  }, [activeSchoolYearId]);
 
   useEffect(() => {
     if (!errorMessage) return;
@@ -307,10 +321,11 @@ export default function PublicEnrollmentSubmissionsPage() {
     const loadActiveSchoolYear = async () => {
       const { data: activeYearRow } = await supabase
         .from('registrar_school_years')
-        .select('label')
+        .select('id,label')
         .eq('is_active', true)
         .limit(1)
         .maybeSingle();
+      setActiveSchoolYearId(String((activeYearRow as any)?.id || '').trim());
       setActiveSchoolYearLabel(String((activeYearRow as any)?.label || '').trim());
     };
     loadActiveSchoolYear();

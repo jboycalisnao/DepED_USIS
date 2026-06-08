@@ -57,8 +57,13 @@ const upsertSubmission = (
   return filtered.sort(sortByCreatedAtDesc);
 };
 
-export function usePublicEnrollmentSubmissions(scopeKey = 'default') {
-  const [submissions, setSubmissions] = useState<PublicEnrollmentSubmission[]>(() => readCache(scopeKey));
+const normalizeCacheScopeKey = (scopeKey: string, schoolYearLabel: string) =>
+  `${scopeKey}:${String(schoolYearLabel || '').trim() || 'unscoped'}`;
+
+export function usePublicEnrollmentSubmissions(scopeKey = 'default', schoolYearLabel = '') {
+  const cacheScopeKey = normalizeCacheScopeKey(scopeKey, schoolYearLabel);
+  const hasSchoolYearScope = Boolean(String(schoolYearLabel || '').trim());
+  const [submissions, setSubmissions] = useState<PublicEnrollmentSubmission[]>(() => readCache(cacheScopeKey));
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -66,15 +71,20 @@ export function usePublicEnrollmentSubmissions(scopeKey = 'default') {
     if (!options?.silent) setIsLoading(true);
     setErrorMessage(null);
     try {
-      const rows = await fetchPublicEnrollmentSubmissions();
+      if (!hasSchoolYearScope) {
+        setSubmissions([]);
+        return;
+      }
+
+      const rows = await fetchPublicEnrollmentSubmissions(undefined, schoolYearLabel);
       setSubmissions(rows);
-      writeCache(scopeKey, rows);
+      writeCache(cacheScopeKey, rows);
     } catch (error: any) {
       setErrorMessage(error?.message || 'Unable to load submissions.');
     } finally {
       if (!options?.silent) setIsLoading(false);
     }
-  }, [scopeKey]);
+  }, [cacheScopeKey, hasSchoolYearScope, schoolYearLabel]);
 
   const refreshSubmissionById = useCallback(async (submissionId: string) => {
     const trimmedId = String(submissionId || '').trim();
@@ -99,18 +109,19 @@ export function usePublicEnrollmentSubmissions(scopeKey = 'default') {
   }, []);
 
   useEffect(() => {
-    const cachedRows = readCache(scopeKey);
+    const cachedRows = readCache(cacheScopeKey);
     setSubmissions(cachedRows);
     setIsLoading(true);
-  }, [scopeKey]);
+  }, [cacheScopeKey]);
 
   useEffect(() => {
+    if (!hasSchoolYearScope) return;
     void refresh();
-  }, [scopeKey, refresh]);
+  }, [cacheScopeKey, hasSchoolYearScope, refresh]);
 
   useEffect(() => {
-    writeCache(scopeKey, submissions);
-  }, [scopeKey, submissions]);
+    writeCache(cacheScopeKey, submissions);
+  }, [cacheScopeKey, submissions]);
 
   return useMemo(
     () => ({
