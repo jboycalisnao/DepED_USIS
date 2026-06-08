@@ -82,9 +82,9 @@ export function LearnerCredentialPage({ onPrefillLogin }: LearnerCredentialPageP
             <span className="usis-login-modal__stripe-yellow" />
           </div>
           <header className="usis-login-modal__header">
-            <h2 id="learner-credential-title">Get Learner Portal Credential</h2>
+            <h2 id="learner-credential-title">Get School Portal Credential</h2>
             <p className="learner-public-form__subtitle">
-              Provide LRN and verify your name to retrieve your learner portal access.
+              Provide LRN and verify your name to retrieve your school portal access.
             </p>
           </header>
 

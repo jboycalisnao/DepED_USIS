@@ -129,7 +129,7 @@ export function PtaFeeServicePage({ session }: PtaFeeServicePageProps) {
       parentOrGuardian: 'N/A',
       schoolName: 'LEON NATIONAL HIGH SCHOOL',
       schoolYear: snapshot.schoolYear || 'N/A',
-      issuedBy: 'Learner Portal',
+      issuedBy: 'School Portal',
       feeRows,
       paymentHistoryRows,
       watermarkText: 'Learner Copy',

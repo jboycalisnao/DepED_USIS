@@ -26,7 +26,7 @@ export function LearnerLoginPage({
     <section className="section-shell">
       <UsisLoginModal
         moduleKey="learner_portal"
-        title="Learner's Portal"
+        title="School Portal"
         usernameLabel="LRN (Learner Reference Number)"
         usernameInputMode="numeric"
         usernamePattern="[0-9]{12}"

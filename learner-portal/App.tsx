@@ -64,9 +64,9 @@ function LearnerPortalShell({
     <>
       <main className="page-frame learner-portal-main">
         <div className="content-width">
-          <section className="learner-page-intro" aria-label="Current learner portal page">
+          <section className="learner-page-intro" aria-label="Current school portal page">
             <UsisBreadcrumbBar
-              rootLabel="Learner Portal"
+              rootLabel="School Portal"
               currentLabel={currentSection.label}
               profileName={session.learnerName}
               profileRole="Learner"
@@ -96,7 +96,7 @@ function LearnerPortalShell({
               onMobileOpenChange={setIsMobileNavOpen}
               hideInternalMobileToggle
             />
-            <div className="learner-content">
+          <div className="learner-content">
               <Routes>
                 <Route path="/" element={<DashboardPage session={session} />} />
                 <Route path="/grades" element={<GradesPage session={session} />} />
@@ -162,7 +162,7 @@ export default function App() {
         <UsisPortalGate moduleKey="learner_portal" />
         <header className="site-chrome learner-portal-chrome">
           <div className="content-width">
-            <UsisUnifiedHeader searchId="learner-portal-search" searchLabel="Search learner portal" />
+            <UsisUnifiedHeader searchId="learner-portal-search" searchLabel="Search school portal" />
           </div>
         </header>
 

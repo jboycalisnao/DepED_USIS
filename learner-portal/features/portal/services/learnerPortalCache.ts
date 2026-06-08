@@ -64,7 +64,7 @@ function openIndexedDb() {
 
   indexedDbPromise = new Promise((resolve, reject) => {
     const request = window.indexedDB.open(INDEXED_DB_NAME, INDEXED_DB_VERSION);
-    request.onerror = () => reject(request.error || new Error('Unable to open learner portal cache.'));
+    request.onerror = () => reject(request.error || new Error('Unable to open school portal cache.'));
     request.onupgradeneeded = () => {
       const database = request.result;
       if (!database.objectStoreNames.contains(INDEXED_DB_STORE)) {
@@ -85,7 +85,7 @@ async function readIndexedCache<T>(key: string): Promise<CacheEnvelope<T> | null
       const transaction = db.transaction(INDEXED_DB_STORE, 'readonly');
       const store = transaction.objectStore(INDEXED_DB_STORE);
       const request = store.get(key);
-      request.onerror = () => reject(request.error || new Error('Unable to read learner portal cache.'));
+      request.onerror = () => reject(request.error || new Error('Unable to read school portal cache.'));
       request.onsuccess = () => {
         const result = request.result as IndexedCacheRecord<T> | undefined;
         resolve(result ? { updatedAt: result.updatedAt, payload: result.payload } : null);
@@ -108,9 +108,9 @@ async function writeIndexedCache<T>(key: string, payload: T) {
         updatedAt: Date.now(),
         payload,
       } satisfies IndexedCacheRecord<T>);
-      request.onerror = () => reject(request.error || new Error('Unable to store learner portal cache.'));
+      request.onerror = () => reject(request.error || new Error('Unable to store school portal cache.'));
       transaction.oncomplete = () => resolve();
-      transaction.onerror = () => reject(transaction.error || new Error('Unable to store learner portal cache.'));
+      transaction.onerror = () => reject(transaction.error || new Error('Unable to store school portal cache.'));
     });
   } catch {
     // Fallback remains localStorage; ignore IndexedDB failures.
@@ -125,9 +125,9 @@ async function clearIndexedCache() {
       const transaction = db.transaction(INDEXED_DB_STORE, 'readwrite');
       const store = transaction.objectStore(INDEXED_DB_STORE);
       const request = store.clear();
-      request.onerror = () => reject(request.error || new Error('Unable to clear learner portal cache.'));
+      request.onerror = () => reject(request.error || new Error('Unable to clear school portal cache.'));
       transaction.oncomplete = () => resolve();
-      transaction.onerror = () => reject(transaction.error || new Error('Unable to clear learner portal cache.'));
+      transaction.onerror = () => reject(transaction.error || new Error('Unable to clear school portal cache.'));
     });
   } catch {
     // Ignore cache clear failures.

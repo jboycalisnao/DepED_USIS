@@ -1,7 +1,7 @@
 @import "../../common/css/index.css";
 
 :root {
-  --usis-module-label: "Learner Access Portal";
+  --usis-module-label: "School Portal";
   --usis-module-kicker: "School";
   --usis-module-title: "LEARNER PORTAL";
   --learner-radius-md: 0.375rem;

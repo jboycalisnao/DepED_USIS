@@ -281,7 +281,7 @@ export function MerchServicePage({ session }: MerchServicePageProps) {
                             <td>{order.orderStatus}</td>
                             <td>
                               <span className={`learner-merch-order-source learner-merch-order-source--${order.orderSource}`}>
-                                {order.orderSource === 'integrated_admin' ? 'IA Override' : order.orderSource === 'learner_portal' ? 'Learner Portal' : 'Unknown'}
+                                {order.orderSource === 'integrated_admin' ? 'IA Override' : order.orderSource === 'learner_portal' ? 'School Portal' : 'Unknown'}
                               </span>
                             </td>
                             <td>{order.createdAt ? new Date(order.createdAt).toLocaleString() : '-'}</td>

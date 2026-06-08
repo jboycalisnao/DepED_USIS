@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { PublicEnrollmentSubmission } from '../types';
-import { fetchPublicEnrollmentSubmissions } from '../services/publicEnrollmentSubmissions';
+import {
+  fetchPublicEnrollmentSubmissionById,
+  fetchPublicEnrollmentSubmissions,
+} from '../services/publicEnrollmentSubmissions';
 
 const CACHE_PREFIX = 'registrar_public_enrollment_submissions_cache_v1';
 const CACHE_MAX_ROWS = 250;
@@ -42,6 +45,18 @@ const writeCache = (scopeKey: string, rows: PublicEnrollmentSubmission[]) => {
   }
 };
 
+const sortByCreatedAtDesc = (left: PublicEnrollmentSubmission, right: PublicEnrollmentSubmission) =>
+  new Date(right.created_at).getTime() - new Date(left.created_at).getTime();
+
+const upsertSubmission = (
+  rows: PublicEnrollmentSubmission[],
+  nextRow: PublicEnrollmentSubmission
+): PublicEnrollmentSubmission[] => {
+  const filtered = rows.filter((row) => row.id !== nextRow.id);
+  filtered.push(nextRow);
+  return filtered.sort(sortByCreatedAtDesc);
+};
+
 export function usePublicEnrollmentSubmissions(scopeKey = 'default') {
   const [submissions, setSubmissions] = useState<PublicEnrollmentSubmission[]>(() => readCache(scopeKey));
   const [isLoading, setIsLoading] = useState(true);
@@ -60,6 +75,28 @@ export function usePublicEnrollmentSubmissions(scopeKey = 'default') {
       if (!options?.silent) setIsLoading(false);
     }
   }, [scopeKey]);
+
+  const refreshSubmissionById = useCallback(async (submissionId: string) => {
+    const trimmedId = String(submissionId || '').trim();
+    if (!trimmedId) return null;
+
+    try {
+      const row = await fetchPublicEnrollmentSubmissionById(trimmedId);
+      if (!row) return null;
+
+      setSubmissions((current) => upsertSubmission(current, row));
+      return row;
+    } catch (error: any) {
+      setErrorMessage(error?.message || 'Unable to load submission.');
+      return null;
+    }
+  }, []);
+
+  const removeSubmissionById = useCallback((submissionId: string) => {
+    const trimmedId = String(submissionId || '').trim();
+    if (!trimmedId) return;
+    setSubmissions((current) => current.filter((row) => row.id !== trimmedId));
+  }, []);
 
   useEffect(() => {
     const cachedRows = readCache(scopeKey);
@@ -81,7 +118,9 @@ export function usePublicEnrollmentSubmissions(scopeKey = 'default') {
       isLoading,
       errorMessage,
       refresh,
+      refreshSubmissionById,
+      removeSubmissionById,
     }),
-    [submissions, isLoading, errorMessage, refresh]
+    [submissions, isLoading, errorMessage, refresh, refreshSubmissionById, removeSubmissionById]
   );
 }

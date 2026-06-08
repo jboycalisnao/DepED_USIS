@@ -16,7 +16,7 @@ export function DashboardPage({ session }: DashboardPageProps) {
       <nav className="enrollment-status-breadcrumb" aria-label="Learner dashboard breadcrumb">
         <span>{new Date().getFullYear()}-{new Date().getFullYear() + 1}</span>
         <span>/</span>
-        <span>Learner Portal</span>
+        <span>School Portal</span>
         <span>/</span>
         <span>Dashboard</span>
       </nav>

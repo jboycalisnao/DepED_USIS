@@ -5,7 +5,7 @@ import './styles/global.css';
 import { applyDocumentBranding } from '../common/config/usisBranding';
 import { UsisAppLoaderGate } from '../common/components/UsisAppLoaderGate';
 
-applyDocumentBranding({ moduleTitle: 'Learner Portal' });
+applyDocumentBranding({ moduleTitle: 'School Portal' });
 
 const rootElement = document.getElementById('root');
 
@@ -15,7 +15,7 @@ if (!rootElement) {
 
 createRoot(rootElement).render(
   <React.StrictMode>
-    <UsisAppLoaderGate label="Loading learner portal">
+    <UsisAppLoaderGate label="Loading school portal">
       <App />
     </UsisAppLoaderGate>
   </React.StrictMode>,

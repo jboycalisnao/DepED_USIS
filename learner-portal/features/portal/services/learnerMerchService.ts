@@ -351,7 +351,7 @@ export const placeLearnerMerchOrder = async (payload: PlaceLearnerMerchOrderPayl
   await addMerchOrderAudit({
     changedBy: payload.learnerName,
     fromStatus: null,
-    notes: 'Order placed from Learner Portal merch service.',
+    notes: 'Order placed from School Portal merch service.',
     orderId: String(orderRow.id),
     source: 'learner_portal',
     toStatus: 'Pending',
@@ -387,7 +387,7 @@ export const updateLearnerMerchOrder = async (payload: UpdateLearnerMerchOrderPa
 
   const source = String(orderResult.data.order_source || '');
   if (source !== 'learner_portal') {
-    throw new Error('Only learner portal orders can be edited.');
+    throw new Error('Only school portal orders can be edited.');
   }
 
   const item = Array.isArray(orderResult.data.merch_order_items) ? orderResult.data.merch_order_items[0] : null;
@@ -427,7 +427,7 @@ export const updateLearnerMerchOrder = async (payload: UpdateLearnerMerchOrderPa
 
   await addMerchOrderAudit({
     fromStatus: null,
-    notes: 'Order updated from Learner Portal merch service.',
+    notes: 'Order updated from School Portal merch service.',
     orderId: payload.orderId,
     source: 'learner_portal',
     toStatus: 'Pending',
@@ -459,7 +459,7 @@ export const deleteLearnerMerchOrder = async (payload: DeleteLearnerMerchOrderPa
     throw new Error('Order not found or inaccessible.');
   }
   if (String(existing.data.order_source || '') !== 'learner_portal') {
-    throw new Error('Only learner portal orders can be deleted.');
+    throw new Error('Only school portal orders can be deleted.');
   }
 
   const { error } = await supabase

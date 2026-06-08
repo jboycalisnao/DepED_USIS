@@ -92,7 +92,7 @@ export const resolveLearnerAccess = async (username: string, password: string) =
 
   if (!data) {
     return {
-      error: 'Invalid learner portal credentials.',
+      error: 'Invalid school portal credentials.',
       record: null as LearnerPortalAccessRecord | null,
     };
   }
@@ -108,7 +108,7 @@ export const resolveLearnerAccess = async (username: string, password: string) =
   const validPassword = normalizedPassword === String(data.login_password_plain || '').trim();
   if (!validPassword) {
     return {
-      error: 'Invalid learner portal credentials.',
+      error: 'Invalid school portal credentials.',
       record: null as LearnerPortalAccessRecord | null,
     };
   }

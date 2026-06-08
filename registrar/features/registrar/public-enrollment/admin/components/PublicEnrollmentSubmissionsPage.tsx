@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePublicEnrollmentSubmissions } from '../../hooks/usePublicEnrollmentSubmissions';
 import { useStore } from '../../../../../store';
@@ -201,7 +201,14 @@ export default function PublicEnrollmentSubmissionsPage() {
   const { registrarAccess, refreshData, availableStrands } = useStore();
   const schoolId = registrarAccess?.schoolId || '302522';
   const submissionsScopeKey = registrarAccess?.schoolUuid || schoolId;
-  const { submissions, isLoading, errorMessage, refresh } = usePublicEnrollmentSubmissions(submissionsScopeKey);
+  const {
+    submissions,
+    isLoading,
+    errorMessage,
+    refresh,
+    refreshSubmissionById,
+    removeSubmissionById,
+  } = usePublicEnrollmentSubmissions(submissionsScopeKey);
   const [query, setQuery] = useState('');
   const [actionError, setActionError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -255,77 +262,31 @@ export default function PublicEnrollmentSubmissionsPage() {
     });
   }, [query, activeSchoolYearSubmissions]);
 
-  useEffect(() => {
-    const loadExistingLearners = async () => {
-      const lrns = Array.from(new Set(activeSchoolYearSubmissions.map((row) => (row.lrn || row.payload?.lrn || '').trim()).filter(Boolean)));
-      if (!lrns.length || !activeYearNormalized) {
-        setExistingLearnerLrns(new Set());
-        return;
-      }
+  const syncLearnerStatusByLrn = useCallback(async (lrn: string) => {
+    const trimmedLrn = String(lrn || '').trim();
+    if (!trimmedLrn) return false;
 
-      const { data: learnerRows, error: learnerError } = await supabase.from('registrar_learners').select('id,lrn,section_id').in('lrn', lrns);
-      if (learnerError) return;
+    const { data: learnerRow, error } = await supabase
+      .from('registrar_learners')
+      .select('id,lrn,section_id,status')
+      .eq('lrn', trimmedLrn)
+      .maybeSingle();
 
-      const learnerIds = Array.from(new Set((learnerRows || []).map((row: any) => String(row.id || '').trim()).filter(Boolean)));
-      if (!learnerIds.length) {
-        setExistingLearnerLrns(new Set());
-        return;
-      }
+    if (error) throw error;
 
-      const learnersWithSectionAssigned = new Set(
-        (learnerRows || [])
-          .map((row: any) => ({
-            lrn: String(row.lrn || '').trim(),
-            sectionId: String(row.section_id || '').trim(),
-          }))
-          .filter((row) => Boolean(row.lrn) && Boolean(row.sectionId))
-          .map((row) => row.lrn),
-      );
+    const hasActiveSection = Boolean(String((learnerRow as any)?.section_id || '').trim());
+    const statusValue = String((learnerRow as any)?.status || '').trim().toLowerCase();
+    const isExistingLearner = hasActiveSection || statusValue === 'enrolled';
 
-      const { data: historyRows, error: historyError } = await supabase
-        .from('registrar_enrollment_history')
-        .select('learner_id,school_year')
-        .in('learner_id', learnerIds);
-      if (historyError) return;
+    setExistingLearnerLrns((current) => {
+      const next = new Set(current);
+      if (isExistingLearner) next.add(trimmedLrn);
+      else next.delete(trimmedLrn);
+      return next;
+    });
 
-      const { data: priorSubmissionRows, error: priorSubmissionError } = await supabase
-        .from('registrar_public_enrollment_submissions')
-        .select('lrn,school_year,payload,created_at')
-        .in('lrn', lrns);
-      if (priorSubmissionError) return;
-
-      const learnersWithPriorHistory = new Set<string>();
-      const learnerIdByLrn = new Map<string, string>();
-      for (const row of learnerRows || []) {
-        const lrn = String((row as any).lrn || '').trim();
-        const learnerId = String((row as any).id || '').trim();
-        if (lrn && learnerId) learnerIdByLrn.set(lrn, learnerId);
-      }
-
-      const learnerIdsWithHistory = new Set<string>();
-      for (const row of historyRows || []) {
-        const learnerId = String((row as any).learner_id || '').trim();
-        const schoolYear = normalizeSchoolYear(String((row as any).school_year || '').trim());
-        if (!learnerId || !schoolYear) continue;
-        if (schoolYear !== activeYearNormalized) learnerIdsWithHistory.add(learnerId);
-      }
-
-      const lrnsWithPriorSubmission = new Set<string>();
-      for (const row of priorSubmissionRows || []) {
-        const lrn = String((row as any).lrn || (row as any).payload?.lrn || '').trim();
-        const schoolYear = normalizeSchoolYear(String((row as any).school_year || (row as any).payload?.schoolYear || '').trim());
-        if (!lrn || !schoolYear) continue;
-        if (schoolYear !== activeYearNormalized) lrnsWithPriorSubmission.add(lrn);
-      }
-
-      for (const [lrn, learnerId] of learnerIdByLrn.entries()) {
-        if (learnerIdsWithHistory.has(learnerId) || learnersWithSectionAssigned.has(lrn) || lrnsWithPriorSubmission.has(lrn)) learnersWithPriorHistory.add(lrn);
-      }
-
-      setExistingLearnerLrns(learnersWithPriorHistory);
-    };
-    loadExistingLearners();
-  }, [activeSchoolYearSubmissions]);
+    return isExistingLearner;
+  }, []);
 
   useEffect(() => {
     if (!errorMessage) return;
@@ -846,11 +807,11 @@ export default function PublicEnrollmentSubmissionsPage() {
 
       if (editingSubmission) {
         await updatePublicEnrollmentSubmissionRecord(editingSubmission.id, dbPayload);
+        await refreshSubmissionById(editingSubmission.id);
       } else {
-        await createPublicEnrollmentSubmissionRecord(dbPayload);
+        const createdSubmission = await createPublicEnrollmentSubmissionRecord(dbPayload);
+        await refreshSubmissionById(createdSubmission.id);
       }
-
-      await refresh();
       closeEditor();
     } catch (error: any) {
       setActionError(error?.message || 'Unable to save submission.');
@@ -931,7 +892,7 @@ export default function PublicEnrollmentSubmissionsPage() {
     const visibleInList = submissions.some((entry) => entry.id === id);
     try {
       await deletePublicEnrollmentSubmissionRecord(id);
-      await refresh();
+      removeSubmissionById(id);
       setPendingDeleteSubmissionId(null);
     } catch (error: any) {
       if (error?.code === 'NO_ROWS_DELETED' && visibleInList) {
@@ -1011,6 +972,10 @@ export default function PublicEnrollmentSubmissionsPage() {
     try {
       const gradeLevel = row.grade_to_enroll || row.payload?.gradeToEnroll || '';
       if (!gradeLevel) throw new Error('Submission has no Grade Level to Enroll.');
+      const lrn = String(row.lrn || row.payload?.lrn || '').trim();
+      if (lrn) {
+        void syncLearnerStatusByLrn(lrn);
+      }
       const { data: activeSchoolYear, error: syError } = await supabase
         .from('registrar_school_years')
         .select('id')
@@ -1140,7 +1105,8 @@ export default function PublicEnrollmentSubmissionsPage() {
         ),
       });
 
-      await refresh();
+      await refreshSubmissionById(enrollingSubmission.id);
+      await syncLearnerStatusByLrn(lrn);
       closeEnrollModal();
     } catch (error: any) {
       setEnrollError(error?.message || 'Unable to enroll submission to learner records.');

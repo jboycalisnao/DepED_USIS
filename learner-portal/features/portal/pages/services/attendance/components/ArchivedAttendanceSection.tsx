@@ -15,7 +15,7 @@ export function ArchivedAttendanceSection({ snapshot, isLoading, error }: Archiv
         <div>
           <h3>Archived Attendance</h3>
           <p>
-            These records have already been archived. The learner portal shows only the archive summary and date ranges here.
+            These records have already been archived. The school portal shows only the archive summary and date ranges here.
           </p>
         </div>
         <span className="learner-attendance-archive__badge">Archived Records</span>
