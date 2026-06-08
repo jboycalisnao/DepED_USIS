@@ -1,4 +1,4 @@
-import { supabase } from '../../../lib/supabase';
+import { supabase } from '@deped-usis/shared-supabase';
 import { getCoordinatorModuleAccessMap, hasCoordinatorModuleAccess } from '../../../../common/auth/moduleAccess';
 
 export interface AttendanceAccessRecord {

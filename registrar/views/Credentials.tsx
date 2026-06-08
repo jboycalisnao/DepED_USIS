@@ -41,6 +41,14 @@ const Credentials: React.FC = () => {
     return map;
   }, [sectionsForGrade]);
 
+  const gradeHasLearners = (grade: GradeLevel) =>
+    activeLearnersForYear.some((learner) => {
+      const studentSid = String(learner.sectionId || '').trim();
+      const section = sections.find((entry) => String(entry.id || '').trim() === studentSid);
+      const placementGrade = section?.gradeLevel;
+      return placementGrade === grade;
+    });
+
   const activeLearnersForYear = useMemo(
     () => getActiveLearnersForYear(learners, sections, activeSchoolYear),
     [learners, sections, activeSchoolYear],
@@ -269,6 +277,18 @@ const Credentials: React.FC = () => {
   const sectionOptions = [{ value: 'all', label: `All Sections in ${selectedGrade}` }, ...sectionsForGrade.map((section) => ({ value: section.id, label: `${section.name}${section.strand ? ` (${section.strand})` : ''}` }))];
   const allVisibleSelected = targetLearners.length > 0 && targetLearners.every((learner) => selectedLearnerIds.has(learner.id));
   const autoExpandSectionKey = selectedSectionId === 'all' ? undefined : selectedSectionId;
+
+  useEffect(() => {
+    if (gradeLevels.length === 0) return;
+    const firstGradeWithLearners = gradeLevels.find((grade) => gradeHasLearners(grade));
+    const nextGrade = firstGradeWithLearners || gradeLevels[0];
+    if (nextGrade && nextGrade !== selectedGrade) {
+      setSelectedGrade(nextGrade);
+      setSelectedSectionId('all');
+    }
+    // Re-run only when the available grades or current learner pool changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gradeLevels, activeLearnersForYear, activeSchoolYear.label, sections]);
 
   const sectionListData = useMemo<UsisGradeSectionListGrade[]>(() => {
     if (groupedBySection.length === 0) return [];

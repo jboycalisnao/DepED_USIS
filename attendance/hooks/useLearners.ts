@@ -1,20 +1,66 @@
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Learner, Section } from '../types';
-import { supabase } from '../lib/supabase';
+import { supabase } from '@deped-usis/shared-supabase';
 import { normalizeRfidValue } from '../utils/rfid';
+import { loadLearnerRosterCache, saveLearnerRosterCache } from '../utils/learnerRosterCache';
 
 export const useLearners = () => {
   const [learners, setLearners] = useState<Learner[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
   const [fetchedCount, setFetchedCount] = useState(0);
+  const [hasCachedRoster, setHasCachedRoster] = useState(false);
+  const [lastSyncedAt, setLastSyncedAt] = useState<string>('');
+  const syncLockRef = useRef(false);
+  const sectionsCacheRef = useRef<Section[]>([]);
+
+  const hydrateRosterCache = useCallback(async () => {
+    try {
+      const cached = await loadLearnerRosterCache();
+      if (cached) {
+        sectionsCacheRef.current = cached.sections || [];
+        const sectionsMap = (cached.sections || []).reduce((acc, section) => {
+          acc[String(section.id)] = section;
+          return acc;
+        }, {} as Record<string, Section>);
+
+        const enriched = (cached.learners || []).map((learner) => {
+          const sId = String((learner as any).section_id || (learner as any).sectionId || '').trim();
+          const section = sId ? sectionsMap[sId] : null;
+          const gradeVal = section ? (section.grade_level || section.gradeLevel || 'General Education') : 'NO GRADE ASSIGNED';
+          return {
+            ...learner,
+            section_name: section
+              ? (section.name || 'Unknown Section')
+              : (sId ? 'Unknown Section' : 'No Section Assigned'),
+            grade_level: gradeVal,
+          };
+        });
+
+        setLearners(enriched);
+        setFetchedCount(enriched.length);
+        setHasCachedRoster(enriched.length > 0);
+        setLastSyncedAt(cached.updatedAt || '');
+      }
+    } catch (err) {
+      console.error('Roster cache hydration error:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void hydrateRosterCache();
+  }, [hydrateRosterCache]);
 
   const fetchAll = useCallback(async () => {
-    if (isSyncing) return;
+    if (syncLockRef.current) return;
+    syncLockRef.current = true;
+    setIsSyncing(true);
+    setIsLoading(true);
+
     try {
-      setIsSyncing(true);
-      
       // 1. Fetch shared registrar section catalog first, then fallback to legacy sections table.
       const { data: registrarSectionsData, error: registrarSectionsError } = await supabase
         .from('registrar_sections')
@@ -29,82 +75,50 @@ export const useLearners = () => {
         if (fallbackSectionsError) throw fallbackSectionsError;
         sectionsData = fallbackSectionsData as Section[] | null;
       }
-      
+
       const sectionsMap = (sectionsData || []).reduce((acc, s) => {
         acc[String(s.id)] = s;
         return acc;
       }, {} as Record<string, Section>);
 
-      // 2. Fetch Learners in chunks
-      let allData: Learner[] = [];
-      let from = 0;
-      const step = 1000;
-      let hasMore = true;
+      const { data, error } = await supabase
+        .from('registrar_learners')
+        .select('*')
+        .order('last_name', { ascending: true })
+        .order('id', { ascending: true });
 
-      while (hasMore) {
-        // FIX: Added .order('id') as a secondary sort key. 
-        // Without this, pagination is non-deterministic for rows with identical last names,
-        // causing records to be skipped or duplicated between the 'from' ranges.
-        const { data, error } = await supabase
-          .from('registrar_learners')
-          .select('*')
-          .range(from, from + step - 1)
-          .order('last_name', { ascending: true })
-          .order('id', { ascending: true });
-        
-        if (error) throw error;
+      if (error) throw error;
 
-        if (data && data.length > 0) {
-          const enriched = data.map(l => {
-            const sId = (l as any).section_id || (l as any).sectionId;
-            const section = sId ? sectionsMap[String(sId)] : null;
-            
-            // Priority: 1. grade_level 2. gradeLevel 3. Default
-            const gradeVal = section ? (section.grade_level || section.gradeLevel || 'General Education') : 'NO GRADE ASSIGNED';
-            
-            return {
-              ...l,
-              section_name: section
-                ? (section.name || 'Unknown Section')
-                : (sId ? 'Unknown Section' : 'No Section Assigned'),
-              grade_level: gradeVal
-            };
-          });
+      sectionsCacheRef.current = sectionsData || [];
+      const enriched = (data || []).map((l) => {
+        const sId = (l as any).section_id || (l as any).sectionId;
+        const section = sId ? sectionsMap[String(sId)] : null;
 
-          // Deduplication check: logic to ensure we don't count the same ID twice
-          // even if the DB returns it in different ranges due to unstable sorting.
-          const currentIds = new Set(allData.map(l => l.id));
-          const unique = enriched.filter(l => {
-            if (currentIds.has(l.id)) {
-              console.warn(`Duplicate learner ID detected during fetch: ${l.id}. Skipping to maintain count integrity.`);
-              return false;
-            }
-            return true;
-          });
-          
-          allData = [...allData, ...unique];
-          setLearners([...allData]); 
-          setFetchedCount(allData.length);
-          setIsLoading(false);
-          
-          hasMore = data.length === step;
-          from += step;
+        return {
+          ...l,
+          section_name: section
+            ? (section.name || 'Unknown Section')
+            : (sId ? 'Unknown Section' : 'No Section Assigned'),
+          grade_level: section ? (section.grade_level || section.gradeLevel || 'General Education') : 'NO GRADE ASSIGNED',
+        };
+      });
 
-          // Performance throttle
-          await new Promise(resolve => setTimeout(resolve, 30));
-        } else {
-          hasMore = false;
-        }
-      }
+      setLearners(enriched);
+      setFetchedCount(enriched.length);
+      setHasCachedRoster(enriched.length > 0);
+      setLastSyncedAt(new Date().toISOString());
+      await saveLearnerRosterCache({
+        learners: enriched,
+        sections: sectionsData || [],
+      });
     } catch (err) {
       console.error('Data Fetching Error:', err);
     } finally {
+      syncLockRef.current = false;
       setIsSyncing(false);
       setIsLoading(false);
     }
-  }, [isSyncing]);
-
-  useEffect(() => { fetchAll(); }, []);
+  }, []);
 
   const getFiltered = useCallback((query: string, uidMappings: Record<string, string>) => {
     const raw = query.trim().toLowerCase();
@@ -151,9 +165,14 @@ export const useLearners = () => {
       return { ok: false as const, error: error.message || 'Failed to save learner RFID.' };
     }
 
-    setLearners((prev) =>
-      prev.map((learner) => (learner.id === learnerId ? { ...learner, rfid: normalizedRfid } : learner))
-    );
+    setLearners((prev) => {
+      const nextLearners = prev.map((learner) => (learner.id === learnerId ? { ...learner, rfid: normalizedRfid } : learner));
+      void saveLearnerRosterCache({
+        learners: nextLearners,
+        sections: sectionsCacheRef.current,
+      });
+      return nextLearners;
+    });
     return { ok: true as const };
   }, []);
 
@@ -169,11 +188,16 @@ export const useLearners = () => {
       return { ok: false as const, error: error.message || 'Failed to clear learner RFID.' };
     }
 
-    setLearners((prev) =>
-      prev.map((learner) => (learner.id === learnerId ? { ...learner, rfid: null } : learner))
-    );
+    setLearners((prev) => {
+      const nextLearners = prev.map((learner) => (learner.id === learnerId ? { ...learner, rfid: null } : learner));
+      void saveLearnerRosterCache({
+        learners: nextLearners,
+        sections: sectionsCacheRef.current,
+      });
+      return nextLearners;
+    });
     return { ok: true as const };
   }, []);
 
-  return { learners, isLoading, isSyncing, fetchedCount, getFiltered, saveLearnerRfid, clearLearnerRfid };
+  return { learners, isLoading, isSyncing, fetchedCount, getFiltered, saveLearnerRfid, clearLearnerRfid, loadLearners: fetchAll, hasCachedRoster, lastSyncedAt };
 };

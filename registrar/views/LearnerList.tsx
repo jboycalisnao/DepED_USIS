@@ -35,10 +35,9 @@ const LearnerList: React.FC = () => {
       };
     }
 
-    const currentEnrollment = student.enrollments?.find((entry) => entry.schoolYear === activeSchoolYear.label);
     return {
-      gradeLevel: currentEnrollment?.gradeLevel || ('Unassigned Registry' as GradeLevel | 'Unassigned Registry'),
-      sectionLabel: currentEnrollment?.section || 'Pending Placement',
+      gradeLevel: 'Unassigned Registry' as GradeLevel | 'Unassigned Registry',
+      sectionLabel: 'Pending Placement',
       sectionId: undefined,
     };
   };

@@ -466,7 +466,7 @@ const fetchLearners = (forceRefresh = false) => fetchAllFromTable(REGISTRAR_TABL
   commitLearners(data.map(mapDbToLearner));
 }, {
   forceRefresh,
-  selectColumns: 'id,lrn,first_name,last_name,middle_name,birth_date,gender,address,contact_number,guardian_name,father_name,mother_name,status,section_id,is_sslg,is_club_officer,is_athlete,is_artist,is_4ps,is_indigent,org_affiliations,enrollment_history,login_username,login_password_plain,login_status,last_login_at,microsoft_user_id,microsoft_upn,microsoft_mail_nickname,microsoft_account_status,microsoft_license_sku_id,microsoft_created_at,microsoft_last_synced_at,created_at',
+  selectColumns: 'id,lrn,first_name,last_name,middle_name,birth_date,gender,address,contact_number,guardian_name,father_name,mother_name,email,status,section_id,school_year,is_sslg,is_club_officer,is_athlete,is_artist,is_4ps,is_indigent,org_affiliations,login_username,login_password_plain,login_status,last_login_at,microsoft_user_id,microsoft_upn,microsoft_mail_nickname,microsoft_account_status,microsoft_license_sku_id,microsoft_created_at,microsoft_last_synced_at,created_at',
 });
 
 const fetchSections = (forceRefresh = false) => fetchAllFromTable(REGISTRAR_TABLES.sections, (data) => {

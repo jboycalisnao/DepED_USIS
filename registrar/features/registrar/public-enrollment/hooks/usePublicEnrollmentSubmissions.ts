@@ -3,6 +3,7 @@ import type { PublicEnrollmentSubmission } from '../types';
 import { fetchPublicEnrollmentSubmissions } from '../services/publicEnrollmentSubmissions';
 
 const CACHE_PREFIX = 'registrar_public_enrollment_submissions_cache_v1';
+const CACHE_MAX_ROWS = 250;
 
 const readCache = (scopeKey: string): PublicEnrollmentSubmission[] => {
   if (typeof window === 'undefined') return [];
@@ -18,10 +19,27 @@ const readCache = (scopeKey: string): PublicEnrollmentSubmission[] => {
 
 const writeCache = (scopeKey: string, rows: PublicEnrollmentSubmission[]) => {
   if (typeof window === 'undefined') return;
-  window.localStorage.setItem(
-    `${CACHE_PREFIX}:${scopeKey}`,
-    JSON.stringify({ updatedAt: new Date().toISOString(), rows }),
-  );
+  const rowsToCache = rows.slice(0, CACHE_MAX_ROWS);
+  const payload = JSON.stringify({ updatedAt: new Date().toISOString(), rows: rowsToCache });
+
+  try {
+    window.localStorage.setItem(`${CACHE_PREFIX}:${scopeKey}`, payload);
+  } catch (error) {
+    const isQuotaError =
+      error instanceof DOMException &&
+      (error.name === 'QuotaExceededError' || error.name === 'NS_ERROR_DOM_QUOTA_REACHED');
+
+    if (!isQuotaError) {
+      throw error;
+    }
+
+    try {
+      window.localStorage.removeItem(`${CACHE_PREFIX}:${scopeKey}`);
+      window.localStorage.setItem(`${CACHE_PREFIX}:${scopeKey}`, payload);
+    } catch {
+      // Swallow quota errors so refresh continues using in-memory state only.
+    }
+  }
 };
 
 export function usePublicEnrollmentSubmissions(scopeKey = 'default') {

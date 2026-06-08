@@ -73,7 +73,18 @@ function App() {
   
   const monitors = [monitor1, monitor2, monitor3];
 
-  const { learners, isLoading, isSyncing, fetchedCount, getFiltered, saveLearnerRfid, clearLearnerRfid } = useLearners();
+  const {
+    learners,
+    isLoading,
+    isSyncing,
+    fetchedCount,
+    getFiltered,
+    saveLearnerRfid,
+    clearLearnerRfid,
+    loadLearners,
+    hasCachedRoster,
+    lastSyncedAt,
+  } = useLearners();
   const {
     uidMappings,
     adminUids,
@@ -84,8 +95,8 @@ function App() {
     logAttendance,
     addManualAttendanceRecord,
     deleteRecord,
-    queryRecordsByDateRange,
     querySummaryByDateRange,
+    refreshAttendanceStatusByRange,
   } = useAttendance();
   const { settings, updateSettings } = useSettings();
 
@@ -676,10 +687,13 @@ function App() {
                           selectedId={selectedLearnerId}
                           onSelect={setSelectedLearnerId}
                           onUnlink={handleUnlinkMapping}
+                          onLoadRoster={() => void loadLearners()}
                           isLoading={isLoading}
                           isSearching={searchQuery.trim().length > 0}
                           isSyncing={isSyncing}
                           fetchedCount={fetchedCount}
+                          hasCachedRoster={hasCachedRoster}
+                          lastSyncedAt={lastSyncedAt}
                         />
                       </div>
                     </div>
@@ -692,8 +706,8 @@ function App() {
                       logs={attendanceLogs}
                       learners={learners}
                       onDelete={deleteRecord}
-                      onQueryRange={queryRecordsByDateRange}
                       onAddManualRecord={addManualAttendanceRecord}
+                      refreshAttendanceStatusByRange={refreshAttendanceStatusByRange}
                     />
                   }
                 />

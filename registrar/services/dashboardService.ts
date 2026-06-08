@@ -21,9 +21,9 @@ export const getActiveLearnersForYear = (
   return learners.filter(l => {
     const studentSid = String(l.sectionId || '').trim();
     const hasActiveSection = studentSid && activeSectionIds.has(studentSid);
-    const hasMatchingEnrollment = l.enrollments?.some((e) => normalizeSchoolYear(e.schoolYear) === normalizeSchoolYear(activeSchoolYear.label));
+    const hasMatchingSchoolYear = normalizeSchoolYear(l.schoolYear) === normalizeSchoolYear(activeSchoolYear.label);
     
-    return hasActiveSection || hasMatchingEnrollment;
+    return hasActiveSection || hasMatchingSchoolYear;
   });
 };
 
@@ -41,7 +41,7 @@ export const calculateEnrollmentComposition = (
   activeLearners.forEach(l => {
     const studentSid = String(l.sectionId || '').trim();
     const section = sections.find(s => s.id === studentSid);
-    const g = section?.gradeLevel || l.enrollments?.find((e) => normalizeSchoolYear(e.schoolYear) === normalizeSchoolYear(activeSchoolYear.label))?.gradeLevel;
+    const g = section?.gradeLevel;
     if (!g) return;
     
     const jhs = [GradeLevel.GRADE_7, GradeLevel.GRADE_8, GradeLevel.GRADE_9, GradeLevel.GRADE_10];

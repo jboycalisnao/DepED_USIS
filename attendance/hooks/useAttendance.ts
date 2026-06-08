@@ -9,7 +9,7 @@ import {
   AttendanceType,
 } from '../types';
 import { normalizeRfidValue } from '../utils/rfid';
-import { supabase } from '../lib/supabase';
+import { supabase } from '@deped-usis/shared-supabase';
 import {
   loadAttendanceLocalState,
   saveAdminUids,
@@ -26,43 +26,7 @@ const generateRecordId = () =>
   crypto.randomUUID?.() || `local-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 const SYNC_INTERVAL_MS = 60 * 1000;
 const SYNC_BATCH_SIZE = 50;
-const REMOTE_FETCH_LIMIT = 5000;
-const RAW_RETENTION_DAYS = 90;
 const MANILA_TIME_ZONE = 'Asia/Manila';
-
-const mapRemoteRowToAttendanceRecord = (row: any): AttendanceRecord | null => {
-  const id = String(row?.id || '').trim();
-  const learnerId = String(row?.learner_id || '').trim();
-  const type = String(row?.attendance_type || '').trim() as AttendanceType;
-  const timestamp = String(row?.logged_at || '').trim();
-  if (!id || !learnerId || !type || !timestamp) return null;
-  return {
-    id,
-    learnerId,
-    type,
-    timestamp,
-    synced: true,
-  };
-};
-
-const mergeAttendanceRecords = (localRecords: AttendanceRecord[], remoteRecords: AttendanceRecord[]) => {
-  const merged = new Map<string, AttendanceRecord>();
-  for (const record of remoteRecords) merged.set(record.id, record);
-  for (const record of localRecords) {
-    const existing = merged.get(record.id);
-    if (!existing) {
-      merged.set(record.id, record);
-      continue;
-    }
-    merged.set(record.id, {
-      ...existing,
-      synced: existing.synced || record.synced,
-    });
-  }
-  return Array.from(merged.values()).sort(
-    (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-  );
-};
 
 const toIsoDate = (value: Date) => {
   const yyyy = value.getFullYear();
@@ -90,23 +54,236 @@ const formatDateInManila = (timestamp: string) => {
 const isWithinDateRange = (dateKey: string, fromDate: string, toDate: string) =>
   dateKey >= fromDate && dateKey <= toDate;
 
+type LearnerSectionMeta = {
+  sectionId: string | null;
+};
+
+type SectionMeta = {
+  name: string;
+  gradeLevel: string;
+};
+
+const buildDailySummariesFromRecords = (records: AttendanceRecord[]) => {
+  const sortedRecords = [...records].sort(
+    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
+  );
+  const byDay = new Map<string, Map<string, AttendanceDailySummaryRow>>();
+
+  sortedRecords.forEach((record) => {
+    const attendanceDate = formatDateInManila(record.timestamp);
+    if (!attendanceDate) return;
+
+    const dayMap = byDay.get(attendanceDate) || new Map<string, AttendanceDailySummaryRow>();
+    const existing =
+      dayMap.get(record.learnerId) ||
+      ({
+        learnerId: record.learnerId,
+        attendanceDate,
+        amIn: null,
+        amOut: null,
+        pmIn: null,
+        pmOut: null,
+        unscheduledCount: 0,
+        lastStationNo: null,
+      } satisfies AttendanceDailySummaryRow);
+
+    const timestamp = record.timestamp;
+    switch (record.type) {
+      case 'AM_IN':
+        existing.amIn = existing.amIn || timestamp;
+        break;
+      case 'AM_OUT':
+        existing.amOut = existing.amOut || timestamp;
+        break;
+      case 'PM_IN':
+        existing.pmIn = existing.pmIn || timestamp;
+        break;
+      case 'PM_OUT':
+        existing.pmOut = existing.pmOut || timestamp;
+        break;
+      case 'UNSCHEDULED':
+        existing.unscheduledCount += 1;
+        break;
+    }
+
+    dayMap.set(record.learnerId, existing);
+    byDay.set(attendanceDate, dayMap);
+  });
+
+  return Array.from(byDay.entries())
+    .flatMap(([, dayMap]) => Array.from(dayMap.values()))
+    .sort((a, b) => {
+      if (a.attendanceDate !== b.attendanceDate) {
+        return b.attendanceDate.localeCompare(a.attendanceDate);
+      }
+      return a.learnerId.localeCompare(b.learnerId);
+    });
+};
+
+const buildMonthlySummariesFromDailyRows = (
+  dailyRows: any[],
+  learnerMap: Map<string, LearnerSectionMeta>,
+  sectionMap: Map<string, SectionMeta>,
+) => {
+  const monthlyMap = new Map<string, AttendanceMonthlySummaryRow>();
+
+  dailyRows.forEach((row: any) => {
+    const attendanceDate = String(row.attendanceDate || row.attendance_date || '').trim();
+    const learnerId = String(row.learnerId || row.learner_id || '').trim();
+    if (!attendanceDate || !learnerId) return;
+
+    const monthKey = attendanceDate.slice(0, 7);
+    const learner = learnerMap.get(learnerId);
+    const section = learner?.sectionId ? sectionMap.get(learner.sectionId) : undefined;
+    const sectionName = section?.name || 'No Section';
+    const gradeLevel = section?.gradeLevel || 'Unknown';
+    const key = `${monthKey}|${sectionName}|${gradeLevel}`;
+
+    const presentSlots =
+      (row.amIn ? 1 : 0) +
+      (row.amOut ? 1 : 0) +
+      (row.pmIn ? 1 : 0) +
+      (row.pmOut ? 1 : 0);
+
+    const existing = monthlyMap.get(key);
+    if (!existing) {
+      monthlyMap.set(key, {
+        summaryMonth: monthKey,
+        sectionName,
+        gradeLevel,
+        learnerDays: 1,
+        expectedSlots: 4,
+        presentSlots,
+        missingSlots: 4 - presentSlots,
+      });
+      return;
+    }
+
+    existing.learnerDays += 1;
+    existing.expectedSlots += 4;
+    existing.presentSlots += presentSlots;
+    existing.missingSlots += 4 - presentSlots;
+  });
+
+  return Array.from(monthlyMap.values()).sort((a, b) =>
+    a.summaryMonth < b.summaryMonth ? 1 : a.summaryMonth > b.summaryMonth ? -1 : a.sectionName.localeCompare(b.sectionName),
+  );
+};
+
+const buildWeeklySummariesFromDailyRows = (
+  dailyRows: AttendanceDailySummaryRow[],
+  learnerMap: Map<string, LearnerSectionMeta>,
+  sectionMap: Map<string, SectionMeta>,
+) => {
+  const weeklyMap = new Map<string, AttendanceWeeklySummaryRow>();
+
+  dailyRows.forEach((row) => {
+    if (!row.attendanceDate || !row.learnerId) return;
+
+    const date = new Date(`${row.attendanceDate}T00:00:00`);
+    const day = date.getDay();
+    const diff = day === 0 ? -6 : 1 - day;
+    date.setDate(date.getDate() + diff);
+    const weekStart = toIsoDate(date);
+
+    const learner = learnerMap.get(row.learnerId);
+    const section = learner?.sectionId ? sectionMap.get(learner.sectionId) : undefined;
+    const sectionName = section?.name || 'No Section';
+    const gradeLevel = section?.gradeLevel || 'Unknown';
+    const key = `${weekStart}|${sectionName}|${gradeLevel}`;
+
+    const presentSlots =
+      (row.amIn ? 1 : 0) +
+      (row.amOut ? 1 : 0) +
+      (row.pmIn ? 1 : 0) +
+      (row.pmOut ? 1 : 0);
+
+    const existing = weeklyMap.get(key);
+    if (!existing) {
+      weeklyMap.set(key, {
+        weekStart,
+        sectionName,
+        gradeLevel,
+        learnerDays: 1,
+        expectedSlots: 4,
+        presentSlots,
+        missingSlots: 4 - presentSlots,
+      });
+      return;
+    }
+
+    existing.learnerDays += 1;
+    existing.expectedSlots += 4;
+    existing.presentSlots += presentSlots;
+    existing.missingSlots += 4 - presentSlots;
+  });
+
+  return Array.from(weeklyMap.values()).sort((a, b) =>
+    a.weekStart < b.weekStart ? 1 : a.weekStart > b.weekStart ? -1 : a.sectionName.localeCompare(b.sectionName),
+  );
+};
+
 export const useAttendance = () => {
   const [uidMappings, setUidMappings] = useState<Record<string, string>>({});
   const [adminUids, setAdminUids] = useState<string[]>([]);
   const [attendanceLogs, setAttendanceLogs] = useState<AttendanceRecord[]>([]);
   const [isHydrated, setIsHydrated] = useState(false);
 
-  const loadRemoteAttendanceRecords = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('attendance_records')
-      .select('id,learner_id,attendance_type,logged_at')
-      .order('logged_at', { ascending: false })
-      .limit(REMOTE_FETCH_LIMIT);
-    if (error) throw error;
-    return (data || [])
-      .map(mapRemoteRowToAttendanceRecord)
-      .filter(Boolean) as AttendanceRecord[];
-  }, []);
+  const getLocalAttendanceRecordsInRange = useCallback((fromDate: string, toDate: string) => {
+    const start = String(fromDate || '').trim();
+    const end = String(toDate || '').trim();
+
+    return attendanceLogs
+      .filter((record) => {
+        const dateKey = formatDateInManila(record.timestamp);
+        return !!dateKey && isWithinDateRange(dateKey, start, end);
+      })
+      .slice()
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  }, [attendanceLogs]);
+
+  const refreshAttendanceStatusByRange = useCallback(async (fromDate: string, toDate: string): Promise<Set<string>> => {
+    if (!isHydrated) return new Set<string>();
+    if (typeof navigator !== 'undefined' && !navigator.onLine) return new Set<string>();
+
+    const start = String(fromDate || '').trim();
+    const end = String(toDate || '').trim();
+    const scopedRecords = attendanceLogs.filter((record) => {
+      const dateKey = formatDateInManila(record.timestamp);
+      return !!dateKey && isWithinDateRange(dateKey, start, end);
+    });
+
+    const scopedIds = scopedRecords
+      .map((record) => record.id)
+      .filter((id) => isUuid(String(id)));
+
+    if (scopedIds.length === 0) return new Set<string>();
+
+    const remoteIds = new Set<string>();
+    const uniqueIds = Array.from(new Set(scopedIds.map((id) => String(id))));
+    for (let index = 0; index < uniqueIds.length; index += SYNC_BATCH_SIZE) {
+      const chunk = uniqueIds.slice(index, index + SYNC_BATCH_SIZE);
+      // eslint-disable-next-line no-await-in-loop
+      const { data, error } = await supabase
+        .from('attendance_records')
+        .select('id')
+        .in('id', chunk);
+
+      if (error) throw error;
+      (data || []).forEach((row: any) => {
+        if (row?.id) remoteIds.add(String(row.id));
+      });
+    }
+
+    setAttendanceLogs((prev) =>
+      prev.map((record) => {
+        const dateKey = formatDateInManila(record.timestamp);
+        if (!dateKey || !isWithinDateRange(dateKey, start, end)) return record;
+        return { ...record, synced: remoteIds.has(record.id) };
+      }),
+    );
+    return remoteIds;
+  }, [attendanceLogs, isHydrated]);
 
   useEffect(() => {
     const hydrate = async () => {
@@ -141,24 +318,14 @@ export const useAttendance = () => {
           synced: !!log.synced
         }));
 
-        let mergedLogs = normalizedLogs;
-        if (typeof navigator === 'undefined' || navigator.onLine) {
-          try {
-            const remoteLogs = await loadRemoteAttendanceRecords();
-            mergedLogs = mergeAttendanceRecords(normalizedLogs, remoteLogs);
-          } catch (remoteError) {
-            console.error('Failed to fetch remote attendance records:', remoteError);
-          }
-        }
-
         setUidMappings(normalizedMappings);
         setAdminUids(normalizedAdmins);
-        setAttendanceLogs(mergedLogs);
+        setAttendanceLogs(normalizedLogs);
 
         await Promise.all([
           saveUidMappings(normalizedMappings),
           saveAdminUids(normalizedAdmins),
-          saveAttendanceLogs(mergedLogs),
+          saveAttendanceLogs(normalizedLogs),
         ]);
       } catch (error) {
         console.error('Failed to load attendance local state from IndexedDB:', error);
@@ -168,7 +335,7 @@ export const useAttendance = () => {
     };
 
     void hydrate();
-  }, [loadRemoteAttendanceRecords]);
+  }, []);
 
   useEffect(() => {
     if (!isHydrated) return;
@@ -327,32 +494,31 @@ export const useAttendance = () => {
       // eslint-disable-next-line no-await-in-loop
       await trySyncRecord(record);
     }
+  }, [attendanceLogs, trySyncRecord, isHydrated]);
 
-    try {
-      const remoteLogs = await loadRemoteAttendanceRecords();
-      setAttendanceLogs((prev) => mergeAttendanceRecords(prev, remoteLogs));
-    } catch (error) {
-      console.error('Failed to refresh attendance records from database:', error);
+  const deleteRecord = async (record: AttendanceRecord) => {
+    if (record.synced) {
+      if (isUuid(record.id)) {
+        const { error } = await supabase.from('attendance_records').delete().eq('id', record.id);
+        if (error) {
+          console.error('Failed to delete attendance record:', error);
+          return;
+        }
+      } else {
+        const { error } = await supabase
+          .from('attendance_records')
+          .delete()
+          .eq('learner_id', record.learnerId)
+          .eq('attendance_type', record.type)
+          .eq('logged_at', record.timestamp);
+        if (error) {
+          console.error('Failed to delete attendance record:', error);
+          return;
+        }
+      }
     }
-  }, [attendanceLogs, trySyncRecord, isHydrated, loadRemoteAttendanceRecords]);
 
-  const deleteRecord = (record: AttendanceRecord) => {
     setAttendanceLogs(prev => prev.filter(log => log.id !== record.id));
-
-    if (!record.synced) return;
-
-    if (isUuid(record.id)) {
-      void supabase.from('attendance_records').delete().eq('id', record.id);
-      return;
-    }
-
-    // Fallback delete path for rare synced rows without uuid IDs.
-    void supabase
-      .from('attendance_records')
-      .delete()
-      .eq('learner_id', record.learnerId)
-      .eq('attendance_type', record.type)
-      .eq('logged_at', record.timestamp);
   };
 
   const removeMapping = (learnerId: string) => {
@@ -364,70 +530,67 @@ export const useAttendance = () => {
   };
 
   const queryRecordsByDateRange = useCallback(async (fromDate: string, toDate: string): Promise<AttendanceReportResult> => {
-    const today = new Date();
-    const cutoff = new Date(today);
-    cutoff.setDate(cutoff.getDate() - RAW_RETENTION_DAYS);
-    const cutoffDate = toIsoDate(cutoff);
+    const rawRecords = getLocalAttendanceRecordsInRange(fromDate, toDate);
 
-    const normalizedFrom = fromDate || cutoffDate;
-    const normalizedTo = toDate || toIsoDate(today);
-    const shouldUseSummary = normalizedTo < cutoffDate;
+    return { mode: 'raw', rawRecords, summaryRows: [] };
+  }, [getLocalAttendanceRecordsInRange]);
 
-    if (!shouldUseSummary) {
-      const { data, error } = await supabase
-        .from('attendance_records')
-        .select('id,learner_id,attendance_type,logged_at')
-        .order('logged_at', { ascending: false })
-        .limit(REMOTE_FETCH_LIMIT);
-      if (error) throw error;
-      const rawRecords = (data || [])
-        .map(mapRemoteRowToAttendanceRecord)
-        .filter(Boolean)
-        .filter((record): record is AttendanceRecord => {
-          if (!record) return false;
-          const dateKey = formatDateInManila(record.timestamp);
-          return !!dateKey && isWithinDateRange(dateKey, normalizedFrom, normalizedTo);
-        });
-      return { mode: 'raw', rawRecords, summaryRows: [] };
-    }
+  const queryMonthlySummariesByRange = useCallback(async (fromDate: string, toDate: string): Promise<AttendanceMonthlySummaryRow[]> => {
+    const dailyRows = buildDailySummariesFromRecords(getLocalAttendanceRecordsInRange(fromDate, toDate));
 
-    const { data, error } = await supabase
-      .from('attendance_daily_summary')
-      .select('learner_id,attendance_date,am_in,am_out,pm_in,pm_out,unscheduled_count,last_station_no')
-      .gte('attendance_date', normalizedFrom)
-      .lte('attendance_date', normalizedTo)
-      .order('attendance_date', { ascending: false })
-      .limit(REMOTE_FETCH_LIMIT);
-    if (error) throw error;
-    const summaryRows: AttendanceDailySummaryRow[] = (data || []).map((row: any) => ({
-      learnerId: String(row.learner_id || '').trim(),
-      attendanceDate: String(row.attendance_date || '').trim(),
-      amIn: row.am_in ? String(row.am_in) : null,
-      amOut: row.am_out ? String(row.am_out) : null,
-      pmIn: row.pm_in ? String(row.pm_in) : null,
-      pmOut: row.pm_out ? String(row.pm_out) : null,
-      unscheduledCount: Number(row.unscheduled_count || 0),
-      lastStationNo: row.last_station_no == null ? null : Number(row.last_station_no),
-    }));
-    return { mode: 'summary', rawRecords: [], summaryRows };
-  }, []);
+    const { data: learnerRows, error: learnerError } = await supabase
+      .from('registrar_learners')
+      .select('id,section_id');
+    if (learnerError) throw learnerError;
+
+    const { data: sectionRows, error: sectionError } = await supabase
+      .from('registrar_sections')
+      .select('id,name,grade_level');
+    if (sectionError) throw sectionError;
+
+    const learnerMap = new Map<string, LearnerSectionMeta>();
+    (learnerRows || []).forEach((row: any) => {
+      learnerMap.set(String(row.id), {
+        sectionId: row.section_id ? String(row.section_id) : null,
+      });
+    });
+
+    const sectionMap = new Map<string, SectionMeta>();
+    (sectionRows || []).forEach((row: any) => {
+      sectionMap.set(String(row.id), {
+        name: String(row.name || 'No Section'),
+        gradeLevel: String(row.grade_level || 'Unknown'),
+      });
+    });
+
+    return buildMonthlySummariesFromDailyRows(dailyRows || [], learnerMap, sectionMap);
+  }, [getLocalAttendanceRecordsInRange]);
+
+  const queryDailySummariesByMonth = useCallback(async (summaryMonth: string): Promise<AttendanceDailySummaryRow[]> => {
+    const monthStart = `${String(summaryMonth || '').slice(0, 7)}-01`;
+    const monthEndDate = new Date(`${monthStart}T00:00:00`);
+    monthEndDate.setMonth(monthEndDate.getMonth() + 1);
+    monthEndDate.setDate(0);
+    const monthEnd = toIsoDate(monthEndDate);
+
+    return buildDailySummariesFromRecords(getLocalAttendanceRecordsInRange(monthStart, monthEnd));
+  }, [getLocalAttendanceRecordsInRange]);
+
+  const queryRawRecordsByDate = useCallback(async (attendanceDate: string): Promise<AttendanceRecord[]> => {
+    const day = String(attendanceDate || '').trim();
+    return getLocalAttendanceRecordsInRange(day, day);
+  }, [getLocalAttendanceRecordsInRange]);
 
   const querySummaryByDateRange = useCallback(
     async (fromDate: string, toDate: string): Promise<{
       weekly: AttendanceWeeklySummaryRow[];
       monthly: AttendanceMonthlySummaryRow[];
     }> => {
-      const { data: dailyRows, error: dailyError } = await supabase
-        .from('attendance_daily_summary')
-        .select('attendance_date,am_in,am_out,pm_in,pm_out,learner_id')
-        .gte('attendance_date', fromDate)
-        .lte('attendance_date', toDate)
-        .limit(REMOTE_FETCH_LIMIT);
-      if (dailyError) throw dailyError;
+      const dailyRows = buildDailySummariesFromRecords(getLocalAttendanceRecordsInRange(fromDate, toDate));
 
       const { data: learnerRows, error: learnerError } = await supabase
         .from('registrar_learners')
-        .select('id,grade_level,section_id');
+        .select('id,section_id');
       if (learnerError) throw learnerError;
 
       const { data: sectionRows, error: sectionError } = await supabase
@@ -435,10 +598,9 @@ export const useAttendance = () => {
         .select('id,name,grade_level');
       if (sectionError) throw sectionError;
 
-      const learnerMap = new Map<string, { gradeLevel: string; sectionId: string | null }>();
+      const learnerMap = new Map<string, LearnerSectionMeta>();
       (learnerRows || []).forEach((row: any) => {
         learnerMap.set(String(row.id), {
-          gradeLevel: String(row.grade_level || 'Unknown'),
           sectionId: row.section_id ? String(row.section_id) : null,
         });
       });
@@ -451,73 +613,12 @@ export const useAttendance = () => {
         });
       });
 
-      const weeklyMap = new Map<string, AttendanceWeeklySummaryRow>();
-      (dailyRows || []).forEach((row: any) => {
-        const date = new Date(`${row.attendance_date}T00:00:00`);
-        const day = date.getDay();
-        const diff = day === 0 ? -6 : 1 - day;
-        date.setDate(date.getDate() + diff);
-        const weekStart = toIsoDate(date);
-
-        const learner = learnerMap.get(String(row.learner_id));
-        const section = learner?.sectionId ? sectionMap.get(learner.sectionId) : undefined;
-        const sectionName = section?.name || 'No Section';
-        const gradeLevel = section?.gradeLevel || learner?.gradeLevel || 'Unknown';
-        const key = `${weekStart}|${sectionName}|${gradeLevel}`;
-
-        const presentSlots =
-          (row.am_in ? 1 : 0) +
-          (row.am_out ? 1 : 0) +
-          (row.pm_in ? 1 : 0) +
-          (row.pm_out ? 1 : 0);
-
-        const existing = weeklyMap.get(key);
-        if (!existing) {
-          weeklyMap.set(key, {
-            weekStart,
-            sectionName,
-            gradeLevel,
-            learnerDays: 1,
-            expectedSlots: 4,
-            presentSlots,
-            missingSlots: 4 - presentSlots,
-          });
-          return;
-        }
-        existing.learnerDays += 1;
-        existing.expectedSlots += 4;
-        existing.presentSlots += presentSlots;
-        existing.missingSlots += 4 - presentSlots;
-      });
-
-      const weekly = Array.from(weeklyMap.values()).sort((a, b) =>
-        a.weekStart < b.weekStart ? 1 : a.weekStart > b.weekStart ? -1 : a.sectionName.localeCompare(b.sectionName),
-      );
-
-      const monthStart = `${fromDate.slice(0, 7)}-01`;
-      const monthEnd = `${toDate.slice(0, 7)}-31`;
-      const { data: monthlyRows, error: monthlyError } = await supabase
-        .from('attendance_monthly_summary')
-        .select('summary_month,section_name,grade_level,learner_days,expected_slots,present_slots,missing_slots')
-        .gte('summary_month', monthStart)
-        .lte('summary_month', monthEnd)
-        .order('summary_month', { ascending: false })
-        .limit(REMOTE_FETCH_LIMIT);
-      if (monthlyError) throw monthlyError;
-
-      const monthly: AttendanceMonthlySummaryRow[] = (monthlyRows || []).map((row: any) => ({
-        summaryMonth: String(row.summary_month || ''),
-        sectionName: String(row.section_name || 'No Section'),
-        gradeLevel: String(row.grade_level || 'Unknown'),
-        learnerDays: Number(row.learner_days || 0),
-        expectedSlots: Number(row.expected_slots || 0),
-        presentSlots: Number(row.present_slots || 0),
-        missingSlots: Number(row.missing_slots || 0),
-      }));
+      const weekly = buildWeeklySummariesFromDailyRows(dailyRows, learnerMap, sectionMap);
+      const monthly = buildMonthlySummariesFromDailyRows(dailyRows, learnerMap, sectionMap);
 
       return { weekly, monthly };
     },
-    [],
+    [getLocalAttendanceRecordsInRange],
   );
 
   useEffect(() => {
@@ -563,6 +664,10 @@ export const useAttendance = () => {
     addManualAttendanceRecord,
     deleteRecord,
     queryRecordsByDateRange,
+    queryMonthlySummariesByRange,
+    queryDailySummariesByMonth,
+    queryRawRecordsByDate,
     querySummaryByDateRange,
+    refreshAttendanceStatusByRange,
   };
 };

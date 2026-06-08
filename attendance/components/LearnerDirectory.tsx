@@ -14,10 +14,13 @@ interface LearnerDirectoryProps {
   selectedId: string | null;
   onSelect: (id: string | null) => void;
   onUnlink: (id: string) => void;
+  onLoadRoster: () => void;
   isLoading: boolean;
   isSearching: boolean;
   isSyncing: boolean;
   fetchedCount: number;
+  hasCachedRoster: boolean;
+  lastSyncedAt: string;
 }
 
 const naturalSort = (a: string, b: string) => {
@@ -125,7 +128,7 @@ const LearnerItem: React.FC<{
 };
 
 const LearnerDirectory: React.FC<LearnerDirectoryProps> = ({
-  learners, uidMappings, selectedId, onSelect, onUnlink, isLoading, isSearching, isSyncing, fetchedCount
+  learners, uidMappings, selectedId, onSelect, onUnlink, onLoadRoster, isLoading, isSearching, isSyncing, fetchedCount, hasCachedRoster, lastSyncedAt
 }) => {
   const [listSearchQuery, setListSearchQuery] = useState('');
   const [unlinkId, setUnlinkId] = useState<string | null>(null);
@@ -236,6 +239,25 @@ const LearnerDirectory: React.FC<LearnerDirectoryProps> = ({
 
   return (
     <div className="bg-white rounded-md border border-gray-200 overflow-hidden shadow-sm min-h-[500px]">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-4 py-3 bg-gray-50">
+        <div className="space-y-1">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Cached Roster</p>
+          <p className="text-[11px] font-semibold text-gray-600">
+            {hasCachedRoster ? `Ready offline${lastSyncedAt ? ` • Synced ${new Date(lastSyncedAt).toLocaleString()}` : ''}` : 'No roster cached yet'}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onLoadRoster}
+          disabled={isSyncing}
+          className="inline-flex items-center gap-2 rounded-md border border-primary-200 bg-primary-50 px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-primary-700 transition hover:bg-primary-100 disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          <span className="material-symbols-outlined text-[16px] leading-none">
+            {hasCachedRoster ? 'refresh' : 'download'}
+          </span>
+          {isSyncing ? 'Loading...' : hasCachedRoster ? 'Refresh Learners' : 'Load Learners'}
+        </button>
+      </div>
       {isLoading ? (
           <div className="p-40 text-center flex flex-col items-center gap-6">
             <div className="w-10 h-10 border-4 border-gray-100 border-t-primary-600 rounded-md animate-spin" />
@@ -283,7 +305,9 @@ const LearnerDirectory: React.FC<LearnerDirectoryProps> = ({
           ) : (
             Object.keys(groupedData).length === 0 ? (
               <div className="p-16 text-center text-gray-400 text-xs font-semibold uppercase tracking-wider">
-                No records match this section list search
+                {hasCachedRoster
+                  ? 'No records match this section list search'
+                  : 'No cached roster loaded yet. Press Load Learners to fetch the registry.'}
               </div>
             ) : (
               <UsisGradeSectionList

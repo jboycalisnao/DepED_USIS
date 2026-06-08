@@ -1,5 +1,5 @@
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Layout from './components/Layout';
 import Dashboard from './views/Dashboard';
@@ -79,13 +79,18 @@ const AuthenticatedRouter: React.FC = () => {
 
 const App: React.FC = () => {
   const { isAuthenticated, refreshData } = useStore();
+  const hasForcedRefreshRef = useRef(false);
 
   useEffect(() => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated) {
+      hasForcedRefreshRef.current = false;
+      return;
+    }
+
+    if (hasForcedRefreshRef.current) return;
+    hasForcedRefreshRef.current = true;
     void refreshData(true);
-    // Run once when the authenticated shell mounts.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isAuthenticated, refreshData]);
 
   if (!isAuthenticated) {
     return (
