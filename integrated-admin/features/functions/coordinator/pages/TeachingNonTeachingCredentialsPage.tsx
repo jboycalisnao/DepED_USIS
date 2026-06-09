@@ -22,24 +22,8 @@ import {
   type CoordinatorDepartmentRecord,
   type TeachingNonTeachingCredentialRecord,
 } from '../teaching-non-teaching/services/teachingNonTeachingCredentialsService';
-
-const toRoleLabel = (role: string) =>
-  role === 'registrar_coordinator'
-    ? 'Teaching Coordinator'
-    : role === 'attendance_coordinator'
-      ? 'Non-Teaching Coordinator'
-      : role
-          .split('_')
-          .filter(Boolean)
-          .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-          .join(' ');
-
-const formatModuleLabel = (value: string) =>
-  value
-    .split('_')
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ');
+import { TeachingNonTeachingCredentialList } from '../teaching-non-teaching/components/TeachingNonTeachingCredentialList';
+import type { TeachingNonTeachingBulkImportResult } from '../teaching-non-teaching/utils/teachingNonTeachingCredentialWorkbook';
 
 export function TeachingNonTeachingCredentialsPage() {
   const schoolCode = getStoredIntegratedAdminAccess()?.coordinatorAccess.schoolId || '';
@@ -110,7 +94,8 @@ export function TeachingNonTeachingCredentialsPage() {
       row.name.toLowerCase().includes(normalized) ||
       row.username.toLowerCase().includes(normalized) ||
       row.email.toLowerCase().includes(normalized) ||
-      toRoleLabel(row.role).toLowerCase().includes(normalized),
+      row.departmentName.toLowerCase().includes(normalized) ||
+      row.personnelType.toLowerCase().includes(normalized),
     );
   }, [query, rows]);
 
@@ -142,91 +127,32 @@ export function TeachingNonTeachingCredentialsPage() {
             </div>
 
             <div className="registry-list">
-              {filteredRows.length === 0 ? <p>No credentials found.</p> : null}
-              {filteredRows.length > 0 ? (
-                <div className="registry-table-wrap">
-                  <table className="registry-table ia-registry-table--enhanced">
-                    <thead>
-                      <tr>
-                        <th>Name</th>
-                        <th>Username</th>
-                        <th>Email</th>
-                        <th>Department</th>
-                        <th>Type</th>
-                        <th>Status</th>
-                        <th>Module Access</th>
-                        <th>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredRows.map((row) => (
-                        <tr key={row.id}>
-                          <td><strong>{row.name}</strong></td>
-                          <td>{row.username}</td>
-                          <td>{row.email}</td>
-                          <td><span className="modal-record__chip">{row.departmentName || 'Not Set'}</span></td>
-                          <td>
-                            <div className="modal-record__chips">
-                              <span className="modal-record__chip">{toRoleLabel(row.role)}</span>
-                            </div>
-                          </td>
-                          <td>{row.isActive ? 'Active' : 'Inactive'}</td>
-                          <td>
-                            <div className="modal-record__chips">
-                              {(moduleAccessMap[row.id] || []).length ? (
-                                (moduleAccessMap[row.id] || []).map((moduleKey) => (
-                                  <span key={moduleKey} className="modal-record__chip">
-                                    {formatModuleLabel(moduleKey)}
-                                  </span>
-                                ))
-                              ) : (
-                                <span className="modal-record__chip">Not Set</span>
-                              )}
-                            </div>
-                          </td>
-                          <td>
-                            <div className="registry-table__actions">
-                              <button type="button" className="registry-icon-btn" onClick={() => setModuleRecord(row)} aria-label="Manage module access">
-                                <span className="material-symbols-outlined">apps</span>
-                              </button>
-                              <button type="button" className="registry-icon-btn registry-icon-btn--primary" onClick={() => setEditingRecord(row)} aria-label="Edit account">
-                                <span className="material-symbols-outlined">edit</span>
-                              </button>
-                              <button
-                                type="button"
-                                className="registry-icon-btn registry-icon-btn--danger"
-                                onClick={async () => {
-                                  setIsSubmitting(true);
-                                  setActionLoadingMessage('Applying coordinator changes...');
-                                  try {
-                                    await deactivateTeachingNonTeachingCredential(row.id);
-                                    setNotice('Credential deactivated.');
-                                    setStatusAlert({ title: 'Credential Deactivated', message: 'Account was deactivated successfully.', tone: 'success' });
-                                    await refresh();
-                                  } catch (nextError: any) {
-                                    setError(nextError?.message || 'Unable to deactivate credential.');
-                                    setStatusAlert({
-                                      title: 'Deactivate Failed',
-                                      message: nextError?.message || 'Unable to deactivate credential.',
-                                      tone: 'danger',
-                                    });
-                                  } finally {
-                                    setActionLoadingMessage('');
-                                    setIsSubmitting(false);
-                                  }
-                                }}
-                                aria-label="Deactivate account"
-                              >
-                                <span className="material-symbols-outlined">delete</span>
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : null}
+              <TeachingNonTeachingCredentialList
+                moduleAccessMap={moduleAccessMap}
+                onDeactivate={async (row) => {
+                  setIsSubmitting(true);
+                  setActionLoadingMessage('Applying coordinator changes...');
+                  try {
+                    await deactivateTeachingNonTeachingCredential(row.id);
+                    setNotice('Credential deactivated.');
+                    setStatusAlert({ title: 'Credential Deactivated', message: 'Account was deactivated successfully.', tone: 'success' });
+                    await refresh();
+                  } catch (nextError: any) {
+                    setError(nextError?.message || 'Unable to deactivate credential.');
+                    setStatusAlert({
+                      title: 'Deactivate Failed',
+                      message: nextError?.message || 'Unable to deactivate credential.',
+                      tone: 'danger',
+                    });
+                  } finally {
+                    setActionLoadingMessage('');
+                    setIsSubmitting(false);
+                  }
+                }}
+                onEdit={(row) => setEditingRecord(row)}
+                onManageModules={(row) => setModuleRecord(row)}
+                rows={filteredRows}
+              />
             </div>
           </div>
         </article>
@@ -247,10 +173,59 @@ export function TeachingNonTeachingCredentialsPage() {
             personnelType: editingRecord.personnelType,
             username: editingRecord.username,
           } : null}
+          existingRecords={rows}
           isSubmitting={isSubmitting}
           departments={departments}
           schoolCode={schoolCode}
           onClose={() => setEditingRecord(null)}
+          onBulkImport={async (payloads) => {
+            setIsSubmitting(true);
+            setActionLoadingMessage(`Importing ${payloads.length} credential${payloads.length === 1 ? '' : 's'}...`);
+            const summary: TeachingNonTeachingBulkImportResult = {
+              createdCount: 0,
+              errors: [],
+              skippedCount: 0,
+            };
+            try {
+              for (const payload of payloads) {
+                try {
+                  await saveTeachingNonTeachingCredential(payload);
+                  summary.createdCount += 1;
+                } catch (nextError: any) {
+                  summary.skippedCount += 1;
+                  summary.errors.push(nextError?.message || 'Unable to import one credential row.');
+                }
+              }
+              if (summary.createdCount > 0) {
+                setNotice(`Imported ${summary.createdCount} credential${summary.createdCount === 1 ? '' : 's'}.`);
+              }
+              if (summary.errors.length > 0) {
+                setStatusAlert({
+                  title: 'Bulk Import Completed with Warnings',
+                  message: summary.errors.slice(0, 3).join(' '),
+                  tone: 'warning',
+                });
+              } else {
+                setSuccessAlert({
+                  title: 'Bulk Import Complete',
+                  message: `${summary.createdCount} credential${summary.createdCount === 1 ? '' : 's'} were imported successfully.`,
+                });
+              }
+              await refresh();
+              return summary;
+            } catch (nextError: any) {
+              summary.errors.push(nextError?.message || 'Unable to complete bulk import.');
+              setStatusAlert({
+                title: 'Bulk Import Failed',
+                message: nextError?.message || 'Unable to complete bulk import.',
+                tone: 'danger',
+              });
+              return summary;
+            } finally {
+              setActionLoadingMessage('');
+              setIsSubmitting(false);
+            }
+          }}
           onSubmit={async (payload) => {
             setIsSubmitting(true);
             setActionLoadingMessage(payload.id ? 'Updating credential record...' : 'Saving credential to database...');

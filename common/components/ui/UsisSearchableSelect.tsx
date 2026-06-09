@@ -26,6 +26,7 @@ interface UsisSearchableSelectProps {
   value: string;
   forceInlineMenu?: boolean;
   forcePortalMenu?: boolean;
+  required?: boolean;
 }
 
 export function UsisSearchableSelect({
@@ -48,6 +49,7 @@ export function UsisSearchableSelect({
   value,
   forceInlineMenu = false,
   forcePortalMenu = false,
+  required = false,
 }: UsisSearchableSelectProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const fieldRef = useRef<HTMLDivElement>(null);
@@ -209,11 +211,17 @@ export function UsisSearchableSelect({
 
   return (
     <div className={`searchable-select ${!allowTyping ? 'searchable-select--readonly' : ''} ${className}`.trim()} ref={rootRef}>
-      {showLabel && !floatingLabel ? <span className="searchable-select__label">{label || ariaLabel}</span> : null}
+      {showLabel && !floatingLabel ? (
+        <span className={`searchable-select__label${required ? ' searchable-select__label--required' : ''}`}>
+          {label || ariaLabel}
+          {required ? <span className="searchable-select__required-marker" aria-hidden="true"> *</span> : null}
+        </span>
+      ) : null}
       <div className={floatingLabel ? 'floating-field searchable-select--floating' : undefined}>
         <div className={floatingLabel ? 'floating-field__control' : 'searchable-select__field'} ref={fieldRef}>
           <input
             aria-label={ariaLabel}
+            aria-required={required || undefined}
             data-has-value={hasValue ? 'true' : 'false'}
             disabled={disabled}
             onChange={(event) => {
@@ -259,7 +267,12 @@ export function UsisSearchableSelect({
               />
             </svg>
           </button>
-          {floatingLabel ? <span>{label || ariaLabel}</span> : null}
+          {floatingLabel ? (
+            <span className={required ? 'searchable-select__label--required' : undefined}>
+              {label || ariaLabel}
+              {required ? <span className="searchable-select__required-marker" aria-hidden="true"> *</span> : null}
+            </span>
+          ) : null}
         </div>
       </div>
 

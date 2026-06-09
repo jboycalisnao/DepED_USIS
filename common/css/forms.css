@@ -159,6 +159,17 @@
   text-transform: uppercase;
 }
 
+.searchable-select__label--required {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.searchable-select__required-marker {
+  color: #b42318;
+  font-weight: 700;
+}
+
 .searchable-select__field {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;

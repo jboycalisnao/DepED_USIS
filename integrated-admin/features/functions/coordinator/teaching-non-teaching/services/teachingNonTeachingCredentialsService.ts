@@ -46,12 +46,33 @@ const normalizeOptionalEmail = (value: string, username: string) => {
   const normalized = normalizeIdentity(value);
   return normalized || `${normalizeIdentity(username)}@usis.local`;
 };
+const buildCoordinatorPayload = (input: SaveTeachingNonTeachingCredentialInput) => ({
+  school_id: null as string | null,
+  employee_id: toText(input.employeeId) || null,
+  username: normalizeIdentity(input.username),
+  email: normalizeOptionalEmail(input.email, input.username),
+  first_name: toText(input.firstName),
+  middle_name: toText(input.middleName) || null,
+  last_name: toText(input.lastName),
+  mobile_no: toText(input.mobileNo) || null,
+  role: resolveRoleByPersonnelType(input.personnelType),
+  personnel_type: input.personnelType,
+  access_level: 'school',
+  is_super_admin: false,
+  is_active: input.isActive ?? true,
+  division_code: null,
+  region_code: null,
+});
 
 export type CoordinatorDepartmentRecord = {
   id: string;
   isActive: boolean;
   name: string;
 };
+
+const hasMissingColumnError = (error: { message?: string } | null, column: string) =>
+  String(error?.message || '').toLowerCase().includes(`column "${column}" does not exist`) ||
+  String(error?.message || '').toLowerCase().includes(`column ${column} does not exist`);
 
 const resolveSchoolUuid = async (schoolCode: string) => {
   const { data, error } = await supabase
@@ -66,13 +87,28 @@ const resolveSchoolUuid = async (schoolCode: string) => {
 
 export const loadTeachingNonTeachingCredentials = async (schoolCode: string): Promise<TeachingNonTeachingCredentialRecord[]> => {
   const schoolId = await resolveSchoolUuid(schoolCode);
-  const { data, error } = await supabase
+  const primary = await supabase
     .from('usis_core_coordinators')
-    .select('id,username,email,first_name,middle_name,last_name,employee_id,mobile_no,role,is_active')
+    .select('id,username,email,first_name,middle_name,last_name,employee_id,mobile_no,role,is_active,personnel_type')
     .eq('school_id', schoolId)
     .eq('role', 'school_usis_coordinator')
     .order('created_at', { ascending: false });
-  if (error) throw new Error(error.message || 'Unable to load teaching and non-teaching credentials.');
+
+  let data: any[] = [];
+  if (!primary.error) {
+    data = (primary.data || []) as any[];
+  } else if (hasMissingColumnError(primary.error, 'personnel_type') || hasMissingColumnError(primary.error, 'middle_name')) {
+    const fallback = await supabase
+      .from('usis_core_coordinators')
+      .select('id,username,email,first_name,last_name,employee_id,mobile_no,role,is_active')
+      .eq('school_id', schoolId)
+      .eq('role', 'school_usis_coordinator')
+      .order('created_at', { ascending: false });
+    if (fallback.error) throw new Error(fallback.error.message || 'Unable to load teaching and non-teaching credentials.');
+    data = (fallback.data || []) as any[];
+  } else {
+    throw new Error(primary.error.message || 'Unable to load teaching and non-teaching credentials.');
+  }
 
   const accountIds = (data || []).map((row: any) => toText(row.id)).filter(Boolean);
   const { data: assignments } = accountIds.length
@@ -96,6 +132,7 @@ export const loadTeachingNonTeachingCredentials = async (schoolCode: string): Pr
     const first = toText(row.first_name);
     const middle = toText(row.middle_name);
     const last = toText(row.last_name);
+    const personnelType = toText(row.personnel_type).toLowerCase() === 'non_teaching' ? 'non_teaching' : 'teaching';
     return {
       departmentId: assignmentMap.get(toText(row.id))?.departmentId || '',
       departmentName: assignmentMap.get(toText(row.id))?.departmentName || 'Not Set',
@@ -108,7 +145,7 @@ export const loadTeachingNonTeachingCredentials = async (schoolCode: string): Pr
       middleName: middle,
       mobileNo: toText(row.mobile_no),
       name: [last, first, middle].filter(Boolean).join(', ').replace(', ,', ',') || toText(row.username),
-      personnelType: 'teaching',
+      personnelType,
       role: toText(row.role),
       schoolCode,
       username: toText(row.username),
@@ -119,20 +156,8 @@ export const loadTeachingNonTeachingCredentials = async (schoolCode: string): Pr
 export const saveTeachingNonTeachingCredential = async (input: SaveTeachingNonTeachingCredentialInput) => {
   const schoolId = await resolveSchoolUuid(input.schoolCode);
   const payload: Record<string, unknown> = {
+    ...buildCoordinatorPayload(input),
     school_id: schoolId,
-    employee_id: toText(input.employeeId) || null,
-    username: normalizeIdentity(input.username),
-    email: normalizeOptionalEmail(input.email, input.username),
-    first_name: toText(input.firstName),
-    middle_name: toText(input.middleName) || null,
-    last_name: toText(input.lastName),
-    mobile_no: toText(input.mobileNo) || null,
-    role: resolveRoleByPersonnelType(input.personnelType),
-    access_level: 'school',
-    is_super_admin: false,
-    is_active: input.isActive ?? true,
-    division_code: null,
-    region_code: null,
   };
   const departmentId = toText(input.departmentId);
   if (!departmentId) throw new Error('Department is required.');
@@ -154,7 +179,16 @@ export const saveTeachingNonTeachingCredential = async (input: SaveTeachingNonTe
 
   if (input.id) {
     const { error } = await supabase.from('usis_core_coordinators').update(payload).eq('id', input.id);
-    if (error) throw new Error(formatDbError(error, 'Unable to update credential.'));
+    if (error) {
+      const message = `${error.message || ''} ${error.details || ''}`.toLowerCase();
+      if (!message.includes('personnel_type')) {
+        throw new Error(formatDbError(error, 'Unable to update credential.'));
+      }
+      const fallbackPayload = { ...payload };
+      delete fallbackPayload.personnel_type;
+      const retry = await supabase.from('usis_core_coordinators').update(fallbackPayload).eq('id', input.id);
+      if (retry.error) throw new Error(formatDbError(retry.error, 'Unable to update credential.'));
+    }
     const { error: assignmentError } = await supabase
       .from('coordinator_account_departments')
       .upsert([{ account_id: input.id, department_id: departmentId }], { onConflict: 'account_id' });
@@ -166,6 +200,20 @@ export const saveTeachingNonTeachingCredential = async (input: SaveTeachingNonTe
     supabase.from('usis_core_coordinators').insert([nextPayload]).select('id').single();
 
   const { data, error } = await insertOnce(payload);
+  if (error && hasMissingColumnError(error, 'personnel_type')) {
+    const fallbackPayload = { ...payload };
+    delete fallbackPayload.personnel_type;
+    const retryWithoutPersonnelType = await insertOnce(fallbackPayload);
+    if (!retryWithoutPersonnelType.error && retryWithoutPersonnelType.data?.id) {
+      const createdId = String(retryWithoutPersonnelType.data.id);
+      const { error: assignmentError } = await supabase
+        .from('coordinator_account_departments')
+        .upsert([{ account_id: createdId, department_id: departmentId }], { onConflict: 'account_id' });
+      if (assignmentError) throw new Error(formatDbError(assignmentError, 'Unable to assign department to credential.'));
+      return createdId;
+    }
+    throw new Error(formatDbError(retryWithoutPersonnelType.error || error, 'Unable to create credential.'));
+  }
   if (!error && data?.id) {
     const createdId = String(data.id);
     const { error: assignmentError } = await supabase

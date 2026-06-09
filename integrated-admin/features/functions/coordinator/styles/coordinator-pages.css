@@ -110,6 +110,208 @@
   margin-top: 12px;
 }
 
+.ia-teaching-credential-groups {
+  display: grid;
+  gap: 10px;
+}
+
+.ia-teaching-credential-group,
+.ia-teaching-credential-department {
+  overflow: hidden;
+  border: 1px solid rgba(18, 35, 61, 0.12);
+  border-radius: 0.375rem;
+  background: #ffffff;
+}
+
+.ia-teaching-credential-group > summary,
+.ia-teaching-credential-department > summary {
+  list-style: none;
+  cursor: pointer;
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  padding: 12px 14px;
+  background: #f8faff;
+}
+
+.ia-teaching-credential-group > summary::-webkit-details-marker,
+.ia-teaching-credential-department > summary::-webkit-details-marker {
+  display: none;
+}
+
+.ia-teaching-credential-group__summary-icon,
+.ia-teaching-credential-department__summary-icon {
+  color: var(--deped-blue);
+}
+
+.ia-teaching-credential-group__summary-icon .material-symbols-outlined {
+  display: inline-flex;
+  transition: transform 180ms ease;
+}
+
+.ia-teaching-credential-department__summary-icon .material-symbols-outlined {
+  display: inline-flex;
+  transition: transform 180ms ease;
+}
+
+.ia-teaching-credential-group__summary-copy,
+.ia-teaching-credential-department__summary-copy {
+  display: grid;
+  gap: 2px;
+}
+
+.ia-teaching-credential-group__summary-copy strong,
+.ia-teaching-credential-department__summary-copy strong {
+  color: var(--deped-blue);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.ia-teaching-credential-group__summary-copy small,
+.ia-teaching-credential-department__summary-copy small {
+  color: var(--deped-muted);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.2;
+}
+
+.ia-teaching-credential-group[open] > summary .ia-teaching-credential-group__summary-icon .material-symbols-outlined {
+  transform: rotate(180deg);
+}
+
+.ia-teaching-credential-department[open] > summary .ia-teaching-credential-department__summary-icon .material-symbols-outlined {
+  transform: rotate(180deg);
+}
+
+.ia-teaching-credential-department {
+  margin-top: 6px;
+  border-color: rgba(0, 56, 168, 0.12);
+}
+
+.ia-teaching-credential-department > summary {
+  grid-template-columns: 22px minmax(0, 1fr);
+  padding: 10px 12px;
+  background: #fbfdff;
+}
+
+.ia-teaching-credential-department > summary strong {
+  font-size: 13px;
+}
+
+.ia-teaching-credential-group__body {
+  display: grid;
+  gap: 8px;
+  padding: 10px 10px 10px 18px;
+  border-top: 1px solid rgba(18, 35, 61, 0.08);
+  border-left: 3px solid rgba(0, 56, 168, 0.1);
+  background: #fcfdff;
+}
+
+.ia-teaching-credential-department__body {
+  padding: 10px;
+  border-top: 1px solid rgba(18, 35, 61, 0.08);
+}
+
+.integrated-admin-app .ia-teaching-credential-table-wrap {
+  overflow-x: hidden;
+}
+
+.integrated-admin-app .ia-teaching-credential-table {
+  width: 100%;
+  min-width: 0 !important;
+  table-layout: fixed;
+}
+
+.integrated-admin-app .ia-teaching-credential-table th,
+.integrated-admin-app .ia-teaching-credential-table td {
+  padding-left: 8px;
+  padding-right: 8px;
+  overflow-wrap: anywhere;
+}
+
+.integrated-admin-app .ia-teaching-credential-table th:nth-child(1),
+.integrated-admin-app .ia-teaching-credential-table td:nth-child(1) {
+  width: 18%;
+}
+
+.integrated-admin-app .ia-teaching-credential-table th:nth-child(2),
+.integrated-admin-app .ia-teaching-credential-table td:nth-child(2) {
+  width: 13%;
+}
+
+.integrated-admin-app .ia-teaching-credential-table th:nth-child(3),
+.integrated-admin-app .ia-teaching-credential-table td:nth-child(3) {
+  width: 25%;
+}
+
+.integrated-admin-app .ia-teaching-credential-table th:nth-child(4),
+.integrated-admin-app .ia-teaching-credential-table td:nth-child(4) {
+  width: 10%;
+}
+
+.integrated-admin-app .ia-teaching-credential-table th:nth-child(5),
+.integrated-admin-app .ia-teaching-credential-table td:nth-child(5) {
+  width: 21%;
+}
+
+.integrated-admin-app .ia-teaching-credential-table th:nth-child(6),
+.integrated-admin-app .ia-teaching-credential-table td:nth-child(6) {
+  width: 13%;
+}
+
+.integrated-admin-app .ia-teaching-credential-table .modal-record__chips {
+  gap: 6px;
+}
+
+.integrated-admin-app .ia-teaching-credential-table .modal-record__chip {
+  padding: 6px 9px;
+  white-space: normal;
+}
+
+.integrated-admin-app .ia-teaching-credential-table .registry-table__actions {
+  gap: 6px;
+}
+
+.integrated-admin-app .ia-teaching-credential-table .registry-icon-btn {
+  inline-size: 30px;
+  block-size: 30px;
+}
+
+.ia-teaching-credential-table td,
+.ia-teaching-credential-table th {
+  vertical-align: middle;
+}
+
+@media (max-width: 760px) {
+  .ia-teaching-credential-group > summary {
+    grid-template-columns: 18px minmax(0, 1fr);
+    padding: 10px 12px;
+  }
+
+  .ia-teaching-credential-department > summary {
+    grid-template-columns: 18px minmax(0, 1fr);
+    padding: 10px 12px;
+  }
+
+  .ia-teaching-credential-group__body {
+    padding: 8px 8px 8px 14px;
+  }
+
+  .ia-teaching-credential-department__body {
+    padding: 10px;
+  }
+
+  .integrated-admin-app .ia-teaching-credential-table-wrap {
+    overflow-x: auto;
+  }
+
+  .integrated-admin-app .ia-teaching-credential-table {
+    min-width: 760px;
+  }
+}
+
 .registry-page--unified .modal-dialog__close svg {
   inline-size: 18px;
   block-size: 18px;
@@ -355,9 +557,274 @@
   color: var(--deped-blue);
 }
 
+.ia-teaching-credential-modal__header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ia-teaching-credential-modal__mode-button {
+  min-height: 40px;
+  white-space: nowrap;
+}
+
+.ia-teaching-credential-bulk-import {
+  display: grid;
+  gap: 14px;
+}
+
+.ia-teaching-credential-bulk-import__lead {
+  margin-top: 0;
+}
+
+.ia-teaching-credential-bulk-import__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ia-teaching-credential-bulk-import__rules {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid rgba(0, 56, 168, 0.16);
+  border-left-width: 4px;
+  border-radius: 0.375rem;
+  background: #f8faff;
+}
+
+.ia-teaching-credential-bulk-import__rules-title {
+  margin: 0;
+  color: var(--deped-blue);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.ia-teaching-credential-bulk-import__rules-copy {
+  margin: 0;
+}
+
+.ia-teaching-credential-bulk-import__file {
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid rgba(18, 35, 61, 0.1);
+  border-radius: 0.375rem;
+  background: #ffffff;
+}
+
+.ia-teaching-credential-bulk-import__file-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ia-teaching-credential-bulk-import__file-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.ia-teaching-credential-bulk-import__file input {
+  display: none;
+}
+
+.ia-teaching-credential-bulk-import__file-label {
+  color: var(--deped-blue);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.ia-teaching-credential-bulk-import__file-button {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  padding: 0 12px;
+  border: 1px dashed rgba(0, 56, 168, 0.28);
+  border-radius: 0.375rem;
+  background: #fbfdff;
+  color: var(--deped-blue);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ia-teaching-credential-bulk-import__file-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.ia-teaching-credential-bulk-import__file-name {
+  margin: 0;
+  color: var(--deped-muted);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.ia-teaching-credential-bulk-import__preview {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(18, 35, 61, 0.1);
+  border-radius: 0.375rem;
+  background: #ffffff;
+}
+
+.ia-teaching-credential-bulk-import__preview-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.ia-teaching-credential-bulk-import__preview-head .registry-copy {
+  margin-top: 4px;
+}
+
+.ia-teaching-credential-bulk-import__table-wrap {
+  overflow-x: hidden;
+  border: 1px solid rgba(18, 35, 61, 0.1);
+  border-radius: 0.375rem;
+  background: #ffffff;
+}
+
+.ia-teaching-credential-bulk-import__table {
+  width: 100%;
+  min-width: 0 !important;
+  table-layout: fixed;
+}
+
+.ia-teaching-credential-bulk-import__table th,
+.ia-teaching-credential-bulk-import__table td {
+  padding-left: 10px;
+  padding-right: 10px;
+  overflow-wrap: anywhere;
+}
+
+.ia-teaching-credential-bulk-import__table th:nth-child(1),
+.ia-teaching-credential-bulk-import__table td:nth-child(1) {
+  width: 26%;
+}
+
+.ia-teaching-credential-bulk-import__table th:nth-child(2),
+.ia-teaching-credential-bulk-import__table td:nth-child(2) {
+  width: 24%;
+}
+
+.ia-teaching-credential-bulk-import__table th:nth-child(3),
+.ia-teaching-credential-bulk-import__table td:nth-child(3) {
+  width: 18%;
+}
+
+.ia-teaching-credential-bulk-import__table th:nth-child(4),
+.ia-teaching-credential-bulk-import__table td:nth-child(4) {
+  width: 17%;
+}
+
+.ia-teaching-credential-bulk-import__table th:nth-child(5),
+.ia-teaching-credential-bulk-import__table td:nth-child(5) {
+  width: 13%;
+}
+
+.ia-teaching-credential-bulk-import__table th:nth-child(6),
+.ia-teaching-credential-bulk-import__table td:nth-child(6) {
+  width: 14%;
+  text-align: center;
+}
+
+.ia-teaching-credential-bulk-import__duplicate-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(180, 35, 24, 0.2);
+  background: #fff1f0;
+  color: #b42318;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.ia-teaching-credential-bulk-import__duplicate-tag.is-muted {
+  border-color: rgba(18, 35, 61, 0.14);
+  background: #f8faff;
+  color: var(--deped-muted);
+}
+
+.ia-teaching-credential-bulk-import__result {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 0.375rem;
+  border: 1px solid rgba(18, 35, 61, 0.12);
+  background: #fbfdff;
+}
+
+.ia-teaching-credential-bulk-import__result.is-success {
+  border-color: rgba(2, 122, 72, 0.22);
+  background: #f0fdf4;
+}
+
+.ia-teaching-credential-bulk-import__result.is-warning {
+  border-color: rgba(180, 35, 24, 0.18);
+  background: #fff7ed;
+}
+
+.ia-teaching-credential-bulk-import__result strong {
+  color: var(--deped-blue);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.ia-teaching-credential-bulk-import__result ul {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--deped-ink);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 @media (max-width: 760px) {
   .ia-teaching-credential-modal .ia-teaching-credential-form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .ia-teaching-credential-modal__header-actions {
+    gap: 6px;
+  }
+
+  .ia-teaching-credential-bulk-import__actions {
+    flex-direction: column;
+  }
+
+  .ia-teaching-credential-bulk-import__file-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .ia-teaching-credential-bulk-import__file-button {
+    width: 100%;
+  }
+
+  .ia-teaching-credential-bulk-import__preview-head {
+    flex-direction: column;
+  }
+
+  .ia-teaching-credential-bulk-import__table {
+    min-width: 680px;
+  }
+
+  .ia-teaching-credential-bulk-import__table-wrap {
+    overflow-x: auto;
   }
 }
 
