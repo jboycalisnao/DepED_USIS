@@ -67,12 +67,11 @@ export function ManualOrderOverrideModal(props: Props) {
             <span className="material-symbols-outlined">close</span>
           </button>
         </div>
-        <div className="modal-dialog__body integrated-admin-merch-order-manual">
-          <div className="integrated-admin-merch-order-manual__grid">
-            <div className="integrated-admin-merch-order-manual__field integrated-admin-merch-order-manual__field--span-2">
+        <div className="modal-dialog__body registry-form">
+          <div className="floating-field-grid floating-field-grid--two">
+            <div style={{ gridColumn: '1 / -1' }}>
               <UsisSearchableSelect
                 ariaLabel="Search Learner"
-                className="integrated-admin-merch-order-manual__select"
                 emptyQueryMessage="No learners matched your search."
                 floatingLabel
                 label="Search Learner (Active School Year)"
@@ -85,10 +84,9 @@ export function ManualOrderOverrideModal(props: Props) {
                 value={selectedLearnerId}
               />
             </div>
-            <div className="integrated-admin-merch-order-manual__field integrated-admin-merch-order-manual__field--span-2">
+            <div style={{ gridColumn: '1 / -1' }}>
               <UsisSearchableSelect
                 ariaLabel="Product"
-                className="integrated-admin-merch-order-manual__select"
                 floatingLabel
                 label="Product"
                 onChange={onProductChange}
@@ -96,13 +94,13 @@ export function ManualOrderOverrideModal(props: Props) {
                 value={selectedProductId}
               />
             </div>
-            <label className="floating-field integrated-admin-merch-order-manual__field integrated-admin-merch-order-manual__field--span-2">
+            <label className="floating-field" style={{ gridColumn: '1 / -1' }}>
               <div className="floating-field__control">
                 <input readOnly data-has-value="true" value={`PHP ${orderTotal.toFixed(2)}`} placeholder=" " />
                 <span>Order Total</span>
               </div>
             </label>
-            <label className="floating-field integrated-admin-merch-order-manual__field">
+            <label className="floating-field">
               <div className="floating-field__control">
                 <input
                   data-has-value={quantity.trim().length > 0 ? 'true' : 'false'}
@@ -115,10 +113,9 @@ export function ManualOrderOverrideModal(props: Props) {
                 <span>Quantity</span>
               </div>
             </label>
-            <label className="floating-field integrated-admin-merch-order-manual__field">
+            <label className="floating-field">
               <UsisSearchableSelect
                 ariaLabel="Size"
-                className="integrated-admin-merch-order-manual__select"
                 floatingLabel
                 label="Size"
                 onChange={onSelectSize}
@@ -131,10 +128,9 @@ export function ManualOrderOverrideModal(props: Props) {
               />
             </label>
           </div>
-          <label className="floating-field integrated-admin-merch-order-manual__field">
+          <label className="floating-field">
             <div className="floating-field__control">
               <textarea
-                className="integrated-admin-merch-textarea integrated-admin-merch-order-manual__input"
                 onChange={(event) => onManualNotesChange(event.target.value)}
                 placeholder=" "
                 value={manualNotes}
@@ -143,8 +139,10 @@ export function ManualOrderOverrideModal(props: Props) {
             </div>
           </label>
         </div>
-        <div className="modal-dialog__actions integrated-admin-merch-order-manual__modal-actions">
-          <button type="button" onClick={onClose} disabled={isSaving}>Cancel</button>
+        <div className="modal-dialog__actions">
+          <button type="button" onClick={onClose} disabled={isSaving}>
+            Cancel
+          </button>
           <button className="modal-dialog__blue" disabled={isSaving || !selectedLearner || !selectedProduct} onClick={onCreate} type="button">
             Add Order For Learner
           </button>

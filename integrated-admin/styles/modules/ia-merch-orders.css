@@ -30,11 +30,6 @@
   margin-bottom: 0;
 }
 
-.integrated-admin-merch-orders-toolbar .integrated-admin-merch-order-manual__submit {
-  min-height: 58px;
-  height: 58px;
-}
-
 .integrated-admin-order-payment-toolbar {
   display: flex;
   align-items: flex-end;
@@ -423,11 +418,6 @@
 .integrated-admin-merch-order-manual__actions {
   display: flex;
   justify-content: flex-end;
-}
-
-.integrated-admin-merch-order-manual__submit {
-  min-width: 210px;
-  min-height: 48px;
 }
 
 .integrated-admin-merch-orders-empty {

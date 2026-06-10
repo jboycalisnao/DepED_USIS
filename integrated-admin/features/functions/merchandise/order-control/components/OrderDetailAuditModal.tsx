@@ -29,7 +29,7 @@ export function OrderDetailAuditModal({
   return (
     <div className="modal-overlay modal-overlay--high" role="presentation">
       <div className="modal-backdrop" onClick={onClose} />
-      <div className="modal-dialog integrated-admin-merch-order-detail-modal" role="dialog" aria-modal="true" aria-label="Order details">
+      <div className="modal-dialog modal-dialog--wide integrated-admin-merch-order-detail-modal" role="dialog" aria-modal="true" aria-label="Order details">
         <div className="modal-dialog__header">
           <div className="modal-dialog__title-group">
             <p className="modal-dialog__eyebrow">Merch Order Details</p>
@@ -39,9 +39,9 @@ export function OrderDetailAuditModal({
             <span className="material-symbols-outlined">close</span>
           </button>
         </div>
-        <div className="modal-dialog__body integrated-admin-merch-order-detail">
-          <article className="integrated-admin-merch-order-detail__full">
-            <span className="integrated-admin-order-detail-status-title">Manual Status Change</span>
+        <div className="modal-dialog__body modal-record">
+          <section className="modal-record__section">
+            <h4>Manual Status Change</h4>
             <div className="integrated-admin-order-detail-status-row">
               <UsisSearchableSelect
                 ariaLabel="Order status"
@@ -62,21 +62,60 @@ export function OrderDetailAuditModal({
                 {isSaving ? 'Saving...' : 'Save Status'}
               </button>
             </div>
-          </article>
-          <article className="integrated-admin-merch-order-detail__full integrated-admin-merch-order-detail__summary">
-            <div className="integrated-admin-merch-order-detail__metric integrated-admin-merch-order-detail__metric--primary"><span>Reference No.</span><strong>{order.referenceNo || '-'}</strong></div>
-            <div className="integrated-admin-merch-order-detail__metric integrated-admin-merch-order-detail__metric--primary"><span>Learner</span><strong>{order.learnerName || '-'}</strong></div>
-            <div className="integrated-admin-merch-order-detail__metric"><span>LRN</span><strong>{order.learnerLrn || '-'}</strong></div>
-            <div className="integrated-admin-merch-order-detail__metric"><span>Grade / Section</span><strong>{order.gradeLevel} - {order.sectionName}</strong></div>
-            <div className="integrated-admin-merch-order-detail__metric"><span>Quantity</span><strong>{order.quantity}</strong></div>
-            <div className="integrated-admin-merch-order-detail__metric"><span>Order Period</span><strong>{order.orderPeriodLabel || '-'}</strong></div>
-            <div className="integrated-admin-merch-order-detail__metric"><span>Size</span><strong>{order.selectedSize || '-'}</strong></div>
-            <div className="integrated-admin-merch-order-detail__metric integrated-admin-merch-order-detail__metric--status"><span>Status</span><strong>{order.orderStatus}</strong></div>
-            <div className="integrated-admin-merch-order-detail__metric"><span>Date</span><strong>{order.createdAt ? new Date(order.createdAt).toLocaleString() : '-'}</strong></div>
-          </article>
-          <article className="integrated-admin-merch-order-detail__full"><span>Notes</span><strong>{order.notes || '-'}</strong></article>
-          <article className="integrated-admin-merch-order-detail__full">
-            <span>Audit Trail</span>
+          </section>
+
+          <section className="modal-record__section">
+            <h4>Order Summary</h4>
+            <div className="modal-record__fields">
+              <div className="modal-record__field">
+                <span>Reference No.</span>
+                <strong>{order.referenceNo || '-'}</strong>
+              </div>
+              <div className="modal-record__field">
+                <span>Learner</span>
+                <strong>{order.learnerName || '-'}</strong>
+              </div>
+              <div className="modal-record__field">
+                <span>LRN</span>
+                <strong>{order.learnerLrn || '-'}</strong>
+              </div>
+              <div className="modal-record__field">
+                <span>Grade / Section</span>
+                <strong>{order.gradeLevel} - {order.sectionName}</strong>
+              </div>
+              <div className="modal-record__field">
+                <span>Quantity</span>
+                <strong>{order.quantity}</strong>
+              </div>
+              <div className="modal-record__field">
+                <span>Order Period</span>
+                <strong>{order.orderPeriodLabel || '-'}</strong>
+              </div>
+              <div className="modal-record__field">
+                <span>Size</span>
+                <strong>{order.selectedSize || '-'}</strong>
+              </div>
+              <div className="modal-record__field">
+                <span>Status</span>
+                <strong>{order.orderStatus}</strong>
+              </div>
+              <div className="modal-record__field">
+                <span>Date</span>
+                <strong>{order.createdAt ? new Date(order.createdAt).toLocaleString() : '-'}</strong>
+              </div>
+            </div>
+          </section>
+
+          <section className="modal-record__section modal-record__section--full">
+            <h4>Notes</h4>
+            <div className="modal-record__timeline">
+              <span>Order Notes</span>
+              <strong>{order.notes || '-'}</strong>
+            </div>
+          </section>
+
+          <section className="modal-record__section modal-record__section--full">
+            <h4>Audit Trail</h4>
             <div className="integrated-admin-merch-order-audit">
               {isAuditLoading ? (
                 <p>Loading audit trail...</p>
@@ -92,10 +131,12 @@ export function OrderDetailAuditModal({
                 ))
               )}
             </div>
-          </article>
+          </section>
         </div>
         <div className="modal-dialog__actions">
-          <button type="button" className="modal-dialog__blue" onClick={onClose}>Close</button>
+          <button type="button" className="modal-dialog__blue" onClick={onClose}>
+            Close
+          </button>
         </div>
       </div>
     </div>

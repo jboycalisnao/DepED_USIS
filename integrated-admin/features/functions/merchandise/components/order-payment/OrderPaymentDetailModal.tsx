@@ -55,54 +55,71 @@ export function OrderPaymentDetailModal(props: Props) {
             </button>
           </div>
         </div>
-        <div className="modal-dialog__body integrated-admin-merch-order-detail">
+        <div className="modal-dialog__body modal-record">
           {detailModalView === 'record' ? (
-            <article className="integrated-admin-merch-order-detail__full">
-              <div className="integrated-admin-order-payment-glance">
-                <div className="integrated-admin-order-payment-glance__identity">
-                  <div>
-                    <p><strong>{order.referenceNo || '-'}</strong></p>
-                    <p>{order.learnerName || '-'}</p>
-                  </div>
-                  <p>{order.gradeLevel} - {order.sectionName} | LRN: {order.learnerLrn || '-'}</p>
+            <section className="modal-record__section">
+              <h4>Order Snapshot</h4>
+              <div className="modal-record__summary">
+                <div className="modal-record__meta">
+                  <span><strong>{order.referenceNo || '-'}</strong></span>
+                  <span>{order.learnerName || '-'}</span>
+                  <span>{order.gradeLevel} - {order.sectionName}</span>
+                  <span>LRN: {order.learnerLrn || '-'}</span>
                 </div>
-                <div className="integrated-admin-order-payment-glance__metrics">
-                  <article>
+                <div className="modal-record__grid">
+                  <div className="modal-record__field">
                     <span>Order Amount</span>
                     <strong>PHP {order.orderAmount.toFixed(2)}</strong>
-                  </article>
-                  <article>
+                  </div>
+                  <div className="modal-record__field">
                     <span>Paid</span>
                     <strong>PHP {totalPaidAmount.toFixed(2)}</strong>
-                  </article>
-                  <article>
+                  </div>
+                  <div className="modal-record__field">
                     <span>Balance</span>
                     <strong>PHP {detailRemainingBalance.toFixed(2)}</strong>
-                  </article>
-                  <article>
-                    <span>Item</span>
-                    <strong>{order.productName || '-'}</strong>
-                    <small>{order.selectedSize || 'N/A'} | {order.quantity || 0}</small>
-                  </article>
+                  </div>
+                  <div className="modal-record__field">
+                    <span>Balance After This Pay</span>
+                    <strong>PHP {detailPaymentBalance.toFixed(2)}</strong>
+                  </div>
                 </div>
               </div>
-              <div className="integrated-admin-order-payment-divider" />
-              <div className="integrated-admin-order-payment-metrics">
-                <div className="integrated-admin-order-payment-summary__metric"><small>Remaining Balance</small><strong>PHP {detailRemainingBalance.toFixed(2)}</strong></div>
-                <div className="integrated-admin-order-payment-summary__metric"><small>Balance After This Pay</small><strong>PHP {detailPaymentBalance.toFixed(2)}</strong></div>
-              </div>
-              <span className="integrated-admin-payment-form__title">Record Payment Entry</span>
+            </section>
+          ) : null}
+
+          {detailModalView === 'record' ? (
+            <section className="modal-record__section">
+              <h4>Record Payment Entry</h4>
               <div className="registry-form integrated-admin-payment-form">
-                <div className="registry-form__split">
-                  <label className="floating-field"><div className="floating-field__control"><input value={detailPaymentAmount} onChange={(e) => onAmountChange(e.target.value)} inputMode="decimal" placeholder=" " /><span>Payment Amount</span></div>{detailPaymentAmountError ? <small className="integrated-admin-payment-form__error">{detailPaymentAmountError}</small> : null}</label>
-                  <label className="floating-field"><div className="floating-field__control"><input value={detailReceiptNo} onChange={(e) => onReceiptNoChange(e.target.value)} placeholder=" " /><span>Receipt No. (Optional)</span></div></label>
+                <div className="floating-field-grid floating-field-grid--two">
+                  <label className="floating-field">
+                    <div className="floating-field__control">
+                      <input value={detailPaymentAmount} onChange={(e) => onAmountChange(e.target.value)} inputMode="decimal" placeholder=" " />
+                      <span>Payment Amount</span>
+                    </div>
+                    {detailPaymentAmountError ? <small className="integrated-admin-payment-form__error">{detailPaymentAmountError}</small> : null}
+                  </label>
+                  <label className="floating-field">
+                    <div className="floating-field__control">
+                      <input value={detailReceiptNo} onChange={(e) => onReceiptNoChange(e.target.value)} placeholder=" " />
+                      <span>Receipt No. (Optional)</span>
+                    </div>
+                  </label>
                 </div>
-                <label className="floating-field"><div className="floating-field__control"><textarea value={detailPaymentNotes} onChange={(e) => onNotesChange(e.target.value)} rows={3} placeholder=" " /><span>Payment Notes (Optional)</span></div></label>
+                <label className="floating-field">
+                  <div className="floating-field__control">
+                    <textarea value={detailPaymentNotes} onChange={(e) => onNotesChange(e.target.value)} rows={3} placeholder=" " />
+                    <span>Payment Notes (Optional)</span>
+                  </div>
+                </label>
               </div>
-            </article>
-          ) : detailModalView === 'payment' ? (
-            <article className="integrated-admin-merch-order-detail__full">
-              <span>Payment History</span>
+            </section>
+          ) : null}
+
+          {detailModalView === 'payment' ? (
+            <section className="modal-record__section modal-record__section--full">
+              <h4>Payment History</h4>
               <div className="integrated-admin-merch-order-audit">
                 {isPaymentsLoading ? <p>Loading payment history...</p> : paymentHistoryEntries.length === 0 ? <p>No payment history found for this order.</p> : (
                   paymentHistoryEntries.map((entry, index) => (
@@ -118,10 +135,12 @@ export function OrderPaymentDetailModal(props: Props) {
                   ))
                 )}
               </div>
-            </article>
-          ) : (
-            <article className="integrated-admin-merch-order-detail__full">
-              <span>Audit Trail</span>
+            </section>
+          ) : null}
+
+          {detailModalView === 'audit' ? (
+            <section className="modal-record__section modal-record__section--full">
+              <h4>Audit Trail</h4>
               <div className="integrated-admin-merch-order-audit">
                 {isAuditLoading ? <p>Loading audit trail...</p> : selectedOrderAudit.length === 0 ? <p>No audit logs found for this order.</p> : (
                   selectedOrderAudit.map((log, index) => (
@@ -133,8 +152,8 @@ export function OrderPaymentDetailModal(props: Props) {
                   ))
                 )}
               </div>
-            </article>
-          )}
+            </section>
+          ) : null}
         </div>
         <div className="modal-dialog__actions">
           {detailModalView === 'record' ? (

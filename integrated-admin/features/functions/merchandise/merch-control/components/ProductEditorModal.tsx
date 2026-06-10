@@ -41,11 +41,11 @@ export function ProductEditorModal({
           </button>
         </div>
         <form className="modal-dialog__body registry-form" onSubmit={onSave}>
-          <div className="registry-form__split">
+          <div className="floating-field-grid floating-field-grid--two">
             <label className="floating-field"><div className="floating-field__control"><input value={modalState.sku} onChange={(event) => onSetModalState((current) => ({ ...current, sku: event.target.value }))} required placeholder=" " /><span>SKU</span></div></label>
             <label className="floating-field"><div className="floating-field__control"><input value={modalState.name} onChange={(event) => onSetModalState((current) => ({ ...current, name: event.target.value }))} required placeholder=" " /><span>Product Name</span></div></label>
           </div>
-          <div className="registry-form__split">
+          <div className="floating-field-grid floating-field-grid--two">
             <UsisSearchableSelect ariaLabel="Category" allowTyping={false} floatingLabel label="Category" options={PRESET_CATEGORY_OPTIONS} value={modalState.categoryName} onChange={(value) => onSetModalState((current) => ({ ...current, categoryName: value }))} />
             <label className="floating-field"><div className="floating-field__control"><input value={modalState.imageUrl} onChange={(event) => onSetModalState((current) => ({ ...current, imageUrl: event.target.value }))} placeholder=" " /><span>Image URL</span></div></label>
           </div>
@@ -75,7 +75,7 @@ export function ProductEditorModal({
           {!modalState.isPreOrder && isCategoryApparel ? (
             <div className="integrated-admin-merch-sizes">
               <p className="integrated-admin-merch-sizes__title">Apparel Size Stocks</p>
-              <div className="registry-form__split">
+              <div className="floating-field-grid floating-field-grid--two">
                 {APPAREL_SIZE_KEYS.map((sizeKey) => (
                   <label key={sizeKey} className="floating-field"><div className="floating-field__control"><input value={modalState.sizeStock[sizeKey] || ''} onChange={(event) => onSetModalState((current) => ({ ...current, sizeStock: { ...current.sizeStock, [sizeKey]: event.target.value } }))} inputMode="numeric" placeholder=" " /><span>{sizeKey} Stock</span></div></label>
                 ))}

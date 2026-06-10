@@ -45,7 +45,7 @@ export function GrantLearnerAccessModal({
             <article><span>Learner</span><strong>{learner.fullName}</strong></article>
             <article><span>LRN</span><strong>{learner.lrn || '-'}</strong></article>
           </div>
-          <div className="registry-form__split">
+          <div className="floating-field-grid floating-field-grid--two">
             <UsisSearchableSelect
               ariaLabel="Class position"
               allowTyping={false}

@@ -274,7 +274,7 @@ export function MerchOrderControlPage() {
             </div>
             <div className="integrated-admin-merch-order-manual-trigger">
               <button
-                className="primary-button integrated-admin-merch-order-manual__submit"
+                className="primary-button"
                 onClick={() => setIsManualModalOpen(true)}
                 type="button"
               >

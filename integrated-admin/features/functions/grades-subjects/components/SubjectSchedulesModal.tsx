@@ -198,7 +198,7 @@ export function SubjectSchedulesModal({ onClose, sections }: Props) {
               </table>
             </div>
           )}
-          <form className="floating-field-grid ia-teaching-credential-form-grid ia-subjects-modal__form" onSubmit={(event) => {
+          <form className="floating-field-grid form-grid" onSubmit={(event) => {
             event.preventDefault();
             void (async () => {
               if (isShsGrade && !strand.trim()) {

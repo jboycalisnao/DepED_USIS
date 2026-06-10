@@ -1,12 +1,13 @@
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Learner, Section } from '../types';
 import { supabase } from '@deped-usis/shared-supabase';
 import { normalizeRfidValue } from '../utils/rfid';
 import { loadLearnerRosterCache, saveLearnerRosterCache } from '../utils/learnerRosterCache';
 
-export const useLearners = () => {
-  const [learners, setLearners] = useState<Learner[]>([]);
+export const useLearners = (selectedSchoolYearId: string) => {
+  const [allLearners, setAllLearners] = useState<Learner[]>([]);
+  const [sections, setSections] = useState<Section[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
   const [fetchedCount, setFetchedCount] = useState(0);
@@ -15,32 +16,55 @@ export const useLearners = () => {
   const syncLockRef = useRef(false);
   const sectionsCacheRef = useRef<Section[]>([]);
 
+  const selectedSchoolYearKey = String(selectedSchoolYearId || '').trim();
+
+  const enrichLearners = useCallback((rows: Learner[], sourceSections: Section[]) => {
+    const sectionsMap = sourceSections.reduce((acc, section) => {
+      acc[String(section.id)] = section;
+      return acc;
+    }, {} as Record<string, Section>);
+
+    return rows.map((learner) => {
+      const sId = String((learner as any).section_id || (learner as any).sectionId || '').trim();
+      const section = sId ? sectionsMap[sId] : null;
+      const gradeVal = section ? (section.grade_level || section.gradeLevel || 'General Education') : 'NO GRADE ASSIGNED';
+      return {
+        ...learner,
+        section_name: section
+          ? (section.name || 'Unknown Section')
+          : (sId ? 'Unknown Section' : 'No Section Assigned'),
+        grade_level: gradeVal,
+      };
+    });
+  }, []);
+
+  const visibleLearners = useMemo(() => {
+    const enriched = enrichLearners(allLearners, sections);
+    if (!selectedSchoolYearKey) return enriched;
+
+    const sectionsMap = sections.reduce((acc, section) => {
+      acc[String(section.id)] = section;
+      return acc;
+    }, {} as Record<string, Section>);
+
+    return enriched.filter((learner) => {
+      const sId = String((learner as any).section_id || (learner as any).sectionId || '').trim();
+      if (!sId) return false;
+      const section = sectionsMap[sId];
+      const sectionSchoolYearId = String(section?.school_year_id || (section as any)?.schoolYearId || '').trim();
+      return sectionSchoolYearId === selectedSchoolYearKey;
+    });
+  }, [allLearners, enrichLearners, sections, selectedSchoolYearKey]);
+
   const hydrateRosterCache = useCallback(async () => {
     try {
       const cached = await loadLearnerRosterCache();
       if (cached) {
         sectionsCacheRef.current = cached.sections || [];
-        const sectionsMap = (cached.sections || []).reduce((acc, section) => {
-          acc[String(section.id)] = section;
-          return acc;
-        }, {} as Record<string, Section>);
-
-        const enriched = (cached.learners || []).map((learner) => {
-          const sId = String((learner as any).section_id || (learner as any).sectionId || '').trim();
-          const section = sId ? sectionsMap[sId] : null;
-          const gradeVal = section ? (section.grade_level || section.gradeLevel || 'General Education') : 'NO GRADE ASSIGNED';
-          return {
-            ...learner,
-            section_name: section
-              ? (section.name || 'Unknown Section')
-              : (sId ? 'Unknown Section' : 'No Section Assigned'),
-            grade_level: gradeVal,
-          };
-        });
-
-        setLearners(enriched);
-        setFetchedCount(enriched.length);
-        setHasCachedRoster(enriched.length > 0);
+        setSections(cached.sections || []);
+        setAllLearners(cached.learners || []);
+        setFetchedCount((cached.learners || []).length);
+        setHasCachedRoster((cached.learners || []).length > 0);
         setLastSyncedAt(cached.updatedAt || '');
       }
     } catch (err) {
@@ -48,7 +72,12 @@ export const useLearners = () => {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [selectedSchoolYearKey]);
+
+  useEffect(() => {
+    setFetchedCount(visibleLearners.length);
+    setHasCachedRoster(allLearners.length > 0);
+  }, [allLearners.length, visibleLearners.length]);
 
   useEffect(() => {
     void hydrateRosterCache();
@@ -90,25 +119,14 @@ export const useLearners = () => {
       if (error) throw error;
 
       sectionsCacheRef.current = sectionsData || [];
-      const enriched = (data || []).map((l) => {
-        const sId = (l as any).section_id || (l as any).sectionId;
-        const section = sId ? sectionsMap[String(sId)] : null;
-
-        return {
-          ...l,
-          section_name: section
-            ? (section.name || 'Unknown Section')
-            : (sId ? 'Unknown Section' : 'No Section Assigned'),
-          grade_level: section ? (section.grade_level || section.gradeLevel || 'General Education') : 'NO GRADE ASSIGNED',
-        };
-      });
-
-      setLearners(enriched);
+      setSections(sectionsData || []);
+      setAllLearners(data || []);
+      const enriched = enrichLearners((data || []) as Learner[], sectionsData || []);
       setFetchedCount(enriched.length);
       setHasCachedRoster(enriched.length > 0);
       setLastSyncedAt(new Date().toISOString());
       await saveLearnerRosterCache({
-        learners: enriched,
+        learners: (data || []) as Learner[],
         sections: sectionsData || [],
       });
     } catch (err) {
@@ -118,15 +136,15 @@ export const useLearners = () => {
       setIsSyncing(false);
       setIsLoading(false);
     }
-  }, []);
+  }, [enrichLearners]);
 
   const getFiltered = useCallback((query: string, uidMappings: Record<string, string>) => {
     const raw = query.trim().toLowerCase();
-    if (!raw) return learners;
+    if (!raw) return visibleLearners;
 
     const tokens = raw.split(/\s+/).filter(t => t.length > 0);
     
-    return learners
+    return visibleLearners
       .map(l => {
         const first = (l.first_name || '').toLowerCase();
         const last = (l.last_name || '').toLowerCase();
@@ -150,7 +168,7 @@ export const useLearners = () => {
       .filter(i => i.score > 0)
       .sort((a, b) => b.score - a.score)
       .map(i => i.learner);
-  }, [learners]);
+  }, [visibleLearners]);
 
   const saveLearnerRfid = useCallback(async (learnerId: string, rfid: string) => {
     const normalizedRfid = normalizeRfidValue(rfid);
@@ -165,7 +183,7 @@ export const useLearners = () => {
       return { ok: false as const, error: error.message || 'Failed to save learner RFID.' };
     }
 
-    setLearners((prev) => {
+    setAllLearners((prev) => {
       const nextLearners = prev.map((learner) => (learner.id === learnerId ? { ...learner, rfid: normalizedRfid } : learner));
       void saveLearnerRosterCache({
         learners: nextLearners,
@@ -188,7 +206,7 @@ export const useLearners = () => {
       return { ok: false as const, error: error.message || 'Failed to clear learner RFID.' };
     }
 
-    setLearners((prev) => {
+    setAllLearners((prev) => {
       const nextLearners = prev.map((learner) => (learner.id === learnerId ? { ...learner, rfid: null } : learner));
       void saveLearnerRosterCache({
         learners: nextLearners,
@@ -199,5 +217,5 @@ export const useLearners = () => {
     return { ok: true as const };
   }, []);
 
-  return { learners, isLoading, isSyncing, fetchedCount, getFiltered, saveLearnerRfid, clearLearnerRfid, loadLearners: fetchAll, hasCachedRoster, lastSyncedAt };
+  return { learners: visibleLearners, isLoading, isSyncing, fetchedCount, getFiltered, saveLearnerRfid, clearLearnerRfid, loadLearners: fetchAll, hasCachedRoster, lastSyncedAt };
 };

@@ -52,7 +52,7 @@ export function OrderPeriodModal(props: Props) {
         {mode === 'create' ? (
           <form className="modal-dialog__body registry-form" onSubmit={onSaveCreate}>
             <label className="floating-field"><div className="floating-field__control"><input value={orderPeriodDraft.label} onChange={(event) => setOrderPeriodDraft((current) => ({ ...current, label: event.target.value }))} required placeholder=" " /><span>Order Period Label</span></div></label>
-            <div className="registry-form__split">
+            <div className="floating-field-grid floating-field-grid--two">
               <UsisDateTimePicker ariaLabel="Order period start" label="Start Date" mode="date" value={orderPeriodDraft.startDate} onChange={(value) => setOrderPeriodDraft((current) => ({ ...current, startDate: value }))} />
               <UsisDateTimePicker ariaLabel="Order period end" label="End Date" mode="date" value={orderPeriodDraft.endDate} onChange={(value) => setOrderPeriodDraft((current) => ({ ...current, endDate: value }))} />
             </div>
@@ -67,7 +67,7 @@ export function OrderPeriodModal(props: Props) {
                   {editingOrderPeriodId === period.id ? (
                     <div className="integrated-admin-order-period-item__edit">
                       <label className="floating-field"><div className="floating-field__control"><input value={orderPeriodEditDraft.label} onChange={(event) => setOrderPeriodEditDraft((current) => ({ ...current, label: event.target.value }))} required placeholder=" " /><span>Order Period Label</span></div></label>
-                      <div className="registry-form__split">
+                      <div className="floating-field-grid floating-field-grid--two">
                         <UsisDateTimePicker ariaLabel="Order period start" label="Start Date" mode="date" value={orderPeriodEditDraft.startDate} onChange={(value) => setOrderPeriodEditDraft((current) => ({ ...current, startDate: value }))} />
                         <UsisDateTimePicker ariaLabel="Order period end" label="End Date" mode="date" value={orderPeriodEditDraft.endDate} onChange={(value) => setOrderPeriodEditDraft((current) => ({ ...current, endDate: value }))} />
                       </div>

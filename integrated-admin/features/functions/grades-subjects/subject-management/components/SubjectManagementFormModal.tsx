@@ -75,7 +75,7 @@ export function SubjectManagementFormModal({ departments, initialValue, isSubmit
             });
           }}
         >
-          <div className="floating-field-grid ia-teaching-credential-form-grid">
+          <div className="floating-field-grid form-grid">
             <UsisSearchableSelect
               ariaLabel="Department"
               allowTyping
@@ -151,7 +151,7 @@ export function SubjectManagementFormModal({ departments, initialValue, isSubmit
               </div>
             </label>
           </div>
-          <div className="registry-form__split">
+          <div className="floating-field-grid floating-field-grid--two">
             <UsisSearchableSelect
               ariaLabel="Status"
               allowTyping={false}

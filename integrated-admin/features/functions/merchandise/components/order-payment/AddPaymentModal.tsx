@@ -62,7 +62,7 @@ export function AddPaymentModal({
             value={selectedPaymentOrderId}
             onChange={onSelectOrder}
           />
-          <div className="registry-form__split">
+          <div className="floating-field-grid floating-field-grid--two">
             <label className="floating-field">
               <div className="floating-field__control">
                 <input value={paymentAmount} onChange={(event) => onAmountChange(event.target.value)} inputMode="decimal" placeholder=" " />

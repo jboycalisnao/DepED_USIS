@@ -125,19 +125,19 @@ export function TeachingNonTeachingCredentialFormModal({
               });
             }}
           >
-            <div className="floating-field-grid ia-teaching-credential-form-grid">
+            <div className="floating-field-grid floating-field-grid--two">
               <label className="floating-field"><div className="floating-field__control"><input value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder=" " required /><span>First Name</span></div></label>
               <label className="floating-field"><div className="floating-field__control"><input value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder=" " required /><span>Last Name</span></div></label>
               <label className="floating-field"><div className="floating-field__control"><input value={middleName} onChange={(e) => setMiddleName(e.target.value)} placeholder=" " /><span>Middle Name</span></div></label>
               <label className="floating-field"><div className="floating-field__control"><input value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} placeholder=" " /><span>Employee ID</span></div></label>
               <UsisSearchableSelect
                 ariaLabel="Department"
-                floatingLabel
                 forcePortalMenu
                 label="Department"
                 onChange={(value) => setDepartmentId(value)}
                 options={departments.map((department) => ({ label: department.name, value: department.id }))}
                 required
+                floatingLabel
                 value={departmentId}
               />
               {departmentError ? <p className="login-card__error">{departmentError}</p> : null}
@@ -160,11 +160,10 @@ export function TeachingNonTeachingCredentialFormModal({
             {initialValue?.id ? (
               <p className="registry-copy">Leave New Password blank to keep the current password.</p>
             ) : null}
-            <div className="registry-form__split">
+            <div className="floating-field-grid floating-field-grid--two">
               <UsisSearchableSelect
                 ariaLabel="Personnel Type"
                 allowTyping={false}
-                floatingLabel
                 forcePortalMenu
                 label="Personnel Type"
                 onChange={(value) => setPersonnelType(value as PersonnelType)}
@@ -172,12 +171,12 @@ export function TeachingNonTeachingCredentialFormModal({
                   { label: 'Teaching', value: 'teaching' },
                   { label: 'Non-Teaching', value: 'non_teaching' },
                 ]}
+                floatingLabel
                 value={personnelType}
               />
               <UsisSearchableSelect
                 ariaLabel="Status"
                 allowTyping={false}
-                floatingLabel
                 forcePortalMenu
                 label="Status"
                 onChange={(value) => setIsActive(value === 'active')}
@@ -185,6 +184,7 @@ export function TeachingNonTeachingCredentialFormModal({
                   { label: 'Active', value: 'active' },
                   { label: 'Inactive', value: 'inactive' },
                 ]}
+                floatingLabel
                 value={isActive ? 'active' : 'inactive'}
               />
             </div>

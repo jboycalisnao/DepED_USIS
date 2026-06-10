@@ -74,6 +74,15 @@ function App() {
   const monitors = [monitor1, monitor2, monitor3];
 
   const {
+    settings,
+    updateSettings,
+    activeSchoolYear,
+    isSchoolYearsLoading,
+    schoolYears,
+    selectedSchoolYearId,
+    setSelectedSchoolYearId,
+  } = useSettings();
+  const {
     learners,
     isLoading,
     isSyncing,
@@ -84,7 +93,7 @@ function App() {
     loadLearners,
     hasCachedRoster,
     lastSyncedAt,
-  } = useLearners();
+  } = useLearners(selectedSchoolYearId);
   const {
     uidMappings,
     adminUids,
@@ -98,7 +107,6 @@ function App() {
     querySummaryByDateRange,
     refreshAttendanceStatusByRange,
   } = useAttendance();
-  const { settings, updateSettings } = useSettings();
 
   const [isStandbyMode, setIsStandbyMode] = useState(false);
   const currentView: 'registrar' | 'attendance' | 'summary' | 'settings' = useMemo(() => {
@@ -133,6 +141,12 @@ function App() {
     const savedPath = window.localStorage.getItem(ATTENDANCE_LAST_PATH_KEY) || '/registrar';
     return resolveAttendancePath(savedPath, '/registrar');
   }, []);
+
+  useEffect(() => {
+    if (!selectedLearnerId) return;
+    if (learners.some((learner) => learner.id === selectedLearnerId)) return;
+    setSelectedLearnerId(null);
+  }, [learners, selectedLearnerId]);
 
   const clearIdleTimer = (index: number) => {
     if (idleTimers.current[index]) {
@@ -715,7 +729,20 @@ function App() {
                   path="/summary"
                   element={<AttendanceSummaryPage onQuerySummaryRange={querySummaryByDateRange} />}
                 />
-                <Route path="/settings" element={<Settings settings={settings} onUpdate={updateSettings} />} />
+                <Route
+                  path="/settings"
+                  element={
+                    <Settings
+                      activeSchoolYearLabel={activeSchoolYear?.label || ''}
+                      isSchoolYearsLoading={isSchoolYearsLoading}
+                      onSchoolYearChange={setSelectedSchoolYearId}
+                      onUpdate={updateSettings}
+                      schoolYears={schoolYears}
+                      selectedSchoolYearId={selectedSchoolYearId}
+                      settings={settings}
+                    />
+                  }
+                />
                 <Route path="/" element={<Navigate to={restoredAttendancePath} replace />} />
                 <Route path="*" element={<Navigate to={restoredAttendancePath} replace />} />
               </Routes>

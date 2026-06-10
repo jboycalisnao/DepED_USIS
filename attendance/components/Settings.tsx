@@ -1,9 +1,16 @@
 import React from 'react';
+import { UsisSearchableSelect } from '../../common/components/ui/UsisSearchableSelect';
 import { TimeSlotSettings, TimeSlot } from '../types';
+import type { SchoolYearOption } from '../types';
 
 interface SettingsProps {
   settings: TimeSlotSettings;
   onUpdate: (settings: TimeSlotSettings) => void;
+  activeSchoolYearLabel: string;
+  isSchoolYearsLoading: boolean;
+  schoolYears: SchoolYearOption[];
+  selectedSchoolYearId: string;
+  onSchoolYearChange: (schoolYearId: string) => void;
 }
 
 type SlotKey = keyof TimeSlotSettings;
@@ -15,7 +22,7 @@ const SLOT_META: Record<SlotKey, { title: string; icon: string; tone: string }> 
   pmOut: { title: 'Afternoon Exit', icon: 'logout', tone: 'border-amber-200 bg-amber-50 text-amber-700' },
 };
 
-const Settings: React.FC<SettingsProps> = ({ settings, onUpdate }) => {
+const Settings: React.FC<SettingsProps> = ({ settings, onUpdate, activeSchoolYearLabel, isSchoolYearsLoading, schoolYears, selectedSchoolYearId, onSchoolYearChange }) => {
   const handleChange = (slot: SlotKey, field: keyof TimeSlot, value: string) => {
     onUpdate({
       ...settings,
@@ -39,6 +46,35 @@ const Settings: React.FC<SettingsProps> = ({ settings, onUpdate }) => {
               System Settings
             </h2>
           </div>
+        </div>
+      </section>
+
+      <section className="rounded-md border border-gray-200 bg-white p-6 shadow-sm">
+        <div className="flex flex-col gap-2">
+          <p className="text-[11px] font-semibold uppercase tracking-normal text-gray-500">Registrar School Year</p>
+          <h3 className="text-[12px] font-semibold text-gray-700">
+            Attendance roster follows the selected registrar school year.
+          </h3>
+          <p className="text-[12px] text-gray-500">
+            Active registrar school year: <span className="font-semibold text-gray-900">{activeSchoolYearLabel || '--'}</span>
+          </p>
+        </div>
+
+        <div className="mt-5 max-w-xl">
+          <UsisSearchableSelect
+            ariaLabel="Attendance school year"
+            allowTyping={false}
+            floatingLabel
+            forcePortalMenu
+            label="Attendance School Year"
+            onChange={onSchoolYearChange}
+            options={[...schoolYears].map((schoolYear) => ({
+              label: schoolYear.label,
+              value: schoolYear.id,
+            }))}
+            value={selectedSchoolYearId}
+            disabled={isSchoolYearsLoading}
+          />
         </div>
       </section>
 

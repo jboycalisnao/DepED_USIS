@@ -161,7 +161,7 @@ export function SectionSubjectsModal({ initialPresetId = '', onClose, onSaved, s
           ) : null}
           {isLoading ? <p>Loading subjects...</p> : null}
 
-          <form className="floating-field-grid ia-teaching-credential-form-grid ia-subjects-modal__form" onSubmit={(event) => {
+          <form className="floating-field-grid form-grid" onSubmit={(event) => {
             event.preventDefault();
             void (async () => {
               if (!selectedCatalogSubject) {

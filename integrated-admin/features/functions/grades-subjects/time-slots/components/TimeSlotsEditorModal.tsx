@@ -79,7 +79,7 @@ export function TimeSlotsEditorModal({
           </button>
         </div>
         <form className="modal-dialog__body" onSubmit={onSubmit}>
-          <div className="floating-field-grid ia-time-slots-editor-modal__grid">
+          <div className="floating-field-grid floating-field-grid--five">
             <UsisSearchableSelect ariaLabel="Grade Level" allowTyping={false} floatingLabel forcePortalMenu label="Grade Level" onChange={setGradeLevel} options={gradeOptions} value={gradeLevel} required disabled={isInheritedContextLocked} />
             {isShsGrade ? (
               <>

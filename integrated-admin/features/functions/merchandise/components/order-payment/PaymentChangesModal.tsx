@@ -24,13 +24,31 @@ export function PaymentChangesModal({ isLoading, isOpen, onClose, order, rows }:
             <span className="material-symbols-outlined">close</span>
           </button>
         </div>
-        <div className="modal-dialog__body integrated-admin-merch-order-detail">
-          <article><span>Learner</span><strong>{order.learnerName || '-'}</strong></article>
-          <article><span>Product</span><strong>{order.productName || '-'}</strong></article>
-          <article><span>Order Amount</span><strong>PHP {order.orderAmount.toFixed(2)}</strong></article>
-          <article><span>Status</span><strong>{order.orderStatus || 'Pending'}</strong></article>
-          <article className="integrated-admin-merch-order-detail__full">
-            <span>Payment History</span>
+        <div className="modal-dialog__body modal-record">
+          <section className="modal-record__section">
+            <h4>Order Summary</h4>
+            <div className="modal-record__fields">
+              <div className="modal-record__field">
+                <span>Learner</span>
+                <strong>{order.learnerName || '-'}</strong>
+              </div>
+              <div className="modal-record__field">
+                <span>Product</span>
+                <strong>{order.productName || '-'}</strong>
+              </div>
+              <div className="modal-record__field">
+                <span>Order Amount</span>
+                <strong>PHP {order.orderAmount.toFixed(2)}</strong>
+              </div>
+              <div className="modal-record__field">
+                <span>Status</span>
+                <strong>{order.orderStatus || 'Pending'}</strong>
+              </div>
+            </div>
+          </section>
+
+          <section className="modal-record__section modal-record__section--full">
+            <h4>Payment History</h4>
             <div className="integrated-admin-merch-order-audit">
               {isLoading ? (
                 <p>Loading payment history...</p>
@@ -46,9 +64,11 @@ export function PaymentChangesModal({ isLoading, isOpen, onClose, order, rows }:
                 ))
               )}
             </div>
-          </article>
+          </section>
         </div>
-        <div className="modal-dialog__actions"><button type="button" className="modal-dialog__blue" onClick={onClose}>Close</button></div>
+        <div className="modal-dialog__actions">
+          <button type="button" className="modal-dialog__blue" onClick={onClose}>Close</button>
+        </div>
       </div>
     </div>
   );

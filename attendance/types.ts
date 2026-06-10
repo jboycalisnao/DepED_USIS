@@ -26,6 +26,12 @@ export interface Section {
   schoolYearId?: string;
 }
 
+export interface SchoolYearOption {
+  id: string;
+  label: string;
+  is_active: boolean | null;
+}
+
 export interface Learner {
   id: string;
   lrn: string | null;

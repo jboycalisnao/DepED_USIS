@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import UsisPageLoader from '../../../../../common/components/UsisPageLoader';
 import { UsisAlertModal } from '../../../../../common/components/UsisAlertModal';
-import { UsisSearchableSelect } from '../../../../../common/components/ui/UsisSearchableSelect';
+import { PortalControlFormModal } from '../components/PortalControlFormModal';
 import { PortalControlPreviewModal } from '../components/PortalControlPreviewModal';
 import {
   loadPortalControls,
@@ -131,7 +131,7 @@ export function PortalControlsPage() {
       </div>
       <article className="section-card ia-portal-controls">
         <div className="section-card__bar" />
-        <div className="section-card__content ia-portal-controls__content">
+        <div className="section-card__content">
           <div className="registry-table-wrap">
             <table className="registry-table">
               <thead>
@@ -205,138 +205,32 @@ export function PortalControlsPage() {
         </div>
       </article>
 
-      {isFormModalOpen ? (
-        <div className="modal-overlay modal-overlay--high" role="presentation">
-          <div className="modal-backdrop" onClick={() => setIsFormModalOpen(false)} />
-          <div className="modal-dialog modal-dialog--wide ia-portal-controls-form-modal" role="dialog" aria-modal="true" aria-label="Portal control form">
-            <div className="modal-dialog__header">
-              <div className="modal-dialog__title-group">
-                <p className="modal-dialog__eyebrow">Portal Controls</p>
-                <h3>Configure Portal Status Modal</h3>
-              </div>
-              <button type="button" className="modal-dialog__close" onClick={() => setIsFormModalOpen(false)} aria-label="Close">
-                <span className="material-symbols-outlined" aria-hidden="true">close</span>
-              </button>
-            </div>
-            <form
-              className="modal-dialog__body ia-portal-controls__content registry-form"
-              onSubmit={(event) => {
-                event.preventDefault();
-                void handleSave();
-              }}
-            >
-              <label className="floating-field">
-                <UsisSearchableSelect
-                  ariaLabel="Module / Portal"
-                  allowTyping={false}
-                  floatingLabel
-                  label="Module / Portal"
-                  onChange={setSelectedModuleId}
-                  options={MODULE_OPTIONS(records)}
-                  value={selectedModuleId}
-                />
-              </label>
-
-              <div className="registry-radio-group">
-                <label className="registry-radio-option registry-radio-option--toggle">
-                  <input type="checkbox" checked={isEnabled} onChange={(event) => setIsEnabled(event.target.checked)} />
-                  <span>Enable gate modal for selected module</span>
-                </label>
-              </div>
-
-              <div className="registry-radio-group">
-                <label className="registry-radio-option">
-                  <input type="radio" name="portal-mode" checked={mode === 'maintenance'} onChange={() => setMode('maintenance')} />
-                  <span>Maintenance</span>
-                </label>
-                <label className="registry-radio-option">
-                  <input type="radio" name="portal-mode" checked={mode === 'soon_open'} onChange={() => setMode('soon_open')} />
-                  <span>Soon to Open</span>
-                </label>
-                <label className="registry-radio-option">
-                  <input type="radio" name="portal-mode" checked={mode === 'live'} onChange={() => setMode('live')} />
-                  <span>Live (No Gate)</span>
-                </label>
-              </div>
-
-              <div className="registry-radio-group">
-                <label className="registry-radio-option">
-                  <input
-                    type="radio"
-                    name="message-source"
-                    checked={messageSource === 'preset'}
-                    onChange={() => setMessageSource('preset')}
-                  />
-                  <span>Use preset text</span>
-                </label>
-                <label className="registry-radio-option">
-                  <input
-                    type="radio"
-                    name="message-source"
-                    checked={messageSource === 'custom'}
-                    onChange={() => setMessageSource('custom')}
-                  />
-                  <span>Use custom text</span>
-                </label>
-              </div>
-
-              {messageSource === 'preset' ? (
-                <label className="floating-field">
-                  <UsisSearchableSelect
-                    ariaLabel="Preset Message"
-                    allowTyping={false}
-                    floatingLabel
-                    label="Preset Message"
-                    onChange={applyPreset}
-                    options={PRESET_OPTIONS}
-                    value={presetKey}
-                  />
-                </label>
-              ) : null}
-
-              <div className="ia-portal-controls__grid">
-                <label className="floating-field">
-                  <UsisSearchableSelect
-                    ariaLabel="Icon Name"
-                    allowTyping={false}
-                    floatingLabel
-                    label="Icon Name"
-                    onChange={setIconName}
-                    options={ICON_SELECT_OPTIONS}
-                    value={iconName}
-                  />
-                </label>
-                <label className="floating-field">
-                  <div className="floating-field__control">
-                    <input value={titleText} onChange={(event) => setTitleText(event.target.value)} placeholder=" " />
-                    <span>Title Text</span>
-                  </div>
-                </label>
-              </div>
-
-              <label className="floating-field">
-                <div className="floating-field__control">
-                  <textarea value={bodyText} onChange={(event) => setBodyText(event.target.value)} placeholder=" " rows={3} />
-                  <span>Body Text</span>
-                </div>
-              </label>
-
-              <div className="modal-dialog__actions">
-                <button type="button" onClick={() => setIsPreviewOpen(true)}>
-                  Preview Modal
-                </button>
-                <button
-                  type="submit"
-                  className="modal-dialog__blue"
-                  disabled={Boolean(savingId)}
-                >
-                  {savingId ? 'Saving...' : 'Save Portal Control'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      ) : null}
+      <PortalControlFormModal
+        bodyText={bodyText}
+        iconName={iconName}
+        iconOptions={ICON_SELECT_OPTIONS}
+        isEnabled={isEnabled}
+        isOpen={isFormModalOpen}
+        isSaving={Boolean(savingId)}
+        messageSource={messageSource}
+        mode={mode}
+        moduleOptions={MODULE_OPTIONS(records)}
+        onApplyPreset={applyPreset}
+        onBodyTextChange={setBodyText}
+        onClose={() => setIsFormModalOpen(false)}
+        onIconChange={setIconName}
+        onIsEnabledChange={setIsEnabled}
+        onMessageSourceChange={setMessageSource}
+        onModeChange={setMode}
+        onModuleChange={setSelectedModuleId}
+        onPreview={() => setIsPreviewOpen(true)}
+        onSave={() => void handleSave()}
+        onTitleTextChange={setTitleText}
+        presetKey={presetKey}
+        presetOptions={PRESET_OPTIONS}
+        selectedModuleId={selectedModuleId}
+        titleText={titleText}
+      />
 
       <PortalControlPreviewModal
         open={isPreviewOpen && isEnabled && mode !== 'live'}

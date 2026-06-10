@@ -49,11 +49,3 @@
   align-items: center;
   flex-wrap: wrap;
 }
-
-.integrated-admin-app .floating-field__control select[data-has-value="true"] + span {
-  top: 11px;
-  color: var(--deped-blue);
-  font-size: var(--usis-helper-size);
-  font-weight: 400;
-  transform: translateY(0);
-}

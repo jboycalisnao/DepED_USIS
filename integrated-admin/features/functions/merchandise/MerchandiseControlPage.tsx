@@ -292,10 +292,10 @@ export function MerchandiseControlPage() {
               </article>
             </div>
             <div className="integrated-admin-merch-control__actions">
-              <button type="button" className="login-card__submit integrated-admin-merch-control__create-btn" onClick={openCreateModal}>
+              <button type="button" className="primary-button" onClick={openCreateModal}>
                 Create Product
               </button>
-              <button type="button" className="secondary-button integrated-admin-merch-control__create-btn" onClick={openCreateOrderPeriodModal}>
+              <button type="button" className="secondary-button" onClick={openCreateOrderPeriodModal}>
                 Create Order Period
               </button>
             </div>

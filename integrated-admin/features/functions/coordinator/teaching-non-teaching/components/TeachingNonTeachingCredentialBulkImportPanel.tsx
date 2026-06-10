@@ -118,7 +118,7 @@ export function TeachingNonTeachingCredentialBulkImportPanel({
         </button>
         <button
           type="button"
-          className="registry-action-button"
+          className="primary-button"
           onClick={handleDownloadTemplate}
           disabled={isSubmitting || isDownloadingTemplate || departments.length === 0}
         >
