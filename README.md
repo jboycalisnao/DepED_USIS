@@ -20,7 +20,7 @@ The repository currently contains these active modules:
 - `deped-web-kit/` - DepEd web branding and UI reference kit
 - `data-privacy/` - data privacy and legal compliance reference subsystem for SIS policy pages
 - `enrollment/` - school enrollment management portal
-- `learner-portal/` - learner self-service access portal
+- `learner-portal/` - school portal / learner self-service access portal
 - `integrated-admin/` - integrated admin configuration portal for cross-subsystem controls
 - `merch/` - school merchandise hub for merchandise catalog, orders, and inventory workflows
 - `election/` - DepED school election system

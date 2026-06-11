@@ -9,37 +9,93 @@ import { ProgramOfferings } from './components/ProgramOfferings';
 import { RequirementsChecklist } from './components/RequirementsChecklist';
 import { SchoolIdentityHeader } from './components/SchoolIdentityHeader';
 import { useAdmissionPortal } from './hooks/useAdmissionPortal';
+import { PortalSeo } from '../../../components/ui/PortalSeo';
 
 export function AdmissionPortalPage() {
   const { regionSlug, divisionSlug, schoolId } = useParams();
   const { isLoading, portal, error } = useAdmissionPortal(regionSlug, divisionSlug, schoolId);
+  const canonicalPath =
+    regionSlug && divisionSlug && schoolId
+      ? `/admissions/${regionSlug}/${divisionSlug}/${schoolId}`
+      : '/admissions/region-vi/iloilo/302345';
 
   if (isLoading) {
-    return <PortalStatusPage eyebrow="SP Portal" title="Loading admissions portal." message="Please wait." />;
+    return (
+      <>
+        <PortalSeo
+          title="Loading school portal | DepED USIS"
+          description="Loading the school admissions portal."
+          canonicalPath={canonicalPath}
+          robots="noindex,nofollow"
+        />
+        <PortalStatusPage eyebrow="SP Portal" title="Loading admissions portal." message="Please wait." />
+      </>
+    );
   }
 
   if (!portal) {
     return (
-      <PortalStatusPage
-        eyebrow="Invalid Route"
-        title="Admissions portal not found."
-        message="Please check the region, division, and school ID in the URL."
-      />
+      <>
+        <PortalSeo
+          title="Admissions portal not found | DepED USIS"
+          description="The requested school admissions portal could not be found."
+          canonicalPath={canonicalPath}
+          robots="noindex,nofollow"
+        />
+        <PortalStatusPage
+          eyebrow="Invalid Route"
+          title="Admissions portal not found."
+          message="Please check the region, division, and school ID in the URL."
+        />
+      </>
     );
   }
 
   if (portal.status === 'inactive') {
     return (
-      <PortalStatusPage
-        eyebrow="Inactive Portal"
-        title="This school admission portal is currently inactive."
-        message="Please contact the school for official admission updates."
-      />
+      <>
+        <PortalSeo
+          title={`${portal.schoolName} school portal | Inactive`}
+          description={`${portal.schoolName} admissions portal is currently inactive.`}
+          canonicalPath={canonicalPath}
+          robots="noindex,nofollow"
+        />
+        <PortalStatusPage
+          eyebrow="Inactive Portal"
+          title="This school admission portal is currently inactive."
+          message="Please contact the school for official admission updates."
+        />
+      </>
     );
   }
 
+  const portalDescription = [
+    `Official school admissions portal for ${portal.schoolName}.`,
+    `View notices, requirements, grade levels, and application guidance for ${portal.divisionName}, ${portal.regionName}.`,
+  ].join(' ');
+  const portalUrl = canonicalPath;
+  const structuredData = {
+    '@context': 'https://schema.org',
+    '@type': 'School',
+    name: portal.schoolName,
+    url: typeof window === 'undefined' ? portalUrl : `${window.location.origin}${portalUrl}`,
+    description: portalDescription,
+    address: {
+      '@type': 'PostalAddress',
+      streetAddress: portal.contact.address,
+    },
+    email: portal.contact.email,
+    telephone: portal.contact.phone,
+  };
+
   return (
     <>
+      <PortalSeo
+        title={`${portal.schoolName} school portal | Special Program admissions`}
+        description={portalDescription}
+        canonicalPath={canonicalPath}
+        structuredData={structuredData}
+      />
       {error ? <p className="portal-data-note">{error}</p> : null}
       <div className="portal-layout">
         <div className="portal-main-column">

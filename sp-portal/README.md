@@ -1,6 +1,6 @@
-# SP Portal
+# School Portal
 
-SP Portal is the DepED USIS Special Program admissions subsystem.
+School Portal is the DepED USIS Special Program admissions subsystem.
 
 The first supported public route is:
 
@@ -15,6 +15,12 @@ Example:
 ```
 
 The route is dynamic. Creating or activating a school portal should be handled through `sp_portal_*` Supabase records rather than by creating a new physical page file for each school.
+
+## SEO Notes
+
+- Public admissions pages use route-aware metadata, canonical URLs, and structured data.
+- `robots.txt` and `sitemap.xml` are generated for the public portal shell.
+- Application and admin routes are marked `noindex` because they are not meant to be indexed as public content.
 
 ## Current Scope
 
