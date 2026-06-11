@@ -21,6 +21,7 @@ The route is dynamic. Creating or activating a school portal should be handled t
 - Public admissions pages use route-aware metadata, canonical URLs, and structured data.
 - `robots.txt` and `sitemap.xml` are generated for the public portal shell.
 - Application and admin routes are marked `noindex` because they are not meant to be indexed as public content.
+- Set `SITE_URL` during deployment if the sitemap domain should differ from the default school URL.
 
 ## Current Scope
 

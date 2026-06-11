@@ -4,7 +4,7 @@ import { ApplicationAccessPanel } from './components/ApplicationAccessModal';
 import { ApplicationForm } from './components/ApplicationForm';
 import { PortalStatusPage } from '../portal/components/PortalStatusPage';
 import { useAdmissionPortal } from '../portal/hooks/useAdmissionPortal';
-import { PortalSeo } from '../../../components/ui/PortalSeo';
+import { PortalSeo } from '../../../../components/ui/PortalSeo';
 
 export function ApplicationStartPage() {
   const { regionSlug, divisionSlug, schoolId } = useParams();

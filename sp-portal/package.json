@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "generate:sitemap": "node ./scripts/generate-sitemap.mjs",
+    "generate:sitemap": "powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File ./scripts/generate-sitemap.ps1",
     "prebuild": "npm run generate:sitemap",
     "build": "vite build",
     "preview": "vite preview"

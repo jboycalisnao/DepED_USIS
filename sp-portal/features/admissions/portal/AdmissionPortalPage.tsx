@@ -9,7 +9,7 @@ import { ProgramOfferings } from './components/ProgramOfferings';
 import { RequirementsChecklist } from './components/RequirementsChecklist';
 import { SchoolIdentityHeader } from './components/SchoolIdentityHeader';
 import { useAdmissionPortal } from './hooks/useAdmissionPortal';
-import { PortalSeo } from '../../../components/ui/PortalSeo';
+import { PortalSeo } from '../../../../components/ui/PortalSeo';
 
 export function AdmissionPortalPage() {
   const { regionSlug, divisionSlug, schoolId } = useParams();
@@ -74,6 +74,8 @@ export function AdmissionPortalPage() {
     `View notices, requirements, grade levels, and application guidance for ${portal.divisionName}, ${portal.regionName}.`,
   ].join(' ');
   const portalUrl = canonicalPath;
+  const portalTelephone = portal.contact.phone.toLowerCase().includes('announcement') ? undefined : portal.contact.phone;
+  const portalEmail = portal.contact.email.toLowerCase().includes('announcement') ? undefined : portal.contact.email;
   const structuredData = {
     '@context': 'https://schema.org',
     '@type': 'School',
@@ -84,8 +86,8 @@ export function AdmissionPortalPage() {
       '@type': 'PostalAddress',
       streetAddress: portal.contact.address,
     },
-    email: portal.contact.email,
-    telephone: portal.contact.phone,
+    email: portalEmail,
+    telephone: portalTelephone,
   };
 
   return (
