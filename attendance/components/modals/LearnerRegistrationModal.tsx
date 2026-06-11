@@ -79,16 +79,13 @@ export default function LearnerRegistrationModal({
             <h3 id="learner-registration-modal-title">Register Learner RFID</h3>
           </div>
           <button type="button" className="modal-dialog__close" onClick={onClose} aria-label="Close learner registration modal">
-            <span aria-hidden="true">x</span>
+            <span className="material-symbols-outlined text-[20px] leading-none" aria-hidden="true">
+              close
+            </span>
           </button>
         </div>
 
         <div className="modal-dialog__body">
-          <div className="notice-box">
-            <strong>Use cached roster</strong>
-            <span>Select a learner from the locally cached roster, then assign the RFID value currently read by the scanner.</span>
-          </div>
-
           <div className="form-grid attendance-manual-modal__grid">
             <UsisSearchableSelect
               ariaLabel="Learner"
