@@ -70,7 +70,7 @@ export function PortalSeo({
   description,
   canonicalPath,
   robots = 'index,follow',
-  image = '/common/assets/USIS_Meta_Pic.png',
+  image = '/common/assets/Web-Kit_Header_Logo.png',
   structuredData,
 }: PortalSeoProps) {
   useEffect(() => {
@@ -92,11 +92,14 @@ export function PortalSeo({
     upsertMeta('property', 'og:image', getAbsoluteUrl(image));
     upsertMeta('property', 'og:image:secure_url', getAbsoluteUrl(image));
     upsertMeta('property', 'og:image:type', 'image/png');
+    upsertMeta('property', 'og:image:width', '1826');
+    upsertMeta('property', 'og:image:height', '335');
     upsertMeta('property', 'og:image:alt', title);
     upsertMeta('name', 'twitter:card', 'summary_large_image');
     upsertMeta('name', 'twitter:title', title);
     upsertMeta('name', 'twitter:description', description);
     upsertMeta('name', 'twitter:image', getAbsoluteUrl(image));
+    upsertMeta('name', 'twitter:image:alt', title);
     upsertLink('canonical', 'sp-portal-canonical', canonicalUrl);
 
     if (structuredData) {

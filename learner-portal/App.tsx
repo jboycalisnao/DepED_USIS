@@ -27,6 +27,7 @@ import { MerchControlServicePage } from './features/portal/pages/services/MerchC
 import { LearnerLoginPage } from './features/auth/pages/LearnerLoginPage';
 import { LearnerCredentialPage } from './features/auth/pages/LearnerCredentialPage';
 import { UsisPortalGate } from '../common/components/UsisPortalGate';
+import { LearnerPortalSeo } from './components/ui/LearnerPortalSeo';
 
 const LEARNER_PORTAL_BASENAME = '/learner-portal';
 
@@ -160,6 +161,7 @@ export default function App() {
     <BrowserRouter basename={basename}>
       <div className="learner-portal-app">
         <UsisPortalGate moduleKey="learner_portal" />
+        <LearnerPortalSeo isAuthenticated={Boolean(session)} />
         <header className="site-chrome learner-portal-chrome">
           <div className="content-width">
             <UsisUnifiedHeader searchId="learner-portal-search" searchLabel="Search school portal" />
