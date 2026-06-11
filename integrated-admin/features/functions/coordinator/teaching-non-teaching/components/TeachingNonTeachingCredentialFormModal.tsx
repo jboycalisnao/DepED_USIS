@@ -100,7 +100,7 @@ export function TeachingNonTeachingCredentialFormModal({
           </div>
         ) : (
           <form
-            className="modal-dialog__body registry-form"
+            className="modal-dialog__body registry-form ia-teaching-credential-modal__form"
             onSubmit={(event) => {
               event.preventDefault();
               if (!departmentId.trim()) {
@@ -132,6 +132,7 @@ export function TeachingNonTeachingCredentialFormModal({
               <label className="floating-field"><div className="floating-field__control"><input value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} placeholder=" " /><span>Employee ID</span></div></label>
               <UsisSearchableSelect
                 ariaLabel="Department"
+                className="ia-teaching-credential-modal__searchable-select"
                 forcePortalMenu
                 label="Department"
                 onChange={(value) => setDepartmentId(value)}
@@ -164,6 +165,7 @@ export function TeachingNonTeachingCredentialFormModal({
               <UsisSearchableSelect
                 ariaLabel="Personnel Type"
                 allowTyping={false}
+                className="ia-teaching-credential-modal__searchable-select"
                 forcePortalMenu
                 label="Personnel Type"
                 onChange={(value) => setPersonnelType(value as PersonnelType)}
@@ -171,12 +173,14 @@ export function TeachingNonTeachingCredentialFormModal({
                   { label: 'Teaching', value: 'teaching' },
                   { label: 'Non-Teaching', value: 'non_teaching' },
                 ]}
+                required
                 floatingLabel
                 value={personnelType}
               />
               <UsisSearchableSelect
                 ariaLabel="Status"
                 allowTyping={false}
+                className="ia-teaching-credential-modal__searchable-select"
                 forcePortalMenu
                 label="Status"
                 onChange={(value) => setIsActive(value === 'active')}
@@ -184,6 +188,7 @@ export function TeachingNonTeachingCredentialFormModal({
                   { label: 'Active', value: 'active' },
                   { label: 'Inactive', value: 'inactive' },
                 ]}
+                required
                 floatingLabel
                 value={isActive ? 'active' : 'inactive'}
               />

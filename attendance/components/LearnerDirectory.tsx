@@ -1,20 +1,25 @@
-
-import React, { useState, useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Learner } from '../types';
 import ConfirmationModal from './ConfirmationModal';
+import UsisInlineLoader from './ui/UsisInlineLoader';
+import LearnerRegistrationModal from './modals/LearnerRegistrationModal';
 import { normalizeRfidValue } from '../utils/rfid';
 import {
   UsisGradeSectionList,
   type UsisGradeSectionListGrade,
 } from '../../common/components/ui/UsisGradeSectionList';
+import { RegisterLearnerPayload } from '../hooks/useLearners';
 
 interface LearnerDirectoryProps {
   learners: Learner[];
+  rosterLearners: Learner[];
+  activeRfid: string;
   uidMappings: Record<string, string>;
   selectedId: string | null;
   onSelect: (id: string | null) => void;
   onUnlink: (id: string) => void;
   onLoadRoster: () => void;
+  onRegisterLearner: (payload: RegisterLearnerPayload) => Promise<{ ok: boolean; error?: string }>;
   isLoading: boolean;
   isSearching: boolean;
   isSyncing: boolean;
@@ -23,9 +28,7 @@ interface LearnerDirectoryProps {
   lastSyncedAt: string;
 }
 
-const naturalSort = (a: string, b: string) => {
-  return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
-};
+const naturalSort = (a: string, b: string) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
 
 const genderRank = (gender: string | null | undefined) => {
   const normalized = String(gender || '').trim().toLowerCase();
@@ -42,102 +45,146 @@ const learnerGenderNameSort = (a: Learner, b: Learner) => {
   return (a.first_name || '').localeCompare(b.first_name || '', undefined, { sensitivity: 'base' });
 };
 
-const isMale = (learner: Learner) => genderRank(learner.gender) === 0;
-const isFemale = (learner: Learner) => genderRank(learner.gender) === 1;
-
-const LearnerItem: React.FC<{
-  learner: Learner;
+const SectionLearnersTable: React.FC<{
+  learners: Learner[];
   uidMappings: Record<string, string>;
-  isSelected: boolean;
+  selectedId: string | null;
   onSelect: (id: string | null) => void;
   onUnlink: (id: string) => void;
-}> = ({ learner, uidMappings, isSelected, onSelect, onUnlink }) => {
-  const localTag = uidMappings[learner.id];
-  const dbTag = normalizeRfidValue(learner.rfid);
-  const tag = localTag || dbTag;
-  const isLocallyMapped = !!localTag;
-  
+  onRegister: (id: string) => void;
+}> = ({ learners, uidMappings, selectedId, onSelect, onUnlink, onRegister }) => {
+  const sortedLearners = [...learners].sort(learnerGenderNameSort);
+
   return (
-    <div 
-      className={`flex items-center justify-between p-4 pl-8 transition-colors border-b border-gray-100 last:border-none ${isSelected ? 'bg-primary-50' : 'hover:bg-gray-50'}`}
-    >
-      <div className="flex-grow min-w-0 pr-4">
-        <div className="text-sm font-semibold text-gray-900 truncate">
-          {learner.last_name}, {learner.first_name}
-        </div>
-        <div className="flex items-center gap-3 mt-1">
-          <div className="text-[10px] font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-            LRN: {learner.lrn || 'N/A'}
-          </div>
-          <div className="text-[10px] font-medium text-primary-600/60 uppercase tracking-wider truncate">
-            {learner.grade_level} • {learner.section_name}
-          </div>
-        </div>
-      </div>
-      <div className="flex items-center gap-4 flex-shrink-0">
-        <div className="hidden sm:block">
-          {tag ? (
-            <div className={`flex items-center gap-2 px-3 py-1 rounded-md border ${isLocallyMapped ? 'bg-primary-50 border-primary-200' : 'bg-gray-50 border-gray-200'}`}>
-              <span className={`material-symbols-outlined text-[12px] leading-none ${isLocallyMapped ? 'text-primary-600' : 'text-gray-400'}`}>
-                {isLocallyMapped ? 'tag' : 'database'}
-              </span>
-              <span className={`text-[10px] font-mono font-bold ${isLocallyMapped ? 'text-primary-700' : 'text-gray-600'}`}>{tag}</span>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2 px-3 py-1 bg-accent-50 border border-accent-100 rounded-md">
-              <span className="material-symbols-outlined text-[12px] text-accent-600 leading-none">link_off</span>
-              <span className="text-[10px] font-bold text-accent-700 uppercase tracking-wider">Unlinked</span>
-            </div>
-          )}
-        </div>
-        
-        <div className="flex items-center gap-2">
-          {isLocallyMapped && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                onUnlink(learner.id);
-              }}
-              className="p-2 text-gray-400 hover:text-accent-600 hover:bg-accent-50 rounded-md transition-all"
-              title="Unlink RFID Tag"
-            >
-              <span className="material-symbols-outlined text-xl leading-none">link_off</span>
-            </button>
-          )}
-          
-          <button 
-            type="button"
-            onClick={() => onSelect(isSelected ? null : learner.id)} 
-            className={`flex items-center justify-center w-8 h-8 rounded-md transition-all active:scale-90 border-2 ${
-              isSelected 
-              ? 'bg-primary-600 text-white border-primary-600 shadow-md' 
-              : 'bg-white border-gray-200 text-gray-300 hover:border-primary-600 hover:text-primary-600'
-            }`}
-            title={isSelected ? "Deselect student" : "Select student"}
-          >
-            <span className="material-symbols-outlined text-lg leading-none">
-              {isSelected ? 'check' : 'add'}
-            </span>
-          </button>
-        </div>
-      </div>
+    <div className="table-card border-0 rounded-none border-t border-gray-200">
+      <table className="usis-table">
+        <thead>
+          <tr>
+            <th>Learner</th>
+            <th>LRN</th>
+            <th>Gender</th>
+            <th>RFID</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {sortedLearners.map((learner) => {
+            const localTag = uidMappings[learner.id];
+            const dbTag = normalizeRfidValue(learner.rfid);
+            const tag = localTag || dbTag;
+            const isLocallyMapped = Boolean(localTag);
+            const isSelected = selectedId === learner.id;
+
+            return (
+              <tr key={learner.id} className={isSelected ? 'bg-primary-50' : undefined}>
+                <td>
+                  <div className="grid gap-1">
+                    <span className="font-semibold text-gray-900">
+                      {learner.last_name}, {learner.first_name}
+                    </span>
+                    <span className="text-[11px] text-gray-500">
+                      {learner.grade_level || 'NO GRADE ASSIGNED'} • {learner.section_name || 'Unassigned'}
+                    </span>
+                  </div>
+                </td>
+                <td>{learner.lrn || 'N/A'}</td>
+                <td>
+                  <span className="status-badge status-badge--open">
+                    {String(learner.gender || 'Unspecified').trim() || 'Unspecified'}
+                  </span>
+                </td>
+                <td>
+                  {tag ? (
+                    <span className={`inline-flex items-center gap-2 rounded-md border px-3 py-1 text-[10px] font-bold ${isLocallyMapped ? 'border-primary-200 bg-primary-50 text-primary-700' : 'border-gray-200 bg-gray-50 text-gray-600'}`}>
+                      <span className={`material-symbols-outlined text-[12px] leading-none ${isLocallyMapped ? 'text-primary-600' : 'text-gray-400'}`}>
+                        {isLocallyMapped ? 'tag' : 'database'}
+                      </span>
+                      {tag}
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-2 rounded-md border border-accent-100 bg-accent-50 px-3 py-1 text-[10px] font-bold text-accent-700">
+                      <span className="material-symbols-outlined text-[12px] leading-none">link_off</span>
+                      Unlinked
+                    </span>
+                  )}
+                </td>
+                <td>
+                  <span className={`inline-flex rounded-md px-3 py-1 text-[10px] font-bold uppercase tracking-wider ${String(learner.status || 'Active').toLowerCase() === 'active' ? 'bg-[#e7f6ee] text-[#0f6b3c]' : 'bg-[#fff7e1] text-[#7a4d00]'}`}>
+                    {learner.status || 'Active'}
+                  </span>
+                </td>
+                <td>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {isLocallyMapped ? (
+                      <button
+                        type="button"
+                        onClick={() => onUnlink(learner.id)}
+                        className="inline-flex items-center gap-1 rounded-md border border-[#f4cfd6] bg-white px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-[#b4233d] transition hover:bg-[#fff4f6]"
+                      >
+                        <span className="material-symbols-outlined text-[14px] leading-none">link_off</span>
+                        Unlink
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={() => onRegister(learner.id)}
+                      className={`inline-flex items-center gap-1 rounded-md border px-3 py-2 text-[10px] font-bold uppercase tracking-wider transition ${
+                        isSelected
+                          ? 'border-[#0038a8] bg-[#0038a8] text-white'
+                          : 'border-[#d6deeb] bg-white text-[#43526b] hover:border-[#0038a8] hover:text-[#0038a8]'
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-[14px] leading-none">
+                        add
+                      </span>
+                      Select
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 };
 
 const LearnerDirectory: React.FC<LearnerDirectoryProps> = ({
-  learners, uidMappings, selectedId, onSelect, onUnlink, onLoadRoster, isLoading, isSearching, isSyncing, fetchedCount, hasCachedRoster, lastSyncedAt
+  learners,
+  rosterLearners,
+  activeRfid,
+  uidMappings,
+  selectedId,
+  onSelect,
+  onUnlink,
+  onLoadRoster,
+  onRegisterLearner,
+  isLoading,
+  isSearching,
+  isSyncing,
+  fetchedCount,
+  hasCachedRoster,
+  lastSyncedAt,
 }) => {
   const [listSearchQuery, setListSearchQuery] = useState('');
   const [unlinkId, setUnlinkId] = useState<string | null>(null);
+  const [isRegisterOpen, setIsRegisterOpen] = useState(false);
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [registerError, setRegisterError] = useState<string | null>(null);
+
+  const handleOpenRegister = (learnerId: string) => {
+    onSelect(learnerId);
+    setRegisterError(null);
+    setIsRegisterOpen(true);
+  };
 
   const groupedData = useMemo(() => {
     const localQuery = listSearchQuery.trim().toLowerCase();
     const groups: Record<string, Record<string, Learner[]>> = {};
 
-    learners.forEach(learner => {
+    learners.forEach((learner) => {
       const grade = learner.grade_level || 'NO GRADE ASSIGNED';
       const section = learner.section_name || 'Unassigned';
       const fullName = `${learner.last_name || ''} ${learner.first_name || ''}`.toLowerCase();
@@ -145,16 +192,13 @@ const LearnerDirectory: React.FC<LearnerDirectoryProps> = ({
       const sectionSearchArea = `${grade} ${section}`.toLowerCase();
 
       if (localQuery) {
-        const matches =
-          fullName.includes(localQuery) ||
-          lrn.includes(localQuery) ||
-          sectionSearchArea.includes(localQuery);
+        const matches = fullName.includes(localQuery) || lrn.includes(localQuery) || sectionSearchArea.includes(localQuery);
         if (!matches) return;
       }
 
       if (!groups[grade]) groups[grade] = {};
       if (!groups[grade][section]) groups[grade][section] = [];
-      
+
       groups[grade][section].push(learner);
     });
 
@@ -169,12 +213,12 @@ const LearnerDirectory: React.FC<LearnerDirectoryProps> = ({
       acc[grade] = Object.keys(sections)
         .sort(naturalSort)
         .reduce((secAcc, sec) => {
-          secAcc[sec] = sections[sec].sort(learnerGenderNameSort);
+          secAcc[sec] = sections[sec];
           return secAcc;
         }, {} as Record<string, Learner[]>);
       return acc;
     }, {} as Record<string, Record<string, Learner[]>>);
-  }, [learners, isSearching, listSearchQuery]);
+  }, [learners, listSearchQuery]);
 
   const sharedGradeSectionListData = useMemo<UsisGradeSectionListGrade[]>(() => {
     return Object.entries(groupedData).map(([grade, sections]) => {
@@ -188,49 +232,14 @@ const LearnerDirectory: React.FC<LearnerDirectoryProps> = ({
           label: sectionName,
           count: sectionLearners.length,
           content: (
-            <div className="border-t border-gray-200 bg-white">
-              <div className="px-4 py-2 bg-primary-50 border-b border-primary-100">
-                <p className="text-[10px] font-bold text-primary-700 uppercase tracking-wider">
-                  Male
-                </p>
-              </div>
-              <div className="divide-y divide-gray-100">
-                {sectionLearners.filter(isMale).map((learner) => (
-                  <LearnerItem
-                    key={learner.id}
-                    learner={learner}
-                    uidMappings={uidMappings}
-                    isSelected={selectedId === learner.id}
-                    onSelect={onSelect}
-                    onUnlink={setUnlinkId}
-                  />
-                ))}
-                {sectionLearners.filter(isMale).length === 0 ? (
-                  <p className="px-8 py-3 text-[11px] text-gray-400">No male learners</p>
-                ) : null}
-              </div>
-
-              <div className="px-4 py-2 bg-accent-50 border-y border-accent-100">
-                <p className="text-[10px] font-bold text-accent-700 uppercase tracking-wider">
-                  Female
-                </p>
-              </div>
-              <div className="divide-y divide-gray-100">
-                {sectionLearners.filter(isFemale).map((learner) => (
-                  <LearnerItem
-                    key={learner.id}
-                    learner={learner}
-                    uidMappings={uidMappings}
-                    isSelected={selectedId === learner.id}
-                    onSelect={onSelect}
-                    onUnlink={setUnlinkId}
-                  />
-                ))}
-                {sectionLearners.filter(isFemale).length === 0 ? (
-                  <p className="px-8 py-3 text-[11px] text-gray-400">No female learners</p>
-                ) : null}
-              </div>
-            </div>
+            <SectionLearnersTable
+              learners={sectionLearners}
+              uidMappings={uidMappings}
+              selectedId={selectedId}
+              onSelect={onSelect}
+              onUnlink={setUnlinkId}
+              onRegister={handleOpenRegister}
+            />
           ),
         })),
       };
@@ -246,23 +255,31 @@ const LearnerDirectory: React.FC<LearnerDirectoryProps> = ({
             {hasCachedRoster ? `Ready offline${lastSyncedAt ? ` • Synced ${new Date(lastSyncedAt).toLocaleString()}` : ''}` : 'No roster cached yet'}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={onLoadRoster}
-          disabled={isSyncing}
-          className="inline-flex items-center gap-2 rounded-md border border-primary-200 bg-primary-50 px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-primary-700 transition hover:bg-primary-100 disabled:opacity-60 disabled:cursor-not-allowed"
-        >
-          <span className="material-symbols-outlined text-[16px] leading-none">
-            {hasCachedRoster ? 'refresh' : 'download'}
-          </span>
-          {isSyncing ? 'Loading...' : hasCachedRoster ? 'Refresh Learners' : 'Load Learners'}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setIsRegisterOpen(true)}
+            className="inline-flex items-center gap-2 rounded-md border border-primary-200 bg-primary-50 px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-primary-700 transition hover:bg-primary-100"
+          >
+            <span className="material-symbols-outlined text-[16px] leading-none">person_add</span>
+            Register Learner
+          </button>
+          <button
+            type="button"
+            onClick={onLoadRoster}
+            disabled={isSyncing}
+            className="inline-flex items-center gap-2 rounded-md border border-primary-200 bg-primary-50 px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-primary-700 transition hover:bg-primary-100 disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            <span className="material-symbols-outlined text-[16px] leading-none">
+              {hasCachedRoster ? 'refresh' : 'download'}
+            </span>
+            {isSyncing ? 'Loading...' : hasCachedRoster ? 'Refresh Learners' : 'Load Learners'}
+          </button>
+        </div>
       </div>
+
       {isLoading ? (
-          <div className="p-40 text-center flex flex-col items-center gap-6">
-            <div className="w-10 h-10 border-4 border-gray-100 border-t-primary-600 rounded-md animate-spin" />
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest">Querying Registry...</p>
-          </div>
+        <UsisInlineLoader message="Loading learner registry..." />
       ) : (
         <div className="p-4 space-y-4">
           {!isSearching && (
@@ -320,6 +337,7 @@ const LearnerDirectory: React.FC<LearnerDirectoryProps> = ({
           )}
         </div>
       )}
+
       {isSyncing && (
         <div className="p-3 bg-primary-600 text-white flex items-center justify-center gap-3">
           <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-md animate-spin" />
@@ -328,6 +346,33 @@ const LearnerDirectory: React.FC<LearnerDirectoryProps> = ({
           </p>
         </div>
       )}
+
+      <LearnerRegistrationModal
+        isOpen={isRegisterOpen}
+        learners={rosterLearners}
+        selectedLearnerId={selectedId}
+        readerValue={activeRfid}
+        isSubmitting={isRegistering}
+        errorMessage={registerError}
+        onClose={() => {
+          if (isRegistering) return;
+          setRegisterError(null);
+          setIsRegisterOpen(false);
+        }}
+        onSubmit={async (value) => {
+          setIsRegistering(true);
+          setRegisterError(null);
+          const result = await onRegisterLearner(value);
+          if (!result.ok) {
+            setRegisterError(result.error || 'Failed to register learner.');
+            setIsRegistering(false);
+            return;
+          }
+
+          setIsRegistering(false);
+          setIsRegisterOpen(false);
+        }}
+      />
 
       <ConfirmationModal
         isOpen={!!unlinkId}
@@ -347,4 +392,3 @@ const LearnerDirectory: React.FC<LearnerDirectoryProps> = ({
 };
 
 export default LearnerDirectory;
-

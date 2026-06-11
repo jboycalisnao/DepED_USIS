@@ -7,6 +7,13 @@ export type SectionDirectoryRecord = {
   schoolYearId: string;
 };
 
+export type RegistrarSchoolYearRecord = {
+  id: string;
+  isActive: boolean;
+  isLocked: boolean;
+  label: string;
+};
+
 export type LearnerSearchRecord = {
   fullName: string;
   learnerId: string;
@@ -27,10 +34,92 @@ export type GrantedLearnerAccessRecord = {
 };
 
 const GRADE_SCOPE_PREFIX = 'grade_level::';
+const LEARNER_DIRECTORY_CACHE_PREFIX = 'ia:learner-credentials:learners';
+const SELECTED_SCHOOL_YEAR_CACHE_KEY = 'ia:learner-credentials:selected-school-year';
 export const makeGradeScopeSectionId = (gradeLevel: string) => `${GRADE_SCOPE_PREFIX}${String(gradeLevel || '').trim()}`;
 export const isGradeScopeSectionId = (sectionId: string) => String(sectionId || '').startsWith(GRADE_SCOPE_PREFIX);
 export const getGradeLevelFromScopeSectionId = (sectionId: string) =>
   isGradeScopeSectionId(sectionId) ? String(sectionId).slice(GRADE_SCOPE_PREFIX.length).trim() : '';
+
+const getStorage = () => {
+  if (typeof window === 'undefined') return null;
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+};
+
+const readCachedJson = <T,>(key: string): T | null => {
+  const storage = getStorage();
+  if (!storage) return null;
+  try {
+    const raw = storage.getItem(key);
+    if (!raw) return null;
+    return JSON.parse(raw) as T;
+  } catch {
+    return null;
+  }
+};
+
+const writeCachedJson = (key: string, value: unknown) => {
+  const storage = getStorage();
+  if (!storage) return;
+  try {
+    storage.setItem(key, JSON.stringify(value));
+  } catch {
+    // Ignore storage quota / availability failures.
+  }
+};
+
+const getLearnerDirectoryCacheKey = (schoolYearId: string) =>
+  `${LEARNER_DIRECTORY_CACHE_PREFIX}:${String(schoolYearId || '').trim()}`;
+
+export const getStoredLearnerCredentialsSchoolYearId = () => String(readCachedJson<string>(SELECTED_SCHOOL_YEAR_CACHE_KEY) || '').trim();
+
+export const setStoredLearnerCredentialsSchoolYearId = (schoolYearId: string) => {
+  const normalized = String(schoolYearId || '').trim();
+  if (normalized) {
+    writeCachedJson(SELECTED_SCHOOL_YEAR_CACHE_KEY, normalized);
+  }
+};
+
+export const loadRegistrarSchoolYears = async (): Promise<RegistrarSchoolYearRecord[]> => {
+  const { data, error } = await supabase
+    .from('registrar_school_years')
+    .select('id,label,is_active,is_locked')
+    .order('label', { ascending: false });
+  if (error) throw new Error(error.message || 'Unable to load registrar school years.');
+
+  return (data || []).map((row: any) => ({
+    id: String(row.id || '').trim(),
+    isActive: Boolean(row.is_active),
+    isLocked: Boolean(row.is_locked),
+    label: String(row.label || '').trim(),
+  })).filter((row) => row.id && row.label);
+};
+
+export const loadSectionsDirectoryBySchoolYear = async (schoolYearId: string): Promise<SectionDirectoryRecord[]> => {
+  const normalizedSchoolYearId = String(schoolYearId || '').trim();
+  if (!normalizedSchoolYearId) {
+    throw new Error('School year is required.');
+  }
+
+  const { data, error } = await supabase
+    .from('registrar_sections')
+    .select('id,name,grade_level,school_year_id')
+    .eq('school_year_id', normalizedSchoolYearId)
+    .order('grade_level', { ascending: true })
+    .order('name', { ascending: true });
+  if (error) throw new Error('Unable to load active school year sections.');
+
+  return (data || []).map((row: any) => ({
+    gradeLevel: String(row.grade_level || 'Unassigned').trim() || 'Unassigned',
+    schoolYearId: String(row.school_year_id || normalizedSchoolYearId),
+    sectionId: String(row.id || ''),
+    sectionName: String(row.name || 'Unnamed Section').trim() || 'Unnamed Section',
+  }));
+};
 
 export const loadActiveSectionsDirectory = async (): Promise<SectionDirectoryRecord[]> => {
   const activeSchoolYear = await supabase
@@ -43,21 +132,80 @@ export const loadActiveSectionsDirectory = async (): Promise<SectionDirectoryRec
     throw new Error('Active school year not found.');
   }
 
-  const schoolYearId = String(activeSchoolYear.data.id || '').trim();
-  const { data, error } = await supabase
-    .from('registrar_sections')
-    .select('id,name,grade_level,school_year_id')
-    .eq('school_year_id', schoolYearId)
-    .order('grade_level', { ascending: true })
-    .order('name', { ascending: true });
-  if (error) throw new Error('Unable to load active school year sections.');
+  return loadSectionsDirectoryBySchoolYear(String(activeSchoolYear.data.id || '').trim());
+};
 
-  return (data || []).map((row: any) => ({
-    gradeLevel: String(row.grade_level || 'Unassigned').trim() || 'Unassigned',
-    schoolYearId: String(row.school_year_id || schoolYearId),
-    sectionId: String(row.id || ''),
-    sectionName: String(row.name || 'Unnamed Section').trim() || 'Unnamed Section',
-  }));
+type CachedLearnerDirectory = {
+  rows: LearnerSearchRecord[];
+  schoolYearId: string;
+  updatedAt: string;
+};
+
+const loadLearnerDirectoryFromCache = (schoolYearId: string) => {
+  const cacheKey = getLearnerDirectoryCacheKey(schoolYearId);
+  return readCachedJson<CachedLearnerDirectory>(cacheKey);
+};
+
+const writeLearnerDirectoryCache = (schoolYearId: string, rows: LearnerSearchRecord[]) => {
+  writeCachedJson(getLearnerDirectoryCacheKey(schoolYearId), {
+    rows,
+    schoolYearId: String(schoolYearId || '').trim(),
+    updatedAt: new Date().toISOString(),
+  } satisfies CachedLearnerDirectory);
+};
+
+export const getCachedLearnerDirectory = (schoolYearId: string): LearnerSearchRecord[] => {
+  const cached = loadLearnerDirectoryFromCache(schoolYearId);
+  return cached?.rows || [];
+};
+
+export const loadLearnerDirectoryBySchoolYear = async (params: {
+  forceRefresh?: boolean;
+  schoolYearId: string;
+}): Promise<LearnerSearchRecord[]> => {
+  const schoolYearId = String(params.schoolYearId || '').trim();
+  if (!schoolYearId) {
+    throw new Error('School year is required.');
+  }
+
+  const cached = loadLearnerDirectoryFromCache(schoolYearId);
+  if (cached && !params.forceRefresh) {
+    return cached.rows;
+  }
+
+  const sections = await loadSectionsDirectoryBySchoolYear(schoolYearId);
+  const sectionIds = Array.from(new Set(sections.map((section) => String(section.sectionId || '').trim()).filter(Boolean)));
+  if (sectionIds.length === 0) {
+    writeLearnerDirectoryCache(schoolYearId, []);
+    return [];
+  }
+
+  const learnersResult = await supabase
+    .from('registrar_learners')
+    .select('id,lrn,first_name,middle_name,last_name,section_id')
+    .in('section_id', sectionIds)
+    .order('last_name', { ascending: true })
+    .order('first_name', { ascending: true })
+    .limit(5000);
+  if (learnersResult.error) {
+    throw new Error(learnersResult.error.message || 'Unable to load learners for the selected school year.');
+  }
+
+  const rows = (learnersResult.data || []).map((row: any) => {
+    const first = String(row.first_name || '').trim();
+    const middle = String(row.middle_name || '').trim();
+    const last = String(row.last_name || '').trim();
+    const fullName = [last, first, middle].filter(Boolean).join(', ').replace(', ,', ',');
+    return {
+      fullName: fullName || 'Unnamed Learner',
+      learnerId: String(row.id || ''),
+      lrn: String(row.lrn || ''),
+      sectionId: String(row.section_id || ''),
+    };
+  });
+
+  writeLearnerDirectoryCache(schoolYearId, rows);
+  return rows;
 };
 
 export const searchLearnersBySection = async (params: {
@@ -217,7 +365,7 @@ export const grantGradeLevelMerchControlAccess = async (payload: {
   });
 };
 
-export const loadGradeLevelRepresentatives = async (): Promise<GrantedLearnerAccessRecord[]> => {
+export const loadGradeLevelRepresentatives = async (learnersDirectory: LearnerSearchRecord[] = []): Promise<GrantedLearnerAccessRecord[]> => {
   const { data, error } = await supabase
     .from('coordinator_learner_operation_credentials')
     .select('id,learner_id,learner_lrn,section_id,operation_key,position_title,is_active,granted_by')
@@ -227,37 +375,11 @@ export const loadGradeLevelRepresentatives = async (): Promise<GrantedLearnerAcc
     .order('created_at', { ascending: false });
   if (error) throw new Error(error.message || 'Unable to load grade-level representatives.');
 
-  const lrnSet = new Set<string>();
-  const idSet = new Set<string>();
-  (data || []).forEach((row: any) => {
-    const learnerId = String(row.learner_id || '').trim();
-    const learnerLrn = String(row.learner_lrn || '').trim();
-    if (learnerId) idSet.add(learnerId);
-    if (learnerLrn) lrnSet.add(learnerLrn);
-  });
-
-  let learnersData: any[] = [];
-  if (idSet.size > 0 || lrnSet.size > 0) {
-    const learnersResult = await supabase
-      .from('registrar_learners')
-      .select('id,lrn,first_name,middle_name,last_name')
-      .or([
-        idSet.size > 0 ? `id.in.(${Array.from(idSet).join(',')})` : '',
-        lrnSet.size > 0 ? `lrn.in.(${Array.from(lrnSet).join(',')})` : '',
-      ].filter(Boolean).join(','))
-      .limit(2000);
-    if (learnersResult.error) throw new Error(learnersResult.error.message || 'Unable to load representative names.');
-    learnersData = learnersResult.data || [];
-  }
-
   const byId = new Map<string, string>();
   const byLrn = new Map<string, string>();
-  learnersData.forEach((row: any) => {
-    const first = String(row.first_name || '').trim();
-    const middle = String(row.middle_name || '').trim();
-    const last = String(row.last_name || '').trim();
-    const fullName = [last, first, middle].filter(Boolean).join(', ').replace(', ,', ',') || 'Unnamed Learner';
-    const learnerId = String(row.id || '').trim();
+  learnersDirectory.forEach((row) => {
+    const fullName = String(row.fullName || '').trim() || 'Unnamed Learner';
+    const learnerId = String(row.learnerId || '').trim();
     const learnerLrn = String(row.lrn || '').trim();
     if (learnerId) byId.set(learnerId, fullName);
     if (learnerLrn) byLrn.set(learnerLrn, fullName);
@@ -313,7 +435,7 @@ export const deleteGradeLevelRepresentativeAccess = async (payload: { credential
   if (error) throw new Error(error.message || 'Unable to delete grade-level representative.');
 };
 
-export const loadGrantedLearnerAccessBySections = async (sectionIds: string[]): Promise<GrantedLearnerAccessRecord[]> => {
+export const loadGrantedLearnerAccessBySections = async (sectionIds: string[], learnersDirectory: LearnerSearchRecord[] = []): Promise<GrantedLearnerAccessRecord[]> => {
   const cleanSectionIds = Array.from(new Set(sectionIds.map((row) => String(row || '').trim()).filter(Boolean)));
   if (cleanSectionIds.length === 0) return [];
 
@@ -327,23 +449,11 @@ export const loadGrantedLearnerAccessBySections = async (sectionIds: string[]): 
     throw new Error(credentialsResult.error.message || 'Unable to load granted learner credentials.');
   }
 
-  const learnersResult = await supabase
-    .from('registrar_learners')
-    .select('id,lrn,first_name,middle_name,last_name,section_id')
-    .in('section_id', cleanSectionIds)
-    .limit(5000);
-  if (learnersResult.error) {
-    throw new Error(learnersResult.error.message || 'Unable to load learner directory for granted credentials.');
-  }
-
   const byId = new Map<string, string>();
   const byLrn = new Map<string, string>();
-  (learnersResult.data || []).forEach((row: any) => {
-    const first = String(row.first_name || '').trim();
-    const middle = String(row.middle_name || '').trim();
-    const last = String(row.last_name || '').trim();
-    const fullName = [last, first, middle].filter(Boolean).join(', ').replace(', ,', ',') || 'Unnamed Learner';
-    const learnerId = String(row.id || '').trim();
+  learnersDirectory.forEach((row) => {
+    const fullName = String(row.fullName || '').trim() || 'Unnamed Learner';
+    const learnerId = String(row.learnerId || '').trim();
     const learnerLrn = String(row.lrn || '').trim();
     if (learnerId) byId.set(learnerId, fullName);
     if (learnerLrn) byLrn.set(learnerLrn, fullName);

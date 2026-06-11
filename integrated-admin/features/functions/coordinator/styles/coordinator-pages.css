@@ -556,7 +556,7 @@
 .ia-learner-credentials__toolbar {
   --ia-learner-credentials-toolbar-height: 50px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(240px, 280px) minmax(0, 1fr) auto;
   gap: 10px;
   align-items: stretch;
   margin-bottom: 12px;
@@ -566,6 +566,18 @@
   margin-bottom: 0;
 }
 
+.ia-learner-credentials__school-year-select {
+  width: 100%;
+}
+
+.ia-learner-credentials__toolbar-actions {
+  display: inline-flex;
+  align-items: stretch;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .ia-learner-credentials__grade-rep-button {
   min-height: var(--ia-learner-credentials-toolbar-height);
   height: var(--ia-learner-credentials-toolbar-height);
@@ -573,6 +585,16 @@
   align-items: center;
   justify-content: center;
   white-space: nowrap;
+}
+
+.ia-learner-credentials__refresh-button {
+  min-height: var(--ia-learner-credentials-toolbar-height);
+  height: var(--ia-learner-credentials-toolbar-height);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  gap: 8px;
 }
 
 .ia-learner-credentials__modal-tabs {
@@ -622,6 +644,26 @@
 .ia-teaching-credential-modal__mode-button {
   min-height: 40px;
   white-space: nowrap;
+}
+
+.ia-teaching-credential-modal__form .floating-field__control input,
+.ia-teaching-credential-modal__form .floating-field__control select,
+.ia-teaching-credential-modal__form .floating-field__control textarea {
+  padding-top: 32px;
+}
+
+.ia-teaching-credential-modal__form .searchable-select--floating .floating-field__control input {
+  padding-top: 32px;
+}
+
+.ia-teaching-credential-modal__searchable-select .searchable-select--floating .floating-field__control {
+  height: 54px;
+  min-height: 54px;
+}
+
+.ia-teaching-credential-modal__searchable-select .searchable-select--floating .floating-field__control input {
+  height: 54px;
+  min-height: 54px;
 }
 
 .ia-teaching-credential-bulk-import {
@@ -895,6 +937,16 @@
 @media (max-width: 760px) {
   .ia-learner-credentials__toolbar {
     grid-template-columns: 1fr;
+  }
+
+  .ia-learner-credentials__toolbar-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
+
+  .ia-learner-credentials__toolbar-actions > button {
+    width: 100%;
   }
 }
 

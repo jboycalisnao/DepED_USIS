@@ -5,6 +5,11 @@ import { supabase } from '@deped-usis/shared-supabase';
 import { normalizeRfidValue } from '../utils/rfid';
 import { loadLearnerRosterCache, saveLearnerRosterCache } from '../utils/learnerRosterCache';
 
+export type RegisterLearnerPayload = {
+  learnerId: string;
+  rfid?: string;
+};
+
 export const useLearners = (selectedSchoolYearId: string) => {
   const [allLearners, setAllLearners] = useState<Learner[]>([]);
   const [sections, setSections] = useState<Section[]>([]);
@@ -217,5 +222,45 @@ export const useLearners = (selectedSchoolYearId: string) => {
     return { ok: true as const };
   }, []);
 
-  return { learners: visibleLearners, isLoading, isSyncing, fetchedCount, getFiltered, saveLearnerRfid, clearLearnerRfid, loadLearners: fetchAll, hasCachedRoster, lastSyncedAt };
+  const registerLearner = useCallback(async (payload: RegisterLearnerPayload) => {
+    const learnerId = String(payload.learnerId || '').trim();
+    const normalizedRfid = normalizeRfidValue(payload.rfid || '');
+    if (!learnerId) return { ok: false as const, error: 'Learner is required.' };
+    if (!normalizedRfid) return { ok: false as const, error: 'RFID reader value is required.' };
+
+    const { error } = await supabase
+      .from('registrar_learners')
+      .update({ rfid: normalizedRfid })
+      .eq('id', learnerId);
+
+    if (error) {
+      return { ok: false as const, error: error.message || 'Failed to register learner RFID.' };
+    }
+
+    setAllLearners((prev) => {
+      const nextLearners = prev.map((learner) => (learner.id === learnerId ? { ...learner, rfid: normalizedRfid } : learner));
+      void saveLearnerRosterCache({
+        learners: nextLearners,
+        sections: sectionsCacheRef.current,
+      });
+      return nextLearners;
+    });
+
+    return { ok: true as const };
+  }, []);
+
+  return {
+    learners: visibleLearners,
+    sections,
+    isLoading,
+    isSyncing,
+    fetchedCount,
+    getFiltered,
+    saveLearnerRfid,
+    clearLearnerRfid,
+    registerLearner,
+    loadLearners: fetchAll,
+    hasCachedRoster,
+    lastSyncedAt,
+  };
 };

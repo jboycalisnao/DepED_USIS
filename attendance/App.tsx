@@ -23,16 +23,11 @@ import {
   getStoredAttendanceAccess,
   type AttendanceAccessRecord,
 } from './features/auth/utils/attendanceAccess';
-
-const ATTENDANCE_LAST_PATH_KEY = 'attendance:last-path';
-
-function resolveAttendancePath(pathname: string, fallback: string) {
-  if (pathname === '/registrar') return '/registrar';
-  if (pathname.startsWith('/records')) return '/records';
-  if (pathname.startsWith('/summary')) return '/summary';
-  if (pathname.startsWith('/settings')) return '/settings';
-  return fallback;
-}
+import {
+  ATTENDANCE_DEFAULT_PATH,
+  ATTENDANCE_LAST_PATH_KEY,
+  resolveAttendancePath,
+} from './utils/attendanceRoutePersistence';
 
 const extractUid = (text: string): string | null => {
   const clean = text.trim().toUpperCase();
@@ -90,6 +85,7 @@ function App() {
     getFiltered,
     saveLearnerRfid,
     clearLearnerRfid,
+    registerLearner,
     loadLearners,
     hasCachedRoster,
     lastSyncedAt,
@@ -138,8 +134,8 @@ function App() {
   const usbRfidTimerRef = useRef<number | null>(null);
   const restoredAttendancePath = useMemo(() => {
     if (typeof window === 'undefined') return '/registrar';
-    const savedPath = window.localStorage.getItem(ATTENDANCE_LAST_PATH_KEY) || '/registrar';
-    return resolveAttendancePath(savedPath, '/registrar');
+    const savedPath = window.localStorage.getItem(ATTENDANCE_LAST_PATH_KEY) || ATTENDANCE_DEFAULT_PATH;
+    return resolveAttendancePath(savedPath, ATTENDANCE_DEFAULT_PATH);
   }, []);
 
   useEffect(() => {
@@ -474,8 +470,11 @@ function App() {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    window.localStorage.setItem(ATTENDANCE_LAST_PATH_KEY, resolveAttendancePath(location.pathname, '/registrar'));
-  }, [location.pathname]);
+    window.localStorage.setItem(
+      ATTENDANCE_LAST_PATH_KEY,
+      resolveAttendancePath(`${location.pathname}${location.search}${location.hash}`, ATTENDANCE_DEFAULT_PATH)
+    );
+  }, [location.hash, location.pathname, location.search]);
 
   if (isStandbyMode) {
     return (
@@ -697,11 +696,14 @@ function App() {
                       <div className="lg:col-span-8 space-y-6">
                         <LearnerDirectory
                           learners={filteredLearners}
+                          rosterLearners={learners}
+                          activeRfid={activeRfid}
                           uidMappings={uidMappings}
                           selectedId={selectedLearnerId}
                           onSelect={setSelectedLearnerId}
                           onUnlink={handleUnlinkMapping}
                           onLoadRoster={() => void loadLearners()}
+                          onRegisterLearner={registerLearner}
                           isLoading={isLoading}
                           isSearching={searchQuery.trim().length > 0}
                           isSyncing={isSyncing}

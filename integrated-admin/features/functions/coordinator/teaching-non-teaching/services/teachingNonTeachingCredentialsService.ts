@@ -42,15 +42,11 @@ const normalizeIdentity = (value: string) => toText(value).toLowerCase();
 const resolveRoleByPersonnelType = (_type: PersonnelType) => 'school_usis_coordinator';
 const formatDbError = (error: { message?: string; details?: string; hint?: string } | null, fallback: string) =>
   [error?.message, error?.details, error?.hint].filter(Boolean).join(' | ') || fallback;
-const normalizeOptionalEmail = (value: string, username: string) => {
-  const normalized = normalizeIdentity(value);
-  return normalized || `${normalizeIdentity(username)}@usis.local`;
-};
 const buildCoordinatorPayload = (input: SaveTeachingNonTeachingCredentialInput) => ({
   school_id: null as string | null,
   employee_id: toText(input.employeeId) || null,
   username: normalizeIdentity(input.username),
-  email: normalizeOptionalEmail(input.email, input.username),
+  email: normalizeIdentity(input.email) || null,
   first_name: toText(input.firstName),
   middle_name: toText(input.middleName) || null,
   last_name: toText(input.lastName),

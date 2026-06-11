@@ -77,7 +77,7 @@
   resize: vertical;
 }
 
-.floating-field__control span {
+.floating-field__control > span {
   position: absolute;
   top: 50%;
   left: 16px;
@@ -253,7 +253,7 @@
 
 .searchable-select--floating .floating-field__control > .searchable-select__floating-label {
   position: absolute;
-  top: 6px;
+  top: 50%;
   left: 14px;
   display: inline-flex;
   align-items: center;
@@ -261,15 +261,15 @@
   max-width: calc(100% - 28px);
   padding: 0 4px;
   background: #fff;
-  color: var(--deped-blue);
-  font-size: 12px;
+  color: var(--deped-muted);
+  font-size: var(--usis-body-size);
   font-weight: 400;
   line-height: 1.2;
   z-index: 3;
   pointer-events: none;
-  transform: translateY(0);
+  transform: translateY(-50%);
   transform-origin: left top;
-  transition: color 180ms ease;
+  transition: top 180ms ease, color 180ms ease, transform 180ms ease, font-size 180ms ease;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -289,7 +289,10 @@
 .searchable-select--floating .floating-field__control input:focus ~ .searchable-select__floating-label,
 .searchable-select--floating .floating-field__control input:not(:placeholder-shown) ~ .searchable-select__floating-label,
 .searchable-select--floating .floating-field__control input[data-has-value="true"] ~ .searchable-select__floating-label {
+  top: 11px;
   color: var(--deped-blue);
+  font-size: var(--usis-helper-size);
+  transform: translateY(0);
 }
 
 .searchable-select--floating .floating-field__control input {
