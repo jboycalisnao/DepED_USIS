@@ -172,12 +172,24 @@ const LearnerDirectory: React.FC<LearnerDirectoryProps> = ({
   const [unlinkId, setUnlinkId] = useState<string | null>(null);
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
+  const [isUnlinking, setIsUnlinking] = useState(false);
   const [registerError, setRegisterError] = useState<string | null>(null);
 
   const handleOpenRegister = (learnerId: string) => {
     onSelect(learnerId);
     setRegisterError(null);
     setIsRegisterOpen(true);
+  };
+
+  const handleUnlinkSelectedLearner = async (learnerId: string) => {
+    setIsUnlinking(true);
+    setRegisterError(null);
+    try {
+      onSelect(learnerId);
+      await onUnlink(learnerId);
+    } finally {
+      setIsUnlinking(false);
+    }
   };
 
   const groupedData = useMemo(() => {
@@ -353,9 +365,11 @@ const LearnerDirectory: React.FC<LearnerDirectoryProps> = ({
         selectedLearnerId={selectedId}
         readerValue={activeRfid}
         isSubmitting={isRegistering}
+        isUnlinking={isUnlinking}
         errorMessage={registerError}
         onClose={() => {
           if (isRegistering) return;
+          if (isUnlinking) return;
           setRegisterError(null);
           setIsRegisterOpen(false);
         }}
@@ -372,6 +386,7 @@ const LearnerDirectory: React.FC<LearnerDirectoryProps> = ({
           setIsRegistering(false);
           setIsRegisterOpen(false);
         }}
+        onUnlinkLearner={handleUnlinkSelectedLearner}
       />
 
       <ConfirmationModal

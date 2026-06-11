@@ -10,9 +10,11 @@ interface LearnerRegistrationModalProps {
   selectedLearnerId?: string | null;
   readerValue: string;
   isSubmitting?: boolean;
+  isUnlinking?: boolean;
   errorMessage?: string | null;
   onClose: () => void;
   onSubmit: (value: RegisterLearnerPayload) => Promise<void> | void;
+  onUnlinkLearner?: (learnerId: string) => Promise<void> | void;
 }
 
 const formatLearnerLabel = (learner: Learner) => {
@@ -28,9 +30,11 @@ export default function LearnerRegistrationModal({
   selectedLearnerId = null,
   readerValue,
   isSubmitting = false,
+  isUnlinking = false,
   errorMessage = null,
   onClose,
   onSubmit,
+  onUnlinkLearner,
 }: LearnerRegistrationModalProps) {
   const [form, setForm] = useState<RegisterLearnerPayload>({
     learnerId: selectedLearnerId || learners[0]?.id || '',
@@ -144,6 +148,23 @@ export default function LearnerRegistrationModal({
                 </div>
               )}
             </div>
+
+            {selectedLearner && selectedLearner.rfid ? (
+              <div className="flex flex-wrap items-center justify-between gap-3 px-1">
+                <p className="text-[11px] text-gray-500">
+                  Current RFID: <span className="font-semibold text-gray-700">{selectedLearner.rfid}</span>
+                </p>
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-2 rounded-md border border-[#f4cfd6] bg-white px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-[#b4233d] transition hover:bg-[#fff4f6] disabled:cursor-not-allowed disabled:opacity-60"
+                  onClick={() => onUnlinkLearner?.(selectedLearner.id)}
+                  disabled={isSubmitting || isUnlinking}
+                >
+                  <span className="material-symbols-outlined text-[16px] leading-none">link_off</span>
+                  {isUnlinking ? 'Unlinking...' : 'Unlink RFID'}
+                </button>
+              </div>
+            ) : null}
           </div>
 
           {errorMessage ? <p className="attendance-manual-modal__error">{errorMessage}</p> : null}
