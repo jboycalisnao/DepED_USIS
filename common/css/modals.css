@@ -115,6 +115,11 @@
   line-height: 1.7;
 }
 
+.usis-portal-gate__icon {
+  font-size: 2.6rem;
+  color: var(--deped-blue);
+}
+
 .modal-dialog__actions,
 .alert-modal__actions {
   display: flex;

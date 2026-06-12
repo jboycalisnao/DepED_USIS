@@ -18,6 +18,7 @@ interface UsisPortalGateProps {
 export function UsisPortalGate({ moduleKey }: UsisPortalGateProps) {
   const [config, setConfig] = useState<PortalGateConfig | null>(null);
   const allowPortalGateBypass = import.meta.env.VITE_ALLOW_PORTAL_GATE_BYPASS === 'true';
+  const iconName = String(config?.icon_name || 'construction').trim() || 'construction';
 
   useEffect(() => {
     if (allowPortalGateBypass) {
@@ -69,8 +70,8 @@ export function UsisPortalGate({ moduleKey }: UsisPortalGateProps) {
         </div>
         <div className="modal-dialog__body">
           <div style={{ display: 'grid', justifyItems: 'center', textAlign: 'center', gap: '8px' }}>
-            <span className="material-symbols-outlined" aria-hidden="true" style={{ fontSize: '2rem' }}>
-              {config.icon_name || 'construction'}
+            <span className="material-symbols-outlined usis-portal-gate__icon" aria-hidden="true">
+              {iconName}
             </span>
             <p>{config.body_text}</p>
           </div>
