@@ -74,7 +74,7 @@ export function UsisLoginModal({
           .limit(1)
           .maybeSingle();
         if (!isMounted || error || !data) return;
-        const isBlocked = Boolean(data.is_enabled && data.mode !== 'live');
+        const isBlocked = Boolean(!data.is_enabled || data.mode !== 'live');
         setIsPortalBlocked(isBlocked);
       } catch {
         if (isMounted) setIsPortalBlocked(false);

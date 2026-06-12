@@ -90,7 +90,7 @@ export function VerificationAddressSection({
         <span>{permanentPreview || existingPermanentAddress || '--'}</span>
       </div>
 
-      <label className="choice-row registrar-public-enrollment__same-address">
+      <label className="choice-row registrar-public-enrollment__same-address enrollment-public-enrollment__choice-box">
         <input type="checkbox" checked={sameAsPermanent} onChange={(event) => setSameAsPermanent(event.target.checked)} />
         <span>Current address is same as permanent address.</span>
       </label>

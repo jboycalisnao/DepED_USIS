@@ -51,7 +51,7 @@ export function UsisPortalGate({ moduleKey }: UsisPortalGateProps) {
   }, [allowPortalGateBypass, moduleKey]);
 
   const shouldBlock = useMemo(
-    () => !allowPortalGateBypass && Boolean(config?.is_enabled && config.mode !== 'live'),
+    () => !allowPortalGateBypass && Boolean(config && (!config.is_enabled || config.mode !== 'live')),
     [allowPortalGateBypass, config],
   );
 

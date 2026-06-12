@@ -69,7 +69,19 @@ type Props = {
   deviceOptions: string[];
 };
 
-const inputClassName = 'w-full min-h-[56px] rounded-[12px] border border-surfaceVariant bg-white px-4 text-[14px] outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10 disabled:cursor-not-allowed disabled:bg-surface';
+const inputClassName = 'w-full min-h-[64px] rounded-[12px] border border-surfaceVariant bg-white px-4 text-[16px] outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10 disabled:cursor-not-allowed disabled:bg-surface';
+
+const buildPreviousSchoolYearOptions = (schoolYear: string, count = 5) => {
+  const match = String(schoolYear || '').trim().match(/^(\d{4})-(\d{4})$/);
+  if (!match) return [];
+  const start = Number(match[1]);
+  const end = Number(match[2]);
+  if (end - start !== 1) return [];
+  return Array.from({ length: count }, (_, index) => {
+    const optionStart = start - (index + 1);
+    return { value: `${optionStart}-${optionStart + 1}`, label: `${optionStart}-${optionStart + 1}` };
+  });
+};
 
 function Field({
   label,
@@ -90,9 +102,10 @@ function Field({
   maxLength?: number;
   pattern?: string;
 }) {
+  const hasValue = Boolean(String(value || '').trim());
   return (
     <label className="floating-field">
-      <div className="floating-field__control">
+      <div className="floating-field__control" data-has-value={hasValue ? 'true' : 'false'}>
         <input value={value} onChange={(event) => onChange(event.target.value)} placeholder=" " type={type} disabled={disabled} inputMode={inputMode} maxLength={maxLength} pattern={pattern} className={inputClassName} />
         <span>{label}</span>
       </div>
@@ -116,7 +129,7 @@ function SelectField({
   return (
     <UsisSearchableSelect
       ariaLabel={label}
-      label={label}
+      label="Previous SY"
       floatingLabel
       showLabel={false}
       value={value}
@@ -124,6 +137,37 @@ function SelectField({
       disabled={disabled}
       options={options.map((option) => ({ value: option, label: option }))}
       forceInlineMenu
+    />
+  );
+}
+
+function SchoolYearField({
+  label,
+  value,
+  onChange,
+  schoolYear,
+  disabled = false,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  schoolYear: string;
+  disabled?: boolean;
+}) {
+  const options = buildPreviousSchoolYearOptions(schoolYear, 5);
+  return (
+    <UsisSearchableSelect
+      ariaLabel={label}
+      label={label}
+      floatingLabel
+      showLabel={false}
+      value={value}
+      onChange={onChange}
+      disabled={disabled || options.length === 0}
+      options={options}
+      forceInlineMenu
+      placeholder="Search previous school year"
+      allowCustomValue={false}
     />
   );
 }
@@ -159,7 +203,7 @@ export function InformationVerificationFormSections({
           <SelectField label="Learner Category" value={draft.learnerCategory} onChange={(value) => onFieldChange('learnerCategory', value)} options={learnerCategoryOptions} disabled={contextLocked} />
           <Field label="School to Enroll" value={draft.schoolToEnroll} onChange={(value) => onFieldChange('schoolToEnroll', value)} disabled={contextLocked} />
           <Field label="Previous School Attended" value={draft.previousSchool} onChange={(value) => onFieldChange('previousSchool', value)} disabled={contextLocked} />
-          <Field label="Last S.Y. Attended" value={draft.previousSchoolYear} onChange={(value) => onFieldChange('previousSchoolYear', value)} disabled={contextLocked} />
+          <SchoolYearField label="Last S.Y. Attended" value={draft.previousSchoolYear} onChange={(value) => onFieldChange('previousSchoolYear', value)} schoolYear={draft.schoolYear} disabled={contextLocked} />
           <SelectField label="Last Grade Level Attended" value={draft.lastGradeLevel} onChange={(value) => onFieldChange('lastGradeLevel', value)} options={['Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7', 'Grade 8', 'Grade 9', 'Grade 10', 'Grade 11', 'Grade 12']} disabled={contextLocked} />
           <SelectField label="Grade Level to Enroll" value={draft.gradeToEnroll} onChange={(value) => onFieldChange('gradeToEnroll', value)} options={gradeToEnrollOptions} disabled={contextLocked} />
           <SelectField label="Track" value={draft.track} onChange={(value) => onFieldChange('track', value)} options={trackOptions} disabled={contextLocked || !isSeniorHighTargetGrade} />

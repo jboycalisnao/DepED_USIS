@@ -49,12 +49,12 @@ export const buildInitialEnrollmentDraft = (schoolYear = ''): EnrollmentDraft =>
   birthDate: '',
   height: '',
   weight: '',
-  gender: 'Male',
+  gender: '',
   placeOfBirth: '',
   learnerContact: '',
   motherTongue: '',
-  religion: 'Roman Catholic',
-  is4Ps: 'No',
+  religion: '',
+  is4Ps: '',
   fourPsHouseholdId: '',
   currentAddress: '',
   permanentAddress: '',
@@ -84,6 +84,32 @@ export const isValidMobileNumber = (value: string) => {
   const normalized = digitsOnly(String(value || '').trim());
   if (!normalized) return true;
   return /^09\d{9}$/.test(normalized);
+};
+
+export const parseGuidedDateInput = (value: string) => {
+  const normalized = String(value || '').trim();
+  if (!normalized) return null;
+  const isoMatch = normalized.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (isoMatch) {
+    const parsed = new Date(Number(isoMatch[1]), Number(isoMatch[2]) - 1, Number(isoMatch[3]));
+    if (
+      parsed.getFullYear() === Number(isoMatch[1]) &&
+      parsed.getMonth() === Number(isoMatch[2]) - 1 &&
+      parsed.getDate() === Number(isoMatch[3])
+    ) {
+      return parsed;
+    }
+    return null;
+  }
+  const digits = normalized.replace(/\D/g, '');
+  if (digits.length !== 8) return null;
+  const month = Number(digits.slice(0, 2));
+  const day = Number(digits.slice(2, 4));
+  const year = Number(digits.slice(4, 8));
+  if (!month || !day || !year) return null;
+  const parsed = new Date(year, month - 1, day);
+  if (parsed.getFullYear() !== year || parsed.getMonth() !== month - 1 || parsed.getDate() !== day) return null;
+  return parsed;
 };
 
 export const depedSchoolToOption = (record: any): SchoolDirectoryEntry | null => {
@@ -162,6 +188,24 @@ export const normalizeSchoolYearPair = (startYear: string, endYear: string) => {
   return `${startYear}-${endYear}`;
 };
 
+export const parseSchoolYearStart = (schoolYear: string) => {
+  const match = String(schoolYear || '').trim().match(/^(\d{4})-(\d{4})$/);
+  if (!match) return null;
+  if (Number(match[2]) - Number(match[1]) !== 1) return null;
+  return Number(match[1]);
+};
+
+export const buildPreviousSchoolYearOptions = (schoolYear: string, count = 5) => {
+  const currentStart = parseSchoolYearStart(schoolYear);
+  if (currentStart == null) return [];
+  return Array.from({ length: count }, (_, index) => {
+    const start = currentStart - (index + 1);
+    const end = start + 1;
+    const label = `${start}-${end}`;
+    return { value: label, label };
+  });
+};
+
 export const validateCommonFields = (
   draft: EnrollmentDraft,
   gradeLevelOrder: Array<{ label: string; value: number }>
@@ -172,9 +216,10 @@ export const validateCommonFields = (
   if (trimmedBirthCert && !/^\d{12}$/.test(trimmedBirthCert)) return 'PSA Birth Certificate No. must be exactly 12 digits.';
   if (!isValidEmailAddress(draft.email)) return 'Email Address must contain @ and a valid domain.';
   if (draft.birthDate) {
-    const birthDate = new Date(draft.birthDate);
+    const birthDate = parseGuidedDateInput(draft.birthDate);
     const now = new Date();
-    if (!Number.isNaN(birthDate.getTime()) && birthDate > now) return 'Date of Birth cannot be in the future.';
+    if (!birthDate) return 'Date of Birth must use mm/dd/yyyy.';
+    if (birthDate > now) return 'Date of Birth cannot be in the future.';
   }
   for (const entry of [
     { label: "Learner's Contact Number", value: draft.learnerContact },

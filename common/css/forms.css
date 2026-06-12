@@ -41,7 +41,7 @@
 
 .floating-field {
   display: grid;
-  gap: 8px;
+  gap: 6px;
   text-transform: none;
 }
 
@@ -54,16 +54,83 @@
   position: relative;
 }
 
-.floating-field__control input,
-.floating-field__control select,
-.floating-field__control textarea {
+.floating-field__guided-entry {
   width: 100%;
+  min-height: 64px;
   padding: 24px 16px 10px;
   border: 1px solid rgba(18, 35, 61, 0.14);
   border-radius: 0.375rem;
   background: #fbfcff;
   color: var(--deped-ink);
   text-transform: none;
+  font-size: 16px;
+  line-height: 1.35;
+  outline: none;
+  transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  font-variant-numeric: tabular-nums;
+  cursor: text;
+  caret-color: var(--deped-ink);
+}
+
+.floating-field__control--guided[data-disabled="true"] .floating-field__guided-entry {
+  background: #e8edf5;
+  border-color: rgba(18, 35, 61, 0.22);
+  color: #6c7688;
+  cursor: not-allowed;
+  box-shadow: none;
+  caret-color: transparent;
+}
+
+.floating-field__control--guided[data-disabled="true"] .floating-field__guided-typed,
+.floating-field__control--guided[data-disabled="true"] .floating-field__guided-remaining {
+  color: #6c7688;
+}
+
+.floating-field__control--guided[data-disabled="true"] .floating-field__guided-remaining {
+  color: rgba(108, 118, 136, 0.42);
+}
+
+.floating-field__guided-entry:focus {
+  border-color: rgba(0, 56, 168, 0.44);
+  box-shadow: 0 0 0 4px rgba(0, 56, 168, 0.08);
+  transform: translateY(-1px);
+}
+
+.floating-field__guided-typed,
+.floating-field__guided-remaining {
+  display: inline-block;
+  line-height: 1.35;
+  white-space: pre;
+  font-variant-numeric: tabular-nums;
+}
+
+.floating-field__guided-typed {
+  color: var(--deped-ink);
+  min-width: 1px;
+}
+
+.floating-field__guided-remaining {
+  color: rgba(108, 118, 136, 0.42);
+}
+
+.floating-field__control input,
+.floating-field__control select,
+.floating-field__control textarea {
+  width: 100%;
+  min-height: 64px;
+  padding: 24px 16px 10px;
+  border: 1px solid rgba(18, 35, 61, 0.14);
+  border-radius: 0.375rem;
+  background: #fbfcff;
+  color: var(--deped-ink);
+  text-transform: none;
+  font-size: 16px;
+  line-height: 1.35;
   outline: none;
   transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
 }
@@ -75,20 +142,46 @@
 .floating-field__control textarea {
   min-height: 132px;
   resize: vertical;
+  padding-top: 24px;
+}
+
+.floating-field__control input::placeholder,
+.floating-field__control select::placeholder,
+.floating-field__control textarea::placeholder {
+  color: transparent;
+  opacity: 1;
 }
 
 .floating-field__control > span {
   position: absolute;
   top: 50%;
   left: 16px;
+  right: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 2px;
+  width: auto;
+  max-width: calc(100% - 48px);
+  margin: 0;
+  padding: 0;
+  background: transparent;
   color: var(--deped-muted);
   font-size: var(--usis-body-size);
   font-weight: 400;
-  text-transform: none;
+  line-height: 1;
+  z-index: 3;
   pointer-events: none;
-  transform: translateY(-50%);
-  transform-origin: left top;
-  transition: transform 180ms ease, top 180ms ease, color 180ms ease, font-size 180ms ease;
+  transform: translateY(calc(-50% - 1px)) scale(1);
+  transform-origin: left center;
+  will-change: transform, top, color;
+  transition: top 220ms cubic-bezier(0.2, 0.8, 0.2, 1), color 180ms ease, transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1), font-size 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  white-space: normal;
+  overflow: hidden;
+  text-overflow: clip;
+  overflow-wrap: anywhere;
+  max-height: 2.6em;
+  text-transform: none;
 }
 
 .floating-field__password-toggle {
@@ -126,19 +219,40 @@
 }
 
 .floating-field__control input:focus + span,
-.floating-field__control select:focus + span,
 .floating-field__control textarea:focus + span,
-.floating-field__control input:focus ~ span,
+.floating-field__control select:focus + span,
 .floating-field__control input:not(:placeholder-shown) + span,
 .floating-field__control textarea:not(:placeholder-shown) + span,
+.floating-field__control select:not(:placeholder-shown) + span,
+.floating-field__control input[data-has-value="true"] + span,
+.floating-field__control textarea[data-has-value="true"] + span,
 .floating-field__control select[data-has-value="true"] + span,
-.floating-field__control input[data-has-value="true"] ~ span {
-  top: 11px;
+.floating-field__control input:focus ~ span,
+.floating-field__control textarea:focus ~ span,
+.floating-field__control select:focus ~ span,
+.floating-field__control input:not(:placeholder-shown) ~ span,
+.floating-field__control textarea:not(:placeholder-shown) ~ span,
+.floating-field__control select:not(:placeholder-shown) ~ span,
+.floating-field__control input[data-has-value="true"] ~ span,
+.floating-field__control textarea[data-has-value="true"] ~ span,
+.floating-field__control select[data-has-value="true"] ~ span {
   color: var(--deped-blue);
-  font-size: var(--usis-helper-size);
+  font-size: 16px;
   font-weight: 400;
   text-transform: none;
-  transform: translateY(0);
+  top: 10px;
+  transform: translateY(0) scale(0.82);
+}
+
+.floating-field__control--guided:focus-within > span,
+.floating-field__control--guided[data-has-value="true"] > span {
+  top: 7px;
+  transform: translateY(0) scale(0.82);
+  color: var(--deped-blue);
+}
+
+.floating-field__control--guided[data-disabled="true"] > span {
+  color: #7d889a;
 }
 
 .floating-field__control input:disabled,
@@ -255,30 +369,39 @@
   position: absolute;
   top: 50%;
   left: 14px;
-  display: inline-flex;
+  right: 44px;
+  bottom: auto;
+  display: flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 2px;
-  max-width: calc(100% - 28px);
-  padding: 0 4px;
-  background: #fff;
+  width: auto;
+  max-width: none;
+  padding: 0;
+  background: transparent;
   color: var(--deped-muted);
-  font-size: var(--usis-body-size);
+  font-size: 16px;
   font-weight: 400;
   line-height: 1.2;
   z-index: 3;
   pointer-events: none;
-  transform: translateY(-50%);
-  transform-origin: left top;
-  transition: top 180ms ease, color 180ms ease, transform 180ms ease, font-size 180ms ease;
-  white-space: nowrap;
+  transform: translateY(-50%) scale(1);
+  transform-origin: left center;
+  will-change: transform, top, color;
+  transition: top 220ms cubic-bezier(0.2, 0.8, 0.2, 1), color 180ms ease, transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  white-space: normal;
   overflow: hidden;
-  text-overflow: ellipsis;
+  text-overflow: clip;
+  overflow-wrap: anywhere;
+  max-height: 2.6em;
 }
 
 .searchable-select--floating .floating-field__control > .searchable-select__floating-label .searchable-select__label-text {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .searchable-select--floating .floating-field__control > .searchable-select__floating-label .searchable-select__required-marker {
@@ -289,15 +412,19 @@
 .searchable-select--floating .floating-field__control input:focus ~ .searchable-select__floating-label,
 .searchable-select--floating .floating-field__control input:not(:placeholder-shown) ~ .searchable-select__floating-label,
 .searchable-select--floating .floating-field__control input[data-has-value="true"] ~ .searchable-select__floating-label {
-  top: 11px;
+  top: 10px;
   color: var(--deped-blue);
-  font-size: var(--usis-helper-size);
-  transform: translateY(0);
+  font-size: 16px;
+  transform: translateY(0) scale(0.82);
 }
 
 .searchable-select--floating .floating-field__control input {
-  padding-top: 26px;
-  padding-bottom: 10px;
+  padding-top: 34px;
+  padding-bottom: 8px;
+}
+
+.searchable-select--floating .floating-field__control {
+  min-height: 64px;
 }
 
 .searchable-select--floating .floating-field__control input:focus ~ .searchable-select__floating-label .searchable-select__required-marker,
@@ -310,16 +437,18 @@
   display: inline-flex;
   align-items: center;
   gap: 2px;
-  white-space: nowrap;
+  white-space: normal;
   overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: calc(100% - 64px);
+  text-overflow: clip;
+  max-width: calc(100% - 44px);
 }
 
 .searchable-select--floating .floating-field__control > span.searchable-select__label .searchable-select__label-text {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .searchable-select__field {
@@ -375,7 +504,7 @@
   padding: 14px 16px;
   border-right: 0;
   border-radius: 0.375rem 0 0 0.375rem;
-  font-size: var(--usis-body-size);
+  font-size: 16px;
   line-height: 1.35;
   outline: none;
 }
@@ -458,7 +587,7 @@
 .searchable-select__empty {
   width: 100%;
   padding: 12px 14px;
-  font-size: 14px;
+  font-size: 16px;
   line-height: 1.35;
   text-align: left;
 }
@@ -494,6 +623,9 @@
 }
 
 .usis-date-time-picker__control input {
+  min-height: 64px;
+  padding-top: 34px;
+  padding-bottom: 8px;
   padding-right: 52px;
 }
 
@@ -535,25 +667,36 @@
   pointer-events: none;
 }
 
+.usis-date-time-picker__control input::placeholder {
+  color: #8b95a6;
+  opacity: 1;
+}
+
 .usis-date-time-picker__floating-label {
   position: absolute;
   top: 50%;
   left: 16px;
+  right: 48px;
+  bottom: auto;
   color: var(--deped-muted);
   font-size: var(--usis-body-size);
   font-weight: 400;
+  line-height: 1.2;
   pointer-events: none;
-  transform: translateY(-50%);
-  transform-origin: left top;
-  transition: transform 180ms ease, top 180ms ease, color 180ms ease, font-size 180ms ease;
+  display: flex;
+  align-items: center;
+  transform: translateY(-50%) scale(1);
+  transform-origin: left center;
+  will-change: transform, top, color;
+  transition: top 220ms cubic-bezier(0.2, 0.8, 0.2, 1), transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1), color 180ms ease;
 }
 
 .usis-date-time-picker__control input:focus + .usis-date-time-picker__floating-label,
 .usis-date-time-picker__control input[data-has-value="true"] + .usis-date-time-picker__floating-label {
-  top: 11px;
+  top: 6px;
   color: var(--deped-blue);
-  font-size: var(--usis-helper-size);
-  transform: translateY(0);
+  font-size: 16px;
+  transform: translateY(0) scale(0.82);
 }
 
 .usis-date-time-picker__trigger {
@@ -584,7 +727,9 @@
 
 .usis-date-time-picker__icon {
   color: currentColor;
-  font-size: 20px;
+  display: block;
+  width: 20px;
+  height: 20px;
   line-height: 1;
 }
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 interface UsisDateTimePickerProps {
@@ -10,6 +10,8 @@ interface UsisDateTimePickerProps {
   min?: string;
   mode?: 'date' | 'time' | 'datetime-local';
   onChange: (value: string) => void;
+  required?: boolean;
+  helperText?: string;
   showLabel?: boolean;
   step?: number;
   value: string;
@@ -17,6 +19,24 @@ interface UsisDateTimePickerProps {
 
 const WEEK_DAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+const CalendarIcon = () => (
+  <svg className="usis-date-time-picker__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+    <path
+      d="M7 2v2H5a2 2 0 0 0-2 2v2h18V6a2 2 0 0 0-2-2h-2V2h-2v2H9V2H7Zm12 8H5v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V10Zm-2 2v8H7v-8h10Zm-6 2H9v2h2v-2Z"
+      fill="currentColor"
+    />
+  </svg>
+);
+
+const TimeIcon = () => (
+  <svg className="usis-date-time-picker__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+    <path
+      d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm1 5v5.2l4 2.4-1 1.6-5-3V7Z"
+      fill="currentColor"
+    />
+  </svg>
+);
 
 const formatDateValue = (date: Date) => {
   const year = date.getFullYear();
@@ -32,6 +52,38 @@ const formatDateDisplay = (value: string) => {
   const day = `${parsed.getDate()}`.padStart(2, '0');
   const year = parsed.getFullYear();
   return `${month}/${day}/${year}`;
+};
+
+const formatGuidedDateInput = (value: string) => {
+  const digits = String(value || '').replace(/\D/g, '').slice(0, 8);
+  if (!digits) return '';
+  const parts: string[] = [];
+  if (digits.length <= 2) {
+    parts.push(digits);
+  } else if (digits.length <= 4) {
+    parts.push(digits.slice(0, 2), digits.slice(2));
+  } else {
+    parts.push(digits.slice(0, 2), digits.slice(2, 4), digits.slice(4));
+  }
+  return parts.join('/');
+};
+
+const parseGuidedDateValue = (value: string) => {
+  const digits = String(value || '').replace(/\D/g, '');
+  if (digits.length !== 8) return null;
+  const month = Number(digits.slice(0, 2));
+  const day = Number(digits.slice(2, 4));
+  const year = Number(digits.slice(4, 8));
+  if (!month || !day || !year) return null;
+  const parsed = new Date(year, month - 1, day);
+  if (
+    parsed.getFullYear() !== year ||
+    parsed.getMonth() !== month - 1 ||
+    parsed.getDate() !== day
+  ) {
+    return null;
+  }
+  return parsed;
 };
 
 const parseDateValue = (value: string) => {
@@ -50,25 +102,37 @@ export function UsisDateTimePicker({
   min,
   mode = 'date',
   onChange,
+  required = false,
+  helperText,
   showLabel = false,
   step,
   value,
 }: UsisDateTimePickerProps) {
+  const inputId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
   const controlRef = useRef<HTMLDivElement>(null);
   const monthYearPanelRef = useRef<HTMLDivElement>(null);
-  const hasValue = Boolean(value?.trim());
   const fieldLabel = label || ariaLabel;
   const useCustomCalendar = mode === 'date';
   const [isOpen, setIsOpen] = useState(false);
   const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
   const [popoverPosition, setPopoverPosition] = useState<{ left: number; top: number }>({ left: 0, top: 0 });
+  const [guidedInputValue, setGuidedInputValue] = useState(() => (useCustomCalendar ? formatDateDisplay(value) : value));
 
   const selectedDate = useMemo(() => parseDateValue(value), [value]);
-  const displayValue = useMemo(() => (useCustomCalendar ? formatDateDisplay(value) : value), [useCustomCalendar, value]);
   const [viewDate, setViewDate] = useState(() => selectedDate || new Date());
+  const displayValue = useMemo(
+    () => (useCustomCalendar ? guidedInputValue : value),
+    [guidedInputValue, useCustomCalendar, value]
+  );
+  const hasValue = Boolean(String(displayValue || '').trim());
+
+  useEffect(() => {
+    if (!useCustomCalendar) return;
+    setGuidedInputValue(formatDateDisplay(value));
+  }, [useCustomCalendar, value]);
 
   useEffect(() => {
     if (selectedDate) setViewDate(selectedDate);
@@ -182,6 +246,7 @@ export function UsisDateTimePicker({
   const selectDate = (date: Date) => {
     if (isDisabledDate(date)) return;
     onChange(formatDateValue(date));
+    setGuidedInputValue(formatDateDisplay(formatDateValue(date)));
     setIsOpen(false);
   };
 
@@ -201,12 +266,27 @@ export function UsisDateTimePicker({
         <div className="floating-field__control usis-date-time-picker__control" ref={controlRef}>
           <input
             aria-label={ariaLabel}
+            aria-required={required || undefined}
+            aria-describedby={helperText ? `${inputId}-helper` : undefined}
             data-has-value={hasValue ? 'true' : 'false'}
             disabled={disabled}
             max={max}
             min={min}
+            required={required}
             onChange={(event) => {
-              if (useCustomCalendar) return;
+              if (useCustomCalendar) {
+                const nextValue = formatGuidedDateInput(event.target.value);
+                setGuidedInputValue(nextValue);
+                if (!nextValue) {
+                  onChange('');
+                  return;
+                }
+                const parsed = parseGuidedDateValue(nextValue);
+                if (parsed && !isDisabledDate(parsed)) {
+                  onChange(formatDateValue(parsed));
+                }
+                return;
+              }
               onChange(event.target.value);
             }}
             onFocus={() => {
@@ -221,7 +301,9 @@ export function UsisDateTimePicker({
             }}
             placeholder=" "
             ref={inputRef}
-            readOnly={useCustomCalendar}
+            readOnly={false}
+            inputMode={useCustomCalendar ? 'numeric' : undefined}
+            pattern={useCustomCalendar ? '\\d{2}/\\d{2}/\\d{4}' : undefined}
             step={step}
             type={useCustomCalendar ? 'text' : mode}
             value={displayValue}
@@ -234,9 +316,7 @@ export function UsisDateTimePicker({
             aria-label={`Open ${fieldLabel}`}
             disabled={disabled}
           >
-            <i className="material-symbols-outlined usis-date-time-picker__icon" aria-hidden="true">
-              {mode === 'time' ? 'schedule' : 'calendar_today'}
-            </i>
+            {mode === 'time' ? <TimeIcon /> : <CalendarIcon />}
           </button>
 
           {useCustomCalendar && isOpen && typeof document !== 'undefined'
@@ -369,7 +449,7 @@ export function UsisDateTimePicker({
                   Today
                 </button>
               </div>
-            </div>,
+              </div>,
             document.body,
           ) : null}
         </div>

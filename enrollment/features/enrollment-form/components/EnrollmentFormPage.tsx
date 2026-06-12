@@ -33,27 +33,28 @@ import {
   initialDraft,
   LEON_NHS_ID,
   LEON_NHS_NAME,
-  normalizeSchoolYearPair,
   SAME_SCHOOL_LABEL,
+  buildPreviousSchoolYearOptions,
   type AddressSelection,
   type SchoolDirectoryEntry,
   uniqueSchoolEntries,
   validateCommonFields,
 } from '../utils/enrollmentFormUtils';
-import { DateField, SelectField, TextField } from './form/FormFields';
+import { DateField, SchoolYearField, SelectField, TextField } from './form/FormFields';
 import UsisPageLoader from '../../../../common/components/UsisPageLoader';
 import { EnrollmentAnnouncementsModal } from '../../../../common/components/enrollment/EnrollmentAnnouncementsModal';
 import { useEnrollmentAnnouncements } from '../../portal/hooks/useEnrollmentAnnouncements';
 import { buildDuplicateEnrollmentSubmissionMessage, findDuplicateEnrollmentSubmission } from '../services/publicEnrollmentSubmissions';
 import { fetchEnrollmentSchoolYear } from '../../../lib/enrollmentSchoolYear';
 
-const gradeLevelOrder = gradeLevelOptions.map((level) => ({ label: level, value: Number(level.replace(/\D/g, '')) }));
-const SHS_GRADES = new Set(['Grade 11', 'Grade 12']);
-const ACADEMIC_TRACK_STRANDS = ['STEM', 'HUMSS', 'ABM', 'ALS'].map((strand) => ({ value: strand, label: strand }));
-const TECHPRO_TRACK_LABEL = 'TechPro Track';
-const TECHPRO_STRAND_LABEL = 'Technical Vocational Strand';
-const MOTHER_TONGUE_OPTIONS = ['Kinaray-a', 'Hiligaynon', 'Bisaya', 'Tagalog', 'English'];
-const getNextGradeLevel = (gradeLevel: string) => {
+  const gradeLevelOrder = gradeLevelOptions.map((level) => ({ label: level, value: Number(level.replace(/\D/g, '')) }));
+  const SHS_GRADES = new Set(['Grade 11', 'Grade 12']);
+  const ACADEMIC_TRACK_STRANDS = ['STEM', 'HUMSS', 'ABM', 'ALS'].map((strand) => ({ value: strand, label: strand }));
+  const TECHPRO_TRACK_LABEL = 'TechPro Track';
+  const TECHPRO_STRAND_LABEL = 'Technical Vocational Strand';
+  const MOTHER_TONGUE_OPTIONS = ['Kinaray-a', 'Hiligaynon', 'Bisaya', 'Tagalog', 'English'];
+  const NON_SAME_SCHOOL_LEARNER_CATEGORY = learnerCategoryOptions.find((option) => option !== SAME_SCHOOL_LABEL) || learnerCategoryOptions[0];
+  const getNextGradeLevel = (gradeLevel: string) => {
   const current = gradeLevelOrder.find((entry) => entry.label === gradeLevel);
   if (!current) return '';
   const next = gradeLevelOrder.find((entry) => entry.value === current.value + 1);
@@ -75,6 +76,7 @@ export function EnrollmentFormPage() {
   const [formAvailabilityMessage, setFormAvailabilityMessage] = useState<string>('The online enrollment form is currently unavailable.');
   const [isFormAvailabilityLoading, setIsFormAvailabilityLoading] = useState(true);
   const [isSchoolYearLoading, setIsSchoolYearLoading] = useState(true);
+  const [isEnrollmentPortalBlocked, setIsEnrollmentPortalBlocked] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [previousSchoolOptions, setPreviousSchoolOptions] = useState<SchoolDirectoryEntry[]>([]);
   const [previousSchoolQuery, setPreviousSchoolQuery] = useState('');
@@ -181,9 +183,11 @@ export function EnrollmentFormPage() {
       setIsSchoolYearLoading(true);
       try {
         const resolvedSchoolYear = await fetchEnrollmentSchoolYear();
+        const defaultPreviousSchoolYear = buildPreviousSchoolYearOptions(resolvedSchoolYear.label, 1)[0]?.label || '';
         setDraft((current) => ({
           ...current,
           schoolYear: resolvedSchoolYear.label,
+          previousSchoolYear: current.previousSchoolYear || defaultPreviousSchoolYear,
           schoolId: LEON_NHS_ID,
           schoolToEnroll: LEON_NHS_NAME,
         }));
@@ -192,6 +196,30 @@ export function EnrollmentFormPage() {
       }
     };
     void loadActiveSchoolYear();
+  }, []);
+
+  useEffect(() => {
+    const loadPortalGate = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('ia_portal_controls')
+          .select('is_enabled,mode')
+          .eq('module_key', 'enrollment')
+          .limit(1)
+          .maybeSingle();
+
+        if (error || !data) {
+          setIsEnrollmentPortalBlocked(false);
+          return;
+        }
+
+        setIsEnrollmentPortalBlocked(Boolean(data.is_enabled && data.mode !== 'live'));
+      } catch {
+        setIsEnrollmentPortalBlocked(false);
+      }
+    };
+
+    void loadPortalGate();
   }, []);
 
   useEffect(() => {
@@ -265,12 +293,13 @@ export function EnrollmentFormPage() {
           setDraft((current) => ({
             ...buildInitialEnrollmentDraft(current.schoolYear),
             schoolYear: current.schoolYear,
+            previousSchoolYear: current.previousSchoolYear,
             schoolId: current.schoolId || LEON_NHS_ID,
             schoolToEnroll: current.schoolToEnroll || LEON_NHS_NAME,
             lrn: normalizedLrn,
             studentType: 'New Student',
-            learnerCategory: SAME_SCHOOL_LABEL,
-            previousSchool: LEON_NHS_NAME,
+            learnerCategory: NON_SAME_SCHOOL_LEARNER_CATEGORY,
+            previousSchool: '',
           }));
           return;
         }
@@ -316,7 +345,7 @@ export function EnrollmentFormPage() {
           birthDate: data.birth_date ? String(data.birth_date) : String(submissionPayload.birthDate || current.birthDate || ''),
           height: String(submissionPayload.height || current.height || ''),
           weight: String(submissionPayload.weight || current.weight || ''),
-          gender: String(data.gender || submissionPayload.gender || current.gender || 'Male'),
+          gender: String(data.gender || submissionPayload.gender || current.gender || ''),
           placeOfBirth: String(submissionPayload.placeOfBirth || current.placeOfBirth || ''),
           motherTongue: String(submissionPayload.motherTongue || current.motherTongue || ''),
           religion: String(submissionPayload.religion || current.religion || ''),
@@ -327,7 +356,7 @@ export function EnrollmentFormPage() {
           fatherContact: String(submissionPayload.fatherContact || current.fatherContact || ''),
           motherContact: String(submissionPayload.motherContact || current.motherContact || ''),
           guardianContact: String(submissionPayload.guardianContact || current.guardianContact || ''),
-          is4Ps: data.is_4ps ? 'Yes' : String(submissionPayload.is4Ps || current.is4Ps || 'No'),
+          is4Ps: data.is_4ps ? 'Yes' : String(submissionPayload.is4Ps || current.is4Ps || ''),
           fourPsHouseholdId: String(submissionPayload.fourPsHouseholdId || current.fourPsHouseholdId || ''),
           currentAddress: String((data as any).address || submissionPayload.currentAddress || current.currentAddress || ''),
           permanentAddress: String(submissionPayload.permanentAddress || current.permanentAddress || ''),
@@ -567,6 +596,16 @@ export function EnrollmentFormPage() {
   }, [draft.studentType]);
 
   useEffect(() => {
+    if (draft.studentType !== 'New Student') return;
+    if (draft.learnerCategory !== SAME_SCHOOL_LABEL) return;
+    setDraft((current) => ({
+      ...current,
+      learnerCategory: NON_SAME_SCHOOL_LEARNER_CATEGORY,
+      previousSchool: '',
+    }));
+  }, [draft.studentType, draft.learnerCategory]);
+
+  useEffect(() => {
     if (draft.learnerCategory !== SAME_SCHOOL_LABEL) return;
     setDraft((current) => ({
       ...current,
@@ -577,37 +616,6 @@ export function EnrollmentFormPage() {
   }, [draft.learnerCategory]);
 
   const updateField = (name: keyof EnrollmentDraft, value: string | boolean) => setDraft((current) => ({ ...current, [name]: value }));
-  const handlePreviousSchoolYearChange = (value: string) => {
-    const digits = value.replace(/\D/g, '').slice(0, 8);
-    if (!digits) {
-      updateField('previousSchoolYear', '');
-      return;
-    }
-
-    const startYear = digits.slice(0, 4);
-    if (startYear.length < 4) {
-      updateField('previousSchoolYear', startYear);
-      return;
-    }
-
-    const nextYear = String(Number(startYear) + 1).padStart(4, '0');
-    const typedEndYear = digits.slice(4, 8);
-    const endYear = typedEndYear.length === 4 ? typedEndYear : nextYear;
-    const normalized = `${startYear}-${endYear}`;
-    const [start, end] = normalized.split('-');
-    const completed = normalizeSchoolYearPair(start || '', end || '');
-
-    if (completed) {
-      const [currentStart] = String(draft.schoolYear || '').split('-');
-      const currentStartNum = Number(currentStart);
-      const prevStartNum = Number(start);
-      if (!Number.isNaN(currentStartNum) && !Number.isNaN(prevStartNum) && prevStartNum >= currentStartNum) {
-        return;
-      }
-    }
-
-    updateField('previousSchoolYear', normalized);
-  };
 
   const availableGradeToEnrollOptions = useMemo(() => {
     const lastGrade = gradeLevelOrder.find((grade) => grade.label === draft.lastGradeLevel);
@@ -618,6 +626,14 @@ export function EnrollmentFormPage() {
       return Boolean(nextGrade && nextGrade.value > lastGrade.value);
     });
   }, [draft.lastGradeLevel, draft.learnerCategory, draft.studentType]);
+
+  const availableLearnerCategoryOptions = useMemo(
+    () =>
+      draft.studentType === 'New Student'
+        ? learnerCategoryOptions.filter((option) => option !== SAME_SCHOOL_LABEL)
+        : [...learnerCategoryOptions],
+    [draft.studentType],
+  );
 
   const selectedPreviousSchoolValue = useMemo(() => {
     if (draft.learnerCategory === SAME_SCHOOL_LABEL) {
@@ -805,7 +821,7 @@ export function EnrollmentFormPage() {
               <p>This form is not for sale. Revised based on DepEd enrollment template.</p>
             </header>
             <form className="portal-panel__body enrollment-public-enrollment__form" onSubmit={handleSubmit}>
-              <section className="enrollment-public-enrollment__section">
+              <section className="enrollment-public-enrollment__section enrollment-public-enrollment__lrn-validation">
                 <p style={{ margin: 0, color: 'var(--deped-muted)', fontSize: '13px' }}>
                   School to Enroll: {LEON_NHS_NAME} ({LEON_NHS_ID})
                 </p>
@@ -820,6 +836,8 @@ export function EnrollmentFormPage() {
                     inputMode="numeric"
                     maxLength={12}
                     pattern="[0-9]{12}"
+                    digitGuideLength={12}
+                    disabled={isEnrollmentPortalBlocked}
                     required
                   />
                 </div>
@@ -861,7 +879,7 @@ export function EnrollmentFormPage() {
                     label="Learner Category"
                     value={draft.learnerCategory}
                     onChange={(value) => updateField('learnerCategory', value)}
-                    options={learnerCategoryOptions as unknown as string[]}
+                    options={availableLearnerCategoryOptions as unknown as string[]}
                     disabled={draft.studentType === 'Continuing Student' || lrnLookupState.status === 'matched'}
                   />
                   <UsisSearchableSelect
@@ -886,12 +904,11 @@ export function EnrollmentFormPage() {
                         : previousSchoolOptions.map((entry) => ({ value: `${entry.schoolId}::${entry.schoolName}`, label: `${entry.schoolName} (${entry.schoolId})` }))
                     }
                   />
-                  <TextField
+                  <SchoolYearField
                     label="Last School Year Attended (Previous S.Y.)"
                     value={draft.previousSchoolYear}
-                    onChange={handlePreviousSchoolYearChange}
-                    inputMode="numeric"
-                    maxLength={9}
+                    onChange={(value) => updateField('previousSchoolYear', value)}
+                    schoolYear={draft.schoolYear}
                   />
                   <SelectField label="Last Grade Level" value={draft.lastGradeLevel} onChange={(value) => updateField('lastGradeLevel', value)} options={gradeLevelOptions as unknown as string[]} disabled={draft.studentType === 'New Student'} />
                   <SelectField label="Grade Level to Enroll" value={draft.gradeToEnroll} onChange={(value) => updateField('gradeToEnroll', value)} options={availableGradeToEnrollOptions as unknown as string[]} disabled={draft.studentType === 'New Student'} />
@@ -963,7 +980,7 @@ export function EnrollmentFormPage() {
                   <SelectField label="Barangay" value={permanentAddress.barangayName} onChange={(value) => setPermanentAddress((current) => ({ ...current, barangayName: value }))} options={permanentBarangays.map((row) => ({ value: row.name, label: row.name }))} disabled={!permanentAddress.cityCode} />
                   <TextField label="Street / Barangay / Purok" value={permanentAddress.streetLine} onChange={(value) => setPermanentAddress((current) => ({ ...current, streetLine: value }))} />
                 </div>
-                <label className="choice-row" style={{ marginTop: 12 }}>
+                <label className="choice-row enrollment-public-enrollment__choice-box" style={{ marginTop: 12 }}>
                   <input type="checkbox" checked={sameAsPermanent} onChange={(event) => setSameAsPermanent(event.target.checked)} />
                   <span>Current address is same as permanent address.</span>
                 </label>
@@ -1029,11 +1046,13 @@ export function EnrollmentFormPage() {
                 </div>
               </section>
               <section className="enrollment-public-enrollment__section enrollment-public-enrollment__consent">
-                <strong>Validate Entry</strong>
-                <label className="choice-row">
-                  <input type="checkbox" checked={draft.consent} onChange={(event) => updateField('consent', event.target.checked)} />
-                  <span>I certify that the information provided is true and correct and I authorize DepEd to process learner data in compliance with the Data Privacy Act of 2012.</span>
-                </label>
+                <div className="notice-box enrollment-public-enrollment__consent-box">
+                  <strong>Validate Entry</strong>
+                  <label className="choice-row enrollment-public-enrollment__choice-box enrollment-public-enrollment__consent-row">
+                    <input type="checkbox" checked={draft.consent} onChange={(event) => updateField('consent', event.target.checked)} />
+                    <span>I certify that the information provided is true and correct and I authorize DepEd to process learner data in compliance with the Data Privacy Act of 2012.</span>
+                  </label>
+                </div>
               </section>
               <div className="form-actions">
                 <button type="submit" className="primary-button" disabled={isSubmitting}>{isSubmitting ? 'Submitting' : 'Next'}</button>

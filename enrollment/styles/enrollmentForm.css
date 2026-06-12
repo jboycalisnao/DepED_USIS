@@ -40,10 +40,43 @@
   align-items: flex-start;
 }
 
-.enrollment-public-enrollment__consent .choice-row span {
-  color: var(--deped-muted);
+.enrollment-public-enrollment__choice-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid rgba(0, 56, 168, 0.18);
+  border-radius: 0.375rem;
+  background: #f4f8ff;
+  box-shadow: 0 1px 0 rgba(18, 35, 61, 0.03);
+}
+
+.enrollment-public-enrollment__choice-box input[type='checkbox'] {
+  margin-top: 2px;
+  inline-size: 18px;
+  block-size: 18px;
+  accent-color: var(--deped-blue);
+  flex: 0 0 18px;
+}
+
+.enrollment-public-enrollment__choice-box span {
+  color: var(--deped-ink);
   font-size: var(--usis-helper-size);
   line-height: 1.6;
+}
+
+.enrollment-public-enrollment__consent-box {
+  background: #f4f8ff;
+  border-color: rgba(0, 56, 168, 0.18);
+  box-shadow: 0 1px 0 rgba(18, 35, 61, 0.03);
+}
+
+.enrollment-public-enrollment__consent-box strong {
+  color: var(--deped-blue);
+}
+
+.enrollment-public-enrollment__consent-row {
+  margin-top: 4px;
 }
 
 .enrollment-public-enrollment .portal-panel__header p {
@@ -62,59 +95,12 @@
 .enrollment-public-enrollment .floating-field__control textarea {
   font-family: var(--deped-font) !important;
   font-weight: 400;
+  min-height: 64px;
+  box-sizing: border-box;
 }
 
-.enrollment-public-enrollment .floating-field__control span,
-.enrollment-public-enrollment .searchable-select__option,
-.enrollment-public-enrollment .searchable-select__empty,
-.enrollment-public-enrollment .searchable-select__toggle {
-  font-family: var(--deped-font) !important;
-  font-weight: 400;
-}
-
-.enrollment-public-enrollment .searchable-select__field input:disabled,
-.enrollment-public-enrollment .searchable-select__field button:disabled,
-.enrollment-public-enrollment .searchable-select--floating .floating-field__control input:disabled,
-.enrollment-public-enrollment .searchable-select--floating .floating-field__control button:disabled {
-  cursor: not-allowed;
-  opacity: 1;
-  background: #e8edf5;
-  border-color: rgba(18, 35, 61, 0.22);
-  color: #6c7688;
-}
-
-.enrollment-public-enrollment .searchable-select--floating .floating-field__control input:focus ~ span,
-.enrollment-public-enrollment .searchable-select--floating .floating-field__control input[data-has-value="true"] ~ span {
-  top: 11px;
-  color: var(--deped-blue);
-  font-size: 0.74rem;
-  transform: translateY(0);
-}
-
-.enrollment-public-enrollment .floating-field__control span {
-  max-width: calc(100% - 64px);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.enrollment-public-enrollment .floating-field__control input,
-.enrollment-public-enrollment .floating-field__control textarea {
-  padding-top: 28px;
-}
-
-.enrollment-public-enrollment .searchable-select--floating .searchable-select__toggle {
-  padding: 0;
-  margin: 0;
-  line-height: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.enrollment-public-enrollment .searchable-select--floating .searchable-select__toggle svg {
-  display: block;
-  margin: 0;
+.enrollment-public-enrollment .floating-field-grid {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
 }
 
 .enrollment-confirmation {
@@ -313,8 +299,8 @@
     padding: 12px;
   }
 
-  .enrollment-public-enrollment .floating-field__control span {
-    max-width: calc(100% - 56px);
+  .enrollment-public-enrollment .floating-field-grid {
+    grid-template-columns: 1fr;
   }
 
   .enrollment-confirmation__header {
