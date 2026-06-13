@@ -1,51 +1,122 @@
-
-import React, { useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Student, User, Section, GradeLevel } from '../../../types';
 import { useStore } from '../../../supabaseStore';
-import { DEPED_SEAL_URL } from '../../../constants';
+import { FloatingField } from '../../ui/FloatingField';
+import MasterlistDocument from '../settings/MasterlistDocument';
+import { handlePdfPrint, handleZipExport } from '../settings/exportHandlers';
 
 interface VotersTabProps {
   learnerDatabase: Student[];
   voters: User[];
   sections: Section[];
+  schoolName: string;
   onDeleteBallot: (lrn: string) => Promise<void>;
   showAlert: (title: string, message: string, type?: 'info' | 'warning' | 'error' | 'success' | 'confirm', onConfirm?: () => void) => void;
 }
 
-const VotersTab: React.FC<VotersTabProps> = ({ learnerDatabase = [], voters = [], sections = [], onDeleteBallot, showAlert }) => {
+const VotersTab: React.FC<VotersTabProps> = ({
+  learnerDatabase = [],
+  voters = [],
+  sections = [],
+  schoolName = 'Leon National High School',
+  onDeleteBallot,
+  showAlert,
+}) => {
   const store = useStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedGrades, setExpandedGrades] = useState<Record<string, boolean>>({});
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
+  const [selectedSections, setSelectedSections] = useState<string[]>([]);
   const [auditBallot, setAuditBallot] = useState<any[] | null>(null);
   const [auditedUser, setAuditedUser] = useState<Student | null>(null);
   const [isAuditing, setIsAuditing] = useState(false);
   const [isProcessingDelete, setIsProcessingDelete] = useState(false);
+  const [isProcessingExport, setIsProcessingExport] = useState(false);
+  const exportContainerRef = useRef<HTMLDivElement>(null);
 
-  const toggleGrade = (grade: string) => {
-    setExpandedGrades(prev => ({ ...prev, [grade]: !prev[grade] }));
+  const gradeLevels = useMemo(() => Object.values(GradeLevel), []);
+  const activeSchoolYear = store.activeSchoolYear?.label || '2025-2026';
+
+  const closeAudit = () => {
+    setAuditedUser(null);
+    setAuditBallot(null);
   };
 
-  const toggleSection = (sectionId: string) => {
-    setExpandedSections(prev => ({ ...prev, [sectionId]: !prev[sectionId] }));
+  const formatGradeLabel = (grade: string) => {
+    const cleaned = String(grade || '').replace(/^GRADE_/i, 'Grade ');
+    return cleaned === 'Grade 12' ? 'Grade 12 (Non-Voting)' : cleaned;
   };
 
-  const getLearnerName = (l: Student) => {
-    const firstName = l.firstName || '';
-    const lastName = l.lastName || '';
-    const middleName = l.middleName ? ` ${l.middleName}` : '';
-    return `${firstName}${middleName} ${lastName}`;
+  const getLearnerName = (learner: Student) => {
+    const firstName = learner.firstName || '';
+    const middleName = learner.middleName ? ` ${learner.middleName}` : '';
+    const lastName = learner.lastName || '';
+    return `${firstName}${middleName} ${lastName}`.trim();
   };
 
-  const getLearnerLRN = (l: Student) => l.lrn || 'N/A';
+  const getLearnerLRN = (learner: Student) => learner.lrn || 'N/A';
 
-  // Normalization helper for gender strings
-  const getGenderChar = (l: Student) => {
-    const g = (l.gender || (l as any).GENDER || '').toUpperCase();
-    if (g.startsWith('M')) return 'M';
-    if (g.startsWith('F')) return 'F';
+  const getGenderChar = (learner: Student) => {
+    const value = String(learner.gender || (learner as any).GENDER || '').toUpperCase();
+    if (value.startsWith('M')) return 'M';
+    if (value.startsWith('F')) return 'F';
     return 'U';
+  };
+
+  const getGradeLearners = (grade: string) => {
+    return (learnerDatabase || []).filter((learner) => {
+      const section = (sections || []).find((item) => item.id === learner.sectionId);
+      return section?.gradeLevel === grade;
+    });
+  };
+
+  const getFilteredLearners = (learners: Student[]) => {
+    const term = searchTerm.toLowerCase().trim();
+    if (!term) return learners;
+    return learners.filter((learner) => {
+      const name = getLearnerName(learner).toLowerCase();
+      const lrn = getLearnerLRN(learner).toLowerCase();
+      return name.includes(term) || lrn.includes(term);
+    });
+  };
+
+  const getVoteCount = (learners: Student[]) => {
+    return learners.filter((learner) => (voters || []).find((voter) => voter.studentId === getLearnerLRN(learner))?.hasVoted).length;
+  };
+
+  const handleToggleSectionSelection = (sectionId: string) => {
+    setSelectedSections((prev) =>
+      prev.includes(sectionId) ? prev.filter((id) => id !== sectionId) : [...prev, sectionId],
+    );
+  };
+
+  const handleToggleGradeSelection = (grade: string) => {
+    const gradeSectionIds = (sections || []).filter((section) => section.gradeLevel === grade).map((section) => section.id);
+    setSelectedSections((prev) => {
+      const allSelected = gradeSectionIds.length > 0 && gradeSectionIds.every((id) => prev.includes(id));
+      const withoutGrade = prev.filter((id) => !gradeSectionIds.includes(id));
+      return allSelected ? withoutGrade : [...new Set([...prev, ...gradeSectionIds])];
+    });
+  };
+
+  const handleClearExportSelection = () => {
+    setSelectedSections([]);
+  };
+
+  const handlePrintMasterlist = () => {
+    if (!exportContainerRef.current || selectedSections.length === 0) return;
+    handlePdfPrint(exportContainerRef.current.innerHTML, activeSchoolYear);
+  };
+
+  const handleZipMasterlist = async () => {
+    if (!exportContainerRef.current || selectedSections.length === 0) return;
+    setIsProcessingExport(true);
+    try {
+      await handleZipExport(exportContainerRef.current, selectedSections, sections, activeSchoolYear);
+    } finally {
+      setIsProcessingExport(false);
+    }
   };
 
   const handleAudit = async (learner: Student) => {
@@ -54,8 +125,8 @@ const VotersTab: React.FC<VotersTabProps> = ({ learnerDatabase = [], voters = []
     try {
       const ballot = await store.fetchVoterBallot(getLearnerLRN(learner), store.activeSchoolYear?.id || '');
       setAuditBallot(ballot || []);
-    } catch (err) {
-      console.error("Audit fetch failed", err);
+    } catch (error) {
+      console.error('Audit fetch failed', error);
       setAuditBallot([]);
     } finally {
       setIsAuditing(false);
@@ -65,20 +136,19 @@ const VotersTab: React.FC<VotersTabProps> = ({ learnerDatabase = [], voters = []
   const handleDeleteVote = (learner: Student) => {
     const lrn = getLearnerLRN(learner);
     const name = getLearnerName(learner);
-    
+
     showAlert(
-      "Confirm Ballot Void",
+      'Confirm Ballot Void',
       `Are you sure you want to permanently void the ballot cast by ${name} (LRN: ${lrn})? This will allow the student to vote again.`,
-      "confirm",
+      'confirm',
       async () => {
         try {
           setIsProcessingDelete(true);
           await onDeleteBallot(lrn);
-          setAuditedUser(null);
-          setAuditBallot(null);
-          showAlert("Ballot Voided", `Records for ${name} have been cleared.`, "success");
-        } catch (err) {
-          showAlert("Action Failed", "Could not void the ballot. Please check cloud connection.", "error");
+          closeAudit();
+          showAlert('Ballot Voided', `Records for ${name} have been cleared.`, 'success');
+        } catch (error) {
+          showAlert('Action Failed', 'Could not void the ballot. Please check cloud connection.', 'error');
         } finally {
           setIsProcessingDelete(false);
         }
@@ -86,42 +156,28 @@ const VotersTab: React.FC<VotersTabProps> = ({ learnerDatabase = [], voters = []
     );
   };
 
-  const gradeLevels = Object.values(GradeLevel);
-
   const renderAuditModal = () => {
     if (!auditedUser) return null;
 
     return createPortal(
-      <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-[rgba(18,35,61,0.24)] p-4 backdrop-blur-sm animate-in fade-in duration-300">
-        <div className="flex max-h-[90vh] w-full max-w-[860px] flex-col overflow-hidden rounded-[12px] border border-[rgba(18,35,61,0.14)] bg-white shadow-[0_18px_36px_rgba(18,35,61,0.18)] animate-in zoom-in-95 duration-200">
-          <div className="flex items-start justify-between gap-4 border-b border-[rgba(18,35,61,0.12)] px-6 py-5">
-            <div className="flex items-start gap-4">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[12px] border border-[rgba(18,35,61,0.08)] bg-[#eef4ff]">
-                <img src={DEPED_SEAL_URL} className="h-8 w-8 object-contain" alt="DepEd" />
-              </div>
-              <div>
-                <h3 className="text-[24px] font-black uppercase tracking-tight text-[#12233d]">
-                  Voter Audit Report
-                </h3>
-                <p className="mt-1 text-[13px] font-bold uppercase tracking-[0.12em] text-slate-500">
-                  Official ballot record
-                </p>
-              </div>
+      <div className="modal-overlay modal-overlay--high">
+        <div className="modal-backdrop" onClick={closeAudit} />
+        <section className="modal-dialog modal-dialog--wide" role="dialog" aria-modal="true" aria-labelledby="voter-audit-title">
+          <div className="modal-dialog__header">
+            <div className="modal-dialog__title-group">
+              <p className="modal-dialog__eyebrow">Election Modal</p>
+              <h3 id="voter-audit-title">Voter Audit Report</h3>
+              <p className="modal-dialog__eyebrow">Official ballot record</p>
             </div>
-
-            <button
-              onClick={() => { setAuditedUser(null); setAuditBallot(null); }}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-[12px] border border-[rgba(18,35,61,0.14)] bg-white text-[16px] font-bold text-[#12233d] transition-colors hover:bg-slate-50"
-              aria-label="Close audit modal"
-            >
-              <i className="fa-solid fa-xmark"></i>
+            <button type="button" onClick={closeAudit} className="modal-dialog__close" aria-label="Close audit modal">
+              <i className="fa-solid fa-xmark" />
             </button>
           </div>
 
-          <div className="overflow-y-auto p-6 no-scrollbar">
+          <div className="modal-dialog__body">
             <div className="mb-6 rounded-[12px] border border-[rgba(18,35,61,0.08)] bg-white p-5 shadow-sm">
               <p className="mb-2 text-[13px] font-bold uppercase tracking-[0.12em] text-slate-500">Voter Profile</p>
-              <h4 className="text-[24px] font-black uppercase text-[#12233d]">{getLearnerName(auditedUser)}</h4>
+              <h4 className="text-[24px] font-bold text-[#12233d]">{getLearnerName(auditedUser)}</h4>
               <p className="mt-2 text-[16px] font-bold text-[#0038a8]">{getLearnerLRN(auditedUser)}</p>
             </div>
 
@@ -131,7 +187,7 @@ const VotersTab: React.FC<VotersTabProps> = ({ learnerDatabase = [], voters = []
               </p>
               {isAuditing ? (
                 <div className="py-12 text-center">
-                  <i className="fa-solid fa-circle-notch animate-spin text-3xl text-blue-500"></i>
+                  <i className="fa-solid fa-circle-notch animate-spin text-3xl text-blue-500" />
                   <p className="mt-4 text-[13px] font-bold uppercase tracking-[0.12em] text-slate-500">Retrieving ballot data</p>
                 </div>
               ) : auditBallot && auditBallot.length > 0 ? (
@@ -153,111 +209,109 @@ const VotersTab: React.FC<VotersTabProps> = ({ learnerDatabase = [], voters = []
                 </div>
               ) : (
                 <div className="rounded-[12px] border border-red-100 bg-red-50 py-10 text-center">
-                  <i className="fa-solid fa-box-open mb-2 text-3xl text-red-200"></i>
+                  <i className="fa-solid fa-box-open mb-2 text-3xl text-red-200" />
                   <p className="text-[13px] font-bold uppercase tracking-[0.12em] text-red-400">No ballot lines recorded for this LRN</p>
                 </div>
               )}
             </div>
           </div>
 
-          <div className="flex flex-wrap justify-end gap-3 border-t border-[rgba(18,35,61,0.12)] bg-slate-50 px-6 py-5">
-            <button
-              onClick={() => {
-                setAuditedUser(null);
-                setAuditBallot(null);
-              }}
-              className="rounded-[12px] border border-[rgba(18,35,61,0.14)] bg-white px-5 py-3 text-[13px] font-bold uppercase tracking-[0.08em] text-[#12233d] transition-colors hover:bg-slate-50"
-            >
+          <div className="modal-dialog__actions">
+            <button type="button" onClick={closeAudit}>
               Dismiss Audit View
             </button>
-            <button 
+            <button
+              type="button"
               onClick={() => handleDeleteVote(auditedUser)}
               disabled={isProcessingDelete}
-              className="inline-flex items-center justify-center rounded-[12px] bg-[#ce1126] px-5 py-3 text-[13px] font-bold uppercase tracking-[0.08em] text-white transition-colors hover:bg-[#b10f21] disabled:opacity-50"
+              className="modal-dialog__primary"
             >
-              <i className={`fa-solid ${isProcessingDelete ? 'fa-circle-notch animate-spin' : 'fa-trash-can'} mr-2`}></i>
+              <i className={`fa-solid ${isProcessingDelete ? 'fa-circle-notch animate-spin' : 'fa-trash-can'} mr-2`} />
               Permanently Void This Ballot
             </button>
           </div>
-        </div>
+        </section>
       </div>,
       document.body
     );
   };
 
-  const renderLearnerTable = (learnersList: Student[], label: string, colorClass: string, icon: string) => {
+  const renderLearnerTable = (learnersList: Student[], label: string, icon: string) => {
     if (learnersList.length === 0) return null;
-    
-    const votedCount = learnersList.filter(l => (voters || []).find(v => v.studentId === getLearnerLRN(l))?.hasVoted).length;
+
+    const votedCount = getVoteCount(learnersList);
 
     return (
-      <div className="mb-8">
-        <div className={`flex items-center justify-between px-6 py-2 ${colorClass} bg-opacity-5 rounded-t-xl border-x border-t border-gray-100`}>
-          <div className="flex items-center space-x-2">
-            <i className={`fa-solid ${icon} ${colorClass.replace('bg-', 'text-')} text-xs`}></i>
-            <span className={`text-[10px] font-black uppercase tracking-widest ${colorClass.replace('bg-', 'text-')}`}>{label}</span>
+      <div className="election-page__table-card">
+        <div className="election-page__table-card-header">
+          <div className="election-page__table-card-title-wrap">
+            <h4 className="election-page__table-card-title">
+              <i className={`fa-solid ${icon}`} style={{ color: '#0038a8', marginRight: '8px' }} />
+              {label}
+            </h4>
           </div>
-          <span className="text-[9px] font-black text-gray-400 uppercase tracking-tighter">
+          <span className="election-page__table-card-count">
             {votedCount} / {learnersList.length} Cast
           </span>
         </div>
-        <div className="overflow-x-auto border border-gray-100 rounded-b-xl shadow-sm bg-white">
-          <table className="w-full text-left">
-            <thead className="bg-gray-50/80">
-              <tr className="text-[9px] font-black text-gray-500 uppercase tracking-[0.2em]">
-                <th className="px-6 py-3">LRN Identification</th>
-                <th className="px-6 py-3">Full Legal Name</th>
-                <th className="px-6 py-3 text-right">Election Action</th>
+        <div className="election-page__table-wrap">
+          <table className="election-page__table">
+            <thead>
+              <tr>
+                <th>LRN Identification</th>
+                <th>Full Legal Name</th>
+                <th style={{ textAlign: 'right' }}>Election Action</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
-              {learnersList.sort((a, b) => (a.lastName || '').localeCompare(b.lastName || '')).map(l => {
-                const lrn = getLearnerLRN(l);
-                const hasVoted = (voters || []).find(v => v.studentId === lrn)?.hasVoted;
-                const isG12 = sections.find(s => s.id === l.sectionId)?.gradeLevel === GradeLevel.GRADE_12;
-                
-                return (
-                  <tr key={l.id} className="hover:bg-blue-50/20 transition-colors group">
-                    <td className="px-6 py-3 font-mono text-[10px] font-black text-[#034F8B]">{lrn}</td>
-                    <td className="px-6 py-3">
-                      <div className="flex items-center">
-                        <p className="font-bold text-gray-900 text-xs group-hover:text-[#034F8B] transition-colors">{getLearnerName(l)}</p>
-                        {l.isSSLG && (
-                          <span className="ml-3 text-[7px] font-black text-white bg-[#E11C38] px-1.5 py-0.5 rounded-full uppercase tracking-tighter shadow-sm">Officer</span>
+            <tbody>
+              {learnersList
+                .slice()
+                .sort((a, b) => (a.lastName || '').localeCompare(b.lastName || ''))
+                .map((learner) => {
+                  const lrn = getLearnerLRN(learner);
+                  const hasVoted = (voters || []).find((voter) => voter.studentId === lrn)?.hasVoted;
+                  const isG12 = sections.find((section) => section.id === learner.sectionId)?.gradeLevel === GradeLevel.GRADE_12;
+
+                  return (
+                    <tr key={learner.id}>
+                      <td className="election-page__vote-lrn">{lrn}</td>
+                      <td>
+                        <span className="election-page__vote-name">
+                          {getLearnerName(learner)}
+                          {learner.isSSLG && <span className="election-page__vote-officer">Officer</span>}
+                        </span>
+                      </td>
+                      <td style={{ textAlign: 'right' }}>
+                        {isG12 ? (
+                          <span className="election-page__vote-status election-page__vote-status--none">
+                            <i className="fa-solid fa-ban" style={{ marginRight: '6px' }} />
+                            Non-Voter
+                          </span>
+                        ) : hasVoted ? (
+                          <div style={{ display: 'inline-flex', gap: '8px', justifyContent: 'flex-end' }}>
+                            <button
+                              type="button"
+                              onClick={() => handleAudit(learner)}
+                              className="election-page__candidate-table-action election-page__candidate-table-action--edit"
+                            >
+                              <i className="fa-solid fa-magnifying-glass-chart" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteVote(learner)}
+                              className="election-page__candidate-table-action election-page__candidate-table-action--duplicate"
+                              title="Void Ballot"
+                            >
+                              <i className="fa-solid fa-trash-can" />
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="election-page__vote-status election-page__vote-status--none">No Vote Yet</span>
                         )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-3 text-right">
-                      {isG12 ? (
-                        <span className="inline-flex items-center px-3 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest bg-gray-100 text-gray-400 border border-gray-200">
-                          <i className="fa-solid fa-ban mr-1.5"></i> Non-Voter
-                        </span>
-                      ) : hasVoted ? (
-                        <div className="flex justify-end items-center space-x-1">
-                          <button 
-                            onClick={() => handleAudit(l)}
-                            className="inline-flex items-center px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest bg-blue-50 text-[#034F8B] border border-blue-100 shadow-sm hover:bg-[#034F8B] hover:text-white transition-all active:scale-95"
-                          >
-                            <i className="fa-solid fa-magnifying-glass-chart mr-1.5"></i>
-                            Audit
-                          </button>
-                          <button 
-                            onClick={() => handleDeleteVote(l)}
-                            className="inline-flex items-center p-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest bg-red-50 text-red-500 border border-red-100 shadow-sm hover:bg-red-500 hover:text-white transition-all active:scale-95"
-                            title="Void Ballot"
-                          >
-                            <i className="fa-solid fa-trash-can"></i>
-                          </button>
-                        </div>
-                      ) : (
-                        <span className="inline-flex items-center px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest bg-red-50 text-red-400 border border-red-100 italic opacity-50">
-                          No Vote Yet
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
+                      </td>
+                    </tr>
+                  );
+                })}
             </tbody>
           </table>
         </div>
@@ -266,139 +320,220 @@ const VotersTab: React.FC<VotersTabProps> = ({ learnerDatabase = [], voters = []
   };
 
   return (
-    <div className="space-y-6 pb-20 relative">
+    <div className="election-page pb-20 relative">
       {renderAuditModal()}
 
-      <div className="bg-white rounded-[12px] shadow-sm border border-[rgba(18,35,61,0.08)] overflow-hidden">
-        <div className="grid grid-cols-3" aria-hidden="true">
-          <span className="h-[4px] bg-[#0038a8]" />
-          <span className="h-[4px] bg-[#fcd116]" />
-          <span className="h-[4px] bg-[#ce1126]" />
-        </div>
-        <div className="p-6 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)]">
-        <div className="relative">
-          <i className="fa-solid fa-magnifying-glass absolute left-5 top-1/2 -translate-y-1/2 text-[#98a2b3] text-[16px]"></i>
-          <input 
-            type="text"
-            placeholder="Search by LRN or learner name"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-14 pr-6 py-4 bg-[#f8fafc] border border-[rgba(18,35,61,0.12)] rounded-[12px] outline-none focus:border-[#0038a8] transition-colors font-medium text-[16px] text-[#12233d] placeholder:text-[#98a2b3]"
-          />
-        </div>
-        <div className="mt-4 flex items-center justify-between text-[13px] font-bold text-[#68758d] uppercase tracking-[0.06em] px-1">
-          <span className="flex items-center">
-            <i className="fa-solid fa-user-lock mr-2 text-[#0038a8]"></i>
-            Demographic audit with gender grouping
-          </span>
-          <span>{(learnerDatabase || []).length} Total Database Records</span>
-        </div>
+      <div className="election-page__masterlist-bar election-page__control-card no-print">
+        <div className="election-settings__summary-header">
+          <div className="election-settings__summary-copy">
+            <p className="election-settings__summary-label">Bulk Masterlist Export</p>
+            <h3 className="election-settings__summary-title">Use the existing sections below to print the masterlist</h3>
+            <p className="election-settings__section-subtitle">
+              Tick the section checkboxes or the grade checkbox in the same list you already use for voter turnout.
+            </p>
+          </div>
+          <div className="election-settings__section-actions">
+            <span className="election-settings__section-note">{selectedSections.length} selected</span>
+            <button
+              type="button"
+              onClick={handleClearExportSelection}
+              disabled={selectedSections.length === 0 || isProcessingExport}
+              className="election-settings__secondary-action"
+            >
+              Clear
+            </button>
+            <button
+              type="button"
+              onClick={handleZipMasterlist}
+              disabled={selectedSections.length === 0 || isProcessingExport}
+              className="election-settings__primary-action election-settings__primary-action--soft"
+            >
+              {isProcessingExport ? 'Zipping...' : 'Zip PNGs'}
+            </button>
+            <button
+              type="button"
+              onClick={handlePrintMasterlist}
+              disabled={selectedSections.length === 0}
+              className="election-settings__primary-action"
+            >
+              Print PDF
+            </button>
+          </div>
         </div>
       </div>
 
-      <div className="space-y-4">
-        {gradeLevels.map(grade => {
-          const isG12 = grade === GradeLevel.GRADE_12;
-          const gradeLearners = (learnerDatabase || []).filter(l => {
-            const section = (sections || []).find(s => s.id === l.sectionId);
-            return section?.gradeLevel === grade;
-          });
+      <section className="election-page__search-card" aria-label="Learner search">
+        <div className="election-page__search-card-row">
+          <div className="election-page__search-card-field">
+            <FloatingField
+              as="input"
+              label="Search by LRN or learner name"
+              aria-label="Search by LRN or learner name"
+              placeholder=" "
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <span className="election-page__search-card-meta">{(learnerDatabase || []).length} cached learners</span>
+        </div>
+      </section>
 
-          const filteredGradeLearners = gradeLearners.filter(l => {
-            const fullName = getLearnerName(l).toLowerCase();
-            const lrn = getLearnerLRN(l);
-            return fullName.includes(searchTerm.toLowerCase()) || lrn.includes(searchTerm);
-          });
+      <div className="election-page__compact-grid">
+        {gradeLevels.map((grade) => {
+          const isG12 = grade === GradeLevel.GRADE_12;
+          const gradeLearners = getGradeLearners(grade);
+          const filteredGradeLearners = getFilteredLearners(gradeLearners);
 
           if (filteredGradeLearners.length === 0 && searchTerm) return null;
 
-          const isGradeExpanded = expandedGrades[grade] || searchTerm !== '';
-          const gradeVotedCount = filteredGradeLearners.filter(l => (voters || []).find(v => v.studentId === getLearnerLRN(l))?.hasVoted).length;
+          const isExpanded = expandedGrades[grade] || searchTerm !== '';
+          const gradeVotedCount = getVoteCount(filteredGradeLearners);
+          const turnoutPercent = filteredGradeLearners.length > 0 ? Math.round((gradeVotedCount / filteredGradeLearners.length) * 100) : 0;
+          const gradeSectionIds = (sections || []).filter((section) => section.gradeLevel === grade).map((section) => section.id);
+          const selectedCount = gradeSectionIds.filter((id) => selectedSections.includes(id)).length;
+          const allSelected = gradeSectionIds.length > 0 && gradeSectionIds.every((id) => selectedSections.includes(id));
+          const someSelected = gradeSectionIds.some((id) => selectedSections.includes(id));
 
           return (
-            <div key={grade} className={`bg-white rounded-[12px] shadow-sm border overflow-hidden ${isG12 ? 'border-[rgba(18,35,61,0.08)] opacity-70' : 'border-[rgba(18,35,61,0.08)]'}`}>
-              <button 
-                onClick={() => toggleGrade(grade)}
-                className={`w-full px-6 py-5 flex items-center justify-between transition-colors ${isGradeExpanded ? 'bg-[#f4f8ff] text-[#12233d]' : 'bg-white hover:bg-[#f8fafc] text-[#12233d]'}`}
+            <div key={grade} className="election-page__grade-card">
+              <button
+                type="button"
+                onClick={() => setExpandedGrades((prev) => ({ ...prev, [grade]: !prev[grade] }))}
+                className={`election-page__grade-header ${isExpanded ? 'election-page__grade-header--expanded' : ''}`}
               >
-                <div className="flex items-center space-x-5">
-                  <div className={`w-11 h-11 rounded-[12px] flex items-center justify-center text-[16px] ${isGradeExpanded ? 'bg-white text-[#0038a8] border border-[rgba(18,35,61,0.08)]' : 'bg-[#f4f8ff] text-[#0038a8]'}`}>
-                    <i className={`fa-solid ${isGradeExpanded ? (isG12 ? 'fa-folder-closed' : 'fa-folder-open') : 'fa-folder'}`}></i>
-                  </div>
-                  <div className="text-left">
-                    <h3 className="text-[24px] font-bold uppercase tracking-tight">{grade} {isG12 && '(Non-Voting)'}</h3>
-                    {!isG12 && (
-                      <div className="flex items-center mt-1">
-                        <div className={`h-1.5 w-24 rounded-full mr-3 ${isGradeExpanded ? 'bg-white/20' : 'bg-gray-200'}`}>
-                          <div 
-                            className="h-full bg-[#E11C38] rounded-full" 
-                            style={{ width: `${filteredGradeLearners.length > 0 ? (gradeVotedCount/filteredGradeLearners.length)*100 : 0}%` }}
-                          ></div>
+                <div className="election-page__grade-summary">
+                  <div className="election-page__grade-summary-left">
+                    <label className={`election-page__masterlist-select election-page__masterlist-select--grade${allSelected ? ' election-page__masterlist-select--active' : ''}`}>
+                      <input
+                        type="checkbox"
+                        checked={allSelected}
+                        ref={(node) => {
+                          if (node) {
+                            node.indeterminate = !allSelected && someSelected;
+                          }
+                        }}
+                        onClick={(event) => event.stopPropagation()}
+                        onChange={() => handleToggleGradeSelection(grade)}
+                      />
+                    </label>
+                    <span className="material-symbols-outlined election-page__grade-toggle-icon" aria-hidden="true">
+                      expand_more
+                    </span>
+                    <div className="election-page__grade-copy">
+                      <h3 className="election-page__grade-title">{formatGradeLabel(grade)}</h3>
+                      {!isG12 && (
+                        <div className="election-page__grade-subcopy">
+                          {gradeVotedCount} of {filteredGradeLearners.length} voters cast
+                          {selectedCount > 0 ? ` · ${selectedCount} selected for masterlist` : ''}
                         </div>
-                        <p className="text-[13px] font-bold uppercase tracking-[0.06em] text-[#68758d]">
-                          {gradeVotedCount} / {filteredGradeLearners.length} VOTES CAST
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="election-page__grade-summary-right">
+                    {!isG12 ? (
+                      <div className="election-page__grade-turnout">
+                        <p className="election-page__grade-turnout-label">Grade Turnout</p>
+                        <p className="election-page__grade-turnout-value">
+                          {gradeVotedCount.toLocaleString()} / {filteredGradeLearners.length.toLocaleString()} voters
                         </p>
                       </div>
+                    ) : (
+                      <div className="election-page__grade-turnout election-page__grade-turnout--muted">
+                        <p className="election-page__grade-turnout-label">Grade Turnout</p>
+                        <p className="election-page__grade-turnout-value">Non-voting batch</p>
+                      </div>
                     )}
+                    <div className="election-page__grade-percentage">{turnoutPercent}%</div>
                   </div>
                 </div>
-                <i className={`fa-solid fa-chevron-${isGradeExpanded ? 'up' : 'down'} text-xl opacity-50`}></i>
               </button>
 
-              {isGradeExpanded && (
-                <div className="p-6 space-y-4 bg-gray-50/50">
-                  {(sections || []).filter(s => s.gradeLevel === grade).map(sec => {
-                    const sectionLearners = filteredGradeLearners.filter(l => l.sectionId === sec.id);
-                    if (sectionLearners.length === 0 && searchTerm) return null;
+              {isExpanded ? (
+                <div className="election-page__grade-body">
+                  {(sections || [])
+                    .filter((section) => section.gradeLevel === grade)
+                    .map((section) => {
+                      const sectionLearners = filteredGradeLearners.filter((learner) => learner.sectionId === section.id);
+                      if (sectionLearners.length === 0 && searchTerm) return null;
 
-                    const isSecExpanded = expandedSections[sec.id] || searchTerm !== '';
-                    const secVotedCount = sectionLearners.filter(l => (voters || []).find(v => v.studentId === getLearnerLRN(l))?.hasVoted).length;
+                      const isSectionExpanded = expandedSections[section.id] || searchTerm !== '';
+                      const sectionVotedCount = getVoteCount(sectionLearners);
+                      const males = sectionLearners.filter((learner) => getGenderChar(learner) === 'M');
+                      const females = sectionLearners.filter((learner) => getGenderChar(learner) === 'F');
+                      const others = sectionLearners.filter((learner) => getGenderChar(learner) === 'U');
 
-                    // GENDER CLASSIFICATION WITHIN SECTION
-                    const males = sectionLearners.filter(l => getGenderChar(l) === 'M');
-                    const females = sectionLearners.filter(l => getGenderChar(l) === 'F');
-                    const others = sectionLearners.filter(l => getGenderChar(l) === 'U');
+                      return (
+                        <div key={section.id} className="election-page__section-card">
+                          <button
+                            type="button"
+                            onClick={() => setExpandedSections((prev) => ({ ...prev, [section.id]: !prev[section.id] }))}
+                            className={`election-page__section-toggle ${isSectionExpanded ? 'election-page__section-toggle--expanded' : ''} ${isG12 ? 'election-page__section-toggle--grade12' : ''}`}
+                          >
+                            <div className="election-page__section-toggle-content">
+                              <label className={`election-page__masterlist-select election-page__masterlist-select--section${selectedSections.includes(section.id) ? ' election-page__masterlist-select--active' : ''}`}>
+                                <input
+                                  type="checkbox"
+                                  checked={selectedSections.includes(section.id)}
+                                  onClick={(event) => event.stopPropagation()}
+                                  onChange={() => handleToggleSectionSelection(section.id)}
+                                />
+                              </label>
+                              <div className="election-page__section-icon election-page__section-icon--section">
+                                <span className="material-symbols-outlined">groups</span>
+                              </div>
+                              <div className="election-page__section-copy">
+                                <span className="election-page__section-name">{section.name}</span>
+                                <span className="election-page__section-group-subtitle">{section.adviserName}</span>
+                              </div>
+                            </div>
 
-                    return (
-                      <div key={sec.id} className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm transition-all hover:shadow-md">
-                        <button 
-                          onClick={() => toggleSection(sec.id)}
-                          className={`w-full px-6 py-5 flex items-center justify-between transition-all ${isSecExpanded ? (isG12 ? 'bg-slate-700 text-white' : 'bg-[#E11C38] text-white') : 'bg-white text-gray-700 hover:bg-blue-50/30'}`}
-                        >
-                          <div className="flex items-center space-x-4">
-                            <i className="fa-solid fa-people-group text-lg opacity-40"></i>
-                            <div className="text-left">
-                              <span className="font-black text-base uppercase tracking-wider">{sec.name}</span>
-                              <span className={`ml-4 text-[10px] font-bold uppercase tracking-widest ${isSecExpanded ? 'text-white/70' : 'text-gray-400'}`}>
-                                <i className="fa-solid fa-user-tie mr-1.5"></i>
-                                {sec.adviserName}
+                            <div className="election-page__section-toggle-meta">
+                              {!isG12 ? (
+                                <div className="election-page__section-group-progress">
+                                  <p className="election-page__section-group-progress-label">Turnout</p>
+                                  <p className="election-page__section-group-progress-value">{sectionVotedCount} / {sectionLearners.length}</p>
+                                </div>
+                              ) : (
+                                <span className="election-page__vote-status election-page__vote-status--none">Ineligible Batch</span>
+                              )}
+                              <span className="material-symbols-outlined election-page__section-toggle-icon" aria-hidden="true">
+                                expand_more
                               </span>
                             </div>
-                          </div>
-                          <div className="flex items-center space-x-6">
-                             {!isG12 && (
-                               <div className="text-right">
-                                 <p className={`text-[9px] font-black uppercase tracking-widest ${isSecExpanded ? 'text-white/60' : 'text-gray-400'}`}>Turnout</p>
-                                 <span className="font-black text-sm">{secVotedCount} / {sectionLearners.length}</span>
-                               </div>
-                             )}
-                             {isG12 && <span className="text-[10px] font-black uppercase tracking-widest bg-white/10 px-3 py-1 rounded">Ineligible Batch</span>}
-                             <i className={`fa-solid fa-angle-${isSecExpanded ? 'up' : 'down'} opacity-50`}></i>
-                          </div>
-                        </button>
+                          </button>
 
-                        {isSecExpanded && (
-                          <div className="p-6 bg-gray-50/30">
-                            {renderLearnerTable(males, "Male Learners", "bg-blue-500", "fa-mars")}
-                            {renderLearnerTable(females, "Female Learners", "bg-pink-500", "fa-venus")}
-                            {renderLearnerTable(others, "Unclassified", "bg-gray-500", "fa-genderless")}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                          {isSectionExpanded ? (
+                            <div className="election-page__section-body">
+                              {renderLearnerTable(males, 'Male Learners', 'fa-mars')}
+                              {renderLearnerTable(females, 'Female Learners', 'fa-venus')}
+                              {renderLearnerTable(others, 'Unclassified', 'fa-genderless')}
+                            </div>
+                          ) : null}
+                        </div>
+                      );
+                    })}
                 </div>
-              )}
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="fixed -left-[9999px] opacity-0 pointer-events-none" ref={exportContainerRef} style={{ width: '210mm' }}>
+        {selectedSections.map((sectionId) => {
+          const section = sections.find((entry) => entry.id === sectionId);
+          if (!section) return null;
+          const students = learnerDatabase.filter((learner) => learner.sectionId === sectionId);
+
+          return (
+            <div key={sectionId}>
+              <MasterlistDocument
+                section={section}
+                students={students}
+                schoolYear={activeSchoolYear}
+                schoolName={schoolName}
+              />
             </div>
           );
         })}
@@ -408,3 +543,5 @@ const VotersTab: React.FC<VotersTabProps> = ({ learnerDatabase = [], voters = []
 };
 
 export default VotersTab;
+
+

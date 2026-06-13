@@ -1,5 +1,5 @@
 import { Section } from '../../../types';
-import { getPrintMasterlistTemplate } from './PrintMasterlistTemplate';
+import { getPrintMasterlistStyles, getPrintMasterlistTemplate } from './PrintMasterlistTemplate';
 
 export const handleZipExport = async (
   container: HTMLElement, 
@@ -81,16 +81,101 @@ export const handlePdfPrint = (
   contentHtml: string, 
   schoolYear: string
 ) => {
-  // Removing the window features (width, height, etc.) tells modern browsers to open a new tab instead of a separate window
-  const printWindow = window.open('', '_blank');
+  const popupFeatures = 'popup=yes,width=1120,height=900,resizable=yes,scrollbars=yes';
+  const printWindow = window.open('about:blank', '_blank', popupFeatures);
   
   if (!printWindow) {
     alert("Action blocked! Please allow redirects or pop-ups to open the official masterlist tab.");
     return;
   }
 
-  const fullHtml = getPrintMasterlistTemplate(contentHtml, schoolYear);
+  console.log('[MasterlistPrint] Popup opened', {
+    schoolYear,
+    contentLength: String(contentHtml || '').length,
+  });
 
-  printWindow.document.write(fullHtml);
-  printWindow.document.close();
+  const doc = printWindow.document;
+  const safeTemplate = getPrintMasterlistTemplate(contentHtml, schoolYear);
+  const styles = getPrintMasterlistStyles();
+  let hasRendered = false;
+
+  doc.open();
+  doc.write(`<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <title>Preparing Masterlist...</title>
+  </head>
+  <body>
+    <div id="usis-print-shell" style="min-height:100vh;display:flex;align-items:center;justify-content:center;font-family:Segoe UI,sans-serif;color:#12233d;background:#fff;">
+      <div style="text-align:center;max-width:560px;padding:32px;">
+        <div style="font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#4b5563;">Masterlist Print Debug</div>
+        <div style="font-size:24px;font-weight:700;margin-top:12px;">Loading print content...</div>
+        <div style="font-size:14px;margin-top:8px;color:#4b5563;">If this screen remains visible, the popup body was created successfully and the next render step did not run.</div>
+      </div>
+    </div>
+  </body>
+</html>`);
+  doc.close();
+
+  const applyStyle = () => {
+    if (!doc.head.querySelector('style[data-usis-masterlist-print]')) {
+      const styleTag = doc.createElement('style');
+      styleTag.setAttribute('data-usis-masterlist-print', 'true');
+      styleTag.textContent = styles;
+      doc.head.appendChild(styleTag);
+    }
+  };
+
+  const logToPopup = (message: string) => {
+    const existing = doc.getElementById('usis-print-log');
+    const node = doc.createElement('script');
+    node.textContent = `console.log(${JSON.stringify(message)});`;
+    doc.body.appendChild(node);
+    node.remove();
+    if (existing) {
+      existing.textContent = message;
+    }
+  };
+
+  const renderContent = () => {
+    if (hasRendered) return;
+    hasRendered = true;
+    applyStyle();
+    doc.title = `Master List - SY ${schoolYear}`;
+    doc.body.innerHTML = `
+      <div id="usis-print-log" style="position:sticky;top:0;z-index:5;padding:10px 14px;background:#eff6ff;border-bottom:1px solid #bfdbfe;color:#1d4ed8;font:700 12px Segoe UI,sans-serif;">
+        Masterlist print body rendered. Preparing report...
+      </div>
+      ${safeTemplate}
+    `;
+    logToPopup(`[MasterlistPrint] Report body rendered for SY ${schoolYear}.`);
+    printWindow.focus();
+    setTimeout(() => {
+      console.log('[MasterlistPrint] Triggering print dialog');
+      logToPopup('[MasterlistPrint] Triggering print dialog.');
+      printWindow.print();
+    }, 250);
+  };
+
+  printWindow.addEventListener('afterprint', () => {
+    console.log('[MasterlistPrint] Print dialog closed');
+    try {
+      printWindow.close();
+    } catch (error) {
+      console.warn('[MasterlistPrint] Popup close failed', error);
+    }
+  });
+
+  printWindow.addEventListener('load', () => {
+    console.log('[MasterlistPrint] Popup load event fired');
+    renderContent();
+  }, { once: true });
+
+  setTimeout(() => {
+    if (doc.body && !doc.getElementById('usis-print-log')) {
+      console.log('[MasterlistPrint] Fallback render executed');
+      renderContent();
+    }
+  }, 100);
 };

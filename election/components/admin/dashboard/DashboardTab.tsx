@@ -23,8 +23,6 @@ type SummaryCard = {
   progress?: number;
 };
 
-const panelClassName = 'rounded-[12px] border border-[rgba(18,35,61,0.08)] bg-white shadow-sm';
-
 const DashboardTab: React.FC<DashboardTabProps> = ({ candidates, voters, learnerDatabase, sections }) => {
   const { egressSaved } = useStore();
 
@@ -101,138 +99,121 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ candidates, voters, learner
   });
 
   return (
-    <div className="space-y-6 opacity-0 transition-opacity duration-300 ease-in" style={{ opacity: 1 }}>
-      <section className={`${panelClassName} overflow-hidden`}>
-        <div className="grid grid-cols-3" aria-hidden="true">
-          <span className="h-[4px] bg-[#0038a8]" />
-          <span className="h-[4px] bg-[#fcd116]" />
-          <span className="h-[4px] bg-[#ce1126]" />
-        </div>
-        <div className="px-5 py-4 md:px-6">
-          <h3 className="text-[24px] font-bold leading-tight text-[#0038a8]">Election Operations Dashboard</h3>
-          <p className="mt-1 text-[13px] text-[#5b6b84]">Unified monitoring for turnout, grade participation, and candidate performance.</p>
-        </div>
-      </section>
-
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+    <div className="election-dashboard">
+      <div className="election-dashboard__summary-grid">
         {summaryCards.map((card) => (
-          <section key={card.title} className={`${panelClassName} bg-[linear-gradient(180deg,#ffffff_0%,#f9fbff_100%)] p-5`}>
-            <div className="flex items-start justify-between gap-4">
+          <section key={card.title} className="election-dashboard__summary-card">
+            <div className="election-dashboard__summary-card-inner">
               <div>
-                <p className="text-[13px] font-bold text-[#68758d]">{card.title}</p>
-                <p className={`mt-3 text-[24px] font-bold leading-none ${card.valueClassName || 'text-[#0038a8]'}`}>{card.value}</p>
-                <p className="mt-3 text-[13px] text-[#4a5568]">{card.detail}</p>
+                <p className="election-dashboard__summary-label">{card.title}</p>
+                <p className={`election-dashboard__summary-value ${card.valueClassName || 'text-[#0038a8]'}`}>{card.value}</p>
+                <p className="election-dashboard__summary-copy">{card.detail}</p>
               </div>
 
-              <div
-                className={`flex h-[44px] w-[44px] items-center justify-center rounded-[12px] ${card.accentClassName} text-white`}
-              >
-                <i className={`fa-solid ${card.icon} text-[16px]`}></i>
+              <div className={`election-dashboard__summary-icon ${card.accentClassName}`}>
+                <i className={`fa-solid ${card.icon}`} />
               </div>
             </div>
 
             {typeof card.progress === 'number' && (
-              <div className="mt-4 h-[8px] overflow-hidden rounded-full bg-[#e7edf5]">
-                <div className={`h-full ${card.progressClassName || 'bg-[#0038a8]'}`} style={{ width: `${card.progress}%` }}></div>
+              <div className="election-dashboard__progress">
+                <div className={`election-dashboard__progress-fill ${card.progressClassName || 'bg-[#0038a8]'}`} style={{ width: `${card.progress}%` }} />
               </div>
             )}
           </section>
         ))}
       </div>
 
-      <section className={`${panelClassName} p-6 md:p-8`}>
-        <div className="mb-6">
+      <section className="election-dashboard__panel">
+        <div className="election-dashboard__panel-content">
           <div>
-            <h3 className="text-[24px] font-bold uppercase leading-tight text-[#0038a8]">Grade-Level Participation</h3>
-            <p className="mt-1 text-[13px] font-bold text-[#68758d]">
+            <h3 className="election-dashboard__section-title">Grade-Level Participation</h3>
+            <p className="election-dashboard__section-subtitle">
               Real-time turnout breakdown
             </p>
           </div>
-        </div>
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {gradeLevelStats.map((stat) => (
-            <div
-              key={stat.grade}
-              className={[
-                'rounded-[12px] border p-5',
-                stat.isGrade12
-                  ? 'border-[rgba(18,35,61,0.08)] bg-[#f5f7fa] opacity-70'
-                  : 'border-[rgba(18,35,61,0.08)] bg-white',
-              ].join(' ')}
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h4 className="text-[16px] font-bold text-[#0038a8]">{stat.grade}</h4>
-                  <p className="mt-1 text-[13px] font-bold text-[#68758d]">
-                    {stat.isGrade12 ? 'Non-voting grade' : `${stat.voted} / ${stat.total} voters`}
+          <div className="election-dashboard__section-grid">
+            {gradeLevelStats.map((stat) => (
+              <div
+                key={stat.grade}
+                className={[
+                  'election-dashboard__stat-card',
+                  stat.isGrade12 ? 'opacity-70 bg-[#f5f7fa]' : 'bg-white',
+                ].join(' ')}
+              >
+                <div className="election-dashboard__stat-card-inner">
+                  <div>
+                    <h4 className="election-dashboard__stat-label text-[#0038a8]">{stat.grade}</h4>
+                    <p className="election-dashboard__stat-copy">
+                      {stat.isGrade12 ? 'Non-voting grade' : `${stat.voted} / ${stat.total} voters`}
+                    </p>
+                  </div>
+
+                  <p className={`election-dashboard__stat-value ${stat.isGrade12 ? 'text-[#98a2b3]' : 'text-[#ce1126]'}`}>
+                    {stat.isGrade12 ? 'N/A' : `${stat.percentage}%`}
                   </p>
                 </div>
 
-                <p className={`text-[24px] font-bold leading-none ${stat.isGrade12 ? 'text-[#98a2b3]' : 'text-[#ce1126]'}`}>
-                  {stat.isGrade12 ? 'N/A' : `${stat.percentage}%`}
-                </p>
+                <div className="election-dashboard__progress mt-5 h-[10px]">
+                  {!stat.isGrade12 ? (
+                    <div
+                      className="election-dashboard__progress-fill bg-[#ce1126]"
+                      style={{ width: `${stat.percentage}%` }}
+                    />
+                  ) : (
+                    <div className="election-dashboard__progress-fill w-full bg-[#cfd8e3] opacity-40" />
+                  )}
+                </div>
               </div>
-
-              <div className="mt-5 h-[10px] overflow-hidden rounded-full bg-[#e7edf5]">
-                {!stat.isGrade12 ? (
-                  <div
-                    className="h-full bg-[#ce1126]"
-                    style={{ width: `${stat.percentage}%` }}
-                  ></div>
-                ) : (
-                  <div className="h-full w-full bg-[#cfd8e3] opacity-40"></div>
-                )}
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </section>
 
-      <section className={`${panelClassName} p-6 md:p-8`}>
-        <div className="mb-6">
-          <h3 className="text-[24px] font-bold uppercase leading-tight text-[#0038a8]">Candidate Performance</h3>
-          <p className="mt-1 text-[13px] font-bold text-[#68758d]">
+      <section className="election-dashboard__panel">
+        <div className="election-dashboard__panel-content">
+          <h3 className="election-dashboard__section-title">Candidate Performance</h3>
+          <p className="election-dashboard__section-subtitle">
             Vote distribution across all registry
           </p>
-        </div>
-
-        <div className="h-[360px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={candidates}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7edf5" />
-              <XAxis
-                dataKey="name"
-                axisLine={false}
-                tickLine={false}
-                tick={{ fontSize: 13, fontWeight: 700, fill: '#68758d' }}
-              />
-              <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 13, fill: '#98a2b3' }} />
-              <Tooltip
-                cursor={{ fill: '#f8fafc' }}
-                contentStyle={{
-                  borderRadius: '12px',
-                  border: '1px solid rgba(18,35,61,0.08)',
-                  boxShadow: '0 4px 16px rgba(18,35,61,0.08)',
-                  padding: '12px 14px',
-                }}
-              />
-              <Bar dataKey="votes" radius={[8, 8, 0, 0]} barSize={40}>
-                {candidates.map((_, index) => (
-                  <Cell
-                    key={`cell-${index}`}
-                    fill={
-                      index % 3 === 0
-                        ? DEPED_COLORS.blue
-                        : index % 3 === 1
-                          ? DEPED_COLORS.red
-                          : DEPED_COLORS.yellow
-                    }
-                  />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+          <div className="election-dashboard__chart-panel">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={candidates}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7edf5" />
+                <XAxis
+                  dataKey="name"
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 13, fontWeight: 700, fill: '#68758d' }}
+                />
+                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 13, fill: '#98a2b3' }} />
+                <Tooltip
+                  cursor={{ fill: '#f8fafc' }}
+                  contentStyle={{
+                    borderRadius: '12px',
+                    border: '1px solid rgba(18,35,61,0.08)',
+                    boxShadow: '0 4px 16px rgba(18,35,61,0.08)',
+                    padding: '12px 14px',
+                  }}
+                />
+                <Bar dataKey="votes" radius={[8, 8, 0, 0]} barSize={40}>
+                  {candidates.map((_, index) => (
+                    <Cell
+                      key={`cell-${index}`}
+                      fill={
+                        index % 3 === 0
+                          ? DEPED_COLORS.blue
+                          : index % 3 === 1
+                            ? DEPED_COLORS.red
+                            : DEPED_COLORS.yellow
+                      }
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       </section>
     </div>

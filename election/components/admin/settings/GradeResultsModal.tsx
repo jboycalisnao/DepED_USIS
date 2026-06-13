@@ -52,33 +52,33 @@ const GradeResultsModal: React.FC<GradeResultsModalProps> = ({
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-[10005] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-300">
-      <div className="bg-white rounded-[2.5rem] shadow-2xl max-w-lg w-full overflow-hidden border border-white/10 transform animate-in zoom-in-95 duration-200">
-        <div className="bg-[#034F8B] p-8 text-white text-center relative">
-          <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-white/20">
-            <i className="fa-solid fa-file-pdf text-2xl text-[#fcd116]"></i>
+    <div className="modal-overlay modal-overlay--high">
+      <div className="modal-backdrop" onClick={onClose} />
+      <section className="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="grade-results-title">
+        <div className="modal-dialog__header">
+          <div className="modal-dialog__title-group">
+            <p className="modal-dialog__eyebrow">Election Modal</p>
+            <h3 id="grade-results-title">Official PDF Tally</h3>
+            <p className="modal-dialog__eyebrow">Statement of Votes Exporter</p>
           </div>
-          <h3 className="text-xl font-black uppercase tracking-tight leading-none">Official PDF Tally</h3>
-          <p className="text-[10px] font-bold text-blue-200 uppercase tracking-widest mt-2">Statement of Votes Exporter</p>
-          
-          <button onClick={onClose} className="absolute top-6 right-6 text-white/40 hover:text-white transition-colors">
-            <i className="fa-solid fa-xmark text-xl"></i>
+          <button onClick={onClose} className="modal-dialog__close" aria-label="Close modal">
+            <i className="fa-solid fa-xmark" />
           </button>
         </div>
 
-        <div className="p-8 space-y-8">
+        <div className="modal-dialog__body space-y-8">
           {/* Program Selector */}
           <div>
-            <label className="block text-[11px] font-black text-gray-400 uppercase tracking-widest mb-3">1. Select Target Group</label>
-            <div className="flex p-1 bg-gray-100 rounded-2xl gap-1">
+            <label className="block text-[13px] font-bold uppercase text-[#68758d] mb-3">1. Select Target Group</label>
+            <div className="flex p-1 bg-[#f1f5f9] rounded-[12px] gap-1">
               {(['REGULAR', 'STE', 'SPA'] as const).map(p => (
                 <button
                   key={p}
                   onClick={() => setSelectedProgram(p)}
-                  className={`flex-1 py-3 rounded-xl font-black text-[10px] uppercase transition-all ${
+                  className={`flex-1 py-3 rounded-[12px] font-bold text-[13px] uppercase transition-all ${
                     selectedProgram === p 
-                      ? 'bg-white text-[#034F8B] shadow-sm' 
-                      : 'text-gray-400 hover:text-gray-600'
+                      ? 'bg-white text-[#0038a8] shadow-sm' 
+                      : 'text-[#68758d] hover:text-[#12233d]'
                   }`}
                 >
                   {p === 'REGULAR' ? 'By Grade' : `Whole ${p}`}
@@ -89,7 +89,7 @@ const GradeResultsModal: React.FC<GradeResultsModalProps> = ({
 
           {/* Grade Selector */}
           <div className={`transition-all duration-300 ${isConsolidated ? 'opacity-40 pointer-events-none' : 'opacity-100'}`}>
-            <label className="block text-[11px] font-black text-gray-400 uppercase tracking-widest mb-3">
+            <label className="block text-[13px] font-bold text-[#68758d] uppercase mb-3">
               {isConsolidated ? '2. Scope Automatically Locked' : '2. Select Target Grade Level'}
             </label>
             <div className="grid grid-cols-2 gap-3">
@@ -98,10 +98,10 @@ const GradeResultsModal: React.FC<GradeResultsModalProps> = ({
                   key={grade}
                   disabled={isConsolidated}
                   onClick={() => setSelectedGrade(grade)}
-                  className={`py-4 rounded-2xl font-black text-[11px] uppercase transition-all border-2 ${
+                  className={`py-4 rounded-[12px] font-bold text-[13px] uppercase transition-all border ${
                     !isConsolidated && selectedGrade === grade 
-                      ? 'bg-blue-50 border-[#034F8B] text-[#034F8B] shadow-md' 
-                      : 'bg-white border-gray-100 text-gray-400 hover:border-gray-200'
+                      ? 'bg-[#eef4ff] border-[#0038a8] text-[#0038a8] shadow-md' 
+                      : 'bg-white border-[rgba(18,35,61,0.08)] text-[#68758d] hover:border-[rgba(0,56,168,0.2)]'
                   }`}
                 >
                   {grade}
@@ -110,9 +110,9 @@ const GradeResultsModal: React.FC<GradeResultsModalProps> = ({
             </div>
           </div>
 
-          <div className={`p-4 rounded-xl border flex items-start space-x-3 ${isConsolidated ? 'bg-blue-50 border-blue-100' : 'bg-amber-50 border-amber-100'}`}>
-            <i className={`fa-solid ${isConsolidated ? 'fa-layer-group text-blue-500' : 'fa-circle-info text-amber-500'} mt-0.5 text-xs`}></i>
-            <p className={`text-[9px] font-bold leading-relaxed uppercase tracking-tight ${isConsolidated ? 'text-blue-700' : 'text-amber-700'}`}>
+          <div className={`p-4 rounded-[12px] border flex items-start space-x-3 ${isConsolidated ? 'bg-[#eef4ff] border-[#dbeafe]' : 'bg-[#fff8db] border-[#fde68a]'}`}>
+            <i className={`fa-solid ${isConsolidated ? 'fa-layer-group text-blue-500' : 'fa-circle-info text-amber-500'} mt-0.5 text-xs`} />
+            <p className={`text-[13px] font-bold leading-relaxed uppercase ${isConsolidated ? 'text-[#034F8B]' : 'text-[#8a6a00]'}`}>
               {isConsolidated 
                 ? `Consolidated Mode: Generating a single report for all ${selectedProgram} sections (Grades 7, 8, 9, and 10 combined).`
                 : `Segmented Mode: Reporting for Regular ${selectedGrade} learners only.`}
@@ -120,11 +120,11 @@ const GradeResultsModal: React.FC<GradeResultsModalProps> = ({
           </div>
         </div>
 
-        <div className="p-6 bg-gray-50 flex flex-col gap-3">
+        <div className="modal-dialog__actions">
           <button 
             onClick={handleGenerate}
             disabled={isGenerating}
-            className="w-full bg-[#034F8B] text-white py-4 rounded-2xl font-black text-xs uppercase shadow-xl shadow-blue-900/20 active:scale-95 transition-all flex items-center justify-center border-b-4 border-blue-950"
+            className="modal-dialog__blue w-full"
           >
             {isGenerating ? (
               <><i className="fa-solid fa-spinner animate-spin mr-3"></i> Tallying Scope...</>
@@ -134,12 +134,12 @@ const GradeResultsModal: React.FC<GradeResultsModalProps> = ({
           </button>
           <button 
             onClick={onClose}
-            className="w-full py-2 text-[10px] font-black text-gray-400 hover:text-gray-900 uppercase"
+            className="w-full"
           >
             Cancel
           </button>
         </div>
-      </div>
+      </section>
     </div>,
     document.body
   );

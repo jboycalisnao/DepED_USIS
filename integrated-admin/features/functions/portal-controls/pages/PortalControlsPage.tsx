@@ -11,6 +11,10 @@ import {
   type PortalStatusMode,
 } from '../services/portalControlsService';
 
+type PortalControlsPageProps = {
+  moduleKeyFilter?: string;
+};
+
 const PRESETS: Record<
   string,
   { mode: PortalStatusMode; iconName: string; titleText: string; bodyText: string }
@@ -38,7 +42,7 @@ const PRESET_OPTIONS = [
 ];
 const ICON_SELECT_OPTIONS = ICON_OPTIONS.map((iconName) => ({ label: iconName, value: iconName }));
 
-export function PortalControlsPage() {
+export function PortalControlsPage({ moduleKeyFilter }: PortalControlsPageProps) {
   const [records, setRecords] = useState<PortalControlRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -54,9 +58,14 @@ export function PortalControlsPage() {
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [alert, setAlert] = useState<{ title: string; message: string; tone: 'success' | 'danger' } | null>(null);
 
+  const filteredRecords = useMemo(() => {
+    if (!moduleKeyFilter) return records;
+    return records.filter((item) => item.moduleKey === moduleKeyFilter);
+  }, [moduleKeyFilter, records]);
+
   const selectedRecord = useMemo(
-    () => records.find((item) => item.id === selectedModuleId) || null,
-    [records, selectedModuleId],
+    () => filteredRecords.find((item) => item.id === selectedModuleId) || null,
+    [filteredRecords, selectedModuleId],
   );
 
   useEffect(() => {
@@ -65,9 +74,6 @@ export function PortalControlsPage() {
       try {
         const next = await loadPortalControls();
         setRecords(next);
-        if (next.length > 0) {
-          setSelectedModuleId(next[0].id);
-        }
       } catch (error: any) {
         setAlert({ title: 'Load Failed', message: error?.message || 'Unable to load portal controls.', tone: 'danger' });
       } finally {
@@ -76,6 +82,16 @@ export function PortalControlsPage() {
     };
     void run();
   }, []);
+
+  useEffect(() => {
+    if (filteredRecords.length === 0) {
+      setSelectedModuleId('');
+      return;
+    }
+    if (!filteredRecords.some((item) => item.id === selectedModuleId)) {
+      setSelectedModuleId(filteredRecords[0].id);
+    }
+  }, [filteredRecords, selectedModuleId]);
 
   useEffect(() => {
     if (!selectedRecord) return;
@@ -124,80 +140,91 @@ export function PortalControlsPage() {
 
   if (loading) return <UsisPageLoader message="Loading portal controls..." />;
 
+  const pageTitle = moduleKeyFilter === 'election' ? 'Election Portal Controls' : 'Portal Controls';
+
   return (
     <section className="section-shell integrated-admin-function">
       <div className="integrated-admin-function__header">
-        <h2>Portal Controls</h2>
+        <h2>{pageTitle}</h2>
       </div>
       <article className="section-card ia-portal-controls">
         <div className="section-card__bar" />
         <div className="section-card__content">
-          <div className="registry-table-wrap">
-            <table className="registry-table">
-              <thead>
-                <tr>
-                  <th>Module / Portal</th>
-                  <th>Status</th>
-                  <th>Modal Type</th>
-                  <th>Message Source</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {records.map((record) => (
-                  <tr key={record.id}>
-                    <td>{record.moduleLabel}</td>
-                    <td>
-                      <span className={`ia-status-tag ${record.isEnabled && record.mode !== 'live' ? 'ia-status-tag--danger' : 'ia-status-tag--success'}`}>
-                        {record.isEnabled && record.mode !== 'live' ? 'Gated' : 'Live'}
-                      </span>
-                    </td>
-                    <td>
-                      <span
-                        className={`ia-status-tag ${
-                          record.mode === 'maintenance'
-                            ? 'ia-status-tag--warning'
-                            : record.mode === 'soon_open'
-                              ? 'ia-status-tag--info'
-                              : 'ia-status-tag--neutral'
-                        }`}
-                      >
-                        {record.mode === 'maintenance' ? 'Maintenance' : record.mode === 'soon_open' ? 'Soon to Open' : 'None'}
-                      </span>
-                    </td>
-                    <td>
-                      <span className={`ia-status-tag ${record.messageSource === 'preset' ? 'ia-status-tag--indigo' : 'ia-status-tag--violet'}`}>
-                        {record.messageSource === 'preset' ? 'Preset' : 'Custom'}
-                      </span>
-                    </td>
-                    <td>
-                      <button
-                        type="button"
-                        className="registry-icon-btn registry-icon-btn--primary"
-                        title="Configure"
-                        aria-label={`Configure ${record.moduleLabel}`}
-                        onClick={() => {
-                          setSelectedModuleId(record.id);
-                          setIsFormModalOpen(true);
-                        }}
-                      >
-                        <span className="material-symbols-outlined" aria-hidden="true">edit</span>
-                      </button>
-                    </td>
+          {moduleKeyFilter ? (
+            <div className="ia-portal-controls__single-module">
+              <p className="section-card__eyebrow">Module Scope</p>
+              <h3 className="mt-2">{selectedRecord?.moduleLabel || 'Election'}</h3>
+              <p className="registry-copy">Manage the election portal gate and modal behavior from Integrated Admin.</p>
+            </div>
+          ) : (
+            <div className="registry-table-wrap">
+              <table className="registry-table">
+                <thead>
+                  <tr>
+                    <th>Module / Portal</th>
+                    <th>Status</th>
+                    <th>Modal Type</th>
+                    <th>Message Source</th>
+                    <th>Action</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {records.map((record) => (
+                    <tr key={record.id}>
+                      <td>{record.moduleLabel}</td>
+                      <td>
+                        <span className={`ia-status-tag ${record.isEnabled && record.mode !== 'live' ? 'ia-status-tag--danger' : 'ia-status-tag--success'}`}>
+                          {record.isEnabled && record.mode !== 'live' ? 'Gated' : 'Live'}
+                        </span>
+                      </td>
+                      <td>
+                        <span
+                          className={`ia-status-tag ${
+                            record.mode === 'maintenance'
+                              ? 'ia-status-tag--warning'
+                              : record.mode === 'soon_open'
+                                ? 'ia-status-tag--info'
+                                : 'ia-status-tag--neutral'
+                          }`}
+                        >
+                          {record.mode === 'maintenance' ? 'Maintenance' : record.mode === 'soon_open' ? 'Soon to Open' : 'None'}
+                        </span>
+                      </td>
+                      <td>
+                        <span className={`ia-status-tag ${record.messageSource === 'preset' ? 'ia-status-tag--indigo' : 'ia-status-tag--violet'}`}>
+                          {record.messageSource === 'preset' ? 'Preset' : 'Custom'}
+                        </span>
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          className="registry-icon-btn registry-icon-btn--primary"
+                          title="Configure"
+                          aria-label={`Configure ${record.moduleLabel}`}
+                          onClick={() => {
+                            setSelectedModuleId(record.id);
+                            setIsFormModalOpen(true);
+                          }}
+                        >
+                          <span className="material-symbols-outlined" aria-hidden="true">edit</span>
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
 
           <div className="ia-portal-controls__actions">
             <button
               type="button"
               className="primary-button"
               onClick={() => {
-                if (!selectedModuleId && records[0]) setSelectedModuleId(records[0].id);
+                if (!selectedModuleId && filteredRecords[0]) setSelectedModuleId(filteredRecords[0].id);
                 setIsFormModalOpen(true);
               }}
+              disabled={filteredRecords.length === 0}
             >
               Configure Portal Control
             </button>
@@ -214,7 +241,7 @@ export function PortalControlsPage() {
         isSaving={Boolean(savingId)}
         messageSource={messageSource}
         mode={mode}
-        moduleOptions={MODULE_OPTIONS(records)}
+        moduleOptions={MODULE_OPTIONS(filteredRecords)}
         onApplyPreset={applyPreset}
         onBodyTextChange={setBodyText}
         onClose={() => setIsFormModalOpen(false)}

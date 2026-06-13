@@ -49,60 +49,48 @@ const ManualTallyModal: React.FC<ManualTallyModalProps> = ({ isOpen, onClose, ca
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md animate-in fade-in duration-300">
-      <div className="bg-white rounded-[3rem] shadow-2xl max-w-4xl w-full h-[90vh] flex flex-col overflow-hidden border border-white/20 transform animate-in zoom-in-95 duration-200">
-        
-        {/* Header */}
-        <div className="bg-[#034F8B] p-8 text-white relative flex-shrink-0">
-          <div className="flex items-center space-x-6">
-            <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center border border-white/20 shadow-inner">
-              <i className="fa-solid fa-pen-to-square text-2xl text-[#fcd116]"></i>
-            </div>
-            <div>
-              <h3 className="text-2xl font-black uppercase tracking-tight leading-none">Official Tally Verification</h3>
-              <p className="text-[10px] font-bold text-blue-200 uppercase tracking-[0.2em] mt-2">Final Review & Manual Override Module</p>
-            </div>
+    <div className="modal-overlay modal-overlay--high">
+      <div className="modal-backdrop" onClick={onClose} />
+      <section className="modal-dialog modal-dialog--wide" role="dialog" aria-modal="true" aria-labelledby="manual-tally-title">
+        <div className="modal-dialog__header">
+          <div className="modal-dialog__title-group">
+            <p className="modal-dialog__eyebrow">Election Modal</p>
+            <h3 id="manual-tally-title">Official Tally Verification</h3>
+            <p className="modal-dialog__eyebrow">Final Review & Manual Override Module</p>
           </div>
-          <button 
-            onClick={onClose} 
-            className="absolute top-8 right-8 text-white/40 hover:text-white transition-colors"
-          >
-            <i className="fa-solid fa-xmark text-2xl"></i>
+          <button onClick={onClose} className="modal-dialog__close" aria-label="Close modal">
+            <i className="fa-solid fa-xmark" />
           </button>
         </div>
 
-        {/* Action Bar */}
-        <div className="px-8 py-4 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Registry Sync:</span>
-            <button 
-              onClick={syncFromSystem}
-              className="px-4 py-2 bg-blue-50 text-[#034F8B] rounded-lg font-black text-[9px] uppercase hover:bg-blue-100 border border-blue-100 transition-all flex items-center"
-            >
-              <i className="fa-solid fa-rotate mr-2"></i>
-              Reset to Database Counts
-            </button>
+        <div className="modal-dialog__body space-y-6">
+          <div className="flex flex-wrap items-center justify-between gap-4 rounded-[12px] border border-[rgba(18,35,61,0.08)] bg-[#f8fbff] px-4 py-3">
+            <div className="flex items-center gap-3">
+              <span className="text-[13px] font-bold uppercase tracking-[0.08em] text-[#68758d]">Registry Sync:</span>
+              <button
+                onClick={syncFromSystem}
+                className="inline-flex min-h-[44px] items-center justify-center rounded-[12px] border border-[rgba(0,56,168,0.12)] bg-[#eef4ff] px-4 py-3 text-[13px] font-bold uppercase text-[#0038a8]"
+              >
+                <i className="fa-solid fa-rotate mr-2" />
+                Reset to Database Counts
+              </button>
+            </div>
+            <div className="inline-flex items-center gap-2 rounded-[12px] border border-[rgba(194,138,0,0.16)] bg-[#fff8db] px-3 py-2 text-[13px] font-bold uppercase text-[#8a6a00]">
+              <i className="fa-solid fa-circle-info" />
+              <span>Manual changes affect the printed report only</span>
+            </div>
           </div>
-          <div className="flex items-center space-x-4">
-             <div className="flex items-center space-x-2 text-[10px] font-bold text-amber-600 bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-100">
-                <i className="fa-solid fa-circle-info"></i>
-                <span className="uppercase">Manual changes affect the printed report only</span>
-             </div>
-          </div>
-        </div>
 
-        {/* Scrollable Content */}
-        <div className="flex-grow overflow-y-auto p-8 bg-gray-50/30 no-scrollbar">
           <div className="space-y-12">
             {POSITIONS.map(pos => {
               const posCandidates = candidates.filter(c => c.position === pos);
               if (posCandidates.length === 0) return null;
 
               return (
-                <section key={pos} className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden">
-                  <div className="px-8 py-4 bg-gray-50/80 border-b border-gray-100 flex justify-between items-center">
-                    <h4 className="text-[11px] font-black text-[#034F8B] uppercase tracking-widest">{pos}</h4>
-                    <span className="text-[9px] font-bold text-gray-400 uppercase">Input Encoded Counts</span>
+                <section key={pos} className="overflow-hidden rounded-[12px] border border-[rgba(18,35,61,0.08)] bg-white shadow-sm">
+                  <div className="flex items-center justify-between border-b border-[rgba(18,35,61,0.08)] bg-[#f8fbff] px-6 py-4">
+                    <h4 className="text-[13px] font-bold uppercase tracking-[0.08em] text-[#0038a8]">{pos}</h4>
+                    <span className="text-[13px] font-bold uppercase text-[#68758d]">Input Encoded Counts</span>
                   </div>
                   <div className="p-6 divide-y divide-gray-50">
                     {posCandidates.map(c => (
@@ -138,32 +126,25 @@ const ManualTallyModal: React.FC<ManualTallyModalProps> = ({ isOpen, onClose, ca
               );
             })}
           </div>
-        </div>
 
-        {/* Footer */}
-        <div className="p-8 bg-white border-t border-gray-100 flex items-center justify-between">
-          <div className="max-w-md">
-            <p className="text-[10px] font-bold text-gray-400 leading-relaxed uppercase">
-              By proceeding, you verify that these manual counts have been cross-checked with official precinct tally sheets.
-            </p>
-          </div>
-          <div className="flex space-x-3">
-            <button 
-              onClick={onClose}
-              className="px-8 py-4 text-[10px] font-black text-gray-400 uppercase hover:text-gray-900 transition-colors"
-            >
-              Cancel Review
-            </button>
-            <button 
-              onClick={handleProceed}
-              className="bg-[#E11C38] text-white px-10 py-4 rounded-2xl font-black text-xs uppercase shadow-xl shadow-red-900/20 hover:bg-red-700 transition-all active:scale-95 flex items-center"
-            >
-              <span>Generate Official Tally</span>
-              <i className="fa-solid fa-print ml-3"></i>
-            </button>
+          <div className="modal-dialog__actions">
+            <div className="max-w-md">
+              <p className="text-[13px] font-bold leading-relaxed text-[#68758d]">
+                By proceeding, you verify that these manual counts have been cross-checked with official precinct tally sheets.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <button onClick={onClose}>
+                Cancel Review
+              </button>
+              <button onClick={handleProceed} className="modal-dialog__primary">
+                <span>Generate Official Tally</span>
+                <i className="fa-solid fa-print ml-3" />
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      </section>
     </div>,
     document.body
   );

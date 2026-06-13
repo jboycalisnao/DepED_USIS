@@ -8,18 +8,15 @@ import Confirmation from './components/Confirmation';
 import Results from './components/Results';
 import PublicResults from './components/PublicResults';
 import PublicTurnout from './components/PublicTurnout';
-import FeaturePlaceholder from './components/FeaturePlaceholder';
 import ElectionRegistrationPage from './components/ElectionRegistrationPage';
-import Footer from './components/Footer';
 import AdminPanel from './components/admin/AdminPanel';
 import NotificationModal, { ModalConfig } from './components/NotificationModal';
 import CandidateAuditView from './components/CandidateAuditView';
 import LiveTallyMonitor from './components/admin/dashboard/LiveTallyMonitor';
 import SystemAlerts from './components/SystemAlerts';
-import { UsisLoginModal } from '../common/components/UsisLoginModal';
 import { UsisPortalGate } from '../common/components/UsisPortalGate';
-import { hasCoordinatorModuleAccess } from '../common/auth/moduleAccess';
-import { Candidate, AppView, User, ElectionConfig, ElectionStatus, Position, GradeLevel } from './types';
+import { UsisGlobalFooter } from '../common/footer/UsisGlobalFooter';
+import { Candidate, AppView, User, ElectionConfig, ElectionStatus, GradeLevel } from './types';
 import { DEPED_SEAL_URL, DEPED_LOGO_URL, LEON_NHS_LOGO_URL, LG_COMEA_LOGO_URL } from './constants';
 import { useStore } from './supabaseStore';
 import { supabase } from './lib/supabase';
@@ -49,12 +46,9 @@ const App: React.FC = () => {
   const [turnoutByPosition, setTurnoutByPosition] = useState<Record<string, number>>({});
   const [votedLrns, setVotedLrns] = useState<string[]>([]);
   const [selections, setSelections] = useState<Record<string, string[]>>({});
-  const [adminUsername, setAdminUsername] = useState('');
-  const [adminPassword, setAdminPassword] = useState('');
-  const [adminAccessError, setAdminAccessError] = useState<string | null>(null);
   const [isDemoMode, setIsDemoMode] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [activeElectionRegistration, setActiveElectionRegistration] = useState(() =>
+  const [, setActiveElectionRegistration] = useState(() =>
     getStoredElectionRegistration(),
   );
   const [registrationStep, setRegistrationStep] = useState<'access' | 'setup'>(() =>
@@ -66,8 +60,10 @@ const App: React.FC = () => {
     startTime: null,
     endTime: null,
     schoolName: 'Leon National High School',
+    electionName: 'Learner Government Election',
     publicResultsEnabled: false,
-    publicTurnoutEnabled: false
+    publicTurnoutEnabled: false,
+    allowedGradeLevel: null
   });
   
   const [modalConfig, setModalConfig] = useState<ModalConfig>({
@@ -76,14 +72,6 @@ const App: React.FC = () => {
     message: '',
     type: 'info'
   });
-
-  const getElectionYearLabel = () => {
-    const activeLabel = store.activeSchoolYear?.label;
-    if (!activeLabel) return '';
-    return activeLabel.replace(/\d{4}/g, (year) => (parseInt(year) + 1).toString());
-  };
-
-  const electionYearLabel = getElectionYearLabel();
 
   const refreshElectionData = async () => {
     try {
@@ -97,7 +85,7 @@ const App: React.FC = () => {
       ]);
       setCandidates(res.candidates || []);
       setTurnoutByPosition(res.turnoutByPosition || {});
-      setElectionConfig(config || { status: ElectionStatus.MANUAL_OPEN, startTime: null, endTime: null, schoolName: 'Leon National High School', publicResultsEnabled: false, publicTurnoutEnabled: false });
+      setElectionConfig(config || { status: ElectionStatus.MANUAL_OPEN, startTime: null, endTime: null, schoolName: 'Leon National High School', electionName: 'Learner Government Election', publicResultsEnabled: false, publicTurnoutEnabled: false, allowedGradeLevel: null });
       setVotedLrns(participation || []);
     } catch (err) {
       console.error("Data synchronization error:", err);
@@ -146,7 +134,6 @@ const App: React.FC = () => {
         'election-registration',
         'tally-results',
         'admin',
-        'admin-access',
         'audit',
         'monitoring',
         'public-results',
@@ -171,7 +158,8 @@ const App: React.FC = () => {
         }
 
         if (mainView === 'public-results') {
-          setView('public-results');
+          navigateToElectionPath('/results', true);
+          setView('results-page');
           return;
         }
 
@@ -185,11 +173,6 @@ const App: React.FC = () => {
           return;
         }
         
-        if (mainView === 'admin-access') {
-          setView('admin-access');
-          return;
-        }
-
         if (mainView === 'election-registration') {
           const hasAccess = !!getStoredElectionRegistrationAccess();
           const nextStep = parts[1] === 'setup' ? 'setup' : 'access';
@@ -242,9 +225,9 @@ const App: React.FC = () => {
     setModalConfig({ isOpen: true, title, message, type, onConfirm });
   };
 
-  const handleUpdateElectionConfig = (newConfig: ElectionConfig) => {
+  const handleUpdateElectionConfig = async (newConfig: ElectionConfig) => {
     setElectionConfig(newConfig);
-    store.saveElectionConfig(newConfig);
+    await store.saveElectionConfig(newConfig);
   };
 
   const handleAddCandidate = async (candidate: Partial<Candidate>, syId: string) => {
@@ -305,11 +288,6 @@ const App: React.FC = () => {
     const lrn = username.trim();
     const passwordValue = password.trim();
 
-    if (lrn.toLowerCase() === 'admin') {
-      updateView('admin-access');
-      return;
-    }
-
     if (lrn === DEMO_LRN) {
       setIsDemoMode(true);
       setCurrentUser(DEMO_USER);
@@ -340,7 +318,7 @@ const App: React.FC = () => {
       credentialPassword !== passwordValue ||
       credentialsDisabled
     ) {
-      showAlert('Invalid Credentials', 'The username or password is incorrect.', 'error');
+      showAlert('Invalid Credentials', 'The LRN or password is incorrect.', 'error');
       setPassword('');
       return;
     }
@@ -357,11 +335,23 @@ const App: React.FC = () => {
 
     const section = (store.sections || []).find(s => s.id === learner.sectionId);
     
-    if (section?.gradeLevel === GradeLevel.GRADE_12) {
+    const configuredGradeLevel = String(electionConfig.allowedGradeLevel || '').trim();
+    if (configuredGradeLevel) {
+      if (section?.gradeLevel !== configuredGradeLevel) {
+        showAlert(
+          'Access Restricted',
+          `This election portal is limited to ${configuredGradeLevel} learners.`,
+          'warning',
+        );
+        setUsername('');
+        setPassword('');
+        return;
+      }
+    } else if (section?.gradeLevel === GradeLevel.GRADE_12) {
       showAlert(
-        "Non-Voter Status", 
-        "Grade 12 students are graduating and are excluded from the current Learner Government election cycle.", 
-        "warning"
+        'Non-Voter Status',
+        'Grade 12 students are graduating and are excluded from the current Learner Government election cycle.',
+        'warning',
       );
       setUsername('');
       setPassword('');
@@ -445,72 +435,6 @@ const App: React.FC = () => {
     updateView('login');
   };
 
-  const handleAdminAccessLogin = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const normalizedUsername = adminUsername.trim().toLowerCase();
-    const normalizedPassword = adminPassword.trim();
-
-    if (!normalizedUsername || !normalizedPassword) {
-      setAdminAccessError('Enter both username and password.');
-      return;
-    }
-
-    const coordinatorsResponse = await supabase
-      .from('usis_core_coordinators')
-      .select('id,first_name,last_name,role,password_hash,is_active')
-      .eq('username', normalizedUsername)
-      .eq('is_active', true)
-      .limit(1)
-      .maybeSingle();
-
-    let coordinatorData = coordinatorsResponse.data as any;
-    let coordinatorError = coordinatorsResponse.error as any;
-
-    if (coordinatorError) {
-      setAdminAccessError('Unable to contact the coordinator registry in Supabase.');
-      return;
-    }
-
-    if (!coordinatorData) {
-      setAdminAccessError('No active coordinator account matches these credentials.');
-      return;
-    }
-
-    const validPassword = normalizedPassword === String(coordinatorData.password_hash || '');
-
-    if (!validPassword) {
-      setAdminAccessError('No active coordinator account matches these credentials.');
-      return;
-    }
-
-    const hasElectionAccess =
-      coordinatorData.role === 'system_admin' ||
-      coordinatorData.role === 'school_usis_coordinator' ||
-      hasCoordinatorModuleAccess(coordinatorData.id, 'election');
-
-    if (!hasElectionAccess) {
-      setAdminAccessError('Access denied. This coordinator account is not granted Election module access.');
-      return;
-    }
-
-    const displayName =
-      [coordinatorData.first_name, coordinatorData.last_name].filter(Boolean).join(' ') ||
-      'System Administrator';
-
-    pendingAuthRef.current = true;
-    setCurrentUser({
-      studentId: 'admin',
-      name: displayName,
-      hasVoted: false,
-      isAdmin: true,
-    });
-    setAdminAccessError(null);
-    setAdminUsername('');
-    setAdminPassword('');
-    setView('admin');
-    updateView('admin/dashboard');
-  };
-
   const voters: User[] = (votedLrns || []).map(lrn => ({
     studentId: lrn,
     name: 'Verified Voter', 
@@ -542,10 +466,7 @@ const App: React.FC = () => {
       
       {!isIdentityFocusView && (
         <Header 
-          onLogout={currentUser ? handleLogout : undefined} 
           currentUser={currentUser?.name} 
-          schoolName={electionConfig.schoolName} 
-          electionYear={electionYearLabel}
           currentView={view}
         />
       )}
@@ -565,27 +486,6 @@ const App: React.FC = () => {
             config={electionConfig}
           />
         )}
-        {view === 'admin-access' && !currentUser && (
-          <section className="flex-grow bg-[#f8fafc]">
-            <div className="w-full px-[var(--page-inset)] py-4 md:py-6">
-              <div className="mx-auto flex w-full max-w-[720px] flex-col items-center">
-                <UsisLoginModal
-                  moduleKey="election"
-                  title="Admin Access"
-                  username={adminUsername}
-                  password={adminPassword}
-                  submitLabel="Login"
-                  noticeTitle="Access Denied"
-                  noticeMessage={adminAccessError}
-                  onDismissNotice={() => setAdminAccessError(null)}
-                  onUsernameChange={setAdminUsername}
-                  onPasswordChange={setAdminPassword}
-                  onSubmit={handleAdminAccessLogin}
-                />
-              </div>
-            </div>
-          </section>
-        )}
         {view === 'identity-confirmation' && currentUser && <IdentityConfirmation user={currentUser} onConfirm={() => updateView('ballot')} onCancel={handleLogout} />}
         {view === 'ballot' && (
           <Ballot 
@@ -597,13 +497,6 @@ const App: React.FC = () => {
           />
         )}
         {view === 'confirmation' && <Confirmation candidates={isDemoMode ? DEMO_CANDIDATES : candidates} selections={selections} onLogout={handleLogout} user={currentUser} />}
-        {view === 'results-page' && (
-          <FeaturePlaceholder
-            label="Results"
-            title="Election Results"
-            message="The new election results page will be added here using the DepED-Web-Kit template and the updated election portal standards."
-          />
-        )}
         {view === 'election-registration' && (
           <ElectionRegistrationPage
             schoolName={electionConfig.schoolName || 'Leon National High School'}
@@ -637,10 +530,10 @@ const App: React.FC = () => {
           />
         )}
         {view === 'tally-results' && <Results candidates={candidates} turnoutByPosition={turnoutByPosition} />}
-        {view === 'public-results' && (
-          <PublicResults 
-            candidates={candidates} 
-            turnoutByPosition={turnoutByPosition} 
+        {view === 'results-page' && (
+          <PublicResults
+            candidates={candidates}
+            turnoutByPosition={turnoutByPosition}
             config={electionConfig}
             schoolYearLabel={store.activeSchoolYear?.label || '----'}
           />
@@ -679,7 +572,7 @@ const App: React.FC = () => {
         )}
       </main>
 
-      {!isIdentityFocusView && <Footer schoolYearLabel={store.activeSchoolYear?.label} />}
+      {!isIdentityFocusView && <UsisGlobalFooter />}
     </div>
   );
 };

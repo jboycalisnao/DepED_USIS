@@ -428,6 +428,60 @@ create index if not exists idx_coordinator_module_access_modules
   on coordinator_module_access using gin (modules);
 
 -- =========================================================
+-- Coordinator IA Page Catalog and Access
+-- =========================================================
+create table if not exists coordinator_ia_pages (
+  page_key text primary key,
+  page_label text not null,
+  page_group text not null,
+  is_active boolean not null default true,
+  sort_order integer not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_coordinator_ia_pages_group on coordinator_ia_pages(page_group);
+create index if not exists idx_coordinator_ia_pages_active on coordinator_ia_pages(is_active);
+
+create table if not exists coordinator_account_ia_page_access (
+  account_id uuid not null references usis_core_coordinators(id) on update cascade on delete cascade,
+  page_key text not null references coordinator_ia_pages(page_key) on update cascade on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (account_id, page_key)
+);
+
+create index if not exists idx_coordinator_account_ia_page_access_page_key
+  on coordinator_account_ia_page_access(page_key);
+
+insert into coordinator_ia_pages (page_key, page_label, page_group, is_active, sort_order)
+values
+  ('ia.coordinator.departments', 'Departments', 'Coordinator', true, 10),
+  ('ia.coordinator.teaching_non_teaching', 'Teaching & Non-Teaching', 'Coordinator', true, 20),
+  ('ia.coordinator.learner_credentials', 'Learner-based Credentials', 'Coordinator', true, 30),
+  ('ia.grades_subjects.subjects', 'Subjects', 'Grades & Subjects', true, 10),
+  ('ia.grades_subjects.grades', 'Grades', 'Grades & Subjects', true, 20),
+  ('ia.grades_subjects.subject_management', 'Subject Management', 'Grades & Subjects', true, 30),
+  ('ia.grades_subjects.time_slots', 'Time Slots', 'Grades & Subjects', true, 40),
+  ('ia.merch.merchandise_control', 'Merchandise Control', 'Merch', true, 10),
+  ('ia.merch.orders', 'Orders', 'Merch', true, 20),
+  ('ia.merch.payment', 'Payment', 'Merch', true, 30),
+  ('ia.merch.order_counts', 'Order Counts', 'Merch', true, 40),
+  ('ia.portal_controls', 'Portal Controls', 'Portal Controls', true, 10),
+  ('ia.election.admin_console', 'Admin Console', 'Election', true, 10),
+  ('ia.election.dashboard', 'Dashboard', 'Election', true, 20),
+  ('ia.election.candidates', 'Candidates', 'Election', true, 30),
+  ('ia.election.voters', 'Voters', 'Election', true, 40),
+  ('ia.election.organization', 'Organization', 'Election', true, 50),
+  ('ia.election.settings', 'Settings', 'Election', true, 60)
+on conflict (page_key) do update
+set
+  page_label = excluded.page_label,
+  page_group = excluded.page_group,
+  is_active = excluded.is_active,
+  sort_order = excluded.sort_order,
+  updated_at = now();
+
+-- =========================================================
 -- Coordinator Departments
 -- =========================================================
 create table if not exists coordinator_departments (
@@ -689,6 +743,11 @@ for each row execute function set_updated_at();
 drop trigger if exists trg_coordinator_module_access_updated_at on coordinator_module_access;
 create trigger trg_coordinator_module_access_updated_at
 before update on coordinator_module_access
+for each row execute function set_updated_at();
+
+drop trigger if exists trg_coordinator_ia_pages_updated_at on coordinator_ia_pages;
+create trigger trg_coordinator_ia_pages_updated_at
+before update on coordinator_ia_pages
 for each row execute function set_updated_at();
 
 drop trigger if exists trg_coordinator_departments_updated_at on coordinator_departments;

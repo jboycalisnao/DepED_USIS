@@ -74,8 +74,8 @@ const MasterlistDocument: React.FC<MasterlistDocumentProps> = ({ section, studen
   allRows.push({ type: 'summary', label: 'GRAND TOTAL', value: students.length });
 
   // Pagination Constants
-  const ROWS_PER_PAGE_FIRST = 17;      
-  const ROWS_PER_PAGE_SUBSEQUENT = 22; 
+  const ROWS_PER_PAGE_FIRST = 19;
+  const ROWS_PER_PAGE_SUBSEQUENT = 24;
 
   const pages: RowItem[][] = [];
   let currentRows: RowItem[] = [];
@@ -117,8 +117,9 @@ const MasterlistDocument: React.FC<MasterlistDocumentProps> = ({ section, studen
               display: 'flex',
               flexDirection: 'column',
               position: 'relative',
-              pageBreakAfter: 'always',
-              margin: '0 auto 20px auto',
+              pageBreakAfter: pageIdx === pages.length - 1 ? 'auto' : 'always',
+              breakAfter: pageIdx === pages.length - 1 ? 'auto' : 'page',
+              margin: '0 auto',
               boxShadow: '0 0 10px rgba(0,0,0,0.1)',
               overflow: 'hidden'
             }}
@@ -212,7 +213,7 @@ const MasterlistDocument: React.FC<MasterlistDocumentProps> = ({ section, studen
               </table>
             </div>
 
-            <MasterlistFooter section={section} schoolYear={schoolYear} />
+            <MasterlistFooter section={section} schoolYear={schoolYear} showSignatories={pageIdx === pages.length - 1} />
           </div>
         );
       })}

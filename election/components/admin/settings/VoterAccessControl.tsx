@@ -1,6 +1,7 @@
-
-import React from 'react';
-import { ElectionConfig, ElectionStatus } from '../../../types';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ElectionConfig, ElectionStatus, GradeLevel } from '../../../types';
+import { FloatingField } from '../../ui/FloatingField';
+import { UsisSearchableSelect } from '../../../../common/components/ui/UsisSearchableSelect';
 
 interface VoterAccessControlProps {
   config: ElectionConfig;
@@ -8,8 +9,26 @@ interface VoterAccessControlProps {
 }
 
 const VoterAccessControl: React.FC<VoterAccessControlProps> = ({ config, onUpdate }) => {
+  const gradeLevelOptions = useMemo(
+    () => [
+      { label: 'All Grades', value: '' },
+      ...Object.values(GradeLevel).map((gradeLevel) => ({
+        label: gradeLevel,
+        value: gradeLevel,
+      })),
+    ],
+    [],
+  );
+  const [draftAllowedGradeLevel, setDraftAllowedGradeLevel] = useState<string>(config.allowedGradeLevel || '');
+  const [lastSavedGradeLevel, setLastSavedGradeLevel] = useState<string>(config.allowedGradeLevel || '');
+
+  useEffect(() => {
+    const nextValue = config.allowedGradeLevel || '';
+    setDraftAllowedGradeLevel(nextValue);
+    setLastSavedGradeLevel(nextValue);
+  }, [config.allowedGradeLevel]);
+
   const handleStatusChange = (status: ElectionStatus) => {
-    // Only trigger update if status actually changes
     if (config.status !== status) {
       onUpdate({ ...config, status });
     }
@@ -19,110 +38,179 @@ const VoterAccessControl: React.FC<VoterAccessControlProps> = ({ config, onUpdat
     onUpdate({ ...config, [field]: value });
   };
 
-  const isPortalActuallyOpen = () => {
-    if (config.status === ElectionStatus.MANUAL_OPEN) return true;
-    if (config.status === ElectionStatus.MANUAL_CLOSED) return false;
-    
-    const now = new Date().getTime();
-    const start = config.startTime ? new Date(config.startTime).getTime() : 0;
-    const end = config.endTime ? new Date(config.endTime).getTime() : Infinity;
-    return now >= start && now <= end;
+  const handleGradeLevelChange = (value: string) => {
+    setDraftAllowedGradeLevel(value);
   };
 
-  const actualStatus = isPortalActuallyOpen();
+  const handleSaveGradeLevel = () => {
+    const nextValue = draftAllowedGradeLevel.trim();
+    onUpdate({
+      ...config,
+      allowedGradeLevel: nextValue ? (nextValue as GradeLevel) : null,
+    });
+    setLastSavedGradeLevel(nextValue);
+  };
+
+  const isScheduleActive = config.status === ElectionStatus.SCHEDULED;
 
   return (
-    <div className="rounded-[12px] border border-[rgba(18,35,61,0.08)] bg-white p-6 shadow-sm no-print">
-      <div className="mb-6 flex items-center">
-        <div className="flex items-center space-x-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-[12px] bg-blue-50 text-[#034F8B]">
-            <i className="fa-solid fa-clock-rotate-left text-[16px]"></i>
+    <section className="election-page__control-card election-settings__access-card">
+      <div className="election-settings__section-header">
+        <div className="election-settings__section-copy">
+          <p className="election-settings__section-kicker">Voter Access Control</p>
+          <h3 className="election-settings__section-title">Manage login availability and scheduling</h3>
+          <div className="election-settings__tag-row">
+            <span className="election-settings__tag election-settings__tag--accent">
+              {isScheduleActive ? 'Schedule Mode' : 'Manual Mode'}
+            </span>
           </div>
-          <div>
-            <h3 className="text-[24px] font-black uppercase tracking-tight text-gray-900">Voter Access Control</h3>
-            <p className="text-[13px] font-bold uppercase tracking-[0.12em] text-slate-500">Manage login availability and scheduling</p>
+        </div>
+        <span className="election-settings__section-badge">
+          {isScheduleActive ? 'Use Schedule' : config.status === ElectionStatus.MANUAL_OPEN ? 'Always Open' : 'Force Closed'}
+        </span>
+      </div>
+
+      <div className="election-settings__toggle-grid">
+        <button
+          type="button"
+          onClick={() => handleStatusChange(ElectionStatus.MANUAL_OPEN)}
+          className={`election-settings__toggle-card ${config.status === ElectionStatus.MANUAL_OPEN ? 'election-settings__toggle-card--active election-settings__toggle-card--open' : ''}`}
+        >
+          <span className="election-settings__toggle-icon">
+            <span className="material-symbols-outlined" aria-hidden="true">
+              lock_open
+            </span>
+          </span>
+          <span className="election-settings__toggle-copy">
+            <strong>Always Open</strong>
+            <small>Manual override that keeps voter login available.</small>
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => handleStatusChange(ElectionStatus.MANUAL_CLOSED)}
+          className={`election-settings__toggle-card ${config.status === ElectionStatus.MANUAL_CLOSED ? 'election-settings__toggle-card--active election-settings__toggle-card--closed' : ''}`}
+        >
+          <span className="election-settings__toggle-icon">
+            <span className="material-symbols-outlined" aria-hidden="true">
+              lock
+            </span>
+          </span>
+          <span className="election-settings__toggle-copy">
+            <strong>Force Closed</strong>
+            <small>Blocks login regardless of schedule state.</small>
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => handleStatusChange(ElectionStatus.SCHEDULED)}
+          className={`election-settings__toggle-card ${config.status === ElectionStatus.SCHEDULED ? 'election-settings__toggle-card--active election-settings__toggle-card--schedule' : ''}`}
+        >
+          <span className="election-settings__toggle-icon">
+            <span className="material-symbols-outlined" aria-hidden="true">
+              calendar_clock
+            </span>
+          </span>
+          <span className="election-settings__toggle-copy">
+            <strong>Use Schedule</strong>
+            <small>Opens and closes voter access by time window.</small>
+          </span>
+        </button>
+      </div>
+
+        <div className={`election-settings__schedule-panel ${!isScheduleActive ? 'election-settings__schedule-panel--disabled' : ''}`}>
+        <div className="election-settings__section-header election-settings__section-header--compact">
+          <div className="election-settings__section-copy">
+            <p className="election-settings__section-kicker">Automation Settings</p>
+            <h4 className="election-settings__section-subtitle">Only editable when schedule mode is active</h4>
           </div>
+          <span className="election-settings__section-note">
+            {isScheduleActive ? 'Schedule Enabled' : 'Schedule Disabled'}
+          </span>
+        </div>
+
+        <div className="election-settings__schedule-grid">
+          <FloatingField
+            as="input"
+            label="Portal Open Time"
+            type="datetime-local"
+            value={config.startTime || ''}
+            onChange={(event) => handleTimeChange('startTime', event.target.value)}
+            disabled={!isScheduleActive}
+          />
+
+          <FloatingField
+            as="input"
+            label="Portal Close Time"
+            type="datetime-local"
+            value={config.endTime || ''}
+            onChange={(event) => handleTimeChange('endTime', event.target.value)}
+            disabled={!isScheduleActive}
+          />
+        </div>
+
+        <div className="election-settings__helper-note election-settings__helper-note--compact">
+          <span className="material-symbols-outlined" aria-hidden="true">
+            info
+          </span>
+          <p>
+            When schedule mode is active, voters can only access the login form between the configured dates. Outside that window, the portal stays closed.
+          </p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-1 space-y-4">
-          <p className="mb-4 text-[13px] font-bold uppercase tracking-[0.12em] text-slate-500">Manual Override</p>
-          <div className="flex flex-col gap-3">
-            <button 
-              type="button"
-              onClick={() => handleStatusChange(ElectionStatus.MANUAL_OPEN)}
-              className={`flex cursor-pointer items-center justify-between rounded-[12px] border px-4 py-4 text-left transition-colors ${config.status === ElectionStatus.MANUAL_OPEN ? 'border-[rgba(0,56,168,0.24)] bg-[#eef4ff] text-[#0038a8]' : 'border-[rgba(18,35,61,0.14)] bg-white text-slate-600 hover:bg-slate-50'}`}
-            >
-              <div className="flex items-center pointer-events-none">
-                <i className="fa-solid fa-lock-open mr-3"></i>
-                <span className="text-[13px] font-bold uppercase tracking-[0.08em]">Always Open</span>
-              </div>
-              {config.status === ElectionStatus.MANUAL_OPEN && <i className="fa-solid fa-check"></i>}
-            </button>
-
-            <button 
-              type="button"
-              onClick={() => handleStatusChange(ElectionStatus.MANUAL_CLOSED)}
-              className={`flex cursor-pointer items-center justify-between rounded-[12px] border px-4 py-4 text-left transition-colors ${config.status === ElectionStatus.MANUAL_CLOSED ? 'border-[rgba(206,17,38,0.24)] bg-[#fff5f6] text-[#ce1126]' : 'border-[rgba(18,35,61,0.14)] bg-white text-slate-600 hover:bg-slate-50'}`}
-            >
-              <div className="flex items-center pointer-events-none">
-                <i className="fa-solid fa-lock mr-3"></i>
-                <span className="text-[13px] font-bold uppercase tracking-[0.08em]">Force Closed</span>
-              </div>
-              {config.status === ElectionStatus.MANUAL_CLOSED && <i className="fa-solid fa-check"></i>}
-            </button>
-
-            <button 
-              type="button"
-              onClick={() => handleStatusChange(ElectionStatus.SCHEDULED)}
-              className={`flex cursor-pointer items-center justify-between rounded-[12px] border px-4 py-4 text-left transition-colors ${config.status === ElectionStatus.SCHEDULED ? 'border-[rgba(0,56,168,0.24)] bg-[#eef4ff] text-[#0038a8]' : 'border-[rgba(18,35,61,0.14)] bg-white text-slate-600 hover:bg-slate-50'}`}
-            >
-              <div className="flex items-center pointer-events-none">
-                <i className="fa-solid fa-calendar-check mr-3"></i>
-                <span className="text-[13px] font-bold uppercase tracking-[0.08em]">Use Schedule</span>
-              </div>
-              {config.status === ElectionStatus.SCHEDULED && <i className="fa-solid fa-check"></i>}
-            </button>
+      <div className="election-settings__schedule-panel">
+        <div className="election-settings__section-header election-settings__section-header--compact">
+          <div className="election-settings__section-copy">
+            <p className="election-settings__section-kicker">Grade-Level Access</p>
+            <h4 className="election-settings__section-subtitle">Limit portal login to a single grade level</h4>
           </div>
+          <span className="election-settings__section-note">
+            {config.allowedGradeLevel ? 'Restricted' : 'Open'}
+          </span>
         </div>
 
-        <div className={`lg:col-span-2 space-y-6 rounded-[12px] border border-[rgba(18,35,61,0.08)] bg-slate-50 p-6 transition-opacity ${config.status !== ElectionStatus.SCHEDULED ? 'pointer-events-none opacity-40 grayscale' : ''}`}>
-          <div className="mb-4 flex items-center space-x-2">
-             <i className="fa-solid fa-timeline text-blue-500"></i>
-             <p className="text-[13px] font-bold uppercase tracking-[0.12em] text-slate-600">Automation Settings</p>
-          </div>
+        <div className="election-settings__grade-access-row">
+          <label className="floating-field election-settings__grade-access-field">
+            <UsisSearchableSelect
+              ariaLabel="Allowed Grade Level"
+              allowTyping={false}
+              floatingLabel
+              label="Allowed Grade Level"
+              onChange={handleGradeLevelChange}
+              options={gradeLevelOptions}
+              value={draftAllowedGradeLevel}
+            />
+          </label>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="mb-2 block text-[13px] font-bold uppercase tracking-[0.12em] text-slate-500">Portal Open Time</label>
-              <input 
-                type="datetime-local"
-                value={config.startTime || ''}
-                onChange={(e) => handleTimeChange('startTime', e.target.value)}
-                className="w-full rounded-[12px] border border-[rgba(18,35,61,0.14)] bg-white px-4 py-[14px] text-[16px] text-[#12233d] outline-none transition-all duration-200 focus:border-[rgba(0,56,168,0.44)] focus:shadow-[0_0_0_4px_rgba(0,56,168,0.08)]"
-              />
-            </div>
-            <div>
-              <label className="mb-2 block text-[13px] font-bold uppercase tracking-[0.12em] text-slate-500">Portal Close Time</label>
-              <input 
-                type="datetime-local"
-                value={config.endTime || ''}
-                onChange={(e) => handleTimeChange('endTime', e.target.value)}
-                className="w-full rounded-[12px] border border-[rgba(18,35,61,0.14)] bg-white px-4 py-[14px] text-[16px] text-[#12233d] outline-none transition-all duration-200 focus:border-[rgba(0,56,168,0.44)] focus:shadow-[0_0_0_4px_rgba(0,56,168,0.08)]"
-              />
-            </div>
-          </div>
-
-          <div className="rounded-[12px] border border-gray-200 bg-white p-4">
-            <p className="text-[13px] leading-relaxed text-slate-600">
-              <i className="fa-solid fa-circle-info mr-2 text-blue-400"></i>
-              When "Use Schedule" is active, voters can only access the login form between these two dates. Outside of this window, they will see a "Portal Closed" message.
-            </p>
-          </div>
+          <button
+            type="button"
+            className="election-settings__grade-save-button"
+            onClick={handleSaveGradeLevel}
+            disabled={draftAllowedGradeLevel.trim() === lastSavedGradeLevel.trim()}
+          >
+            {draftAllowedGradeLevel.trim() === lastSavedGradeLevel.trim() ? 'Saved' : 'Save Access'}
+          </button>
         </div>
+
+        <div className="election-settings__helper-note election-settings__helper-note--compact">
+          <span className="material-symbols-outlined" aria-hidden="true">
+            info
+          </span>
+          <p>
+            Select one grade level to limit election portal login to that group only. Leave it on All Grades to keep the current default access rules.
+          </p>
+        </div>
+
+        <p className="election-settings__save-status" aria-live="polite">
+          {draftAllowedGradeLevel.trim() === lastSavedGradeLevel.trim()
+            ? 'Grade-level access is saved.'
+            : 'You have unsaved grade-level changes.'}
+        </p>
       </div>
-    </div>
+    </section>
   );
 };
 

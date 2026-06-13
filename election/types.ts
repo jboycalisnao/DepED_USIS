@@ -43,12 +43,14 @@ export interface ElectionConfig {
   startTime: string | null;
   endTime: string | null;
   schoolName?: string;
+  electionName?: string;
   schoolId?: string;
   schoolCode?: string;
   electionId?: string;
   electionCode?: string;
   publicResultsEnabled?: boolean;
   publicTurnoutEnabled?: boolean;
+  allowedGradeLevel?: GradeLevel | null;
 }
 
 export interface ElectionContext {
@@ -183,7 +185,6 @@ export type AppView =
   | 'results-page'
   | 'election-registration'
   | 'tally-results'
-  | 'admin-access'
   | 'admin'
   | 'public-results'
   | 'public-turnout';

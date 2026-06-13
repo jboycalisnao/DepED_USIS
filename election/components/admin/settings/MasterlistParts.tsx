@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Section } from '../../../types';
 import { DEPED_SEAL_URL, LEON_NHS_LOGO_URL } from '../../../constants';
@@ -17,9 +16,9 @@ export const MasterlistHeader: React.FC<PartProps & { schoolName: string }> = ({
             <img src={DEPED_SEAL_URL} style={{ height: '70px', width: 'auto', display: 'block', margin: '0 auto' }} alt="DepEd Seal" />
           </td>
           <td style={{ border: 'none', textAlign: 'center', verticalAlign: 'middle', padding: '0 10px' }}>
-            <p style={{ margin: 0, fontSize: '9pt', fontFamily: "serif" }}>Republic of the Philippines</p>
-            <p style={{ margin: '1px 0', fontSize: '11pt', fontWeight: 'bold', fontFamily: "serif" }}>Department of Education</p>
-            <p style={{ margin: 0, fontSize: '7.5pt', letterSpacing: '0.5pt', textTransform: 'uppercase', fontWeight: 500 }}>REGION VI – WESTERN VISAYAS</p>
+            <p style={{ margin: 0, fontSize: '9pt', fontFamily: 'serif' }}>Republic of the Philippines</p>
+            <p style={{ margin: '1px 0', fontSize: '11pt', fontWeight: 'bold', fontFamily: 'serif' }}>Department of Education</p>
+            <p style={{ margin: 0, fontSize: '7.5pt', letterSpacing: '0.5pt', textTransform: 'uppercase', fontWeight: 500 }}>REGION VI â€“ WESTERN VISAYAS</p>
             <p style={{ margin: 0, fontSize: '7.5pt', letterSpacing: '0.5pt', textTransform: 'uppercase', fontWeight: 500 }}>SCHOOLS DIVISION OF ILOILO</p>
             <p style={{ margin: '1px 0', fontSize: '8.5pt', fontWeight: 900, textTransform: 'uppercase' }}>{schoolName}</p>
             <p style={{ margin: '8px 0 0 0', fontSize: '13pt', fontWeight: 900, textTransform: 'uppercase', color: '#034F8B' }}>LEARNER GOVERNMENT (LG) COMEA</p>
@@ -30,37 +29,53 @@ export const MasterlistHeader: React.FC<PartProps & { schoolName: string }> = ({
         </tr>
       </tbody>
     </table>
-    <div style={{ borderTop: '2px solid #000', marginTop: '12px', width: '100%' }}></div>
+    <div style={{ borderTop: '2px solid #000', marginTop: '12px', width: '100%' }} />
   </div>
 );
 
-export const MasterlistSubHeader: React.FC<PartProps & { pageIdx: number, totalPages: number }> = ({ schoolYear, pageIdx, totalPages }) => (
+export const MasterlistSubHeader: React.FC<PartProps & { pageIdx: number; totalPages: number }> = ({ schoolYear, pageIdx, totalPages }) => (
   <div style={{ borderBottom: '1.5px solid #000', paddingBottom: '6px', marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-     <span style={{ fontSize: '9px', fontWeight: 900 }}>OFFICIAL MASTER LIST OF LEARNER-VOTERS</span>
-     <span style={{ fontSize: '9px', fontWeight: 900 }}>SY {schoolYear} | Page {pageIdx + 1} of {totalPages}</span>
+    <span style={{ fontSize: '9px', fontWeight: 900 }}>OFFICIAL MASTER LIST OF LEARNER-VOTERS</span>
+    <span style={{ fontSize: '9px', fontWeight: 900 }}>SY {schoolYear} | Page {pageIdx + 1} of {totalPages}</span>
   </div>
 );
 
 export const MasterlistMetaInfo: React.FC<PartProps> = ({ section }) => (
   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', fontSize: '10px', color: '#000', borderBottom: '0.5px solid #ccc', paddingBottom: '4px' }}>
-    <p style={{ margin: 0 }}><strong>GRADE & SECTION:</strong> {section.gradeLevel} - {section.name}</p>
-    <p style={{ margin: 0 }}><strong>ADVISER:</strong> {section.adviserName || 'N/A'}</p>
+    <p style={{ margin: 0 }}>
+      <strong>GRADE & SECTION:</strong> {section.gradeLevel} - {section.name}
+    </p>
+    <p style={{ margin: 0 }}>
+      <strong>ADVISER:</strong> {section.adviserName || 'N/A'}
+    </p>
   </div>
 );
 
-export const MasterlistFooter: React.FC<PartProps> = ({ schoolYear }) => (
-  <div style={{ position: 'absolute', bottom: '10mm', left: '15mm', right: '15mm', backgroundColor: 'white', color: '#000', display: 'flex', flexDirection: 'column', gap: '15px' }}>
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '40px', paddingBottom: '10px' }}>
-      <div style={{ textAlign: 'center' }}>
-        <p style={{ margin: '30px 0 0 0', borderTop: '1.5px solid #000', paddingTop: '4px', fontSize: '10pt', fontWeight: 900, textTransform: 'uppercase' }}>MARIA TERESITA C. TALITE</p>
-        <p style={{ margin: 0, fontSize: '8pt', fontWeight: 700 }}>Commissioner on Election</p>
+export const MasterlistFooter: React.FC<PartProps & { showSignatories?: boolean }> = ({ schoolYear, showSignatories = false }) => (
+  <div
+    style={{
+      marginTop: 'auto',
+      paddingTop: showSignatories ? '8mm' : '4mm',
+      backgroundColor: 'white',
+      color: '#000',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '6px',
+    }}
+  >
+    {showSignatories ? (
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '28px' }}>
+        <div style={{ textAlign: 'center' }}>
+          <p style={{ margin: '18px 0 0 0', borderTop: '1.5px solid #000', paddingTop: '3px', fontSize: '9pt', fontWeight: 900, textTransform: 'uppercase' }}>MARIA TERESITA C. TALITE</p>
+          <p style={{ margin: 0, fontSize: '7.5pt', fontWeight: 700 }}>Commissioner on Election</p>
+        </div>
+        <div style={{ textAlign: 'center' }}>
+          <p style={{ margin: '18px 0 0 0', borderTop: '1.5px solid #000', paddingTop: '3px', fontSize: '9pt', fontWeight: 900, textTransform: 'uppercase' }}>NELSON C. CANDOLESAS</p>
+          <p style={{ margin: 0, fontSize: '7.5pt', fontWeight: 700 }}>Chief Commissioner / School Principal II</p>
+        </div>
       </div>
-      <div style={{ textAlign: 'center' }}>
-        <p style={{ margin: '30px 0 0 0', borderTop: '1.5px solid #000', paddingTop: '4px', fontSize: '10pt', fontWeight: 900, textTransform: 'uppercase' }}>NELSON C. CANDOLESAS</p>
-        <p style={{ margin: 0, fontSize: '8pt', fontWeight: 700 }}>Chief Commissioner / School Principal II</p>
-      </div>
-    </div>
-    <div style={{ borderTop: '1px solid #000', paddingTop: '6px', display: 'flex', justifyContent: 'space-between', fontSize: '8px', fontWeight: 800, textTransform: 'uppercase' }}>
+    ) : null}
+    <div style={{ borderTop: '1px solid #000', paddingTop: '4px', display: 'flex', justifyContent: 'space-between', fontSize: '7px', fontWeight: 800, textTransform: 'uppercase' }}>
       <span>*** SYSTEM GENERATED OFFICIAL DOCUMENT • SY {schoolYear} ***</span>
       <span>Generated: {new Date().toLocaleString()} • Leon NHS E-Boto</span>
     </div>

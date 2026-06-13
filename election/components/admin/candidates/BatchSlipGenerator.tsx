@@ -154,24 +154,21 @@ const BatchSlipGenerator: React.FC<BatchSlipGeneratorProps> = ({ candidates, sch
   };
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-      <div className="bg-white rounded-[2.5rem] shadow-2xl max-w-2xl w-full flex flex-col max-h-[85vh] overflow-hidden border border-gray-100 animate-in zoom-in-95 duration-200">
-        <div className="bg-[#034F8B] p-8 text-white relative flex-shrink-0">
-          <div className="flex items-center space-x-4 mb-2">
-            <div className="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center border border-white/20">
-              <i className="fa-solid fa-copy text-xl text-[#fcd116]"></i>
-            </div>
-            <div>
-              <h3 className="text-xl font-black uppercase tracking-tight">Encoding Duplicate Engine</h3>
-              <p className="text-[10px] font-bold text-blue-200 uppercase tracking-widest">Batch Generator for Official Slips</p>
-            </div>
+    <div className="modal-overlay modal-overlay--high">
+      <div className="modal-backdrop" onClick={onClose} />
+      <section className="modal-dialog modal-dialog--wide" role="dialog" aria-modal="true" aria-labelledby="batch-slip-title">
+        <div className="modal-dialog__header">
+          <div className="modal-dialog__title-group">
+            <p className="modal-dialog__eyebrow">Election Modal</p>
+            <h3 id="batch-slip-title">Encoding Duplicate Engine</h3>
+            <p className="modal-dialog__eyebrow">Batch Generator for Official Slips</p>
           </div>
-          <button onClick={onClose} className="absolute top-8 right-8 text-white/50 hover:text-white transition-colors">
-            <i className="fa-solid fa-xmark text-xl"></i>
+          <button onClick={onClose} className="modal-dialog__close" aria-label="Close modal">
+            <i className="fa-solid fa-xmark" />
           </button>
         </div>
 
-        <div className="p-8 overflow-y-auto no-scrollbar flex-grow">
+        <div className="modal-dialog__body">
           {/* Integrity Check Panel */}
           {selectedDuplicatesCount > 0 && (
             <div className="mb-8 p-6 bg-red-50 border-2 border-red-100 rounded-[2rem] flex items-start space-x-4 animate-in slide-in-from-top-4">
@@ -245,14 +242,14 @@ const BatchSlipGenerator: React.FC<BatchSlipGeneratorProps> = ({ candidates, sch
           </div>
         </div>
 
-        <div className="p-8 bg-gray-50 border-t border-gray-100 flex items-center justify-between">
+        <div className="modal-dialog__actions">
           <p className="text-[9px] font-bold text-gray-400 leading-relaxed max-w-[50%] uppercase tracking-tight italic">
             Engine will produce individual A5 landscape slips for each selected candidate. Suspended if duplicates are selected.
           </p>
           <button 
             onClick={handleGenerateBatch}
             disabled={selectedIds.size === 0 || isGenerating || selectedDuplicatesCount > 0}
-            className={`px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl transition-all flex items-center ${
+            className={`modal-dialog__primary px-8 py-4 flex items-center ${
               selectedDuplicatesCount > 0 
                 ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
                 : 'bg-[#E11C38] text-white shadow-red-900/20 hover:bg-red-700 active:scale-95'
@@ -267,7 +264,7 @@ const BatchSlipGenerator: React.FC<BatchSlipGeneratorProps> = ({ candidates, sch
             )}
           </button>
         </div>
-      </div>
+      </section>
     </div>
   );
 };

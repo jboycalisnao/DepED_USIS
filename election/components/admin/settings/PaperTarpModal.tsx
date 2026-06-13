@@ -88,22 +88,23 @@ const PaperTarpModal: React.FC<PaperTarpModalProps> = ({
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-[10002] flex items-center justify-center p-4 bg-slate-950/95 backdrop-blur-xl animate-in fade-in duration-300">
-      <div className={`bg-white rounded-[3rem] shadow-2xl w-full overflow-hidden border border-white/20 transform animate-in zoom-in-95 duration-200 flex flex-col ${showPreview ? 'max-w-7xl h-[90vh]' : 'max-w-2xl'}`}>
-        
-        {/* Header */}
-        <div className="bg-[#034F8B] p-8 text-white text-center relative flex-shrink-0">
-          <div className="flex items-center justify-center space-x-4 mb-2">
-            <div className="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center border border-white/20">
-              <i className="fa-solid fa-image text-xl text-[#fcd116]"></i>
-            </div>
-            <div className="text-left">
-              <h3 className="text-2xl font-black uppercase tracking-tight text-white">Report Image Exporter</h3>
-              <p className="text-[10px] font-bold text-blue-200 uppercase tracking-widest">High-Resolution Digital Assets</p>
-            </div>
+    <div className="modal-overlay modal-overlay--high">
+      <div className="modal-backdrop" onClick={onClose} />
+      <section
+        className="modal-dialog modal-dialog--wide"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="report-image-title"
+        style={showPreview ? { width: 'min(100%, 1280px)' } : undefined}
+      >
+        <div className="modal-dialog__header">
+          <div className="modal-dialog__title-group">
+            <p className="modal-dialog__eyebrow">Election Modal</p>
+            <h3 id="report-image-title">Report Image Exporter</h3>
+            <p className="modal-dialog__eyebrow">High-Resolution Digital Assets</p>
           </div>
-          <button onClick={onClose} className="absolute top-8 right-8 text-white/40 hover:text-white transition-colors">
-            <i className="fa-solid fa-xmark text-xl"></i>
+          <button onClick={onClose} className="modal-dialog__close" aria-label="Close modal">
+            <i className="fa-solid fa-xmark" />
           </button>
         </div>
 
@@ -224,12 +225,12 @@ const PaperTarpModal: React.FC<PaperTarpModalProps> = ({
         </div>
 
         {/* Footer Actions */}
-        <div className="p-8 bg-gray-50 border-t border-gray-100 flex items-center justify-between flex-shrink-0">
+        <div className="modal-dialog__actions flex-shrink-0">
           <div className="flex space-x-4">
              {showPreview && (
                <button 
                 onClick={() => setShowPreview(false)}
-                className="px-6 py-4 text-[10px] font-black uppercase text-gray-400 hover:text-gray-900 transition-colors tracking-widest"
+                className="px-6 py-4 text-[13px] font-bold uppercase text-[#68758d] hover:text-[#12233d] transition-colors"
                >
                  Reconfigure Report
                </button>
@@ -238,14 +239,14 @@ const PaperTarpModal: React.FC<PaperTarpModalProps> = ({
           <div className="flex gap-3">
             <button 
               onClick={onClose}
-              className="px-8 py-4 text-[10px] font-black uppercase text-gray-400 hover:text-gray-900 transition-colors tracking-widest"
+              className="px-8 py-4 text-[13px] font-bold uppercase text-[#68758d] hover:text-[#12233d] transition-colors"
             >
               Cancel
             </button>
             <button 
               onClick={handleDownload}
               disabled={isProcessing}
-              className="bg-[#E11C38] text-white px-10 py-5 rounded-2xl font-black text-xs uppercase tracking-widest shadow-2xl shadow-red-900/40 hover:bg-red-700 transition-all active:scale-95 flex items-center justify-center border-b-4 border-red-900"
+              className="modal-dialog__primary px-10 py-5 flex items-center justify-center"
             >
               {isProcessing ? (
                 <><i className="fa-solid fa-spinner animate-spin mr-3"></i> Syncing Engine...</>
@@ -255,7 +256,7 @@ const PaperTarpModal: React.FC<PaperTarpModalProps> = ({
             </button>
           </div>
         </div>
-      </div>
+      </section>
     </div>,
     document.body
   );

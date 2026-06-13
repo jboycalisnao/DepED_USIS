@@ -3,10 +3,7 @@ import { UsisUnifiedHeader } from '../../common/header/UsisUnifiedHeader';
 import { navigateToElectionPath } from '../utils/navigation';
 
 interface HeaderProps {
-  onLogout?: () => void;
   currentUser?: string | null;
-  schoolName?: string;
-  electionYear?: string;
   currentView?: string;
 }
 
@@ -22,11 +19,6 @@ const publicNavItems: NavItem[] = [
     href: '/',
     isActive: (view) =>
       ['login', 'identity-confirmation', 'ballot', 'confirmation'].includes(view),
-  },
-  {
-    label: 'Admin Access',
-    href: '/admin-access',
-    isActive: (view) => view === 'admin-access' || view === 'admin',
   },
   {
     label: 'Results',
@@ -54,15 +46,11 @@ const searchTargets = [
   { keywords: ['registration', 'register', 'coordinator', 'election registration'], href: '/election-registration' },
   { keywords: ['results', 'result', 'winner', 'winners'], href: '/results' },
   { keywords: ['turnout', 'participation'], href: '/public-turnout' },
-  { keywords: ['admin', 'administrator', 'dashboard'], href: '/admin-access' },
   { keywords: ['monitoring', 'live tally', 'tally'], href: '/monitoring' },
 ];
 
 const Header: React.FC<HeaderProps> = ({
-  onLogout,
   currentUser,
-  schoolName,
-  electionYear,
   currentView = 'login',
 }) => {
   const isAdmin = currentUser === 'System Administrator';
@@ -116,6 +104,7 @@ const Header: React.FC<HeaderProps> = ({
                     onClick={(e) => navigateToHashRoute(e, item.href)}
                     className={[
                       'election-header-nav__link inline-flex items-center text-[0.98rem] uppercase transition-colors',
+                      isActive ? 'election-header-nav__link--active' : '',
                       isActive ? 'text-[#0038a8]' : 'text-[#8a8a8a] hover:text-[#0038a8]',
                     ].join(' ')}
                   >

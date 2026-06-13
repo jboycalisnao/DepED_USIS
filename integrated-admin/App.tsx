@@ -32,6 +32,8 @@ import { MerchOrderControlPage } from './features/functions/merchandise/MerchOrd
 import { MerchOrderPaymentPage } from './features/functions/merchandise/MerchOrderPaymentPage';
 import { MerchOrderCountsPage } from './features/functions/merchandise/MerchOrderCountsPage';
 import { PortalControlsPage } from './features/functions/portal-controls/pages/PortalControlsPage';
+import { ElectionFunctionPage } from './features/functions/election/ElectionFunctionPage';
+import { ElectionAdminConsolePage } from './features/functions/election/ElectionAdminConsolePage';
 import { resolveCoordinatorDepartmentAccess } from '../common/auth/coordinatorDepartmentAccess';
 import { loadCoordinatorIaPageAccessMapFromSupabase, loadCoordinatorModuleAccessMapFromSupabase } from '../common/auth/moduleAccess';
 
@@ -47,6 +49,13 @@ const iaPathToPageKey: Record<string, string> = {
   '/functions/merch-control': 'ia.merch.orders',
   '/functions/order-payment': 'ia.merch.payment',
   '/functions/order-counts': 'ia.merch.order_counts',
+  '/functions/portal-controls': 'ia.portal_controls',
+  '/functions/election/admin-console': 'ia.election.admin_console',
+  '/functions/election/dashboard': 'ia.election.dashboard',
+  '/functions/election/candidates': 'ia.election.candidates',
+  '/functions/election/voters': 'ia.election.voters',
+  '/functions/election/organization': 'ia.election.organization',
+  '/functions/election/settings': 'ia.election.settings',
 };
 
 function IntegratedAdminOverview({
@@ -118,6 +127,18 @@ const iaNavItems: UsisSideNavItem[] = [
     path: '/functions/portal-controls',
     label: 'Portal Controls',
     icon: 'tune',
+  },
+  {
+    path: '/functions/election',
+    label: 'Election',
+    icon: 'how_to_vote',
+    children: [
+      { path: '/functions/election/dashboard', label: 'Dashboard', icon: 'dashboard' },
+      { path: '/functions/election/candidates', label: 'Candidates', icon: 'badge' },
+      { path: '/functions/election/voters', label: 'Voters', icon: 'groups' },
+      { path: '/functions/election/organization', label: 'Organization', icon: 'account_tree' },
+      { path: '/functions/election/settings', label: 'Settings', icon: 'settings' },
+    ],
   },
 ];
 
@@ -373,6 +394,15 @@ function IntegratedAdminShell() {
                       <Route path="/functions/grades-subjects/subject-management" element={<SubjectManagementPage />} />
                       <Route path="/functions/grades-subjects/time-slots" element={<TimeSlotsPage />} />
                       <Route path="/functions/portal-controls" element={<PortalControlsPage />} />
+                      <Route path="/functions/election" element={<ElectionFunctionPage />}>
+                        <Route index element={<Navigate to="dashboard" replace />} />
+                        <Route path="admin-console" element={<Navigate to="dashboard" replace />} />
+                        <Route path="dashboard" element={<ElectionAdminConsolePage tab="dashboard" />} />
+                        <Route path="candidates" element={<ElectionAdminConsolePage tab="candidates" />} />
+                        <Route path="voters" element={<ElectionAdminConsolePage tab="voters" />} />
+                        <Route path="organization" element={<ElectionAdminConsolePage tab="organization" />} />
+                        <Route path="settings" element={<ElectionAdminConsolePage tab="settings" />} />
+                      </Route>
                       <Route path="*" element={<Navigate to="/" replace />} />
                     </Routes>
                   )}

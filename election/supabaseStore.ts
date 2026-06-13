@@ -29,7 +29,7 @@ let loadingListeners: Array<(l: boolean) => void> = [];
 let onlineListeners: Array<(status: boolean) => void> = [];
 
 const CACHE_KEYS = {
-  LEARNERS: 'eboto_cache_learners_',
+  LEARNERS: 'eboto_cache_learners_v2_',
   SECTIONS: 'eboto_cache_sections_',
   STATS: 'eboto_egress_saved'
 };
@@ -39,6 +39,10 @@ const updateEgressSaved = (bytes: number) => {
   localStorage.setItem(CACHE_KEYS.STATS, totalEgressSaved.toString());
   egressListeners.forEach(l => l(totalEgressSaved));
 };
+
+const normalizeText = (value: unknown) => String(value || '').trim();
+const normalizeBoolean = (value: unknown) => Boolean(value);
+const normalizeArray = (value: unknown) => (Array.isArray(value) ? value.map((item) => String(item).trim()).filter(Boolean) : []);
 
 const setLoading = (val: boolean) => {
   isLoading = val;
@@ -114,8 +118,10 @@ const DEFAULT_ELECTION_CONFIG: ElectionConfig = {
   startTime: null,
   endTime: null,
   schoolName: 'Leon National High School',
+  electionName: 'Learner Government Election',
   publicResultsEnabled: false,
   publicTurnoutEnabled: false,
+  allowedGradeLevel: null,
 };
 
 const getElectionContext = async (schoolYearId: string): Promise<ElectionContext | null> => {
@@ -136,12 +142,16 @@ const fetchLearners = async (schoolYearId: string) => {
   const cached = localStorage.getItem(cacheKey);
   
   if (cached) {
-    const data = JSON.parse(cached);
-    learners = data;
-    learnersListeners.forEach(l => l(learners));
-    updateEgressSaved(new TextEncoder().encode(cached).length);
-    setLoading(false);
-    return;
+    try {
+      const data = JSON.parse(cached);
+      learners = Array.isArray(data) ? data : [];
+      learnersListeners.forEach(l => l(learners));
+      updateEgressSaved(new TextEncoder().encode(cached).length);
+      setLoading(false);
+      return;
+    } catch {
+      localStorage.removeItem(cacheKey);
+    }
   }
 
   const { data: sySections, error: secError } = await supabase
@@ -171,17 +181,34 @@ const fetchLearners = async (schoolYearId: string) => {
   if (error) {
     setConnectionError(true);
   } else if (data) {
-    const sanitized = data.map(l => ({
-      id: l.id,
-      lrn: l.lrn,
-      firstName: l.first_name,
-      lastName: l.last_name,
-      middleName: l.middle_name,
-      gender: l.gender, 
-      status: l.status as EnrollmentStatus,
-      sectionId: l.section_id,
-      isSSLG: l.is_sslg || false
-    })) as Student[];
+    const sanitized = data.map((l) => {
+      const birthDate = normalizeText(l.birth_date);
+      return {
+        id: normalizeText(l.id),
+        lrn: normalizeText(l.lrn),
+        firstName: normalizeText(l.first_name),
+        lastName: normalizeText(l.last_name),
+        middleName: normalizeText(l.middle_name),
+        birthDate,
+        gender: normalizeText(l.gender),
+        address: normalizeText(l.address),
+        contactNumber: normalizeText(l.contact_number),
+        guardian_name: normalizeText(l.guardian_name) || undefined,
+        status: normalizeText(l.status) as EnrollmentStatus,
+        sectionId: normalizeText(l.section_id) || undefined,
+        schoolYear: normalizeText(l.school_year),
+        isSSLG: normalizeBoolean(l.is_sslg),
+        isClubOfficer: normalizeBoolean(l.is_club_officer),
+        isAthlete: normalizeBoolean(l.is_athlete),
+        isArtist: normalizeBoolean(l.is_artist),
+        is4Ps: normalizeBoolean(l.is_4ps),
+        isIndigent: normalizeBoolean(l.is_indigent),
+        orgAffiliations: normalizeArray(l.org_affiliations),
+        father_name: normalizeText(l.father_name) || undefined,
+        mother_name: normalizeText(l.mother_name) || undefined,
+        email: normalizeText(l.email),
+      } as Student;
+    }) as Student[];
     
     learners = sanitized;
     localStorage.setItem(cacheKey, JSON.stringify(sanitized));
@@ -415,12 +442,14 @@ export const useStore = () => {
         startTime: data?.start_time || null,
         endTime: data?.end_time || null,
         schoolName: data?.school_display_name || context.schoolName,
+        electionName: data?.election_name || 'Learner Government Election',
         schoolId: context.schoolId,
         schoolCode: context.schoolCode,
         electionId: context.electionId,
         electionCode: context.electionCode,
         publicResultsEnabled: data?.public_results_enabled ?? false,
-        publicTurnoutEnabled: data?.public_turnout_enabled ?? false
+        publicTurnoutEnabled: data?.public_turnout_enabled ?? false,
+        allowedGradeLevel: data?.allowed_grade_level || null
       };
     }
 
@@ -435,11 +464,13 @@ export const useStore = () => {
       startTime: data?.start_time || null,
       endTime: data?.end_time || null,
       schoolName: data?.school_name || 'Leon National High School',
+      electionName: data?.election_name || 'Learner Government Election',
       schoolId: getStoredElectionRegistrationContext()?.schoolId,
       schoolCode: getStoredElectionRegistrationContext()?.schoolId,
       electionCode: getStoredElectionRegistrationContext()?.electionCode,
       publicResultsEnabled: data?.public_results_enabled ?? false,
-      publicTurnoutEnabled: data?.public_turnout_enabled ?? false
+      publicTurnoutEnabled: data?.public_turnout_enabled ?? false,
+      allowedGradeLevel: data?.allowed_grade_level || null
     };
   };
 
@@ -454,8 +485,10 @@ export const useStore = () => {
             start_time: config.startTime,
             end_time: config.endTime,
             school_display_name: config.schoolName,
+            election_name: config.electionName,
             public_results_enabled: config.publicResultsEnabled,
-            public_turnout_enabled: config.publicTurnoutEnabled
+            public_turnout_enabled: config.publicTurnoutEnabled,
+            allowed_grade_level: config.allowedGradeLevel ?? null
           })
           .eq('id', context.electionId)
       : supabase
@@ -465,8 +498,10 @@ export const useStore = () => {
             start_time: config.startTime,
             end_time: config.endTime,
             school_name: config.schoolName,
+            election_name: config.electionName,
             public_results_enabled: config.publicResultsEnabled,
-            public_turnout_enabled: config.publicTurnoutEnabled
+            public_turnout_enabled: config.publicTurnoutEnabled,
+            allowed_grade_level: config.allowedGradeLevel ?? null
           })
           .eq('id', 1);
 

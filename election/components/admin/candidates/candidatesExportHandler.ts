@@ -13,8 +13,11 @@ export const handleCandidatesPrint = (
   config: ElectionConfig,
   schoolYear: string
 ) => {
-  const printWindow = window.open('', '_blank');
-  if (!printWindow) return;
+  const printWindow = window.open('', '_blank', 'width=1200,height=900,toolbar=0,scrollbars=1,status=0');
+  if (!printWindow) {
+    alert('Pop-up blocked! Please allow pop-ups to open the candidates list preview.');
+    return;
+  }
 
   const schoolName = config.schoolName || 'Leon National High School';
   const electionYear = getNextSchoolYear(schoolYear);
@@ -69,6 +72,8 @@ export const handleCandidatesPrint = (
     </html>
   `;
 
+  printWindow.document.open();
   printWindow.document.write(content);
   printWindow.document.close();
+  printWindow.focus();
 };

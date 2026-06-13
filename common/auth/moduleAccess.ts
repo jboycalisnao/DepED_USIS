@@ -242,12 +242,44 @@ export const loadIaPageCatalogFromSupabase = async (): Promise<Array<{ group: st
       { group: 'Merch', key: 'ia.merch.orders', label: 'Orders' },
       { group: 'Merch', key: 'ia.merch.payment', label: 'Payment' },
       { group: 'Merch', key: 'ia.merch.order_counts', label: 'Order Counts' },
+      { group: 'Portal Controls', key: 'ia.portal_controls', label: 'Portal Controls' },
+      { group: 'Election', key: 'ia.election.admin_console', label: 'Admin Console' },
+      { group: 'Election', key: 'ia.election.dashboard', label: 'Dashboard' },
+      { group: 'Election', key: 'ia.election.candidates', label: 'Candidates' },
+      { group: 'Election', key: 'ia.election.voters', label: 'Voters' },
+      { group: 'Election', key: 'ia.election.organization', label: 'Organization' },
+      { group: 'Election', key: 'ia.election.settings', label: 'Settings' },
     ];
   }
-  return (data || []).map((row: any) => ({
+
+  const catalog = (data || []).map((row: any) => ({
     group: String(row.page_group || '').trim(),
     key: String(row.page_key || '').trim(),
     label: String(row.page_label || '').trim(),
   })).filter((row) => row.key && row.label);
+
+  if (!catalog.some((entry) => entry.key === 'ia.portal_controls')) {
+    catalog.push({ group: 'Portal Controls', key: 'ia.portal_controls', label: 'Portal Controls' });
+  }
+  if (!catalog.some((entry) => entry.key === 'ia.election.admin_console')) {
+    catalog.push({ group: 'Election', key: 'ia.election.admin_console', label: 'Admin Console' });
+  }
+  if (!catalog.some((entry) => entry.key === 'ia.election.dashboard')) {
+    catalog.push({ group: 'Election', key: 'ia.election.dashboard', label: 'Dashboard' });
+  }
+  if (!catalog.some((entry) => entry.key === 'ia.election.candidates')) {
+    catalog.push({ group: 'Election', key: 'ia.election.candidates', label: 'Candidates' });
+  }
+  if (!catalog.some((entry) => entry.key === 'ia.election.voters')) {
+    catalog.push({ group: 'Election', key: 'ia.election.voters', label: 'Voters' });
+  }
+  if (!catalog.some((entry) => entry.key === 'ia.election.organization')) {
+    catalog.push({ group: 'Election', key: 'ia.election.organization', label: 'Organization' });
+  }
+  if (!catalog.some((entry) => entry.key === 'ia.election.settings')) {
+    catalog.push({ group: 'Election', key: 'ia.election.settings', label: 'Settings' });
+  }
+
+  return catalog;
 };
 

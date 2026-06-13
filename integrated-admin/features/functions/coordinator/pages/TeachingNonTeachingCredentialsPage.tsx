@@ -58,6 +58,9 @@ export function TeachingNonTeachingCredentialsPage() {
     toggleManySelected,
     toggleSelected,
   } = useTeachingNonTeachingSelection(rows);
+  const allowedIaPageKeys = useMemo(() => new Set(iaPageOptions.map((option) => option.key)), [iaPageOptions]);
+  const normalizeIaPageSelections = (pageKeys: string[]) =>
+    pageKeys.filter((pageKey) => allowedIaPageKeys.has(pageKey));
 
   const refresh = async () => {
     if (!schoolCode) {
@@ -80,8 +83,15 @@ export function TeachingNonTeachingCredentialsPage() {
         loadIaPageCatalogFromSupabase(),
       ]);
       setModuleAccessMap(accessMap);
-      setIaPageAccessMap(pageAccessMap);
       setIaPageOptions(pageCatalog);
+      const pageKeySet = new Set(pageCatalog.map((option) => option.key));
+      const sanitizedPageAccessMap = Object.fromEntries(
+        Object.entries(pageAccessMap).map(([accountId, pageKeys]) => [
+          accountId,
+          pageKeys.filter((pageKey) => pageKeySet.has(pageKey)),
+        ]),
+      );
+      setIaPageAccessMap(sanitizedPageAccessMap);
       setError('');
     } catch (nextError: any) {
       setError(nextError?.message || 'Unable to load teaching and non-teaching credentials.');
@@ -97,8 +107,8 @@ export function TeachingNonTeachingCredentialsPage() {
   useEffect(() => {
     if (!moduleRecord) return;
     setModuleSelections(moduleAccessMap[moduleRecord.id] || getCoordinatorModuleAccessMap()[moduleRecord.id] || []);
-    setIaPageSelections(iaPageAccessMap[moduleRecord.id] || getCoordinatorIaPageAccessMap()[moduleRecord.id] || []);
-  }, [iaPageAccessMap, moduleAccessMap, moduleRecord]);
+    setIaPageSelections(normalizeIaPageSelections(iaPageAccessMap[moduleRecord.id] || getCoordinatorIaPageAccessMap()[moduleRecord.id] || []));
+  }, [iaPageAccessMap, moduleAccessMap, moduleRecord, allowedIaPageKeys]);
 
   const filteredRows = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -337,7 +347,7 @@ export function TeachingNonTeachingCredentialsPage() {
             setActionLoadingMessage('Saving module access...');
             try {
               await saveCoordinatorAccountModuleAccessToSupabase(moduleRecord.id, moduleSelections);
-              const nextPageSelections = moduleSelections.includes('ia') ? iaPageSelections : [];
+              const nextPageSelections = moduleSelections.includes('ia') ? normalizeIaPageSelections(iaPageSelections) : [];
               await saveCoordinatorAccountIaPageAccessToSupabase(moduleRecord.id, nextPageSelections);
               setModuleAccessMap((current) => ({
                 ...current,
@@ -382,7 +392,7 @@ export function TeachingNonTeachingCredentialsPage() {
             setIsSavingModules(true);
             setActionLoadingMessage(`Saving module access for ${selectedRows.length} account${selectedRows.length === 1 ? '' : 's'}...`);
             try {
-              const nextPageSelections = moduleSelections.includes('ia') ? iaPageSelections : [];
+              const nextPageSelections = moduleSelections.includes('ia') ? normalizeIaPageSelections(iaPageSelections) : [];
               await Promise.all(selectedRows.map(async (row) => {
                 await saveCoordinatorAccountModuleAccessToSupabase(row.id, moduleSelections);
                 await saveCoordinatorAccountIaPageAccessToSupabase(row.id, nextPageSelections);

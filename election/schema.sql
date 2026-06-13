@@ -56,15 +56,17 @@ CREATE TABLE IF NOT EXISTS public.election_config (
   start_time timestamptz,
   end_time timestamptz,
   school_name text DEFAULT 'Leon National High School',
+  election_name text DEFAULT 'Learner Government Election',
   school_year_id text REFERENCES public.registrar_school_years(id),
   public_results_enabled boolean DEFAULT false,
   public_turnout_enabled boolean DEFAULT false,
+  allowed_grade_level text,
   updated_at timestamptz DEFAULT now()
 );
 
 -- Seed initial config if not exists
-INSERT INTO public.election_config (id, status, school_name) 
-VALUES (1, 'OPEN', 'Leon National High School') 
+INSERT INTO public.election_config (id, status, school_name, election_name) 
+VALUES (1, 'OPEN', 'Leon National High School', 'Learner Government Election') 
 ON CONFLICT (id) DO NOTHING;
 
 -- 5. Voter Participation Registry

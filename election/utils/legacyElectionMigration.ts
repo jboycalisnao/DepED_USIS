@@ -110,7 +110,7 @@ const ensureElectionEvent = async (schoolId: string, schoolYearId: string, confi
     .insert([{
       school_id: schoolId,
       election_code: registration.electionCode,
-      election_name: registration.electionName || 'Learner Government Election',
+      election_name: config.electionName || registration.electionName || 'Learner Government Election',
       election_type: registration.electionType || 'Learner Government',
       school_year_id: schoolYearId,
       status: config.status || 'OPEN',
@@ -118,6 +118,7 @@ const ensureElectionEvent = async (schoolId: string, schoolYearId: string, confi
       end_time: config.endTime,
       public_results_enabled: config.publicResultsEnabled ?? false,
       public_turnout_enabled: config.publicTurnoutEnabled ?? false,
+      allowed_grade_level: config.allowedGradeLevel ?? null,
       allow_schedule_enforcement: config.status === 'SCHEDULED',
       school_display_name: config.schoolName || registration.schoolName,
       instructions: registration.notes || null,

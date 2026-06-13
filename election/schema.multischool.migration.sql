@@ -140,6 +140,7 @@ CREATE TABLE IF NOT EXISTS public.election_events (
   end_time timestamptz,
   public_results_enabled boolean NOT NULL DEFAULT false,
   public_turnout_enabled boolean NOT NULL DEFAULT false,
+  allowed_grade_level text,
   allow_schedule_enforcement boolean NOT NULL DEFAULT false,
   school_display_name text,
   instructions text,
@@ -164,6 +165,9 @@ CREATE INDEX IF NOT EXISTS election_events_status_idx
 
 ALTER TABLE public.election_events
   ADD COLUMN IF NOT EXISTS registration_code text;
+
+ALTER TABLE public.election_events
+  ADD COLUMN IF NOT EXISTS allowed_grade_level text;
 
 CREATE INDEX IF NOT EXISTS election_events_registration_code_idx
   ON public.election_events (registration_code);

@@ -1,7 +1,5 @@
-
 import React, { useState } from 'react';
 import VoterChecker from './VoterChecker';
-import MasterlistGenerator from './MasterlistGenerator';
 import SectionListExporter from './SectionListExporter';
 import VoterAccessControl from './VoterAccessControl';
 import SchoolProfileConfig from './SchoolProfileConfig';
@@ -9,11 +7,10 @@ import ManualTallyModal from './ManualTallyModal';
 import GenderTurnoutAudit from './GenderTurnoutAudit';
 import PaperTarpModal from './PaperTarpModal';
 import GradeResultsModal from './GradeResultsModal';
-import { Student, User, Section, ElectionConfig, SchoolYear, Candidate, ElectionStatus } from '../../../types';
+import { Student, User, Section, ElectionConfig, SchoolYear, Candidate } from '../../../types';
 import { handleResultsPrint } from './resultsExportHandler';
 import { handleParticipationPrint } from './participationExportHandler';
 import { handleNonVotersPrint } from './nonVotersExportHandler';
-import { DEPED_SEAL_URL, LEON_NHS_LOGO_URL } from '../../../constants';
 import { getElectionAbsoluteUrl } from '../../../utils/navigation';
 
 interface SettingsTabProps {
@@ -30,21 +27,21 @@ interface SettingsTabProps {
   schoolYears: SchoolYear[];
 }
 
-const SettingsTab: React.FC<SettingsTabProps> = ({ 
+const SettingsTab: React.FC<SettingsTabProps> = ({
   candidates,
-  onReset, 
+  onReset,
   onMigrateLegacyData,
-  onLogout, 
-  learnerDatabase, 
-  voters, 
-  sections, 
+  onLogout,
+  learnerDatabase,
+  voters,
+  sections,
   electionConfig,
   setElectionConfig,
   showAlert,
-  schoolYears
+  schoolYears,
 }) => {
-  const activeSyLabel = schoolYears.find(sy => sy.isActive || sy.is_active)?.label || '----';
-  
+  const activeSyLabel = schoolYears.find((sy) => sy.isActive || sy.is_active)?.label || '----';
+
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
   const [isTarpModalOpen, setIsTarpModalOpen] = useState(false);
   const [isGradeResultsOpen, setIsGradeResultsOpen] = useState(false);
@@ -54,17 +51,17 @@ const SettingsTab: React.FC<SettingsTabProps> = ({
     const nextState = !electionConfig.publicResultsEnabled;
     setElectionConfig({ ...electionConfig, publicResultsEnabled: nextState });
     showAlert(
-      nextState ? "Public Results Enabled" : "Public Results Disabled",
+      nextState ? 'Public Results Enabled' : 'Public Results Disabled',
       `The live results page is now ${nextState ? 'accessible' : 'hidden'} to the general public.`,
-      nextState ? "success" : "info"
+      nextState ? 'success' : 'info',
     );
   };
 
   const handleCopyLink = (type: 'results' | 'turnout') => {
-    const route = type === 'results' ? 'public-results' : 'public-turnout';
+    const route = type === 'results' ? 'results' : 'public-turnout';
     const publicUrl = getElectionAbsoluteUrl(`/${route}`);
     navigator.clipboard.writeText(publicUrl).then(() => {
-      showAlert("Link Copied", `The ${type} URL has been copied to your clipboard.`, "success");
+      showAlert('Link Copied', `The ${type} URL has been copied to your clipboard.`, 'success');
     });
   };
 
@@ -90,16 +87,21 @@ const SettingsTab: React.FC<SettingsTabProps> = ({
     }
   };
 
+  const handleSaveElectionName = async (nextName: string) => {
+    const trimmedName = nextName.trim() || 'Learner Government Election';
+    void setElectionConfig({ ...electionConfig, electionName: trimmedName });
+  };
+
   return (
-    <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
-      <ManualTallyModal 
+    <div className="election-page election-settings pb-20">
+      <ManualTallyModal
         isOpen={isManualModalOpen}
         onClose={() => setIsManualModalOpen(false)}
         candidates={candidates}
         onPrint={handleFinalizeAndPrint}
       />
 
-      <PaperTarpModal 
+      <PaperTarpModal
         isOpen={isTarpModalOpen}
         onClose={() => setIsTarpModalOpen(false)}
         candidates={candidates}
@@ -110,7 +112,7 @@ const SettingsTab: React.FC<SettingsTabProps> = ({
         schoolName={electionConfig.schoolName || 'Leon National High School'}
       />
 
-      <GradeResultsModal 
+      <GradeResultsModal
         isOpen={isGradeResultsOpen}
         onClose={() => setIsGradeResultsOpen(false)}
         learnerDatabase={learnerDatabase}
@@ -120,243 +122,214 @@ const SettingsTab: React.FC<SettingsTabProps> = ({
         schoolYear={activeSyLabel}
       />
 
-      {/* Branding Header within Tab */}
-      <div className="bg-white rounded-[12px] shadow-sm border border-[rgba(18,35,61,0.08)] overflow-hidden flex flex-col no-print">
-        <div className="grid grid-cols-3" aria-hidden="true">
-          <span className="h-[4px] bg-[#0038a8]" />
-          <span className="h-[4px] bg-[#fcd116]" />
-          <span className="h-[4px] bg-[#ce1126]" />
+      <section className="election-page__hero no-print">
+        <div className="election-page__hero-bar" aria-hidden="true">
+          <span style={{ backgroundColor: '#0038a8' }} />
+          <span style={{ backgroundColor: '#fcd116' }} />
+          <span style={{ backgroundColor: '#ce1126' }} />
         </div>
-        <div className="p-6 flex flex-col md:flex-row items-center justify-between gap-6 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)]">
-        <div className="flex items-center space-x-6">
-          <div className="text-left">
-            <h2 className="text-[#0038a8] font-bold text-[24px] tracking-tight">System Settings</h2>
-            <p className="text-[#68758d] text-[13px] font-bold mt-1">Election configuration and control panel</p>
+        <div className="election-page__hero-content">
+          <div className="election-page__header election-settings__hero-header">
+            <div className="election-settings__hero-copy">
+              <p className="election-page__eyebrow">Election Settings</p>
+              <h2 className="election-page__heading">System Settings</h2>
+              <p className="election-page__lead">Election configuration and control panel</p>
+            </div>
+            <div className="election-settings__hero-badge">
+              <span className="material-symbols-outlined" aria-hidden="true">
+                event
+              </span>
+              <span>Active SY {activeSyLabel}</span>
+            </div>
           </div>
         </div>
-        </div>
-      </div>
+      </section>
 
-      {/* Public Accessibility Controls */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 no-print">
-        <div className="rounded-[12px] border border-[rgba(18,35,61,0.08)] bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] p-6 shadow-sm">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center space-x-4">
-              <div className={`flex h-10 w-10 items-center justify-center rounded-[12px] transition-colors ${electionConfig.publicResultsEnabled ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
-                <i className={`fa-solid ${electionConfig.publicResultsEnabled ? 'fa-square-poll-vertical' : 'fa-eye-slash'} text-[16px]`}></i>
-              </div>
-              <div>
-                <h3 className="text-[16px] font-bold uppercase text-gray-900">Live Tally Access</h3>
-                <p className="text-[13px] font-bold uppercase tracking-[0.12em] text-slate-500">Broadcast candidate performance</p>
-              </div>
+      <section className="election-page__control-grid no-print">
+        <div className="election-page__control-card election-settings__summary-card">
+          <div className="election-settings__summary-header">
+            <div className="election-settings__summary-copy">
+              <p className="election-settings__summary-label">Live Tally Access</p>
+              <h3 className="election-settings__summary-title">Broadcast candidate performance</h3>
             </div>
-            <button 
+            <button
+              type="button"
               onClick={handleTogglePublicResults}
-              className={`rounded-[12px] border px-4 py-3 text-[13px] font-bold uppercase tracking-[0.08em] transition-colors ${electionConfig.publicResultsEnabled ? 'border-green-200 bg-green-50 text-green-700' : 'border-slate-200 bg-slate-50 text-slate-600'}`}
+              className={`election-settings__status-pill ${electionConfig.publicResultsEnabled ? 'election-settings__status-pill--active' : 'election-settings__status-pill--muted'}`}
             >
-              {electionConfig.publicResultsEnabled ? 'PUBLISHED' : 'HIDDEN'}
+              {electionConfig.publicResultsEnabled ? 'Published' : 'Hidden'}
             </button>
           </div>
-          <div className="grid grid-cols-[minmax(0,1fr)_auto]">
-              <input 
-              type="text" 
-              readOnly 
-              value={getElectionAbsoluteUrl('/public-results')}
-              className="w-full rounded-l-[12px] border border-r-0 border-[rgba(18,35,61,0.14)] bg-[#fbfcff] px-4 py-[14px] text-[13px] text-slate-500 outline-none"
-            />
-            <button onClick={() => handleCopyLink('results')} className="cursor-pointer rounded-r-[12px] border border-[rgba(18,35,61,0.14)] bg-[#fbfcff] px-4 text-[#0038a8] transition-colors hover:bg-[#eef4ff]"><i className="fa-solid fa-copy"></i></button>
+          <div className="election-settings__link-row">
+            <div className="election-settings__link-field">
+              <input type="text" readOnly value={getElectionAbsoluteUrl('/results')} />
+            </div>
+            <button type="button" onClick={() => handleCopyLink('results')} className="election-settings__copy-button">
+              <span className="material-symbols-outlined" aria-hidden="true">
+                content_copy
+              </span>
+            </button>
           </div>
         </div>
 
-        <div className="rounded-[12px] border border-[rgba(18,35,61,0.08)] bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] p-6 shadow-sm">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center space-x-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-[12px] bg-blue-50 text-blue-600">
-                <i className="fa-solid fa-chart-area text-[16px]"></i>
-              </div>
-              <div>
-                <h3 className="text-[16px] font-bold uppercase text-gray-900">Participation Dashboard</h3>
-                <p className="text-[13px] font-bold uppercase tracking-[0.12em] text-slate-500">Public engagement statistics</p>
-              </div>
+        <div className="election-page__control-card election-settings__summary-card">
+          <div className="election-settings__summary-header">
+            <div className="election-settings__summary-copy">
+              <p className="election-settings__summary-label">Participation Dashboard</p>
+              <h3 className="election-settings__summary-title">Public engagement statistics</h3>
             </div>
-            <span className="rounded-[12px] border border-blue-200 bg-blue-50 px-4 py-3 text-[13px] font-bold uppercase tracking-[0.08em] text-blue-700">
-              ALWAYS ONLINE
+            <span className="election-settings__status-pill election-settings__status-pill--soft">
+              Always Online
             </span>
           </div>
-          <div className="grid grid-cols-[minmax(0,1fr)_auto]">
-              <input 
-              type="text" 
-              readOnly 
-              value={getElectionAbsoluteUrl('/public-turnout')}
-              className="w-full rounded-l-[12px] border border-r-0 border-[rgba(18,35,61,0.14)] bg-[#fbfcff] px-4 py-[14px] text-[13px] text-slate-500 outline-none"
-            />
-            <button onClick={() => handleCopyLink('turnout')} className="cursor-pointer rounded-r-[12px] border border-[rgba(18,35,61,0.14)] bg-[#fbfcff] px-4 text-[#0038a8] transition-colors hover:bg-[#eef4ff]"><i className="fa-solid fa-copy"></i></button>
+          <div className="election-settings__link-row">
+            <div className="election-settings__link-field">
+              <input type="text" readOnly value={getElectionAbsoluteUrl('/public-turnout')} />
+            </div>
+            <button type="button" onClick={() => handleCopyLink('turnout')} className="election-settings__copy-button">
+              <span className="material-symbols-outlined" aria-hidden="true">
+                content_copy
+              </span>
+            </button>
           </div>
-          <p className="mt-3 text-[13px] italic text-slate-500">
-            <i className="fa-solid fa-circle-info mr-1 text-blue-400"></i>
-            Aggregated stats are shared automatically to promote transparency.
-          </p>
         </div>
+      </section>
+
+      <SchoolProfileConfig
+        schoolYears={schoolYears}
+        electionConfig={electionConfig}
+        onSaveElectionName={handleSaveElectionName}
+        showAlert={showAlert}
+      />
+      <VoterAccessControl config={electionConfig} onUpdate={setElectionConfig} />
+
+      <div className="election-settings__records-stack">
+        <VoterChecker learnerDatabase={learnerDatabase} voters={voters} sections={sections} />
+        <SectionListExporter sections={sections} schoolYear={activeSyLabel} />
       </div>
 
-      {/* School Profile Branding */}
-      <SchoolProfileConfig 
-        config={electionConfig} 
-        onUpdate={setElectionConfig} 
-        schoolYears={schoolYears}
-      />
-
-      {/* Voter Access & Scheduling */}
-      <VoterAccessControl 
-        config={electionConfig} 
-        onUpdate={setElectionConfig} 
-      />
-
-      {/* Searchable Records Checker Section */}
-      <VoterChecker 
-        learnerDatabase={learnerDatabase} 
-        voters={voters} 
-        sections={sections} 
-      />
-
-      {/* Masterlist Generation Section */}
-      <MasterlistGenerator 
-        learnerDatabase={learnerDatabase} 
-        sections={sections} 
-        schoolName={electionConfig.schoolName || 'Leon National High School'}
-      />
-
-      {/* Section Directory Exporter */}
-      <SectionListExporter 
-        sections={sections} 
-        schoolYear={activeSyLabel} 
-      />
-
-      {/* Advance Election Controls */}
-      <div className="bg-white p-6 rounded-[12px] shadow-sm border border-[rgba(18,35,61,0.08)] no-print">
-        <div className="flex items-center justify-between mb-8">
-           <h3 className="text-xl font-black text-[#0038a8] uppercase flex items-center">
-            <i className="fa-solid fa-sliders mr-3 text-[#034F8B]"></i>
-            Advanced Election Controls
-          </h3>
-          <div className="bg-blue-50 px-4 py-2 rounded-xl flex items-center space-x-2 border border-blue-100">
-            <i className="fa-solid fa-shield-check text-[#034F8B] text-xs"></i>
-            <span className="text-[10px] font-black text-[#034F8B] uppercase">Authorized Access Only</span>
+      <div className="election-page__card election-page__compact-card no-print">
+        <div className="election-settings__section-header">
+          <div className="election-settings__section-copy">
+            <p className="election-settings__section-kicker">Advanced Election Controls</p>
+            <h3 className="election-settings__section-title">Authorized access only</h3>
           </div>
+          <span className="election-settings__section-note">Operations panel</span>
         </div>
-        
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
-          <button 
-            onClick={() => setIsManualModalOpen(true)}
-            className="flex flex-col items-center p-8 bg-gray-50 rounded-2xl border border-gray-100 hover:bg-white hover:border-[#034F8B] transition-all group shadow-sm"
-          >
-            <div className="w-12 h-12 bg-white rounded-xl shadow-sm flex items-center justify-center mb-4 group-hover:bg-[#034F8B] group-hover:text-white transition-colors">
-              <i className="fa-solid fa-file-export"></i>
+
+        <div className="election-page__utility-tile-grid">
+          <button type="button" onClick={() => setIsManualModalOpen(true)} className="election-page__utility-tile">
+            <div className="election-page__utility-tile-icon">
+              <span className="material-symbols-outlined" aria-hidden="true">
+                receipt_long
+              </span>
             </div>
-            <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-1">Results Tally</span>
-            <span className="text-xs font-bold text-gray-900 text-center">Verify & Print Official Tally</span>
+            <span className="election-page__utility-tile-label">Results Tally</span>
+            <span className="election-page__utility-tile-copy">Verify and print the official tally</span>
           </button>
 
-          <button 
-            onClick={() => setIsGradeResultsOpen(true)}
-            className="flex flex-col items-center p-8 bg-gray-50 rounded-2xl border border-gray-100 hover:bg-white hover:border-[#034F8B] transition-all group shadow-sm"
-          >
-            <div className="w-12 h-12 bg-white rounded-xl shadow-sm flex items-center justify-center mb-4 group-hover:bg-[#034F8B] group-hover:text-white transition-colors">
-              <i className="fa-solid fa-graduation-cap"></i>
+          <button type="button" onClick={() => setIsGradeResultsOpen(true)} className="election-page__utility-tile">
+            <div className="election-page__utility-tile-icon">
+              <span className="material-symbols-outlined" aria-hidden="true">
+                school
+              </span>
             </div>
-            <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-1">Grade Tally</span>
-            <span className="text-xs font-bold text-gray-900 text-center">Export Grade Results (PDF)</span>
+            <span className="election-page__utility-tile-label">Grade Tally</span>
+            <span className="election-page__utility-tile-copy">Export grade results as PDF</span>
           </button>
 
-          <button 
-            onClick={handleExportParticipation}
-            className="flex flex-col items-center p-8 bg-gray-50 rounded-2xl border border-gray-100 hover:bg-white hover:border-[#034F8B] transition-all group shadow-sm"
-          >
-            <div className="w-12 h-12 bg-white rounded-xl shadow-sm flex items-center justify-center mb-4 group-hover:bg-[#034F8B] group-hover:text-white transition-colors">
-              <i className="fa-solid fa-chart-pie"></i>
+          <button type="button" onClick={handleExportParticipation} className="election-page__utility-tile">
+            <div className="election-page__utility-tile-icon">
+              <span className="material-symbols-outlined" aria-hidden="true">
+                pie_chart
+              </span>
             </div>
-            <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-1">Participation Audit</span>
-            <span className="text-xs font-bold text-gray-900 text-center">Voter Turnout Analysis (PDF)</span>
+            <span className="election-page__utility-tile-label">Participation Audit</span>
+            <span className="election-page__utility-tile-copy">Voter turnout analysis</span>
           </button>
 
-          <GenderTurnoutAudit 
+          <GenderTurnoutAudit
             learnerDatabase={learnerDatabase}
             voters={voters}
             sections={sections}
             schoolYear={activeSyLabel}
             schoolName={electionConfig.schoolName || 'Leon National High School'}
           />
-          
-          <button 
+
+          <button
+            type="button"
             onClick={handleExportNonVoters}
-            className="flex flex-col items-center p-8 bg-gray-50 rounded-2xl border border-gray-100 hover:bg-white hover:border-red-600 transition-all group shadow-sm"
+            className="election-page__utility-tile election-page__utility-tile--danger"
           >
-            <div className="w-12 h-12 bg-white rounded-xl shadow-sm flex items-center justify-center mb-4 group-hover:bg-red-600 group-hover:text-white transition-colors text-red-600">
-              <i className="fa-solid fa-user-xmark"></i>
+            <div className="election-page__utility-tile-icon election-page__utility-tile-icon--danger">
+              <span className="material-symbols-outlined" aria-hidden="true">
+                person_off
+              </span>
             </div>
-            <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-1">Non-Voters List</span>
-            <span className="text-xs font-bold text-gray-900 text-center">Official Record of Non-Participation</span>
+            <span className="election-page__utility-tile-label">Non-Voters List</span>
+            <span className="election-page__utility-tile-copy">Official record of non-participation</span>
           </button>
 
-          <button 
-            onClick={() => setIsTarpModalOpen(true)}
-            className="flex flex-col items-center p-8 bg-gray-50 rounded-2xl border border-gray-100 hover:bg-white hover:border-[#034F8B] transition-all group shadow-sm"
-          >
-            <div className="w-12 h-12 bg-white rounded-xl shadow-sm flex items-center justify-center mb-4 group-hover:bg-[#034F8B] group-hover:text-white transition-colors">
-              <i className="fa-solid fa-file-image"></i>
+          <button type="button" onClick={() => setIsTarpModalOpen(true)} className="election-page__utility-tile">
+            <div className="election-page__utility-tile-icon">
+              <span className="material-symbols-outlined" aria-hidden="true">
+                image
+              </span>
             </div>
-            <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-1">Report Image</span>
-            <span className="text-xs font-bold text-gray-900 text-center">High-Res PNG Infographic Exporter</span>
+            <span className="election-page__utility-tile-label">Report Image</span>
+            <span className="election-page__utility-tile-copy">High-resolution PNG infographic export</span>
           </button>
 
-          <button 
+          <button
+            type="button"
             onClick={handleMigrateLegacy}
             disabled={isMigratingLegacy}
-            className="flex flex-col items-center p-8 bg-gray-50 rounded-2xl border border-gray-100 hover:bg-white hover:border-[#034F8B] transition-all group shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
+            className="election-page__utility-tile"
           >
-            <div className="w-12 h-12 bg-white rounded-xl shadow-sm flex items-center justify-center mb-4 group-hover:bg-[#034F8B] group-hover:text-white transition-colors">
-              <i className={`fa-solid ${isMigratingLegacy ? 'fa-circle-notch animate-spin' : 'fa-database'}`}></i>
+            <div className="election-page__utility-tile-icon">
+              <span className="material-symbols-outlined" aria-hidden="true">
+                database
+              </span>
             </div>
-            <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-1">Legacy Migration</span>
-            <span className="text-xs font-bold text-gray-900 text-center">
-              {isMigratingLegacy ? 'Migrating Legacy Records...' : 'Enforce Legacy Ballots & Candidates'}
+            <span className="election-page__utility-tile-label">Legacy Migration</span>
+            <span className="election-page__utility-tile-copy">
+              {isMigratingLegacy ? 'Migrating legacy records...' : 'Enforce legacy ballots and candidates'}
             </span>
           </button>
         </div>
       </div>
 
-      {/* Security Protocol */}
-      <div className="bg-[#fff7f7] p-6 rounded-[12px] border border-[#ce1126]/12 no-print">
-        <div className="flex items-start space-x-4 mb-8">
-          <div className="bg-red-600 text-white w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg shadow-red-900/20">
-            <i className="fa-solid fa-triangle-exclamation text-xl"></i>
+      <div className="election-settings__danger-card no-print">
+        <div className="election-settings__danger-header">
+          <div className="election-settings__danger-icon">
+            <span className="material-symbols-outlined" aria-hidden="true">
+              warning
+            </span>
           </div>
-          <div>
-            <h3 className="text-xl font-black text-red-800 uppercase leading-none">Emergency Protocol</h3>
-            <p className="text-red-600 text-xs font-bold mt-2 uppercase tracking-tighter italic">Warning: Data wipes are permanent.</p>
+          <div className="election-settings__danger-copy">
+            <p className="election-settings__section-kicker">Emergency Protocol</p>
+            <h3 className="election-settings__section-title">Clear election records</h3>
           </div>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-4">
-          <button 
-            onClick={onReset}
-            className="flex-1 bg-red-600 text-white px-8 py-5 rounded-2xl font-black text-[10px] uppercase hover:bg-red-700 transition-all shadow-xl shadow-red-900/10 flex items-center justify-center"
-          >
-            <i className="fa-solid fa-skull-crossbones mr-3"></i>
-            Clear Election Records
-          </button>
-        </div>
+        <p className="election-settings__danger-note">
+          Warning: data wipes are permanent and are intended for system recovery only.
+        </p>
+
+        <button type="button" onClick={onReset} className="election-settings__danger-action">
+          Clear Election Records
+        </button>
       </div>
-      
-      <div className="flex justify-center pt-8 no-print">
-         <button 
-            onClick={onLogout}
-            className="text-gray-400 hover:text-gray-900 transition-colors font-black uppercase text-[10px] tracking-[0.2em] flex items-center"
-          >
-            <i className="fa-solid fa-door-open mr-2"></i>
-            Deauthorize Administrator Access
-          </button>
+
+      <div className="election-settings__logout no-print">
+        <button type="button" onClick={onLogout} className="election-settings__logout-button">
+          <span className="material-symbols-outlined" aria-hidden="true">
+            logout
+          </span>
+          Deauthorize Administrator Access
+        </button>
       </div>
+
     </div>
   );
 };

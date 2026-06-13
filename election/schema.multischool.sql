@@ -101,6 +101,7 @@ CREATE TABLE IF NOT EXISTS public.election_events (
   end_time timestamptz,
   public_results_enabled boolean NOT NULL DEFAULT false,
   public_turnout_enabled boolean NOT NULL DEFAULT false,
+  allowed_grade_level text,
   allow_schedule_enforcement boolean NOT NULL DEFAULT false,
   school_display_name text,
   instructions text,
@@ -359,6 +360,7 @@ SELECT
   COALESCE(e.school_display_name, s.school_name) AS school_name,
   e.public_results_enabled,
   e.public_turnout_enabled,
+  e.allowed_grade_level,
   e.updated_at
 FROM public.election_events e
 JOIN public.usis_schools s

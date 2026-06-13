@@ -67,6 +67,12 @@ const Login: React.FC<LoginProps> = ({
     <section className="flex-grow bg-[#f8fafc]">
       <div className="w-full px-[var(--page-inset)] py-4 md:py-6">
         <div className="mx-auto flex w-full max-w-[980px] flex-col items-center text-center">
+          <div className="mb-4 flex w-full max-w-[720px] items-center justify-center rounded-[12px] border border-[rgba(18,35,61,0.12)] bg-white px-6 py-5 text-center shadow-[0_10px_24px_rgba(18,35,61,0.06)]">
+            <h2 className="m-0 text-[24px] font-black uppercase tracking-[-0.03em] text-[#0038a8]">
+              {config.electionName || 'Learner Government Election'}
+            </h2>
+          </div>
+
           <div className="mt-2 flex w-full flex-col items-center">
             {isOpen ? (
               <>
@@ -76,13 +82,14 @@ const Login: React.FC<LoginProps> = ({
                     title="Election Portal Access"
                     username={username}
                     password={password}
+                    usernameLabel="LRN (Learner Reference Number)"
                     usernameInputMode="numeric"
                     passwordInputMode="text"
                     usernameAutoComplete="off"
                     passwordAutoComplete="off"
                     submitLabel="Login"
                     onUsernameChange={(val) => {
-                      if (val.toLowerCase() === 'admin' || /^\d*$/.test(val)) {
+                      if (/^\d*$/.test(val)) {
                         setUsername(val.slice(0, 12));
                       }
                     }}
@@ -101,7 +108,9 @@ const Login: React.FC<LoginProps> = ({
                 )}
 
                 <p className="mt-8 mb-0 max-w-[1100px] text-[13px] leading-[1.4] text-[#68758d]">
-                  Enter your Registrar credentials (Username or LRN, plus assigned password) to continue.
+                  {config.allowedGradeLevel
+                    ? `Access is limited to ${config.allowedGradeLevel} learners for this election cycle.`
+                    : 'Enter your LRN and assigned password to continue.'}
                 </p>
               </>
             ) : (

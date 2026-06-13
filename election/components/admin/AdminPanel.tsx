@@ -55,6 +55,9 @@ const tabs: { id: AdminTab; label: string; icon: string }[] = [
 const AdminPanel: React.FC<AdminPanelProps> = (props) => {
   const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
   const isEmbedded = props.variant === 'embedded';
+  const activeSchoolYearLabel = props.schoolYears.find((schoolYear) => schoolYear.isActive || schoolYear.is_active)?.label
+    || props.schoolYears[0]?.label
+    || '2025-2026';
 
   useEffect(() => {
     if (isEmbedded) {
@@ -128,6 +131,7 @@ const AdminPanel: React.FC<AdminPanelProps> = (props) => {
             learnerDatabase={props.learnerDatabase}
             voters={props.voters}
             sections={props.sections}
+            schoolName={props.electionConfig.schoolName || 'Leon National High School'}
             onDeleteBallot={props.onDeleteBallot}
             showAlert={props.showAlert}
           />
@@ -138,6 +142,9 @@ const AdminPanel: React.FC<AdminPanelProps> = (props) => {
             sections={props.sections}
             learnerDatabase={props.learnerDatabase}
             voters={props.voters}
+            schoolName={props.electionConfig.schoolName || 'Leon National High School'}
+            electionName={props.electionConfig.electionName || 'Learner Government Election'}
+            schoolYearLabel={activeSchoolYearLabel}
           />
         );
       case 'settings':
