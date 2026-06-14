@@ -10,6 +10,7 @@
     "enrollment",
     "learner-portal",
     "integrated-admin",
+    "school-help-portal",
     "merch",
     "election",
     "sp-portal",
@@ -28,6 +29,8 @@
     "dev:learner-portal": "npm run dev --workspace ./learner-portal",
     "dev:integrated-admin": "npm run dev --workspace ./integrated-admin",
     "dev:ia": "npm run dev --workspace ./integrated-admin",
+    "dev:help": "npm run dev --workspace ./school-help-portal",
+    "dev:school-help-portal": "npm run dev --workspace ./school-help-portal",
     "dev:merch": "npm run dev --workspace ./merch",
     "dev:election": "npm run dev --workspace ./election",
     "dev:sp-portal": "npm run dev --workspace ./sp-portal",
@@ -42,13 +45,15 @@
     "build:learner-portal": "npm run build --workspace ./learner-portal",
     "build:integrated-admin": "npm run build --workspace ./integrated-admin",
     "build:ia": "npm run build --workspace ./integrated-admin",
+    "build:help": "npm run build --workspace ./school-help-portal",
+    "build:school-help-portal": "npm run build --workspace ./school-help-portal",
     "build:merch": "npm run build --workspace ./merch",
     "build:election": "npm run build --workspace ./election",
     "build:sp-portal": "npm run build --workspace ./sp-portal",
     "build:spta": "npm run build --workspace ./spta",
     "build:registrar": "npm run build --workspace ./registrar",
     "build:support": "npm run build --workspace ./support",
-    "build": "npm run build:attendance && npm run build:coordinator && npm run build:deped-web-kit && npm run build:data-privacy && npm run build:enrollment && npm run build:learner-portal && npm run build:integrated-admin && npm run build:merch && npm run build:election && npm run build:sp-portal && npm run build:spta && npm run build:registrar && npm run build:support"
+    "build": "npm run build:attendance && npm run build:coordinator && npm run build:deped-web-kit && npm run build:data-privacy && npm run build:enrollment && npm run build:learner-portal && npm run build:integrated-admin && npm run build:school-help-portal && npm run build:merch && npm run build:election && npm run build:sp-portal && npm run build:spta && npm run build:registrar && npm run build:support"
   },
   "engines": {
     "node": ">=20"

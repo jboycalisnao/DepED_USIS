@@ -1,0 +1,569 @@
+@import "../../common/css/index.css";
+
+:root {
+  --usis-module-label: "School Help Portal";
+  --usis-module-kicker: "Learner";
+  --usis-module-title: "SCHOOL HELP PORTAL";
+  --school-help-portal-line: rgba(18, 35, 61, 0.12);
+}
+
+.school-help-portal-app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.school-help-portal-main {
+  flex: 1 1 auto;
+  padding-bottom: 72px;
+}
+
+.school-help-portal-content {
+  display: grid;
+  gap: 36px;
+}
+
+.school-help-portal-content > .section-shell {
+  display: grid;
+  gap: 24px;
+}
+
+.school-help-portal-content .section-grid {
+  row-gap: 32px;
+  column-gap: 20px;
+}
+
+.school-help-portal-topic-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.school-help-portal-topic-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid rgba(0, 56, 168, 0.18);
+  border-radius: 999px;
+  background: #f8fbff;
+  color: var(--deped-ink);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.school-help-portal-hero-title {
+  color: var(--deped-blue);
+}
+
+.school-help-portal-two-column {
+  display: grid;
+  row-gap: 32px;
+  column-gap: 18px;
+  grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+}
+
+.school-help-portal-form {
+  display: grid;
+  gap: 14px;
+}
+
+.school-help-portal-form__full-span {
+  grid-column: 1 / -1;
+}
+
+.school-help-portal-ticket-list {
+  display: grid;
+  gap: 12px;
+}
+
+.school-help-portal-ticket-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+
+.school-help-portal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.school-help-portal-actions--start {
+  justify-content: flex-start;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.school-help-portal-admin-shell {
+  display: grid;
+  gap: 18px;
+}
+
+.school-help-portal-admin-view {
+  display: grid;
+  gap: 18px;
+}
+
+.school-help-portal-summary-grid {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.school-help-portal-summary-value {
+  color: var(--deped-blue);
+  font-size: 24px;
+  line-height: 1.08;
+}
+
+.school-help-portal-search {
+  max-width: 420px;
+}
+
+.school-help-portal-table-card .usis-table {
+  min-width: 1080px;
+}
+
+.school-help-portal-admin-workspace {
+  display: grid;
+  gap: 18px;
+}
+
+.school-help-portal-admin-workspace--grouped {
+  gap: 16px;
+}
+
+.school-help-portal-day-group {
+  display: grid;
+  gap: 0;
+  overflow: hidden;
+}
+
+.school-help-portal-day-group__content {
+  display: grid;
+  gap: 14px;
+}
+
+.school-help-portal-day-group .section-card__bar {
+  background: var(--deped-blue);
+}
+
+.school-help-portal-day-group__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.school-help-portal-day-group__header:hover {
+  background: transparent;
+}
+
+.school-help-portal-day-group__title {
+  display: grid;
+  gap: 2px;
+}
+
+.school-help-portal-day-group__title h3 {
+  margin: 0;
+  color: var(--deped-blue);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.school-help-portal-day-group__title span {
+  color: var(--deped-muted);
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.school-help-portal-day-group__chevron {
+  flex: 0 0 auto;
+  min-width: 30px;
+  color: var(--deped-blue);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1;
+  text-align: center;
+}
+
+.school-help-portal-day-group__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0;
+}
+
+.school-help-portal-day-group__tags--status {
+  margin-top: -2px;
+}
+
+.school-help-portal-day-group__tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid rgba(0, 56, 168, 0.14);
+  border-radius: 999px;
+  background: #f8fbff;
+  color: var(--deped-ink);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.school-help-portal-day-group__tag--open {
+  border-color: rgba(47, 128, 237, 0.22);
+  background: rgba(47, 128, 237, 0.08);
+}
+
+.school-help-portal-day-group__tag--review {
+  border-color: rgba(194, 138, 0, 0.22);
+  background: rgba(194, 138, 0, 0.08);
+}
+
+.school-help-portal-day-group__tag--resolved {
+  border-color: rgba(39, 174, 96, 0.22);
+  background: rgba(39, 174, 96, 0.08);
+}
+
+.school-help-portal-day-group__tag--closed {
+  border-color: rgba(214, 48, 49, 0.22);
+  background: rgba(214, 48, 49, 0.08);
+}
+
+.school-help-portal-day-group__list {
+  display: grid;
+  gap: 10px;
+  padding: 2px 0 2px;
+}
+
+.school-help-portal-ticket-row {
+  display: grid;
+  grid-template-columns: 6px minmax(0, 1fr);
+  gap: 0;
+  padding: 0;
+  border: 1px solid rgba(0, 56, 168, 0.12);
+  border-radius: 14px;
+  background: #ffffff;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.school-help-portal-ticket-row:hover {
+  border-color: rgba(0, 56, 168, 0.22);
+  background: #fbfcff;
+}
+
+.school-help-portal-ticket-row--active {
+  border-color: rgba(0, 56, 168, 0.34);
+  background: rgba(0, 56, 168, 0.04);
+}
+
+.school-help-portal-ticket-row__bar {
+  background: var(--deped-blue);
+}
+
+.school-help-portal-ticket-row--active .school-help-portal-ticket-row__bar {
+  background: #1847b0;
+}
+
+.school-help-portal-ticket-row__body {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+}
+
+.school-help-portal-ticket-row__main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 14px;
+}
+
+.school-help-portal-ticket-row__main strong {
+  color: var(--deped-ink);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.school-help-portal-ticket-row__meta {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
+.school-help-portal-ticket-row__meta span {
+  display: grid;
+  gap: 4px;
+  color: #66768f;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.school-help-portal-ticket-row__meta strong {
+  color: var(--deped-ink);
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.school-help-portal-ticket-row__subject {
+  color: var(--deped-ink);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.school-help-portal-ticket-detail {
+  display: grid;
+  gap: 16px;
+}
+
+.school-help-portal-ticket-detail h3 {
+  margin: 0;
+  color: var(--deped-blue);
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+.school-help-portal-ticket-detail__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px 18px;
+}
+
+.school-help-portal-ticket-detail__header .status-badge {
+  margin-top: 2px;
+}
+
+.school-help-portal-ticket-detail__summary {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  padding: 16px;
+  border: 1px solid rgba(0, 56, 168, 0.1);
+  border-radius: 16px;
+  background: #f8fbff;
+}
+
+.school-help-portal-ticket-detail__summary div {
+  display: grid;
+  gap: 4px;
+}
+
+.school-help-portal-ticket-detail__summary span,
+.school-help-portal-ticket-detail__block span {
+  color: #66768f;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.school-help-portal-ticket-detail__summary strong {
+  color: var(--deped-ink);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.school-help-portal-ticket-detail__grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.school-help-portal-ticket-detail__block {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+  border: 1px solid rgba(0, 56, 168, 0.1);
+  border-radius: 14px;
+  background: #fff;
+}
+
+.school-help-portal-ticket-detail__block--full {
+  grid-column: 1 / -1;
+}
+
+.school-help-portal-ticket-detail__block p {
+  margin: 0;
+  color: var(--deped-ink);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.school-help-portal-ticket-actions {
+  display: grid;
+  gap: 14px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(0, 56, 168, 0.1);
+}
+
+.school-help-portal-ticket-actions__notes {
+  width: 100%;
+}
+
+.school-help-portal-ticket-actions__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.school-help-portal-ticket-modal .modal-dialog__body {
+  display: grid;
+  gap: 16px;
+}
+
+.school-help-portal-ticket-modal__body {
+  display: grid;
+  gap: 16px;
+}
+
+.school-help-portal-ticket-modal__summary {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  padding: 14px 16px;
+  border: 1px solid rgba(0, 56, 168, 0.12);
+  border-radius: 16px;
+  background: #f8fbff;
+}
+
+.school-help-portal-ticket-modal__summary div {
+  display: grid;
+  gap: 4px;
+}
+
+.school-help-portal-ticket-modal__summary span,
+.school-help-portal-ticket-modal__card span,
+.school-help-portal-ticket-modal__admin-note span {
+  color: #66768f;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.school-help-portal-ticket-modal__summary strong {
+  color: var(--deped-ink);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.school-help-portal-ticket-modal__body-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.school-help-portal-ticket-modal__card {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+  border: 1px solid rgba(0, 56, 168, 0.12);
+  border-radius: 14px;
+  background: #ffffff;
+}
+
+.school-help-portal-ticket-modal__card--full {
+  grid-column: 1 / -1;
+}
+
+.school-help-portal-ticket-modal__card p,
+.school-help-portal-ticket-modal__admin-note p {
+  margin: 0;
+  color: var(--deped-ink);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.school-help-portal-ticket-modal__status-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 12px;
+  padding: 12px 16px;
+  border: 1px solid rgba(0, 56, 168, 0.12);
+  border-radius: 14px;
+  background: #ffffff;
+}
+
+.school-help-portal-ticket-modal__status-copy {
+  color: var(--deped-muted);
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.school-help-portal-ticket-modal__admin-note {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+  border: 1px solid rgba(0, 56, 168, 0.12);
+  border-radius: 14px;
+  background: #fffef7;
+}
+
+.school-help-portal-ticket-modal__actions {
+  display: grid;
+  gap: 14px;
+}
+
+.school-help-portal-ticket-modal__notes {
+  width: 100%;
+}
+
+.school-help-portal-ticket-modal__footer {
+  justify-content: flex-end;
+}
+
+@media (max-width: 720px) {
+  .school-help-portal-ticket-modal .modal-dialog__actions {
+    justify-content: stretch;
+  }
+
+  .school-help-portal-ticket-modal__footer button {
+    flex: 1 1 0;
+  }
+}
+
+.school-help-portal-table-card .usis-table tbody tr {
+  cursor: pointer;
+}
+
+.school-help-portal-table-row--active td {
+  background: rgba(0, 56, 168, 0.04);
+}
+
+.school-help-portal-filters {
+  align-items: end;
+}
+
+@media (max-width: 920px) {
+  .school-help-portal-two-column {
+    grid-template-columns: 1fr;
+    row-gap: 32px;
+    column-gap: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .school-help-portal-nav .kit-nav__grid {
+    gap: 28px;
+    overflow-x: auto;
+  }
+}

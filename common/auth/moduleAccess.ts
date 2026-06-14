@@ -9,6 +9,7 @@ export type UsisModuleKey =
   | 'sp_portal'
   | 'spta'
   | 'learner_portal'
+  | 'help_admin'
   | 'support';
 
 const STORAGE_KEY = 'usis_coordinator_module_access_map';
@@ -20,7 +21,7 @@ type IaPageAccessMap = Record<string, string[]>;
 const MODULE_ACCESS_TABLE = 'coordinator_module_access';
 const IA_PAGE_ACCESS_TABLE = 'coordinator_account_ia_page_access';
 const IA_PAGE_CATALOG_TABLE = 'coordinator_ia_pages';
-const MODULE_KEYS: UsisModuleKey[] = ['coordinator', 'ia', 'registrar', 'attendance', 'election', 'sp_portal', 'spta', 'learner_portal', 'support'];
+const MODULE_KEYS: UsisModuleKey[] = ['coordinator', 'ia', 'registrar', 'attendance', 'election', 'sp_portal', 'spta', 'learner_portal', 'help_admin', 'support'];
 
 const parseModuleAccessMap = (raw: string | null): ModuleAccessMap => {
   if (!raw) return {};
@@ -127,9 +128,7 @@ export const hasCoordinatorModuleAccessInSupabase = async (accountId: string | n
     .eq('account_id', accountId)
     .limit(1)
     .maybeSingle();
-  if (error || !data) {
-    return hasCoordinatorModuleAccess(accountId, moduleKey);
-  }
+  if (error || !data) return false;
   const modules = sanitizeModules((data as any).modules);
   setCoordinatorAccountModuleAccess(accountId, modules);
   return modules.includes(moduleKey);

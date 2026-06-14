@@ -117,8 +117,6 @@ body {
   .floating-field__control input,
   .floating-field__control select,
   .floating-field__control textarea,
-  .searchable-select__field input,
-  .searchable-select__field button,
   .searchable-select__menu,
   .searchable-select__option,
   .searchable-select__empty,
@@ -132,6 +130,14 @@ body {
   .integrated-admin-merch-order-audit__item
 ) {
   border-radius: 0.375rem !important;
+}
+
+.integrated-admin-app .searchable-select__field input {
+  border-radius: 0.375rem 0 0 0.375rem;
+}
+
+.integrated-admin-app .searchable-select__field button {
+  border-radius: 0 0.375rem 0.375rem 0;
 }
 
 .integrated-admin-app .usis-side-nav__group-summary,

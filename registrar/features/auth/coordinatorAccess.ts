@@ -1,5 +1,5 @@
 import { supabase } from '../../lib/supabase';
-import { getCoordinatorModuleAccessMap, hasCoordinatorModuleAccess } from '../../../common/auth/moduleAccess';
+import { hasCoordinatorModuleAccessInSupabase } from '../../../common/auth/moduleAccess';
 import { resolveCoordinatorDepartmentAccess } from '../../../common/auth/coordinatorDepartmentAccess';
 
 export interface RegistrarCoordinatorAccess {
@@ -63,14 +63,6 @@ const formatCoordinatorDisplayName = (firstName: unknown, middleName: unknown, l
   const middleInitial = toMiddleInitial(middleName);
   const last = String(lastName || '').trim();
   return [first, middleInitial, last].filter(Boolean).join(' ').trim();
-};
-
-const hasExplicitRegistrarDeny = (accountId: string) => {
-  const accessMap = getCoordinatorModuleAccessMap();
-  if (!Object.prototype.hasOwnProperty.call(accessMap, accountId)) {
-    return false;
-  }
-  return !hasCoordinatorModuleAccess(accountId, 'registrar');
 };
 
 const matchesPassword = (record: any, password: string) => {
@@ -150,10 +142,15 @@ export const resolveRegistrarCoordinatorAccess = async (
       };
     }
 
-    // Coordinator module map can be stale across deployments/domains.
-    // Registrar role from DB is treated as authoritative for access.
-    if (candidate.source === 'usis_core_coordinators' && hasExplicitRegistrarDeny(candidate.data.id)) {
+    const hasRegistrarAccess = await hasCoordinatorModuleAccessInSupabase(String(candidate.data.id || ''), 'registrar');
+    if (!hasRegistrarAccess) {
       debug.explicitRegistrarDeny = true;
+      debug.outcome = 'access_denied';
+      return {
+        error: 'This account is not assigned Registrar module access in Coordinator Portal.',
+        record: null,
+        debug,
+      };
     }
 
     const school = Array.isArray(candidate.data.usis_schools)

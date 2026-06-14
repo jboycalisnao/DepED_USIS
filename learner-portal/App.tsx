@@ -20,6 +20,7 @@ import { ProfilePage } from './features/portal/pages/ProfilePage';
 import { EnrollmentHistoryServicePage } from './features/portal/pages/services/EnrollmentHistoryServicePage';
 import { AttendanceServicePage } from './features/portal/pages/services/AttendanceServicePage';
 import { DocumentRequestsServicePage } from './features/portal/pages/services/DocumentRequestsServicePage';
+import { LearnerHelpTicketServicePage } from './features/portal/pages/services/LearnerHelpTicketServicePage';
 import { StudentSupportServicePage } from './features/portal/pages/services/StudentSupportServicePage';
 import { PtaFeeServicePage } from './features/portal/pages/services/PtaFeeServicePage';
 import { MerchServicePage } from './features/portal/pages/services/MerchServicePage';
@@ -106,6 +107,7 @@ function LearnerPortalShell({
                 <Route path="/services/enrollment-history" element={<EnrollmentHistoryServicePage session={session} />} />
                 <Route path="/services/document-requests" element={<DocumentRequestsServicePage />} />
                 <Route path="/services/student-support" element={<StudentSupportServicePage />} />
+                <Route path="/services/help-ticket" element={<LearnerHelpTicketServicePage session={session} />} />
                 <Route path="/services/pta-fee" element={<PtaFeeServicePage session={session} />} />
                 <Route path="/services/merch" element={<MerchServicePage session={session} />} />
                 <Route path="/services/merch-control" element={<MerchControlServicePage session={session} />} />

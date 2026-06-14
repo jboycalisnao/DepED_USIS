@@ -31,6 +31,12 @@ const BASE_SERVICES: LearnerServiceItem[] = [
     actionLabel: 'Open Support',
   },
   {
+    title: 'Help Ticket',
+    description: 'Submit a learner help ticket using your registrar profile details.',
+    path: '/services/help-ticket',
+    actionLabel: 'Open Ticket',
+  },
+  {
     title: 'PTA Fee',
     description: 'View your PTA transaction history, fee breakdown, and current balance.',
     path: '/services/pta-fee',

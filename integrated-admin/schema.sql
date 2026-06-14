@@ -670,6 +670,121 @@ create table if not exists ia_portal_controls (
 create index if not exists idx_ia_portal_controls_enabled on ia_portal_controls(is_enabled);
 create index if not exists idx_ia_portal_controls_mode on ia_portal_controls(mode);
 
+-- =========================================================
+-- Learner Portal Help Desk Tickets
+-- =========================================================
+create table if not exists learner_portal_help_tickets (
+  id uuid primary key default gen_random_uuid(),
+  reference_no text not null unique,
+  learner_id text references public.registrar_learners(id) on update cascade on delete set null,
+  learner_lrn text not null,
+  learner_name text not null,
+  grade_level text,
+  section text,
+  category text not null,
+  subject text not null,
+  details text not null,
+  contact_no text,
+  status text not null default 'Open' check (status in ('Open', 'In Review', 'Resolved', 'Closed')),
+  source text not null default 'learner_portal' check (source in ('learner_portal', 'integrated_admin')),
+  assigned_coordinator_id uuid references usis_core_coordinators(id) on update cascade on delete set null,
+  admin_notes text,
+  resolved_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_learner_portal_help_tickets_learner_id
+  on learner_portal_help_tickets(learner_id);
+create index if not exists idx_learner_portal_help_tickets_status
+  on learner_portal_help_tickets(status);
+create index if not exists idx_learner_portal_help_tickets_category
+  on learner_portal_help_tickets(category);
+create index if not exists idx_learner_portal_help_tickets_created_at
+  on learner_portal_help_tickets(created_at desc);
+
+-- =========================================================
+-- Learner Portal Help Ticket Audit Trail
+-- =========================================================
+create table if not exists learner_portal_help_ticket_audit (
+  id uuid primary key default gen_random_uuid(),
+  ticket_id uuid not null references learner_portal_help_tickets(id) on update cascade on delete cascade,
+  action text not null check (action in ('insert', 'update', 'status_change')),
+  previous_status text,
+  new_status text,
+  previous_admin_notes text,
+  new_admin_notes text,
+  changed_by_coordinator_id uuid references usis_core_coordinators(id) on update cascade on delete set null,
+  changed_source text not null default 'integrated_admin' check (changed_source in ('learner_portal', 'integrated_admin')),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_learner_portal_help_ticket_audit_ticket_id
+  on learner_portal_help_ticket_audit(ticket_id);
+create index if not exists idx_learner_portal_help_ticket_audit_created_at
+  on learner_portal_help_ticket_audit(created_at desc);
+
+create or replace function set_learner_portal_help_ticket_audit()
+returns trigger as $$
+begin
+  if tg_op = 'INSERT' then
+    insert into learner_portal_help_ticket_audit (
+      ticket_id,
+      action,
+      previous_status,
+      new_status,
+      previous_admin_notes,
+      new_admin_notes,
+      changed_by_coordinator_id,
+      changed_source
+    ) values (
+      new.id,
+      'insert',
+      null,
+      new.status,
+      null,
+      new.admin_notes,
+      new.assigned_coordinator_id,
+      new.source
+    );
+    return new;
+  end if;
+
+  if tg_op = 'UPDATE' then
+    insert into learner_portal_help_ticket_audit (
+      ticket_id,
+      action,
+      previous_status,
+      new_status,
+      previous_admin_notes,
+      new_admin_notes,
+      changed_by_coordinator_id,
+      changed_source
+    ) values (
+      new.id,
+      case
+        when old.status is distinct from new.status then 'status_change'
+        else 'update'
+      end,
+      old.status,
+      new.status,
+      old.admin_notes,
+      new.admin_notes,
+      new.assigned_coordinator_id,
+      new.source
+    );
+    return new;
+  end if;
+
+  return new;
+end;
+$$ language plpgsql;
+
+drop trigger if exists trg_learner_portal_help_ticket_audit on learner_portal_help_tickets;
+create trigger trg_learner_portal_help_ticket_audit
+after insert or update on learner_portal_help_tickets
+for each row execute function set_learner_portal_help_ticket_audit();
+
 -- normalize legacy learner_id text values and enforce FK to registrar_learners
 alter table coordinator_learner_operation_credentials
   alter column learner_id type uuid
@@ -793,6 +908,11 @@ for each row execute function set_updated_at();
 drop trigger if exists trg_registrar_enrollment_email_queue_updated_at on registrar_enrollment_email_queue;
 create trigger trg_registrar_enrollment_email_queue_updated_at
 before update on registrar_enrollment_email_queue
+for each row execute function set_updated_at();
+
+drop trigger if exists trg_learner_portal_help_tickets_updated_at on learner_portal_help_tickets;
+create trigger trg_learner_portal_help_tickets_updated_at
+before update on learner_portal_help_tickets
 for each row execute function set_updated_at();
 
 -- =========================================================

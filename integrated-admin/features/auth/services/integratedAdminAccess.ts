@@ -105,12 +105,8 @@ export const resolveIntegratedAdminAccess = async (username: string, password: s
 
   const roleValue = typeof dataRecord.role === 'string' ? dataRecord.role : '';
   const hasIaAccess = await hasCoordinatorModuleAccessInSupabase(accountId, 'ia');
-  const isSchoolCoordinatorRole =
-    roleValue === 'school_usis_coordinator' ||
-    roleValue === 'registrar_coordinator' ||
-    roleValue === 'attendance_coordinator';
   const isSystemAdmin = roleValue === 'system_admin';
-  if (!hasIaAccess && !isSystemAdmin && !isSchoolCoordinatorRole) {
+  if (!hasIaAccess && !isSystemAdmin) {
     return {
       error: 'This account is not allowed to access Integrated Admin. Request IA access in Coordinator Portal.',
       record: null,

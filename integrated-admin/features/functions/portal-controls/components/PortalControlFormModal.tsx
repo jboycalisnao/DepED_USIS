@@ -90,12 +90,17 @@ export function PortalControlFormModal({
             />
           </label>
 
-          <div className="registry-radio-group">
-            <label className="registry-radio-option registry-radio-option--toggle">
-              <input type="checkbox" checked={isEnabled} onChange={(event) => onIsEnabledChange(event.target.checked)} />
-              <span>Enable gate modal for selected module</span>
-            </label>
-          </div>
+          <label className="registry-radio-option portal-status-switch">
+            <input
+              type="checkbox"
+              checked={isEnabled}
+              onChange={(event) => onIsEnabledChange(event.target.checked)}
+            />
+            <span className="portal-status-switch__visual" aria-hidden="true">
+              <span className="portal-status-switch__thumb" />
+            </span>
+            <span className="portal-status-switch__text">Enable gate modal for selected module</span>
+          </label>
 
           <div className="registry-radio-group">
             <label className="registry-radio-option">

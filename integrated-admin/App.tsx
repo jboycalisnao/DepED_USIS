@@ -34,6 +34,7 @@ import { MerchOrderCountsPage } from './features/functions/merchandise/MerchOrde
 import { PortalControlsPage } from './features/functions/portal-controls/pages/PortalControlsPage';
 import { ElectionFunctionPage } from './features/functions/election/ElectionFunctionPage';
 import { ElectionAdminConsolePage } from './features/functions/election/ElectionAdminConsolePage';
+import { HelpDeskTicketsPage } from './features/functions/help-desk/pages/HelpDeskTicketsPage';
 import { resolveCoordinatorDepartmentAccess } from '../common/auth/coordinatorDepartmentAccess';
 import { loadCoordinatorIaPageAccessMapFromSupabase, loadCoordinatorModuleAccessMapFromSupabase } from '../common/auth/moduleAccess';
 
@@ -129,6 +130,11 @@ const iaNavItems: UsisSideNavItem[] = [
     icon: 'tune',
   },
   {
+    path: '/functions/help-desk',
+    label: 'Help Desk Admin',
+    icon: 'support_agent',
+  },
+  {
     path: '/functions/election',
     label: 'Election',
     icon: 'how_to_vote',
@@ -146,10 +152,12 @@ const buildNavItemsWithIaAccessState = (
   items: UsisSideNavItem[],
   hasIaModule: boolean,
   allowedIaPages: string[],
+  hasHelpAdminModule: boolean,
 ) => {
   const allowedSet = new Set(allowedIaPages);
   const isAllowedPath = (path: string) => {
     if (path === '/') return true;
+    if (path === '/functions/help-desk') return hasHelpAdminModule;
     const pageKey = iaPathToPageKey[path];
     if (!pageKey) return true;
     if (!hasIaModule) return false;
@@ -288,11 +296,20 @@ function IntegratedAdminShell() {
 
   const visibleNavItems = useMemo(() => {
     const hasIaModule = currentModules.includes('ia');
-    return buildNavItemsWithIaAccessState(iaNavItems, hasIaModule, currentIaPages);
+    const hasHelpAdminModule = currentModules.includes('help_admin');
+    return buildNavItemsWithIaAccessState(iaNavItems, hasIaModule, currentIaPages, hasHelpAdminModule);
   }, [currentIaPages, currentModules]);
 
   useEffect(() => {
     if (!session?.userId || !hasLoadedPageAccess) return;
+    const hasHelpAdminModule = currentModules.includes('help_admin');
+    if (location.pathname.startsWith('/functions/help-desk')) {
+      if (!hasHelpAdminModule) {
+        setNoAccessAlert({ open: true, message: 'No access: this account is not granted Help Admin access.' });
+        navigate('/', { replace: true });
+      }
+      return;
+    }
     const requiredPageKey = iaPathToPageKey[location.pathname];
     if (!requiredPageKey) return;
     const hasIaModule = currentModules.includes('ia');
@@ -389,6 +406,14 @@ function IntegratedAdminShell() {
                       <Route path="/functions/merch-control" element={<MerchOrderControlPage />} />
                       <Route path="/functions/order-payment" element={<MerchOrderPaymentPage />} />
                       <Route path="/functions/order-counts" element={<MerchOrderCountsPage />} />
+                      <Route
+                        path="/functions/help-desk"
+                        element={
+                          hasLoadedPageAccess && currentModules.includes('help_admin')
+                            ? <HelpDeskTicketsPage session={session} />
+                            : <UsisPageLoader message="Loading Help Desk page..." />
+                        }
+                      />
                       <Route path="/functions/grades-subjects/subjects" element={<SubjectsManagementPage />} />
                       <Route path="/functions/grades-subjects/grades" element={<GradesPage />} />
                       <Route path="/functions/grades-subjects/subject-management" element={<SubjectManagementPage />} />

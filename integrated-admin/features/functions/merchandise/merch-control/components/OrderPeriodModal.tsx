@@ -56,7 +56,17 @@ export function OrderPeriodModal(props: Props) {
               <UsisDateTimePicker ariaLabel="Order period start" label="Start Date" mode="date" value={orderPeriodDraft.startDate} onChange={(value) => setOrderPeriodDraft((current) => ({ ...current, startDate: value }))} />
               <UsisDateTimePicker ariaLabel="Order period end" label="End Date" mode="date" value={orderPeriodDraft.endDate} onChange={(value) => setOrderPeriodDraft((current) => ({ ...current, endDate: value }))} />
             </div>
-            <label className="registry-radio-option registry-radio-option--toggle"><span>Active order period</span><input type="checkbox" checked={orderPeriodDraft.isActive} onChange={(event) => setOrderPeriodDraft((current) => ({ ...current, isActive: event.target.checked }))} /></label>
+            <label className="integrated-admin-order-period-switch integrated-admin-order-period-switch--full">
+              <input
+                type="checkbox"
+                checked={orderPeriodDraft.isActive}
+                onChange={(event) => setOrderPeriodDraft((current) => ({ ...current, isActive: event.target.checked }))}
+              />
+              <span className="integrated-admin-order-period-switch__visual" aria-hidden="true">
+                <span className="integrated-admin-order-period-switch__thumb" />
+              </span>
+              <span className="integrated-admin-order-period-switch__text">Active order period</span>
+            </label>
             <div className="modal-dialog__actions"><button type="button" onClick={onClose} disabled={isSavingOrderPeriod}>Cancel</button><button type="submit" className="modal-dialog__blue" disabled={isSavingOrderPeriod}>{isSavingOrderPeriod ? 'Saving...' : 'Create Order Period'}</button></div>
           </form>
         ) : (
@@ -71,7 +81,17 @@ export function OrderPeriodModal(props: Props) {
                         <UsisDateTimePicker ariaLabel="Order period start" label="Start Date" mode="date" value={orderPeriodEditDraft.startDate} onChange={(value) => setOrderPeriodEditDraft((current) => ({ ...current, startDate: value }))} />
                         <UsisDateTimePicker ariaLabel="Order period end" label="End Date" mode="date" value={orderPeriodEditDraft.endDate} onChange={(value) => setOrderPeriodEditDraft((current) => ({ ...current, endDate: value }))} />
                       </div>
-                      <label className="registry-radio-option registry-radio-option--toggle integrated-admin-order-period-item__toggle"><span>{orderPeriodEditDraft.isActive ? 'Active' : 'Inactive'}</span><input type="checkbox" checked={orderPeriodEditDraft.isActive} onChange={(event) => setOrderPeriodEditDraft((current) => ({ ...current, isActive: event.target.checked }))} /></label>
+                      <label className="integrated-admin-order-period-switch integrated-admin-order-period-switch--compact integrated-admin-order-period-item__toggle">
+                        <input
+                          type="checkbox"
+                          checked={orderPeriodEditDraft.isActive}
+                          onChange={(event) => setOrderPeriodEditDraft((current) => ({ ...current, isActive: event.target.checked }))}
+                        />
+                        <span className="integrated-admin-order-period-switch__visual" aria-hidden="true">
+                          <span className="integrated-admin-order-period-switch__thumb" />
+                        </span>
+                        <span className="integrated-admin-order-period-switch__text">{orderPeriodEditDraft.isActive ? 'Active' : 'Inactive'}</span>
+                      </label>
                       <div className="integrated-admin-order-period-item__actions">
                         <button type="button" className="secondary-button" disabled={orderPeriodActionId === period.id} onClick={onCancelEdit}>Cancel</button>
                         <button type="button" className="modal-dialog__blue" disabled={orderPeriodActionId === period.id} onClick={() => onSaveEdit(period.id)}>{orderPeriodActionId === period.id ? 'Saving...' : 'Save'}</button>
@@ -81,7 +101,18 @@ export function OrderPeriodModal(props: Props) {
                     <>
                       <div className="integrated-admin-order-period-item__meta"><strong>{period.label}</strong><span>{new Date(period.startDate).toLocaleDateString()} - {new Date(period.endDate).toLocaleDateString()}</span></div>
                       <div className="integrated-admin-order-period-item__actions">
-                        <label className="registry-radio-option registry-radio-option--toggle integrated-admin-order-period-item__toggle"><span>{period.isActive ? 'Active' : 'Inactive'}</span><input type="checkbox" checked={period.isActive} disabled={orderPeriodActionId === period.id} onChange={() => onToggleActive(period)} /></label>
+                        <label className="integrated-admin-order-period-switch integrated-admin-order-period-switch--compact integrated-admin-order-period-item__toggle">
+                          <input
+                            type="checkbox"
+                            checked={period.isActive}
+                            disabled={orderPeriodActionId === period.id}
+                            onChange={() => onToggleActive(period)}
+                          />
+                          <span className="integrated-admin-order-period-switch__visual" aria-hidden="true">
+                            <span className="integrated-admin-order-period-switch__thumb" />
+                          </span>
+                          <span className="integrated-admin-order-period-switch__text">{period.isActive ? 'Active' : 'Inactive'}</span>
+                        </label>
                         <button type="button" className="secondary-button" disabled={orderPeriodActionId === period.id} onClick={() => onBeginEdit(period)}>Edit</button>
                         <button type="button" className="secondary-button" disabled={orderPeriodActionId === period.id} onClick={() => onDelete(period)}>Delete</button>
                       </div>

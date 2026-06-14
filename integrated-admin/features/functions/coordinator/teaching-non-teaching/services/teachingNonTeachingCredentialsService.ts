@@ -278,6 +278,7 @@ export const teachingNonTeachingModuleOptions: Array<{ key: UsisModuleKey; label
   { key: 'sp_portal', label: 'SP Portal' },
   { key: 'spta', label: 'SPTA' },
   { key: 'learner_portal', label: 'Learner Portal' },
+  { key: 'help_admin', label: 'Help Desk Admin' },
   { key: 'support', label: 'Support' },
 ];
 

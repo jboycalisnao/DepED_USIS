@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { UsisLoginModal } from '../../../../common/components/UsisLoginModal';
-import { hasCoordinatorModuleAccess } from '../../../../common/auth/moduleAccess';
+import { hasCoordinatorModuleAccessInSupabase } from '../../../../common/auth/moduleAccess';
 import {
   type SupportAccessRecord,
   resolveSupportCoordinatorAccess,
@@ -32,7 +32,7 @@ export function AccessPage({ session, onLoginSuccess, onLogout }: AccessPageProp
     }
 
     const canAccessSupport =
-      result.record.isSuperAdmin || hasCoordinatorModuleAccess(result.record.userId, 'support');
+      result.record.isSuperAdmin || await hasCoordinatorModuleAccessInSupabase(result.record.userId, 'support');
 
     if (!canAccessSupport) {
       setIsSubmitting(false);

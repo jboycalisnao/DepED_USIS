@@ -162,6 +162,13 @@
   color: var(--deped-white);
 }
 
+.modal-dialog__actions .modal-dialog__danger,
+.alert-modal__actions .alert-modal__danger {
+  border-color: var(--deped-red);
+  background: var(--deped-red);
+  color: var(--deped-white);
+}
+
 .alert-modal {
   position: relative;
   z-index: 1;

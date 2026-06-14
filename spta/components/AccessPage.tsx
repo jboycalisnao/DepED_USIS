@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { UsisLoginModal } from '../../common/components/UsisLoginModal';
-import { hasCoordinatorModuleAccess } from '../../common/auth/moduleAccess';
+import { hasCoordinatorModuleAccessInSupabase } from '../../common/auth/moduleAccess';
 import { resolveCoordinatorAccess, type CoordinatorAccessRecord } from '../../coordinator/features/auth/utils/coordinatorAccess';
 
 type AccessPageProps = {
@@ -29,11 +29,9 @@ export function AccessPage({ onAccessSuccess }: AccessPageProps) {
 
     const canAccessSpta =
       result.record.isSuperAdmin ||
-      result.record.accountSource === 'usis_core_coordinators' ||
-      result.record.accountSource === 'sp_portal_coordinators' ||
-      hasCoordinatorModuleAccess(result.record.userId, 'spta') ||
-      hasCoordinatorModuleAccess(result.record.userId, 'sp_portal') ||
-      hasCoordinatorModuleAccess(result.record.userId, 'coordinator');
+      await hasCoordinatorModuleAccessInSupabase(result.record.userId, 'spta') ||
+      await hasCoordinatorModuleAccessInSupabase(result.record.userId, 'sp_portal') ||
+      await hasCoordinatorModuleAccessInSupabase(result.record.userId, 'coordinator');
 
     if (!canAccessSpta) {
       setIsSubmitting(false);

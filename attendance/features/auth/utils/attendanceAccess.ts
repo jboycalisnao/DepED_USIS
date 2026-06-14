@@ -1,5 +1,5 @@
 import { supabase } from '@deped-usis/shared-supabase';
-import { getCoordinatorModuleAccessMap, hasCoordinatorModuleAccess } from '../../../../common/auth/moduleAccess';
+import { hasCoordinatorModuleAccessInSupabase } from '../../../../common/auth/moduleAccess';
 
 export interface AttendanceAccessRecord {
   accountSource: 'usis_core_users' | 'usis_core_coordinators';
@@ -15,14 +15,6 @@ export interface AttendanceAccessRecord {
 const STORAGE_KEY = 'usis_attendance_access';
 
 const normalizeIdentity = (value: string) => value.trim().toLowerCase();
-
-const hasExplicitAttendanceDeny = (accountId: string) => {
-  const accessMap = getCoordinatorModuleAccessMap();
-  if (!Object.prototype.hasOwnProperty.call(accessMap, accountId)) {
-    return false;
-  }
-  return !hasCoordinatorModuleAccess(accountId, 'attendance');
-};
 
 const matchesPassword = (record: any, password: string) => {
   const normalized = password.trim();
@@ -93,11 +85,14 @@ export const resolveAttendanceAccess = async (
       continue;
     }
 
-    if (candidate.source === 'usis_core_coordinators' && hasExplicitAttendanceDeny(candidate.data.id)) {
-      return {
-        error: 'Access denied. This account is not granted Attendance module access in Coordinator Portal.',
-        record: null,
-      };
+    if (candidate.source === 'usis_core_coordinators') {
+      const hasAttendanceAccess = await hasCoordinatorModuleAccessInSupabase(String(candidate.data.id || ''), 'attendance');
+      if (!hasAttendanceAccess) {
+        return {
+          error: 'Access denied. This account is not granted Attendance module access in Coordinator Portal.',
+          record: null,
+        };
+      }
     }
 
     const school = Array.isArray(candidate.data.usis_schools)

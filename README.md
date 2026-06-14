@@ -22,6 +22,7 @@ The repository currently contains these active modules:
 - `enrollment/` - school enrollment management portal
 - `learner-portal/` - school portal / learner self-service access portal
 - `integrated-admin/` - integrated admin configuration portal for cross-subsystem controls
+- `school-help-portal/` - learner help portal for school information, help tickets, and coordinator-admin access
 - `merch/` - school merchandise hub for merchandise catalog, orders, and inventory workflows
 - `election/` - DepED school election system
 - `sp-portal/` - Special Program admissions portal for school-specific application bulletins
@@ -52,6 +53,7 @@ This keeps the current module folders intact while establishing the shared-platf
 - `coordinator/` now provides a DepED-Web-Kit-aligned subsystem shell for coordinator-facing operations, access guidance, and future school-level administration workflows.
 - `sp-portal/` provides the initial school-based Special Program admissions landing page at `/admissions/{region_slug}/{division_slug}/{school_id}`.
 - `registrar/` has dashboard, learner list, enrollment, bulk import, section management, settings, and Supabase-backed services.
+- `school-help-portal/` provides a learner-facing information and ticket submission portal with a shared coordinator-admin workspace.
 - `deped-web-kit/` provides a DepEd-aligned visual baseline for future module UI work using the official branding guide and current portal styling cues.
 - Both modules already use the **same Supabase URL and anon key** in their local `lib/supabase.ts` files.
 
@@ -78,6 +80,7 @@ The intended end state is a unified school platform with multiple modules under 
 - `merch/`
 - `integrated-admin/`
 - `support/`
+- `school-help-portal/`
 - future modules like `guidance/`, `library/`, `clinic/`, `finance/`, `hr/`, or `student-portal/`
 
 All modules should follow these platform rules:

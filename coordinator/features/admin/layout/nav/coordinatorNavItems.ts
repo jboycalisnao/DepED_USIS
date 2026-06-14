@@ -8,4 +8,3 @@ export const coordinatorNavItems: CoordinatorNavItem[] = [
   { label: 'Credentials', path: '/admin/credentials', icon: 'badge' },
   { label: 'Registry', path: '/admin/registry', icon: 'groups' },
 ];
-

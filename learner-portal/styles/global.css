@@ -814,6 +814,10 @@ body {
     gap: 10px;
   }
 
+  .learner-help-ticket-page__grid {
+    grid-template-columns: 1fr;
+  }
+
   .learner-services-card--link {
     min-height: 0;
   }
@@ -988,6 +992,115 @@ body {
   font-size: 16px;
   font-weight: 400;
   background: #fafdff;
+}
+
+.learner-help-ticket-page__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
+  gap: 14px;
+}
+
+.learner-help-ticket-page__panel .portal-panel__body {
+  display: grid;
+  gap: 14px;
+}
+
+.learner-help-ticket-page__form {
+  display: grid;
+  gap: 14px;
+}
+
+.learner-help-ticket-page__tickets {
+  display: grid;
+  gap: 10px;
+}
+
+.learner-help-ticket-page__ticket-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.learner-help-ticket-card {
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--deped-line);
+  border-radius: 12px;
+  background: #ffffff;
+  padding: 14px 16px;
+  box-shadow: 0 8px 20px rgba(18, 35, 61, 0.06);
+}
+
+.learner-help-ticket-card__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.learner-help-ticket-card__heading {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.learner-help-ticket-card__heading strong {
+  color: var(--deped-blue);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.2;
+  word-break: break-word;
+}
+
+.learner-help-ticket-card__heading span {
+  color: var(--deped-muted);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.learner-help-ticket-card__meta {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+
+.learner-help-ticket-card__meta span {
+  display: grid;
+  gap: 2px;
+  color: var(--deped-muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.learner-help-ticket-card__meta strong {
+  color: var(--deped-ink);
+  font-size: 14px;
+  font-weight: 400;
+  text-transform: none;
+}
+
+.learner-help-ticket-card__body {
+  display: grid;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(18, 35, 61, 0.08);
+}
+
+.learner-help-ticket-card__body p {
+  margin: 0;
+  color: var(--deped-ink);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.learner-help-ticket-card__body strong {
+  color: #123b8f;
+  font-weight: 700;
 }
 
 .learner-services-history {
