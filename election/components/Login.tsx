@@ -39,41 +39,11 @@ const Login: React.FC<LoginProps> = ({
 
   const isOpen = isCurrentlyOpen();
 
-  const handleClearCache = () => {
-    if (confirm('Reset local system memory? This will clear cached voter lists and force a fresh sync with the cloud.')) {
-      localStorage.clear();
-      window.location.reload();
-    }
-  };
-
-  const getStatusMessage = () => {
-    if (config.status === ElectionStatus.MANUAL_CLOSED) {
-      return 'The election portal is currently closed by the administrator.';
-    }
-
-    if (config.status === ElectionStatus.SCHEDULED) {
-      const now = new Date().getTime();
-      const start = config.startTime ? new Date(config.startTime).getTime() : 0;
-      if (now < start) {
-        return `Voting scheduled to begin on ${new Date(config.startTime!).toLocaleString()}.`;
-      }
-      return 'The scheduled voting period has ended.';
-    }
-
-    return 'Elections are not yet active.';
-  };
-
   return (
     <section className="flex-grow bg-[#f8fafc]">
       <div className="w-full px-[var(--page-inset)] py-4 md:py-6">
-        <div className="mx-auto flex w-full max-w-[980px] flex-col items-center text-center">
-          <div className="mb-4 flex w-full max-w-[720px] items-center justify-center rounded-[12px] border border-[rgba(18,35,61,0.12)] bg-white px-6 py-5 text-center shadow-[0_10px_24px_rgba(18,35,61,0.06)]">
-            <h2 className="m-0 text-[24px] font-black uppercase tracking-[-0.03em] text-[#0038a8]">
-              {config.electionName || 'Learner Government Election'}
-            </h2>
-          </div>
-
-          <div className="mt-2 flex w-full flex-col items-center">
+        <div className="mx-auto flex w-full max-w-[980px] flex-col items-center justify-center text-center">
+          <div className="flex w-full flex-col items-center justify-center">
             {isOpen ? (
               <>
                 <div className="w-full max-w-[720px]">
@@ -114,29 +84,33 @@ const Login: React.FC<LoginProps> = ({
                 </p>
               </>
             ) : (
-              <div className="mt-8 w-full max-w-[720px] rounded-[12px] border border-[rgba(18,35,61,0.12)] bg-white px-8 py-10 text-center shadow-[0_18px_36px_rgba(18,35,61,0.08)]">
-                <p className="m-0 text-[13px] font-bold uppercase tracking-[0.14em] text-[#8a8a8a]">
-                  Portal Status
-                </p>
-                <h2 className="mt-3 mb-0 text-[24px] font-black uppercase tracking-[-0.03em] text-[#12233d]">
-                  Portal Access Suspended
-                </h2>
-                <p className="mt-4 mb-0 text-[16px] leading-[1.5] text-[#68758d]">
-                  {getStatusMessage()}
-                </p>
+              <div className="modal-overlay modal-overlay--high" role="presentation">
+                <div className="modal-backdrop" />
+                <div className="modal-dialog modal-dialog--wide election-login-modal" role="dialog" aria-modal="true" aria-label="Portal status notice">
+                  <div className="modal-dialog__header">
+                    <div className="modal-dialog__title-group">
+                      <p className="modal-dialog__eyebrow">Portal Status</p>
+                      <h3>Portal Access Suspended</h3>
+                    </div>
+                  </div>
+                  <div className="modal-dialog__body">
+                    <div className="election-login-modal__notice">
+                      <span className="material-symbols-outlined election-login-modal__icon" aria-hidden="true">
+                        lock
+                      </span>
+                      <p>Election portal is temporarily closed.</p>
+                      <p>
+                        Stay tuned for further announcements or visit Leon NHS - LG Comea FB Page at this link{' '}
+                        <a href="https://facebook.com/leonnhs.lgcomea" target="_blank" rel="noreferrer">
+                          facebook.com/leonnhs.lgcomea
+                        </a>
+                        .
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
-
-            <div className="mt-10 flex w-full max-w-[720px] items-center justify-between gap-4 border-t border-[rgba(18,35,61,0.12)] pt-5">
-              <div />
-              <button
-                type="button"
-                onClick={handleClearCache}
-                className="rounded-[4px] border border-[rgba(18,35,61,0.12)] bg-white px-4 py-2 text-[13px] font-bold uppercase tracking-[0.08em] text-[#68758d] transition-colors hover:border-[#ce1126] hover:text-[#ce1126]"
-              >
-                Reset Cache
-              </button>
-            </div>
           </div>
         </div>
       </div>
