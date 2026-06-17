@@ -835,6 +835,98 @@ export default defineConfig(({ mode }) => {
             res.end(JSON.stringify({ error: 'Unable to dispatch enrollment emails.', details: error?.message || String(error) }));
           }
         });
+
+        server.middlewares.use('/api/credentials-email', async (req: any, res: any) => {
+          try {
+            if (req.method !== 'POST') {
+              res.statusCode = 405;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ error: 'Method not allowed' }));
+              return;
+            }
+
+            const body = await parseJsonBody(req);
+            const schoolId = normalize(body?.schoolId);
+            if (!schoolId) {
+              res.statusCode = 400;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ error: 'schoolId is required.' }));
+              return;
+            }
+
+            const supabaseAdmin = getSupabaseAdmin();
+            const { data: settings, error: settingsError } = await supabaseAdmin
+              .from('registrar_enrollment_email_settings')
+              .select('*')
+              .eq('school_id', schoolId)
+              .maybeSingle();
+            if (settingsError) throw settingsError;
+            if (!(settings as any)?.is_enabled) {
+              res.statusCode = 403;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ error: 'Enrollment email service is disabled in Registrar Settings.' }));
+              return;
+            }
+
+            const endpoint = normalize((settings as any)?.apps_script_web_app_url || body?.webhookUrl || '');
+            if (!endpoint) {
+              res.statusCode = 400;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ error: 'Apps Script Web App URL is not configured.' }));
+              return;
+            }
+
+            const bearer = normalize((settings as any)?.apps_script_bearer_token);
+            const headers: Record<string, string> = {
+              'Content-Type': 'application/json',
+            };
+            if (bearer) headers.Authorization = `Bearer ${bearer}`;
+
+            const payload = {
+              type: 'LEARNER_CREDENTIALS',
+              email: String(body?.email || ''),
+              to: String(body?.email || ''),
+              subject: String(body?.subject || ''),
+              htmlContent: String(body?.htmlContent || ''),
+              html: String(body?.htmlContent || ''),
+              textContent: String(body?.textContent || ''),
+              senderName: String(body?.senderName || settings.from_display_name || 'DepED USIS Registrar'),
+              fromDisplayName: String(body?.fromDisplayName || settings.from_display_name || 'DepED USIS Registrar'),
+              replyTo: normalize(body?.replyTo) || normalize((settings as any)?.reply_to_email) || undefined,
+              statusLookupUrl: normalize(body?.statusLookupUrl) || undefined,
+              headerImageSrc: normalize(body?.headerImageSrc) || undefined,
+              learner: body?.learner || {},
+              payload: body?.payload || body?.learner || {},
+            };
+
+            const response = await fetch(endpoint, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify(payload),
+            });
+            const responseText = await response.text().catch(() => '');
+            let responseJson: any = null;
+            try {
+              responseJson = responseText ? JSON.parse(responseText) : null;
+            } catch {
+              responseJson = null;
+            }
+            if (!response.ok || responseJson?.ok === false) {
+              res.statusCode = 502;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ error: responseJson?.error || `Apps Script send failed (${response.status})`, details: responseJson || responseText }));
+              return;
+            }
+
+            res.statusCode = 200;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ sent: true, delivered: true, message: 'Learner credentials email forwarded to Apps Script.', appsScript: responseJson || null }));
+          } catch (error: any) {
+            res.statusCode = 500;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ error: 'Unable to forward learner credentials email.', details: error?.message || String(error) }));
+          }
+        });
       },
     };
 

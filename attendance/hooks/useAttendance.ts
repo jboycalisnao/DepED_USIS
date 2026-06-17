@@ -573,6 +573,32 @@ export const useAttendance = () => {
     monthEndDate.setDate(0);
     const monthEnd = toIsoDate(monthEndDate);
 
+    try {
+      const { data, error } = await supabase
+        .from('attendance_daily_summary')
+        .select('learner_id, attendance_date, am_in, am_out, pm_in, pm_out, unscheduled_count, last_station_no')
+        .gte('attendance_date', monthStart)
+        .lte('attendance_date', monthEnd)
+        .order('attendance_date', { ascending: true });
+
+      if (error) throw error;
+
+      const rows = (data || []).map((row: any) => ({
+        learnerId: String(row.learner_id || ''),
+        attendanceDate: String(row.attendance_date || ''),
+        amIn: row.am_in ? String(row.am_in) : null,
+        amOut: row.am_out ? String(row.am_out) : null,
+        pmIn: row.pm_in ? String(row.pm_in) : null,
+        pmOut: row.pm_out ? String(row.pm_out) : null,
+        unscheduledCount: Number(row.unscheduled_count || 0),
+        lastStationNo: row.last_station_no == null ? null : Number(row.last_station_no),
+      } satisfies AttendanceDailySummaryRow));
+
+      if (rows.length > 0) return rows;
+    } catch (error) {
+      console.error('Failed to load attendance daily summaries from Supabase:', error);
+    }
+
     return buildDailySummariesFromRecords(getLocalAttendanceRecordsInRange(monthStart, monthEnd));
   }, [getLocalAttendanceRecordsInRange]);
 

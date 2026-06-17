@@ -1,14 +1,15 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useStore } from '../store';
 import { EnrollmentRecord, GradeLevel, Student } from '../types';
 import ConfirmationModal from '../components/ConfirmationModal';
 import LearnerDetailsModal from '../components/LearnerDetailsModal';
 import { openLearnerInformationPrintWindow } from '../features/registrar/learners/utils/printLearnerInformation';
+import { sendLearnerCredentialsViaWebhook } from '../features/registrar/learners/services/sendLearnerCredentialsEmail';
 import LearnerEditModal from './learners/LearnerEditModal';
 import { getActiveLearnersForYear } from '../services/dashboardService';
 
 const LearnerList: React.FC = () => {
-  const { learners, sections, activeSchoolYear, availableStrands, removeLearner, clearSectionLearners, updateLearner, loading } = useStore();
+  const { learners, sections, activeSchoolYear, availableStrands, registrarAccess, removeLearner, clearSectionLearners, updateLearner, loading } = useStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [deletingStudent, setDeletingStudent] = useState<Student | null>(null);
@@ -18,6 +19,7 @@ const LearnerList: React.FC = () => {
   const [revealedPasswordLearnerId, setRevealedPasswordLearnerId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  const [sendingCredentialsStudent, setSendingCredentialsStudent] = useState<Student | null>(null);
 
   const isLocked = activeSchoolYear.isLocked;
 
@@ -45,9 +47,26 @@ const LearnerList: React.FC = () => {
   const activeLearnersForYear = useMemo(() => {
     const query = searchTerm.toLowerCase();
     return baseActiveLearnersForYear.filter((l) => {
-      const fullName = `${l.lastName}, ${l.firstName} ${l.middleName || ''}`.toLowerCase();
+      const lastFirstMiddle = `${l.lastName}, ${l.firstName} ${l.middleName || ''}`.toLowerCase();
+      const firstMiddleLast = `${l.firstName} ${l.middleName || ''} ${l.lastName}`.toLowerCase();
+      const firstLastMiddle = `${l.firstName} ${l.lastName} ${l.middleName || ''}`.toLowerCase();
+      const fullNameParts = [
+        l.lastName,
+        l.firstName,
+        l.middleName || '',
+        `${l.firstName} ${l.lastName}`,
+        `${l.firstName} ${l.middleName || ''}`,
+        `${l.middleName || ''} ${l.lastName}`,
+      ]
+        .join(' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .toLowerCase();
       return (
-        fullName.includes(query) ||
+        lastFirstMiddle.includes(query) ||
+        firstMiddleLast.includes(query) ||
+        firstLastMiddle.includes(query) ||
+        fullNameParts.includes(query) ||
         l.lrn.includes(query) ||
         String(l.loginUsername || '').toLowerCase().includes(query) ||
         String(l.loginStatus || '').toLowerCase().includes(query)
@@ -115,6 +134,34 @@ const LearnerList: React.FC = () => {
     return groups;
   }, [activeLearnersForYear, sections, activeSchoolYear]);
 
+  const hasSearchQuery = searchTerm.trim().length > 0;
+
+  useEffect(() => {
+    if (!hasSearchQuery) {
+      setExpandedGrades(new Set());
+      setExpandedSections(new Set());
+      return;
+    }
+
+    const nextGrades = new Set<string>();
+    const nextSections = new Set<string>();
+
+    Object.entries(groupedData).forEach(([grade, sectionsByGrade]) => {
+      const hasMatchingStudents = Object.values(sectionsByGrade).some((entry) => entry.students.length > 0);
+      if (!hasMatchingStudents) return;
+
+      nextGrades.add(grade);
+      Object.entries(sectionsByGrade).forEach(([sectionName, entry]) => {
+        if (entry.students.length > 0) {
+          nextSections.add(grade + sectionName);
+        }
+      });
+    });
+
+    setExpandedGrades(nextGrades);
+    setExpandedSections(nextSections);
+  }, [groupedData, hasSearchQuery]);
+
   const toggleGrade = (grade: string) => {
     const next = new Set(expandedGrades);
     if (next.has(grade)) next.delete(grade);
@@ -134,29 +181,40 @@ const LearnerList: React.FC = () => {
     setEditingStudent(student);
   };
 
+  const openSendCredentials = (student: Student) => {
+    setSendingCredentialsStudent(student);
+  };
+
   return (
     <div className="registrar-learners-page">
       <div className="registrar-learners-page__search">
         <div className="registrar-learners-page__search-field">
-          <span className="material-symbols-outlined registrar-learners-page__search-icon">search</span>
-          <input
-            type="text"
-            placeholder={`Search ${baseActiveLearnersForYear.length} learners in ${activeSchoolYear.label}...`}
-            className="registrar-learners-page__search-input"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-          {searchTerm.trim() && (
-            <button
-              type="button"
-              className="registrar-search-clear-btn"
-              onClick={() => setSearchTerm('')}
-              aria-label="Clear learner search"
-              title="Clear"
-            >
-              <span className="material-symbols-outlined" aria-hidden="true">close</span>
-            </button>
-          )}
+          <label className="floating-field">
+            <div className="floating-field__control registrar-learners-page__search-control" data-has-value={hasSearchQuery ? 'true' : 'false'}>
+              <input
+                type="text"
+                placeholder=" "
+                className="registrar-learners-page__search-input"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+              <span className="registrar-learners-page__search-label">
+                <span className="material-symbols-outlined" aria-hidden="true">search</span>
+                <span>Search Learners</span>
+              </span>
+              {hasSearchQuery && (
+                <button
+                  type="button"
+                  className="registrar-search-clear-btn"
+                  onClick={() => setSearchTerm('')}
+                  aria-label="Clear learner search"
+                  title="Clear"
+                >
+                  <span className="material-symbols-outlined" aria-hidden="true">close</span>
+                </button>
+              )}
+            </div>
+          </label>
         </div>
         <div className="registrar-learners-page__meta-box">
           <span className="registrar-learners-page__meta-label">Active Registry</span>
@@ -173,7 +231,11 @@ const LearnerList: React.FC = () => {
             })
             .map((grade) => (
               <div key={grade} className="registrar-learners-page__grade">
-                <button onClick={() => toggleGrade(grade)} className="registrar-learners-page__grade-toggle">
+                <button
+                  onClick={() => toggleGrade(grade)}
+                  className="registrar-learners-page__grade-toggle"
+                  aria-expanded={expandedGrades.has(grade)}
+                >
                   <div className="registrar-learners-page__grade-title">
                     <div className="registrar-learners-page__grade-icon">
                       <span className="material-symbols-outlined">{expandedGrades.has(grade) ? 'keyboard_arrow_down' : 'keyboard_arrow_right'}</span>
@@ -194,7 +256,11 @@ const LearnerList: React.FC = () => {
                         return (
                           <div key={sectionName} className="registrar-learners-page__section">
                             <div className="registrar-learners-page__section-head">
-                              <button onClick={() => toggleSection(sectionKey)} className="registrar-learners-page__section-toggle">
+                              <button
+                                onClick={() => toggleSection(sectionKey)}
+                                className="registrar-learners-page__section-toggle"
+                                aria-expanded={expandedSections.has(sectionKey)}
+                              >
                                 <div className="registrar-learners-page__section-icon">
                                   <span className={`material-symbols-outlined ${expandedSections.has(sectionKey) ? 'is-open' : ''}`}>chevron_right</span>
                                 </div>
@@ -280,6 +346,14 @@ const LearnerList: React.FC = () => {
                                                     <span className="material-symbols-outlined">edit</span>
                                                   </button>
                                                   <button
+                                                    onClick={() => openSendCredentials(student)}
+                                                    className="icon-btn registrar-learners-page__email-btn"
+                                                    title={student.email ? 'Send Credentials Email' : 'Learner email is not set'}
+                                                    disabled={!student.email}
+                                                  >
+                                                    <span className="material-symbols-outlined">mail</span>
+                                                  </button>
+                                                  <button
                                                     onClick={() => {
                                                       const ok = openLearnerInformationPrintWindow({
                                                         learners: [student],
@@ -362,9 +436,34 @@ const LearnerList: React.FC = () => {
         onSubmit={updateLearner}
       />
       <ConfirmationModal
+        isOpen={!!sendingCredentialsStudent}
+        type="accent"
+        title="Send Credentials Email"
+        message={`Send login credentials to ${sendingCredentialsStudent?.lastName}, ${sendingCredentialsStudent?.firstName}? This will use ${sendingCredentialsStudent?.email || sendingCredentialsStudent?.microsoftUpn || 'the learner email address on record'}.`}
+        onConfirm={async () => {
+          if (!sendingCredentialsStudent) return;
+          try {
+            const section = sections.find((entry) => String(entry.id || '').trim() === String(sendingCredentialsStudent.sectionId || '').trim());
+            const result = await sendLearnerCredentialsViaWebhook({
+              learner: sendingCredentialsStudent,
+              schoolId: String(registrarAccess?.schoolId || '302522').trim(),
+              schoolYearLabel: activeSchoolYear.label,
+              sectionLabel: section ? `${section.name}${section.strand ? ` [${section.strand}]` : ''}` : 'Unassigned',
+            });
+            setFeedback(result?.message || 'Learner credentials email sent.');
+          } catch (error: any) {
+            setFeedback(error?.message || 'Unable to send learner credentials email.');
+          } finally {
+            setSendingCredentialsStudent(null);
+          }
+        }}
+        onCancel={() => setSendingCredentialsStudent(null)}
+        isLoading={loading}
+      />
+      <ConfirmationModal
         isOpen={!!feedback}
         type="accent"
-        title="Print Notice"
+        title="Notice"
         message={feedback || ''}
         confirmLabel="Close"
         hideCancel

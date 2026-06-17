@@ -19,24 +19,6 @@ export function AttendanceServicePage({ session }: AttendanceServicePageProps) {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [refreshNonce, setRefreshNonce] = useState(0);
-
-  useEffect(() => {
-    const refresh = () => setRefreshNonce((current) => current + 1);
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        refresh();
-      }
-    };
-
-    window.addEventListener('focus', refresh);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    return () => {
-      window.removeEventListener('focus', refresh);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -47,7 +29,6 @@ export function AttendanceServicePage({ session }: AttendanceServicePageProps) {
       try {
         const next = await fetchLearnerAttendanceSnapshot(
           { learnerId: session.learnerId, lrn: session.lrn },
-          { forceRefresh: refreshNonce > 0 },
         );
         if (!cancelled) setSnapshot(next);
       } catch (fetchError: any) {
@@ -61,7 +42,7 @@ export function AttendanceServicePage({ session }: AttendanceServicePageProps) {
     return () => {
       cancelled = true;
     };
-  }, [session.learnerId, session.lrn, refreshNonce]);
+  }, [session.learnerId, session.lrn]);
 
   return (
     <section className="section-shell">

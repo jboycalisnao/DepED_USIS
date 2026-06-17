@@ -26,6 +26,50 @@
   gap: 14px;
 }
 
+.registry-modal__mode-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.registry-modal__mode-switch button {
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1px solid rgba(18, 35, 61, 0.14);
+  border-radius: 0.375rem;
+  background: #ffffff;
+  color: var(--deped-ink);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.registry-modal__mode-switch button.is-active {
+  border-color: rgba(0, 56, 168, 0.3);
+  background: #eef4ff;
+  color: var(--deped-blue);
+}
+
+.registry-modal__mode-switch button.is-danger {
+  border-color: rgba(180, 35, 24, 0.18);
+  color: #b42318;
+}
+
+.registry-modal__mode-switch button.is-danger.is-active {
+  background: #fff1f0;
+  border-color: rgba(180, 35, 24, 0.32);
+}
+
+.registry-modal__danger-copy {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid rgba(180, 35, 24, 0.18);
+  border-radius: 0.375rem;
+  background: #fff7ed;
+}
+
 .registry-form__header {
   margin-top: 8px;
   display: flex;
@@ -92,7 +136,22 @@
   margin-top: 12px;
   display: grid;
   gap: 10px;
-  grid-template-columns: minmax(220px, 1fr) minmax(180px, 240px);
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.registry-toolbar__actions {
+  display: inline-flex;
+  align-items: stretch;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: nowrap;
+  width: max-content;
+}
+
+.registry-toolbar__actions > button {
+  min-height: 40px;
+  white-space: nowrap;
 }
 
 .registry-list {
@@ -775,6 +834,37 @@
   background: #ffffff;
 }
 
+.ia-teaching-credential-bulk-import__duplicate-alert {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid rgba(180, 35, 24, 0.18);
+  border-left-width: 4px;
+  border-radius: 0.375rem;
+  background: #fff7ed;
+}
+
+.ia-teaching-credential-bulk-import__duplicate-alert strong {
+  color: #b42318;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.ia-teaching-credential-bulk-import__duplicate-alert p {
+  margin: 0;
+  color: var(--deped-ink);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.ia-teaching-credential-bulk-import__duplicate-alert ul {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--deped-ink);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 .ia-teaching-credential-bulk-import__preview-head {
   display: flex;
   align-items: flex-start;
@@ -911,6 +1001,16 @@
 
   .ia-teaching-credential-bulk-import__preview-head {
     flex-direction: column;
+  }
+
+  .registry-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .registry-toolbar__actions {
+    justify-content: flex-start;
+    width: 100%;
+    flex-wrap: wrap;
   }
 
   .ia-teaching-credential-bulk-import__table {

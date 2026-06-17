@@ -92,6 +92,12 @@ Current shared package:
 
 - `packages/shared-supabase/` is the initialized shared Supabase package for the monorepo foundation.
 
+Registrar webhook source note:
+
+- the learner credentials Google Apps Script webhook source lives in `registrar/apps-script/LearnerCredentialsWebhook.gs`
+- it must stay aligned with `registrar/components/settings/EnrollmentEmailSettings.tsx` and `registrar/features/registrar/learners/services/sendLearnerCredentialsEmail.ts`
+- if the registrar email payload shape changes, update the Apps Script file in the same change set so the webhook contract remains in sync
+
 ## Database Naming Rule
 
 All Supabase tables for DepED USIS should be named according to the module or app that owns them.

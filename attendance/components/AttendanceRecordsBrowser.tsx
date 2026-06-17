@@ -9,7 +9,7 @@ type SearchScope =
 type Props = {
   logs: AttendanceRecord[];
   learners: Learner[]; 
-  onDelete: (record: AttendanceRecord) => Promise<void> | void;
+  onDelete?: (record: AttendanceRecord) => Promise<void> | void;
   refreshAttendanceStatusByRange: (fromDate: string, toDate: string) => Promise<Set<string>>;
 };
 
@@ -263,6 +263,7 @@ const AttendanceRecordsBrowser: React.FC<Props> = ({
   const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set());
   const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set());
   const [deleteTarget, setDeleteTarget] = useState<AttendanceRecord | null>(null);
+  const canDelete = typeof onDelete === 'function';
 
   const rawRowsByDate = useMemo(() => {
     const map = new Map<string, AttendanceRecord[]>();
@@ -426,7 +427,7 @@ const AttendanceRecordsBrowser: React.FC<Props> = ({
   };
 
   const handleDelete = async () => {
-    if (!deleteTarget) return;
+    if (!deleteTarget || !onDelete) return;
     await onDelete(deleteTarget);
     setDeleteTarget(null);
   };
@@ -564,7 +565,7 @@ const AttendanceRecordsBrowser: React.FC<Props> = ({
                                           <th>Type</th>
                                           <th>Time</th>
                                           <th>Status</th>
-                                          <th className="attendance-records-page__raw-table-action-head">Action</th>
+                                          {canDelete ? <th className="attendance-records-page__raw-table-action-head">Action</th> : null}
                                         </tr>
                                       </thead>
                                       <tbody>
@@ -582,16 +583,18 @@ const AttendanceRecordsBrowser: React.FC<Props> = ({
                                                   {getSyncStatusLabel(record)}
                                                 </span>
                                               </td>
-                                              <td className="attendance-records-page__raw-table-action-cell">
-                                                <button
-                                                  type="button"
-                                                  className="attendance-records-page__delete-btn"
-                                                  onClick={() => setDeleteTarget(record)}
-                                                  title="Delete tap"
-                                                >
-                                                  <span className="material-symbols-outlined">delete</span>
-                                                </button>
-                                              </td>
+                                              {canDelete ? (
+                                                <td className="attendance-records-page__raw-table-action-cell">
+                                                  <button
+                                                    type="button"
+                                                    className="attendance-records-page__delete-btn"
+                                                    onClick={() => setDeleteTarget(record)}
+                                                    title="Delete tap"
+                                                  >
+                                                    <span className="material-symbols-outlined">delete</span>
+                                                  </button>
+                                                </td>
+                                              ) : null}
                                             </tr>
                                           );
                                         })}
@@ -613,14 +616,16 @@ const AttendanceRecordsBrowser: React.FC<Props> = ({
         </div>
       </div>
 
-      <ConfirmationModal
-        isOpen={!!deleteTarget}
-        onClose={() => setDeleteTarget(null)}
-        onConfirm={() => void handleDelete()}
-        title="Delete Record"
-        message="Are you sure you want to permanently remove this attendance tap?"
-        confirmLabel="Delete Record"
-      />
+      {canDelete ? (
+        <ConfirmationModal
+          isOpen={!!deleteTarget}
+          onClose={() => setDeleteTarget(null)}
+          onConfirm={() => void handleDelete()}
+          title="Delete Record"
+          message="Are you sure you want to permanently remove this attendance tap?"
+          confirmLabel="Delete Record"
+        />
+      ) : null}
     </section>
   );
 };

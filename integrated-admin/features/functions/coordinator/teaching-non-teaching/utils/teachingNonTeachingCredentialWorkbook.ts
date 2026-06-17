@@ -17,10 +17,8 @@ const templateColumns = [
   { header: 'Middle Name', key: 'middleName', width: 18 },
   { header: 'Employee ID', key: 'employeeId', width: 16 },
   { header: 'Department *', key: 'departmentName', width: 24 },
-  { header: 'Username *', key: 'username', width: 18 },
   { header: 'Email', key: 'email', width: 24 },
   { header: 'Mobile Number', key: 'mobileNo', width: 18 },
-  { header: 'Password *', key: 'password', width: 16 },
   { header: 'Personnel Type *', key: 'personnelType', width: 20 },
   { header: 'Status', key: 'status', width: 14 },
 ] as const;
@@ -50,6 +48,33 @@ const normalizeStatus = (value: unknown) => {
 
 const normalizeForLookup = (value: string) =>
   normalizeText(value).toLowerCase().replace(/[\s_-]+/g, '');
+
+export const buildGeneratedUsername = (firstName: string, middleName: string, lastName: string) => {
+  const initials = [firstName]
+    .flatMap((part) => normalizeText(part).split(/[\s-]+/g))
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toLowerCase())
+    .join('');
+  const surname = normalizeText(lastName).toLowerCase().replace(/[\s-]+/g, '');
+  return `${initials}${surname}`;
+};
+
+const makeUniqueUsername = (baseUsername: string, takenUsernames: Set<string>) => {
+  const base = normalizeText(baseUsername).toLowerCase();
+  if (!base) return '';
+  if (!takenUsernames.has(base)) {
+    takenUsernames.add(base);
+    return base;
+  }
+
+  let suffix = 2;
+  while (takenUsernames.has(`${base}${suffix}`)) {
+    suffix += 1;
+  }
+  const unique = `${base}${suffix}`;
+  takenUsernames.add(unique);
+  return unique;
+};
 
 const downloadBlob = (blob: Blob, filename: string) => {
   const url = URL.createObjectURL(blob);
@@ -113,7 +138,7 @@ export const downloadTeachingNonTeachingCredentialTemplate = async (departments:
     key: column.key,
     width: column.width,
   }));
-  templateSheet.autoFilter = `A1:K1`;
+  templateSheet.autoFilter = `A1:I1`;
   templateSheet.getRow(1).values = templateColumns.map((column) => column.header);
   styleHeaderRow(templateSheet);
 
@@ -146,8 +171,8 @@ export const downloadTeachingNonTeachingCredentialTemplate = async (departments:
   const personnelTypeRange = `'${LISTS_SHEET_NAME}'!$B$2:$B$3`;
   const statusRange = `'${LISTS_SHEET_NAME}'!$C$2:$C$3`;
   applyDataValidation(templateSheet, `E2:E${MAX_TEMPLATE_ROWS}`, departmentRange);
-  applyDataValidation(templateSheet, `J2:J${MAX_TEMPLATE_ROWS}`, personnelTypeRange);
-  applyDataValidation(templateSheet, `K2:K${MAX_TEMPLATE_ROWS}`, statusRange);
+  applyDataValidation(templateSheet, `H2:H${MAX_TEMPLATE_ROWS}`, personnelTypeRange);
+  applyDataValidation(templateSheet, `I2:I${MAX_TEMPLATE_ROWS}`, statusRange);
 
   const buffer = await workbook.xlsx.writeBuffer();
   const blob = new Blob([buffer], {
@@ -174,6 +199,7 @@ export const parseTeachingNonTeachingCredentialWorkbook = async (
   file: File,
   departments: CoordinatorDepartmentRecord[],
   schoolCode: string,
+  existingUsernames: string[] = [],
 ): Promise<SaveTeachingNonTeachingCredentialInput[]> => {
   const { Workbook } = await import('exceljs');
   const workbook = new Workbook();
@@ -188,9 +214,7 @@ export const parseTeachingNonTeachingCredentialWorkbook = async (
     departmentName: ['department'],
     firstName: ['firstname'],
     lastName: ['lastname'],
-    password: ['password'],
     personnelType: ['personneltype'],
-    username: ['username'],
   } as const;
 
   const resolveColumn = (keys: readonly string[]) => {
@@ -210,9 +234,7 @@ export const parseTeachingNonTeachingCredentialWorkbook = async (
     lastName: resolveColumn(requiredHeaders.lastName),
     middleName: resolveColumn(['middlename']),
     mobileNo: resolveColumn(['mobilenumber', 'mobile']),
-    password: resolveColumn(requiredHeaders.password),
     personnelType: resolveColumn(requiredHeaders.personnelType),
-    username: resolveColumn(requiredHeaders.username),
   };
 
   const missingColumns = Object.entries(columnLookup)
@@ -225,6 +247,9 @@ export const parseTeachingNonTeachingCredentialWorkbook = async (
   const departmentMap = new Map(
     departments.map((department) => [normalizeForLookup(department.name), department.id] as const),
   );
+  const takenUsernames = new Set(
+    existingUsernames.map((username) => normalizeText(username).toLowerCase()).filter(Boolean),
+  );
   const parsedRows: SaveTeachingNonTeachingCredentialInput[] = [];
   const errors: string[] = [];
 
@@ -236,10 +261,8 @@ export const parseTeachingNonTeachingCredentialWorkbook = async (
       getCellText(row, columnLookup.middleName),
       getCellText(row, columnLookup.employeeId),
       getCellText(row, columnLookup.departmentName),
-      getCellText(row, columnLookup.username),
       getCellText(row, columnLookup.email),
       getCellText(row, columnLookup.mobileNo),
-      getCellText(row, columnLookup.password),
       getCellText(row, columnLookup.personnelType),
       getCellText(row, columnLookup.isActive),
     ];
@@ -250,19 +273,16 @@ export const parseTeachingNonTeachingCredentialWorkbook = async (
     const middleName = values[2];
     const employeeId = values[3];
     const departmentName = values[4];
-    const username = values[5];
-    const email = values[6];
-    const mobileNo = values[7];
-    const password = values[8];
-    const personnelType = normalizePersonnelType(values[9]);
-    const isActive = normalizeStatus(values[10]);
+    const email = values[5];
+    const mobileNo = values[6];
+    const personnelType = normalizePersonnelType(values[7]);
+    const isActive = normalizeStatus(values[8]);
+    const generatedUsername = makeUniqueUsername(buildGeneratedUsername(firstName, middleName, lastName), takenUsernames);
 
     const rowErrors: string[] = [];
     if (!firstName) rowErrors.push('First Name is required.');
     if (!lastName) rowErrors.push('Last Name is required.');
     if (!departmentName) rowErrors.push('Department is required.');
-    if (!username) rowErrors.push('Username is required.');
-    if (!password) rowErrors.push('Password is required.');
     if (!personnelType) rowErrors.push('Personnel Type must be Teaching or Non-Teaching.');
     if (isActive === null) rowErrors.push('Status must be Active or Inactive.');
 
@@ -285,10 +305,10 @@ export const parseTeachingNonTeachingCredentialWorkbook = async (
       lastName,
       middleName,
       mobileNo,
-      password,
+      password: generatedUsername,
       personnelType,
       schoolCode,
-      username,
+      username: generatedUsername,
     });
   });
 

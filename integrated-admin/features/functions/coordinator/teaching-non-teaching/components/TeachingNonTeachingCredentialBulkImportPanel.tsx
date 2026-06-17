@@ -6,7 +6,12 @@ import {
   type TeachingNonTeachingBulkImportResult,
 } from '../utils/teachingNonTeachingCredentialWorkbook';
 import type { SaveTeachingNonTeachingCredentialInput } from '../services/teachingNonTeachingCredentialsService';
-import { buildDuplicateCoordinatorKeySet, isDuplicateCoordinatorName } from '../utils/teachingNonTeachingCredentialPreview';
+import {
+  buildDuplicateCoordinatorKeySet,
+  buildDuplicateUsernameSet,
+  buildUploadedDuplicateWarnings,
+  isDuplicateCoordinatorName,
+} from '../utils/teachingNonTeachingCredentialPreview';
 
 type Props = {
   departments: CoordinatorDepartmentRecord[];
@@ -44,8 +49,17 @@ export function TeachingNonTeachingCredentialBulkImportPanel({
   const [isDownloadingTemplate, setIsDownloadingTemplate] = useState(false);
   const [isReadingFile, setIsReadingFile] = useState(false);
   const [lastResult, setLastResult] = useState<TeachingNonTeachingBulkImportResult | null>(null);
+  const [duplicateSkipNotice, setDuplicateSkipNotice] = useState('');
   const [mode, setMode] = useState<PanelMode>('guide');
   const duplicateCoordinatorKeys = useMemo(() => buildDuplicateCoordinatorKeySet(existingRecords), [existingRecords]);
+  const duplicateUsernames = useMemo(
+    () => buildDuplicateUsernameSet(existingRecords.map((record) => record.username)),
+    [existingRecords],
+  );
+  const duplicateWarnings = useMemo(
+    () => buildUploadedDuplicateWarnings(parsedRows, duplicateCoordinatorKeys, duplicateUsernames),
+    [duplicateCoordinatorKeys, duplicateUsernames, parsedRows],
+  );
 
   const handleDownloadTemplate = async () => {
     setIsDownloadingTemplate(true);
@@ -66,9 +80,15 @@ export function TeachingNonTeachingCredentialBulkImportPanel({
     setParsedRows([]);
     setLastResult(null);
     setLocalError('');
+    setDuplicateSkipNotice('');
     setIsReadingFile(true);
     try {
-      const rows = await parseTeachingNonTeachingCredentialWorkbook(file, departments, schoolCode);
+      const rows = await parseTeachingNonTeachingCredentialWorkbook(
+        file,
+        departments,
+        schoolCode,
+        existingRecords.map((record) => record.username),
+      );
       setParsedRows(rows);
       setMode(rows.length > 0 ? 'preview' : 'guide');
       if (rows.length === 0) {
@@ -90,8 +110,29 @@ export function TeachingNonTeachingCredentialBulkImportPanel({
       return;
     }
     setLocalError('');
+    setDuplicateSkipNotice('');
     try {
-      const result = await onImport(parsedRows);
+      const seenNames = new Set<string>();
+      const seenUsernames = new Set<string>();
+      const uniqueRows = parsedRows.filter((row) => {
+        const nameKey = `${String(row.firstName || '').trim().toLowerCase()}::${String(row.lastName || '').trim().toLowerCase()}`;
+        const usernameKey = String(row.username || '').trim().toLowerCase();
+        const isDuplicate = duplicateCoordinatorKeys.has(nameKey) || duplicateUsernames.has(usernameKey) || seenNames.has(nameKey) || seenUsernames.has(usernameKey);
+        seenNames.add(nameKey);
+        seenUsernames.add(usernameKey);
+        return !isDuplicate;
+      });
+
+      const skippedDuplicateCount = parsedRows.length - uniqueRows.length;
+      if (skippedDuplicateCount > 0) {
+        setDuplicateSkipNotice(`Skipped ${skippedDuplicateCount} duplicate row${skippedDuplicateCount === 1 ? '' : 's'}. Only unique rows will be imported.`);
+      }
+      if (uniqueRows.length === 0) {
+        setLocalError('No unique rows are available to import after removing duplicates.');
+        return;
+      }
+
+      const result = await onImport(uniqueRows);
       setLastResult(result);
       if (result.errors.length === 0) {
         onBack();
@@ -131,8 +172,8 @@ export function TeachingNonTeachingCredentialBulkImportPanel({
           <div className="ia-teaching-credential-bulk-import__rules">
             <p className="ia-teaching-credential-bulk-import__rules-title">Required Columns</p>
             <p className="registry-copy ia-teaching-credential-bulk-import__rules-copy">
-              First Name, Last Name, Department, Username, Password, and Personnel Type. Department and Personnel Type use Excel dropdowns.
-              Leave Status blank for Active.
+              First Name, Last Name, Department, and Personnel Type. Username and Password are auto-generated from the name
+              using the format first-letter initials plus last name, and both values are the same. Department and Personnel Type use Excel dropdowns. Leave Status blank for Active.
             </p>
           </div>
 
@@ -187,6 +228,26 @@ export function TeachingNonTeachingCredentialBulkImportPanel({
               Change File
             </button>
           </div>
+          {duplicateWarnings.duplicateNames.length > 0 || duplicateWarnings.duplicateUsernames.length > 0 ? (
+            <div className="ia-teaching-credential-bulk-import__duplicate-alert" role="alert">
+              <strong>Duplicate records detected</strong>
+              <p>
+                Some uploaded rows match existing coordinator records or repeat within the uploaded workbook. Review these rows before importing.
+              </p>
+              <ul>
+                {duplicateWarnings.duplicateNames.length > 0 ? (
+                  <li>
+                    Duplicate names: {duplicateWarnings.duplicateNames.slice(0, 5).join(', ')}
+                  </li>
+                ) : null}
+                {duplicateWarnings.duplicateUsernames.length > 0 ? (
+                  <li>
+                    Duplicate usernames: {duplicateWarnings.duplicateUsernames.slice(0, 5).join(', ')}
+                  </li>
+                ) : null}
+              </ul>
+            </div>
+          ) : null}
           <div className="registry-table-wrap ia-teaching-credential-bulk-import__table-wrap">
             <table className="registry-table ia-registry-table--enhanced ia-teaching-credential-bulk-import__table">
               <thead>
@@ -194,6 +255,7 @@ export function TeachingNonTeachingCredentialBulkImportPanel({
                   <th>Name</th>
                   <th>Department</th>
                   <th>Username</th>
+                  <th>Password</th>
                   <th>Personnel Type</th>
                   <th>Status</th>
                   <th>Duplicate</th>
@@ -205,6 +267,7 @@ export function TeachingNonTeachingCredentialBulkImportPanel({
                     <td><strong>{[row.firstName, row.lastName].filter(Boolean).join(' ')}</strong></td>
                     <td>{departments.find((department) => department.id === row.departmentId)?.name || 'Not Set'}</td>
                     <td>{row.username}</td>
+                    <td>{row.password || row.username}</td>
                     <td>{formatPersonnelType(row.personnelType)}</td>
                     <td>{formatStatus(row.isActive ?? true)}</td>
                     <td>
@@ -225,6 +288,7 @@ export function TeachingNonTeachingCredentialBulkImportPanel({
       {parsedRows.length > 0 ? (
         <p className="registry-copy">{parsedRows.length} credential row{parsedRows.length === 1 ? '' : 's'} ready to import.</p>
       ) : null}
+      {duplicateSkipNotice ? <p className="registry-copy">{duplicateSkipNotice}</p> : null}
       {localError ? <p className="login-card__error">{localError}</p> : null}
       {lastResult ? (
         <div className={`ia-teaching-credential-bulk-import__result${lastResult.errors.length ? ' is-warning' : ' is-success'}`}>

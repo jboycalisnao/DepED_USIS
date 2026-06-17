@@ -6,7 +6,7 @@ import type {
 } from '../services/teachingNonTeachingCredentialsService';
 
 type Props = {
-  departments: CoordinatorDepartmentRecord[];
+  departments: CoordinatorDepartmentRecord[]; 
   initialDepartmentId: string;
   initialPersonnelType: PersonnelType;
   initialIsActive: boolean;
@@ -18,6 +18,7 @@ type Props = {
     isActive: boolean;
     personnelType: PersonnelType;
   }) => Promise<void>;
+  onRequestDelete: () => void;
 };
 
 export function TeachingNonTeachingBulkEditModal({
@@ -29,10 +30,12 @@ export function TeachingNonTeachingBulkEditModal({
   selectedCount,
   onClose,
   onSave,
+  onRequestDelete,
 }: Props) {
   const [departmentId, setDepartmentId] = useState(initialDepartmentId);
   const [personnelType, setPersonnelType] = useState<PersonnelType>(initialPersonnelType);
   const [isActive, setIsActive] = useState(initialIsActive);
+  const [mode, setMode] = useState<'edit' | 'delete'>('edit');
 
   useEffect(() => {
     setDepartmentId(initialDepartmentId);
@@ -55,60 +58,103 @@ export function TeachingNonTeachingBulkEditModal({
         </div>
 
         <div className="modal-dialog__body registry-form">
-          <p className="registry-copy">
-            Apply the same department, personnel type, and status to <strong>{selectedCount}</strong> selected account{selectedCount === 1 ? '' : 's'}.
-          </p>
-
-          <UsisSearchableSelect
-            ariaLabel="Department"
-            floatingLabel
-            forcePortalMenu
-            label="Department"
-            onChange={setDepartmentId}
-            options={departments.map((department) => ({ label: department.name, value: department.id }))}
-            value={departmentId}
-          />
-
-          <div className="floating-field-grid floating-field-grid--two">
-            <UsisSearchableSelect
-              ariaLabel="Personnel Type"
-              allowTyping={false}
-              floatingLabel
-              forcePortalMenu
-              label="Personnel Type"
-              onChange={(value) => setPersonnelType(value as PersonnelType)}
-              options={[
-                { label: 'Teaching', value: 'teaching' },
-                { label: 'Non-Teaching', value: 'non_teaching' },
-              ]}
-              value={personnelType}
-            />
-            <UsisSearchableSelect
-              ariaLabel="Status"
-              allowTyping={false}
-              floatingLabel
-              forcePortalMenu
-              label="Status"
-              onChange={(value) => setIsActive(value === 'active')}
-              options={[
-                { label: 'Active', value: 'active' },
-                { label: 'Inactive', value: 'inactive' },
-              ]}
-              value={isActive ? 'active' : 'inactive'}
-            />
+          <div className="registry-modal__mode-switch">
+            <button
+              type="button"
+              className={mode === 'edit' ? 'is-active' : ''}
+              onClick={() => setMode('edit')}
+              disabled={isSubmitting}
+            >
+              Edit Details
+            </button>
+            <button
+              type="button"
+              className={mode === 'delete' ? 'is-active is-danger' : 'is-danger'}
+              onClick={() => setMode('delete')}
+              disabled={isSubmitting}
+            >
+              Delete Selected
+            </button>
           </div>
+
+          {mode === 'edit' ? (
+            <>
+              <p className="registry-copy">
+                Apply the same department, personnel type, and status to <strong>{selectedCount}</strong> selected account{selectedCount === 1 ? '' : 's'}.
+              </p>
+
+              <UsisSearchableSelect
+                ariaLabel="Department"
+                floatingLabel
+                forcePortalMenu
+                label="Department"
+                onChange={setDepartmentId}
+                options={departments.map((department) => ({ label: department.name, value: department.id }))}
+                value={departmentId}
+              />
+
+              <div className="floating-field-grid floating-field-grid--two">
+                <UsisSearchableSelect
+                  ariaLabel="Personnel Type"
+                  allowTyping={false}
+                  floatingLabel
+                  forcePortalMenu
+                  label="Personnel Type"
+                  onChange={(value) => setPersonnelType(value as PersonnelType)}
+                  options={[
+                    { label: 'Teaching', value: 'teaching' },
+                    { label: 'Non-Teaching', value: 'non_teaching' },
+                  ]}
+                  value={personnelType}
+                />
+                <UsisSearchableSelect
+                  ariaLabel="Status"
+                  allowTyping={false}
+                  floatingLabel
+                  forcePortalMenu
+                  label="Status"
+                  onChange={(value) => setIsActive(value === 'active')}
+                  options={[
+                    { label: 'Active', value: 'active' },
+                    { label: 'Inactive', value: 'inactive' },
+                  ]}
+                  value={isActive ? 'active' : 'inactive'}
+                />
+              </div>
+            </>
+          ) : (
+            <div className="registry-modal__danger-copy">
+              <p className="registry-copy">
+                Delete <strong>{selectedCount}</strong> selected account{selectedCount === 1 ? '' : 's'} and remove their linked department and access records.
+              </p>
+              <p className="registry-copy">
+                This action cannot be undone.
+              </p>
+            </div>
+          )}
         </div>
 
         <div className="modal-dialog__actions">
           <button type="button" onClick={onClose} disabled={isSubmitting}>Cancel</button>
-          <button
-            type="button"
-            className="modal-dialog__blue"
-            onClick={() => void onSave({ departmentId, isActive, personnelType })}
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? 'Saving...' : 'Apply to Selected'}
-          </button>
+          {mode === 'edit' ? (
+            <button
+              type="button"
+              className="modal-dialog__blue"
+              onClick={() => void onSave({ departmentId, isActive, personnelType })}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? 'Saving...' : 'Apply to Selected'}
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="modal-dialog__danger"
+              onClick={onRequestDelete}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? 'Deleting...' : 'Delete Selected'}
+            </button>
+          )}
         </div>
       </div>
     </div>

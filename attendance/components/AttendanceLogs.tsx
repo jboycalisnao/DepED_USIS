@@ -12,7 +12,7 @@ interface AttendanceLogsProps {
   learners: Learner[];
   onDelete: (record: AttendanceRecord) => Promise<void> | void;
   onAddManualRecord: (learnerId: string, type: AttendanceType, timestamp: string) => Promise<{ ok: boolean; error: string | null }>;
-  refreshAttendanceStatusByRange: (fromDate: string, toDate: string) => Promise<void>;
+  refreshAttendanceStatusByRange: (fromDate: string, toDate: string) => Promise<Set<string>>;
 }
 
 const AttendanceLogs: React.FC<AttendanceLogsProps> = ({

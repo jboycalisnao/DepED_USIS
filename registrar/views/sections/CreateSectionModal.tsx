@@ -1,6 +1,7 @@
 import React from 'react';
 import { SearchableSelect } from '../../components/ui/SearchableSelect';
-import { AcademicProgram, GradeLevel } from '../../types';
+import { GradeLevel } from '../../types';
+import type { CoordinatorTeacherOption } from './coordinatorTeacherAccounts';
 
 interface CreateSectionModalProps {
   isOpen: boolean;
@@ -17,6 +18,7 @@ interface CreateSectionModalProps {
   setNewClassification: (value: string) => void;
   setNewName: (value: string) => void;
   createClassificationOptions: (grade: GradeLevel) => { value: string; label: string }[];
+  adviserOptions: CoordinatorTeacherOption[];
 }
 
 const CreateSectionModal: React.FC<CreateSectionModalProps> = ({
@@ -34,6 +36,7 @@ const CreateSectionModal: React.FC<CreateSectionModalProps> = ({
   setNewClassification,
   setNewName,
   createClassificationOptions,
+  adviserOptions,
 }) => {
   if (!isOpen) return null;
 
@@ -58,11 +61,16 @@ const CreateSectionModal: React.FC<CreateSectionModalProps> = ({
                 <span>Section Name</span>
               </label>
             </div>
-            <div className="floating-field">
-              <label className="floating-field__control">
-                <input type="text" value={newAdviser} onChange={(e) => setNewAdviser(e.target.value)} placeholder=" " />
-                <span>Class Adviser</span>
-              </label>
+            <div>
+              <SearchableSelect
+                label="Class Adviser"
+                placeholder="Select Class Adviser"
+                floatingLabel
+                showLabel={false}
+                value={newAdviser}
+                onChange={setNewAdviser}
+                options={adviserOptions}
+              />
             </div>
 
             {(isSHS(selectedGrade) || isJHS(selectedGrade)) && (

@@ -269,6 +269,27 @@ export const deactivateTeachingNonTeachingCredential = async (id: string) => {
   if (error) throw new Error(error.message || 'Unable to deactivate credential.');
 };
 
+export const deleteTeachingNonTeachingCredential = async (id: string) => {
+  const credentialId = toText(id);
+  if (!credentialId) throw new Error('Missing credential id.');
+
+  const cleanupSteps: Array<{ table: string; column: string }> = [
+    { table: 'coordinator_account_ia_page_access', column: 'account_id' },
+    { table: 'coordinator_module_access', column: 'account_id' },
+    { table: 'coordinator_account_departments', column: 'account_id' },
+  ];
+
+  for (const step of cleanupSteps) {
+    const { error } = await supabase.from(step.table).delete().eq(step.column, credentialId);
+    if (error) {
+      throw new Error(formatDbError(error, `Unable to remove linked records from ${step.table}.`));
+    }
+  }
+
+  const { error } = await supabase.from('usis_core_coordinators').delete().eq('id', credentialId);
+  if (error) throw new Error(formatDbError(error, 'Unable to delete credential.'));
+};
+
 export const teachingNonTeachingModuleOptions: Array<{ key: UsisModuleKey; label: string }> = [
   { key: 'ia', label: 'Integrated Admin (IA)' },
   { key: 'coordinator', label: 'Coordinator Portal' },

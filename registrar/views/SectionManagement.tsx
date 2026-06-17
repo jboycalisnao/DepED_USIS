@@ -1,9 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import ConfirmationModal from '../components/ConfirmationModal';
 import { SearchableSelect } from '../components/ui/SearchableSelect';
 import { useStore } from '../store';
 import { AcademicProgram, GradeLevel, Section } from '../types';
 import CreateSectionModal from './sections/CreateSectionModal';
+import { loadCoordinatorTeachingAccountOptions, type CoordinatorTeacherOption } from './sections/coordinatorTeacherAccounts';
 
 const SectionManagement: React.FC = () => {
   const {
@@ -13,6 +14,7 @@ const SectionManagement: React.FC = () => {
     availableStrands,
     availableSpecialPrograms,
     activeSchoolYear,
+    registrarAccess,
     addSection,
     updateSection,
     removeSection,
@@ -29,6 +31,7 @@ const SectionManagement: React.FC = () => {
   const [editName, setEditName] = useState('');
   const [editAdviser, setEditAdviser] = useState('');
   const [editClassification, setEditClassification] = useState('');
+  const [adviserOptions, setAdviserOptions] = useState<CoordinatorTeacherOption[]>([]);
   const [pendingAction, setPendingAction] = useState<{ type: 'delete' | 'update' | 'create' | 'clear' | 'dedupe'; data: any } | null>(null);
   const [systemError, setSystemError] = useState<string | null>(null);
   const [createModalOpen, setCreateModalOpen] = useState(false);
@@ -57,6 +60,40 @@ const SectionManagement: React.FC = () => {
 
   const isSHS = (grade: GradeLevel) => grade === GradeLevel.GRADE_11 || grade === GradeLevel.GRADE_12;
   const isJHS = (grade: GradeLevel) => [GradeLevel.GRADE_7, GradeLevel.GRADE_8, GradeLevel.GRADE_9, GradeLevel.GRADE_10].includes(grade);
+
+  useEffect(() => {
+    let cancelled = false;
+    const schoolUuid = registrarAccess?.schoolUuid || '';
+    if (!schoolUuid) {
+      setAdviserOptions([]);
+      return;
+    }
+
+    void loadCoordinatorTeachingAccountOptions(schoolUuid)
+      .then((options) => {
+        if (!cancelled) {
+          setAdviserOptions(options);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setAdviserOptions([]);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [registrarAccess?.schoolUuid]);
+
+  const buildAdviserOptions = (currentValue: string) => {
+    const options = [...adviserOptions];
+    const normalizedCurrent = String(currentValue || '').trim();
+    if (normalizedCurrent && !options.some((option) => option.value === normalizedCurrent)) {
+      options.unshift({ label: normalizedCurrent, value: normalizedCurrent, username: '' });
+    }
+    return options;
+  };
 
   const handleEditClick = (section: Section) => {
     if (isLocked) return;
@@ -336,11 +373,11 @@ const SectionManagement: React.FC = () => {
 
                 {(isSHS(editingSection.gradeLevel) || isJHS(editingSection.gradeLevel)) && (
                   <div>
-                    <SearchableSelect
-                      label="Classification"
-                      placeholder="Classification"
-                      floatingLabel
-                      showLabel={false}
+                  <SearchableSelect
+                    label="Classification"
+                    placeholder="Classification"
+                    floatingLabel
+                    showLabel={false}
                       value={editClassification}
                       onChange={setEditClassification}
                       options={[{ value: '', label: 'General' }, ...createClassificationOptions(editingSection.gradeLevel)]}
@@ -349,10 +386,15 @@ const SectionManagement: React.FC = () => {
                 )}
 
                 <div className="floating-field">
-                  <label className="floating-field__control">
-                    <input type="text" value={editAdviser} onChange={(e) => setEditAdviser(e.target.value)} placeholder=" " />
-                    <span>Adviser Name</span>
-                  </label>
+                  <SearchableSelect
+                    label="Adviser Name"
+                    placeholder="Select Adviser"
+                    floatingLabel
+                    showLabel={false}
+                    value={editAdviser}
+                    onChange={setEditAdviser}
+                    options={buildAdviserOptions(editAdviser)}
+                  />
                 </div>
               </div>
 
@@ -383,6 +425,7 @@ const SectionManagement: React.FC = () => {
         isSHS={isSHS}
         isJHS={isJHS}
         createClassificationOptions={createClassificationOptions}
+        adviserOptions={adviserOptions}
       />
 
       <ConfirmationModal

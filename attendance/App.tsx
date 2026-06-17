@@ -18,11 +18,18 @@ import Settings from './components/Settings';
 import AttendanceSummaryPage from './features/reports/components/AttendanceSummaryPage';
 import { normalizeRfidValue } from './utils/rfid';
 import AttendanceLandingPage from './features/auth/components/AttendanceLandingPage';
+import TeacherAttendanceLandingPage from './features/auth/components/TeacherAttendanceLandingPage';
 import {
   clearStoredAttendanceAccess,
   getStoredAttendanceAccess,
   type AttendanceAccessRecord,
 } from './features/auth/utils/attendanceAccess';
+import {
+  clearStoredTeacherAttendanceAccess,
+  getStoredTeacherAttendanceAccess,
+  type TeacherAttendanceAccessRecord,
+} from './features/auth/utils/teacherAttendanceAccess';
+import TeacherSectionAttendancePage from './features/teacher/components/TeacherSectionAttendancePage';
 import {
   ATTENDANCE_DEFAULT_PATH,
   ATTENDANCE_LAST_PATH_KEY,
@@ -58,6 +65,7 @@ const determineAttendanceType = (now: Date, settings: TimeSlotSettings): Attenda
 
 function App() {
   const [access, setAccess] = useState<AttendanceAccessRecord | null>(() => getStoredAttendanceAccess());
+  const [teacherAccess, setTeacherAccess] = useState<TeacherAttendanceAccessRecord | null>(() => getStoredTeacherAttendanceAccess());
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
   const location = useLocation();
@@ -101,6 +109,7 @@ function App() {
     addManualAttendanceRecord,
     deleteRecord,
     querySummaryByDateRange,
+    queryDailySummariesByMonth,
     refreshAttendanceStatusByRange,
   } = useAttendance();
 
@@ -111,6 +120,7 @@ function App() {
     if (location.pathname.startsWith('/settings')) return 'settings';
     return 'registrar';
   }, [location.pathname]);
+  const isTeacherRoute = location.pathname.startsWith('/teacher');
 
   const [baudRates, setBaudRates] = useState<number[]>(() => {
     return [0, 1, 2].map(i => {
@@ -470,11 +480,12 @@ function App() {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    if (isTeacherRoute) return;
     window.localStorage.setItem(
       ATTENDANCE_LAST_PATH_KEY,
       resolveAttendancePath(`${location.pathname}${location.search}${location.hash}`, ATTENDANCE_DEFAULT_PATH)
     );
-  }, [location.hash, location.pathname, location.search]);
+  }, [isTeacherRoute, location.hash, location.pathname, location.search]);
 
   if (isStandbyMode) {
     return (
@@ -487,6 +498,39 @@ function App() {
           settings={settings}
         />
       </>
+    );
+  }
+
+  if (isTeacherRoute) {
+    if (!teacherAccess) {
+      return (
+        <>
+          <UsisPortalGate moduleKey="attendance" />
+          <TeacherAttendanceLandingPage
+            onAuthenticated={(record) => {
+              setTeacherAccess(record);
+            }}
+          />
+        </>
+      );
+    }
+
+    return (
+      <div className="attendance-app min-h-screen bg-gray-50 text-gray-900 flex flex-col font-sans selection:bg-primary-100 selection:text-primary-900">
+        <UsisPortalGate moduleKey="attendance" />
+        <TeacherSectionAttendancePage
+          access={teacherAccess}
+          learners={learners}
+          logs={attendanceLogs}
+          onLogout={() => {
+            clearStoredTeacherAttendanceAccess();
+            setTeacherAccess(null);
+            navigate('/teacher', { replace: true });
+          }}
+          refreshAttendanceStatusByRange={refreshAttendanceStatusByRange}
+          queryDailySummariesByMonth={queryDailySummariesByMonth}
+        />
+      </div>
     );
   }
 

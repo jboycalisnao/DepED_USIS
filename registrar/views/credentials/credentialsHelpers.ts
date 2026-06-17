@@ -57,7 +57,7 @@ export const buildMicrosoftUsername = (learner: Student) => {
 
   const first = safeCompact(learner.firstName || 'learner');
   const last = safeCompact(learner.lastName || 'user');
-  return `${first}.${last}@leonnhs.edu.ph`;
+  return `${first}.${last}@lr.leonnhs.edu.ph`;
 };
 
 export const groupLearnersByGender = (sectionLearners: Student[]) => {

@@ -4,16 +4,16 @@ import { UsisLoginModal } from '../../../../common/components/UsisLoginModal';
 import { UsisGlobalFooter } from '../../../../common/footer/UsisGlobalFooter';
 import { UsisUnifiedHeader } from '../../../../common/header/UsisUnifiedHeader';
 import {
-  resolveAttendanceAccess,
-  storeAttendanceAccess,
-  type AttendanceAccessRecord,
-} from '../utils/attendanceAccess';
+  resolveTeacherAttendanceAccess,
+  storeTeacherAttendanceAccess,
+  type TeacherAttendanceAccessRecord,
+} from '../utils/teacherAttendanceAccess';
 
-interface AttendanceLandingPageProps {
-  onAuthenticated: (record: AttendanceAccessRecord) => void;
+interface TeacherAttendanceLandingPageProps {
+  onAuthenticated: (record: TeacherAttendanceAccessRecord) => void;
 }
 
-export default function AttendanceLandingPage({ onAuthenticated }: AttendanceLandingPageProps) {
+export default function TeacherAttendanceLandingPage({ onAuthenticated }: TeacherAttendanceLandingPageProps) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [searchValue, setSearchValue] = useState('');
@@ -25,13 +25,13 @@ export default function AttendanceLandingPage({ onAuthenticated }: AttendanceLan
     setIsSubmitting(true);
     setError('');
     try {
-      const result = await resolveAttendanceAccess(username, password);
+      const result = await resolveTeacherAttendanceAccess(username, password);
       if (result.error || !result.record) {
-        setError(result.error || 'Unable to sign in to attendance.');
+        setError(result.error || 'Unable to sign in to teacher attendance.');
         return;
       }
 
-      storeAttendanceAccess(result.record);
+      storeTeacherAttendanceAccess(result.record);
       onAuthenticated(result.record);
     } finally {
       setIsSubmitting(false);
@@ -43,20 +43,20 @@ export default function AttendanceLandingPage({ onAuthenticated }: AttendanceLan
       <header className="site-chrome">
         <div className="content-width">
           <UsisUnifiedHeader
-            searchId="attendance-landing-search"
-            searchLabel="Search attendance portal"
+            searchId="teacher-attendance-landing-search"
+            searchLabel="Search teacher attendance portal"
             searchPlaceholder="Keywords"
             searchValue={searchValue}
             onSearchChange={setSearchValue}
             onSearchSubmit={(event) => event.preventDefault()}
           />
-          <nav className="kit-nav" aria-label="Attendance landing sections">
+          <nav className="kit-nav" aria-label="Teacher attendance landing sections">
             <div className="kit-nav__grid">
-              <a className="kit-nav__link kit-nav__link--active" href="#attendance-login-title">
+              <a className="kit-nav__link kit-nav__link--active" href="#teacher-attendance-login-title">
                 Access
               </a>
-              <Link className="kit-nav__link" to="/teacher">
-                Teacher Access
+              <Link className="kit-nav__link" to="/">
+                Coordinator Access
               </Link>
             </div>
           </nav>
@@ -68,7 +68,7 @@ export default function AttendanceLandingPage({ onAuthenticated }: AttendanceLan
           <section className="section-shell attendance-login">
             <UsisLoginModal
               moduleKey="attendance"
-              title="Attendance Portal"
+              title="Teacher Attendance Portal"
               username={username}
               password={password}
               isSubmitting={isSubmitting}

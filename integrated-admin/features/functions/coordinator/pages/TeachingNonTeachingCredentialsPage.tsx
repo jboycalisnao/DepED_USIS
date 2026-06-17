@@ -18,6 +18,7 @@ import { TeachingNonTeachingModuleAccessModal } from '../teaching-non-teaching/c
 import { TeachingNonTeachingSelectionToolbar } from '../teaching-non-teaching/components/TeachingNonTeachingSelectionToolbar';
 import {
   deactivateTeachingNonTeachingCredential,
+  deleteTeachingNonTeachingCredential,
   loadCoordinatorDepartments,
   loadTeachingNonTeachingCredentials,
   saveTeachingNonTeachingCredential,
@@ -28,6 +29,7 @@ import { TeachingNonTeachingCredentialList } from '../teaching-non-teaching/comp
 import type { TeachingNonTeachingBulkImportResult } from '../teaching-non-teaching/utils/teachingNonTeachingCredentialWorkbook';
 import type { PersonnelType, SaveTeachingNonTeachingCredentialInput } from '../teaching-non-teaching/services/teachingNonTeachingCredentialsService';
 import { useTeachingNonTeachingSelection } from '../teaching-non-teaching/hooks/useTeachingNonTeachingSelection';
+import { loadCachedCoordinatorList, saveCachedCoordinatorList } from '../teaching-non-teaching/utils/teachingNonTeachingCoordinatorListCache';
 
 export function TeachingNonTeachingCredentialsPage() {
   const schoolCode = getStoredIntegratedAdminAccess()?.coordinatorAccess.schoolId || '';
@@ -42,6 +44,8 @@ export function TeachingNonTeachingCredentialsPage() {
   const [moduleRecord, setModuleRecord] = useState<TeachingNonTeachingCredentialRecord | null>(null);
   const [bulkModuleAccessOpen, setBulkModuleAccessOpen] = useState(false);
   const [bulkEditOpen, setBulkEditOpen] = useState(false);
+  const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
+  const [isRefreshingCoordinatorList, setIsRefreshingCoordinatorList] = useState(false);
   const [moduleSelections, setModuleSelections] = useState<UsisModuleKey[]>([]);
   const [iaPageSelections, setIaPageSelections] = useState<string[]>([]);
   const [moduleAccessMap, setModuleAccessMap] = useState<Record<string, UsisModuleKey[]>>({});
@@ -75,6 +79,7 @@ export function TeachingNonTeachingCredentialsPage() {
         loadCoordinatorDepartments(),
       ]);
       setRows(data);
+      await saveCachedCoordinatorList(data);
       setDepartments(departmentRows);
       const accountIds = data.map((row) => row.id);
       const [accessMap, pageAccessMap, pageCatalog] = await Promise.all([
@@ -100,7 +105,38 @@ export function TeachingNonTeachingCredentialsPage() {
     }
   };
 
+  const refreshCoordinatorListOnly = async () => {
+    if (!schoolCode) return;
+    setIsRefreshingCoordinatorList(true);
+    setActionLoadingMessage('Refreshing coordinator list...');
+    try {
+      const data = await loadTeachingNonTeachingCredentials(schoolCode);
+      setRows(data);
+      await saveCachedCoordinatorList(data);
+      setNotice('Coordinator list refreshed.');
+      setStatusAlert({
+        title: 'Coordinator List Refreshed',
+        message: 'Only the coordinator list was reloaded from Supabase and cached locally.',
+        tone: 'success',
+      });
+    } catch (nextError: any) {
+      setStatusAlert({
+        title: 'Refresh Failed',
+        message: nextError?.message || 'Unable to refresh coordinator list.',
+        tone: 'danger',
+      });
+    } finally {
+      setActionLoadingMessage('');
+      setIsRefreshingCoordinatorList(false);
+    }
+  };
+
   useEffect(() => {
+    void loadCachedCoordinatorList().then((cachedRows) => {
+      if (cachedRows.length > 0) {
+        setRows(cachedRows);
+      }
+    });
     void refresh();
   }, [schoolCode]);
 
@@ -157,6 +193,53 @@ export function TeachingNonTeachingCredentialsPage() {
     setBulkEditOpen(true);
   };
 
+  const handleBulkDelete = async () => {
+    if (selectedRows.length === 0) return;
+    setIsSubmitting(true);
+    setActionLoadingMessage(`Deleting ${selectedRows.length} account${selectedRows.length === 1 ? '' : 's'}...`);
+    const summary = {
+      deletedCount: 0,
+      errors: [] as string[],
+    };
+    try {
+      for (const row of selectedRows) {
+        try {
+          await deleteTeachingNonTeachingCredential(row.id);
+          summary.deletedCount += 1;
+        } catch (nextError: any) {
+          summary.errors.push(nextError?.message || `Unable to delete ${row.name}.`);
+        }
+      }
+      if (summary.errors.length > 0) {
+        setStatusAlert({
+          title: 'Bulk Delete Completed with Warnings',
+          message: summary.errors.slice(0, 3).join(' '),
+          tone: 'warning',
+        });
+      } else {
+        setStatusAlert({
+          title: 'Bulk Delete Complete',
+          message: `${summary.deletedCount} account${summary.deletedCount === 1 ? '' : 's'} deleted successfully.`,
+          tone: 'success',
+        });
+      }
+      setNotice(`Deleted ${summary.deletedCount} account${summary.deletedCount === 1 ? '' : 's'}.`);
+      setBulkDeleteConfirmOpen(false);
+      setBulkEditOpen(false);
+      clearSelection();
+      await refresh();
+    } catch (nextError: any) {
+      setStatusAlert({
+        title: 'Bulk Delete Failed',
+        message: nextError?.message || 'Unable to complete the bulk delete.',
+        tone: 'danger',
+      });
+    } finally {
+      setActionLoadingMessage('');
+      setIsSubmitting(false);
+    }
+  };
+
   if (isLoading) {
     return <UsisPageLoader message="Loading teaching and non-teaching credentials..." />;
   }
@@ -179,9 +262,19 @@ export function TeachingNonTeachingCredentialsPage() {
                   <span>Search Credentials</span>
                 </div>
               </label>
-              <button type="button" className="registry-action-button" onClick={() => setEditingRecord({} as TeachingNonTeachingCredentialRecord)}>
-                Create Account
-              </button>
+              <div className="registry-toolbar__actions">
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={() => void refreshCoordinatorListOnly()}
+                  disabled={isRefreshingCoordinatorList || isLoading}
+                >
+                  {isRefreshingCoordinatorList ? 'Refreshing...' : 'Refresh List'}
+                </button>
+                <button type="button" className="registry-action-button" onClick={() => setEditingRecord({} as TeachingNonTeachingCredentialRecord)}>
+                  Create Account
+                </button>
+              </div>
             </div>
 
             <TeachingNonTeachingSelectionToolbar
@@ -257,14 +350,23 @@ export function TeachingNonTeachingCredentialsPage() {
               skippedCount: 0,
             };
             try {
-              for (const payload of payloads) {
-                try {
+              const chunkSize = 20;
+              for (let index = 0; index < payloads.length; index += chunkSize) {
+                const chunk = payloads.slice(index, index + chunkSize);
+                setActionLoadingMessage(
+                  `Importing ${Math.min(index + chunk.length, payloads.length)} of ${payloads.length} credential${payloads.length === 1 ? '' : 's'}...`,
+                );
+                const results = await Promise.allSettled(chunk.map(async (payload) => {
                   await saveTeachingNonTeachingCredential(payload);
-                  summary.createdCount += 1;
-                } catch (nextError: any) {
+                }));
+                results.forEach((result) => {
+                  if (result.status === 'fulfilled') {
+                    summary.createdCount += 1;
+                    return;
+                  }
                   summary.skippedCount += 1;
-                  summary.errors.push(nextError?.message || 'Unable to import one credential row.');
-                }
+                  summary.errors.push(result.reason?.message || 'Unable to import one credential row.');
+                });
               }
               if (summary.createdCount > 0) {
                 setNotice(`Imported ${summary.createdCount} credential${summary.createdCount === 1 ? '' : 's'}.`);
@@ -488,8 +590,22 @@ export function TeachingNonTeachingCredentialsPage() {
               setIsSubmitting(false);
             }
           }}
+          onRequestDelete={() => {
+            setBulkEditOpen(false);
+            setBulkDeleteConfirmOpen(true);
+          }}
         />
       ) : null}
+
+      <UsisAlertModal
+        open={bulkDeleteConfirmOpen}
+        title="Delete Selected Accounts"
+        message={`Delete ${selectedRows.length} selected account${selectedRows.length === 1 ? '' : 's'} from the coordinator registry? This will also remove linked department and module access records.`}
+        tone="danger"
+        confirmLabel={isSubmitting ? 'Deleting...' : 'Delete'}
+        onConfirm={isSubmitting ? undefined : handleBulkDelete}
+        onClose={() => setBulkDeleteConfirmOpen(false)}
+      />
 
       <UsisAlertModal
         open={Boolean(successAlert)}
