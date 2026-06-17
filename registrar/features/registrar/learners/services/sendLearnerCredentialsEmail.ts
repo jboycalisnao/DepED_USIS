@@ -11,7 +11,7 @@ type LearnerEmailSettings = {
   reply_to_email: string | null;
 };
 
-const USIS_EMAIL_HEADER_IMAGE_PATH = '/common/assets/Leon-NHS_USIS-Header-Image-email.jpg';
+const USIS_EMAIL_HEADER_IMAGE_SRC = new URL('../../../../../common/assets/Leon-NHS_USIS-Header-Image-email.jpg', import.meta.url).href;
 
 const normalize = (value: unknown) => String(value ?? '').trim();
 
@@ -206,10 +206,7 @@ export async function sendLearnerCredentialsViaWebhook(input: {
     throw new Error('Apps Script Web App URL is not configured in Registrar Settings.');
   }
 
-  const headerImageSrc =
-    typeof window !== 'undefined'
-      ? new URL(USIS_EMAIL_HEADER_IMAGE_PATH, window.location.origin).href
-      : USIS_EMAIL_HEADER_IMAGE_PATH;
+  const headerImageSrc = USIS_EMAIL_HEADER_IMAGE_SRC;
 
   const envelope = buildCredentialsEmailEnvelope({
     learner: input.learner,

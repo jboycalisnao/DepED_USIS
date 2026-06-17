@@ -35,7 +35,7 @@ function buildCredentialsHtml(data) {
   const fromDisplayName = escapeHtml(data.fromDisplayName || data.senderName || DEFAULT_SENDER_NAME);
   const headerImageSrc = normalize(data.headerImageSrc || data.headerImageUrl || '');
   const headerImageHtml = headerImageSrc
-    ? `<img src="${escapeHtml(headerImageSrc)}" alt="Leon NHS USIS Header" style="display:block;margin:0 auto;max-width:100%;width:320px;height:auto;object-fit:contain;" />`
+    ? `<img src="cid:usisHeader" alt="Leon NHS USIS Header" style="display:block;margin:0 auto;max-width:100%;width:320px;height:auto;object-fit:contain;" />`
     : `<div style="font-size:16px;font-weight:700;color:#0f4c81;line-height:1.2;">Leon NHS - USIS</div>`;
 
   return `<!doctype html>
@@ -115,6 +115,7 @@ function doPost(e) {
     const subject = normalize(data.subject || '');
     const htmlContent = normalize(data.htmlContent || data.html || '');
     const textContent = normalize(data.textContent || '');
+    const headerImageSrc = normalize(data.headerImageSrc || data.headerImageUrl || '');
 
     if (!recipientEmail || !subject || !htmlContent) {
       return ContentService
@@ -122,15 +123,31 @@ function doPost(e) {
         .setMimeType(ContentService.MimeType.JSON);
     }
 
-    const htmlBody = htmlContent || buildCredentialsHtml(data);
     const replyTo = normalize(data.replyTo || '');
     const fromDisplayName = normalize(data.fromDisplayName || data.senderName || DEFAULT_SENDER_NAME);
+    const inlineImages = {};
+    let htmlBody = htmlContent || buildCredentialsHtml(data);
 
-    GmailApp.sendEmail(recipientEmail, subject, textContent || ' ', {
+    if (headerImageSrc) {
+      try {
+        inlineImages.usisHeader = UrlFetchApp.fetch(headerImageSrc).getBlob().setName('usis-header-image');
+        htmlBody = htmlBody.replace(new RegExp(headerImageSrc.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), 'cid:usisHeader');
+      } catch (fetchError) {
+        // Fall back to the HTML image URL if the remote asset is temporarily unavailable.
+      }
+    }
+
+    const emailOptions = {
       htmlBody: htmlBody,
       name: fromDisplayName,
       replyTo: replyTo || undefined,
-    });
+    };
+
+    if (inlineImages.usisHeader) {
+      emailOptions.inlineImages = inlineImages;
+    }
+
+    GmailApp.sendEmail(recipientEmail, subject, textContent || ' ', emailOptions);
 
     return ContentService
       .createTextOutput(JSON.stringify({ ok: true, sent: true }))
