@@ -34,24 +34,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return json(res, 400, { error: 'email, subject, and htmlContent are required.' });
     }
 
-    const supabaseAdmin = getSupabaseAdmin();
-    const { data, error } = await supabaseAdmin
-      .from('registrar_enrollment_email_settings')
-      .select('*')
-      .eq('school_id', schoolId)
-      .maybeSingle();
+    let settings: RegistrarEnrollmentEmailSettings | null = null;
+    let resolvedWebhookUrl = webhookUrl;
 
-    if (error) throw error;
-    if (!data) {
-      return json(res, 404, { error: `Email settings not found for school ${schoolId}.` });
+    if (!resolvedWebhookUrl) {
+      const supabaseAdmin = getSupabaseAdmin();
+      const { data, error } = await supabaseAdmin
+        .from('registrar_enrollment_email_settings')
+        .select('*')
+        .eq('school_id', schoolId)
+        .maybeSingle();
+
+      if (error) throw error;
+      if (!data) {
+        return json(res, 404, { error: `Email settings not found for school ${schoolId}.` });
+      }
+
+      settings = data as RegistrarEnrollmentEmailSettings;
+      if (!settings.is_enabled) {
+        return json(res, 403, { error: 'Enrollment email service is disabled in Registrar Settings.' });
+      }
+
+      resolvedWebhookUrl = normalize(settings.apps_script_web_app_url);
     }
 
-    const settings = data as RegistrarEnrollmentEmailSettings;
-    if (!settings.is_enabled) {
-      return json(res, 403, { error: 'Enrollment email service is disabled in Registrar Settings.' });
-    }
-
-    const resolvedWebhookUrl = webhookUrl || normalize(settings.apps_script_web_app_url);
     if (!resolvedWebhookUrl) {
       return json(res, 400, { error: 'Apps Script Web App URL is not configured in Registrar Settings.' });
     }
@@ -59,7 +65,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
-    const bearerToken = normalize(settings.apps_script_bearer_token);
+    const bearerToken = normalize(body.bearerToken || settings?.apps_script_bearer_token);
     if (bearerToken) {
       headers.Authorization = `Bearer ${bearerToken}`;
     }
@@ -72,9 +78,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       htmlContent,
       html: htmlContent,
       textContent: normalize(body.textContent) || undefined,
-      senderName: normalize(body.senderName) || normalize(settings.from_display_name) || 'DepED USIS Registrar',
-      fromDisplayName: normalize(body.fromDisplayName) || normalize(settings.from_display_name) || 'DepED USIS Registrar',
-      replyTo: normalize(body.replyTo) || normalize(settings.reply_to_email) || null,
+      senderName: normalize(body.senderName) || normalize(settings?.from_display_name) || 'DepED USIS Registrar',
+      fromDisplayName: normalize(body.fromDisplayName) || normalize(settings?.from_display_name) || 'DepED USIS Registrar',
+      replyTo: normalize(body.replyTo) || normalize(settings?.reply_to_email) || null,
       statusLookupUrl: normalize(body.statusLookupUrl) || undefined,
       headerImageSrc: normalize(body.headerImageSrc) || undefined,
       learner: body.learner || {},

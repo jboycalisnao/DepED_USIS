@@ -854,21 +854,28 @@ export default defineConfig(({ mode }) => {
               return;
             }
 
-            const supabaseAdmin = getSupabaseAdmin();
-            const { data: settings, error: settingsError } = await supabaseAdmin
-              .from('registrar_enrollment_email_settings')
-              .select('*')
-              .eq('school_id', schoolId)
-              .maybeSingle();
-            if (settingsError) throw settingsError;
-            if (!(settings as any)?.is_enabled) {
-              res.statusCode = 403;
-              res.setHeader('Content-Type', 'application/json');
-              res.end(JSON.stringify({ error: 'Enrollment email service is disabled in Registrar Settings.' }));
-              return;
+            let settings: any = null;
+            let endpoint = normalize(body?.webhookUrl || '');
+
+            if (!endpoint) {
+              const supabaseAdmin = getSupabaseAdmin();
+              const { data, error: settingsError } = await supabaseAdmin
+                .from('registrar_enrollment_email_settings')
+                .select('*')
+                .eq('school_id', schoolId)
+                .maybeSingle();
+              if (settingsError) throw settingsError;
+              settings = data;
+              if (!(settings as any)?.is_enabled) {
+                res.statusCode = 403;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ error: 'Enrollment email service is disabled in Registrar Settings.' }));
+                return;
+              }
+
+              endpoint = normalize((settings as any)?.apps_script_web_app_url || '');
             }
 
-            const endpoint = normalize((settings as any)?.apps_script_web_app_url || body?.webhookUrl || '');
             if (!endpoint) {
               res.statusCode = 400;
               res.setHeader('Content-Type', 'application/json');
@@ -890,8 +897,8 @@ export default defineConfig(({ mode }) => {
               htmlContent: String(body?.htmlContent || ''),
               html: String(body?.htmlContent || ''),
               textContent: String(body?.textContent || ''),
-              senderName: String(body?.senderName || settings.from_display_name || 'DepED USIS Registrar'),
-              fromDisplayName: String(body?.fromDisplayName || settings.from_display_name || 'DepED USIS Registrar'),
+              senderName: String(body?.senderName || settings?.from_display_name || 'DepED USIS Registrar'),
+              fromDisplayName: String(body?.fromDisplayName || settings?.from_display_name || 'DepED USIS Registrar'),
               replyTo: normalize(body?.replyTo) || normalize((settings as any)?.reply_to_email) || undefined,
               statusLookupUrl: normalize(body?.statusLookupUrl) || undefined,
               headerImageSrc: normalize(body?.headerImageSrc) || undefined,
