@@ -27,6 +27,63 @@ const getAccessToken = async (tenantId: string, clientId: string, clientSecret: 
   return accessToken;
 };
 
+const getLearnersGroupId = async (accessToken: string) => {
+  const envGroupId = String(process.env.M365_LEARNERS_GROUP_ID || '').trim();
+  if (envGroupId) return envGroupId;
+
+  const groupResponse = await fetch(`https://graph.microsoft.com/v1.0/groups?$filter=displayName eq 'Learners'&$select=id,displayName&$top=1`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!groupResponse.ok) throw new Error(`Learners group lookup failed: ${await groupResponse.text()}`);
+
+  const groupJson = await groupResponse.json();
+  const groupId = String(groupJson?.value?.[0]?.id || '').trim();
+  if (groupId) return groupId;
+
+  const createGroupResponse = await fetch('https://graph.microsoft.com/v1.0/groups', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      displayName: 'Learners',
+      description: 'Registrar-created learner group',
+      groupTypes: ['Unified'],
+      mailEnabled: true,
+      mailNickname: `learners-${Date.now()}`,
+      securityEnabled: false,
+      visibility: 'Private',
+    }),
+  });
+
+  if (!createGroupResponse.ok) {
+    throw new Error(`Learners group creation failed: ${await createGroupResponse.text()}`);
+  }
+
+  const createdGroupJson = await createGroupResponse.json();
+  const createdGroupId = String(createdGroupJson?.id || '').trim();
+  if (!createdGroupId) throw new Error('Learners group was created but no group ID was returned.');
+  return createdGroupId;
+};
+
+const addUserToGroup = async (accessToken: string, groupId: string, userId: string, userPrincipalName: string) => {
+  const memberRef = `https://graph.microsoft.com/v1.0/directoryObjects/${encodeURIComponent(userId)}`;
+  const membershipResponse = await fetch(`https://graph.microsoft.com/v1.0/groups/${encodeURIComponent(groupId)}/members/$ref`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ '@odata.id': memberRef }),
+  });
+
+  if (membershipResponse.ok) return;
+
+  const text = await membershipResponse.text();
+  const alreadyMember = membershipResponse.status === 400 && /already exist|added object references/i.test(text);
+  if (alreadyMember) return;
+
+  throw new Error(`Failed to add ${userPrincipalName} to Learners group: ${text}`);
+};
+
 const readBody = (req: VercelRequest): Json => {
   if (req.body && typeof req.body === 'object') return req.body as Json;
   if (typeof req.body === 'string' && req.body.trim()) return JSON.parse(req.body);
@@ -227,6 +284,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!licenseAssigned) return json(res, 502, { error: 'License assignment failed', createdUserId: createdUser?.id || null, userPrincipalName, details: assignLicenseText });
 
     const licenseAssignmentResult = assignLicenseText ? JSON.parse(assignLicenseText) : { ok: true };
+    const learnersGroupId = await getLearnersGroupId(accessToken);
+    await addUserToGroup(accessToken, learnersGroupId, createdUser?.id || userGraphKey, userPrincipalName);
+
     if (supabaseAdmin) {
       const persistResult = await supabaseAdmin.from('registrar_learners').update({
         microsoft_user_id: createdUser?.id || null,
@@ -250,4 +310,3 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return json(res, 500, { error: 'Unexpected server error', details: error?.message || String(error) });
   }
 }
-

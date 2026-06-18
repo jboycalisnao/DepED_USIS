@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ScanResult, TimeSlotSettings } from '../types';
+import { ScanResult, AttendanceScheduleConfig } from '../types';
 import KioskHeader from './kiosk/KioskHeader';
 import KioskStationCard from './kiosk/KioskStationCard';
 import { getSessionInfo } from './kiosk/kioskUtils';
@@ -8,7 +8,7 @@ interface KioskModeProps {
   onExit: () => void;
   lastScanResults: (ScanResult | null)[];
   unknownTags: (string | null)[]; 
-  settings: TimeSlotSettings;
+  settings: AttendanceScheduleConfig;
 }
 
 const KioskMode: React.FC<KioskModeProps> = ({ onExit, lastScanResults, unknownTags, settings }) => {

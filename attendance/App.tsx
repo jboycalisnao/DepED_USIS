@@ -5,7 +5,7 @@ import { useSerial } from './hooks/useSerial';
 import { useLearners } from './hooks/useLearners';
 import { useAttendance } from './hooks/useAttendance';
 import { useSettings } from './hooks/useSettings';
-import { ScanResult, AttendanceType, TimeSlotSettings } from './types';
+import { ScanResult } from './types';
 import { UsisUnifiedHeader } from '../common/header/UsisUnifiedHeader';
 import { UsisGlobalFooter } from '../common/footer/UsisGlobalFooter';
 import { UsisPortalGate } from '../common/components/UsisPortalGate';
@@ -30,6 +30,7 @@ import {
   type TeacherAttendanceAccessRecord,
 } from './features/auth/utils/teacherAttendanceAccess';
 import TeacherSectionAttendancePage from './features/teacher/components/TeacherSectionAttendancePage';
+import { resolveAttendanceDecision } from './utils/attendanceSchedule';
 import {
   ATTENDANCE_DEFAULT_PATH,
   ATTENDANCE_LAST_PATH_KEY,
@@ -52,17 +53,6 @@ const extractUid = (text: string): string | null => {
   return null;
 };
 
-const determineAttendanceType = (now: Date, settings: TimeSlotSettings): AttendanceType => {
-  const time = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
-  
-  if (time >= settings.amIn.start && time <= settings.amIn.end) return 'AM_IN';
-  if (time >= settings.amOut.start && time <= settings.amOut.end) return 'AM_OUT';
-  if (time >= settings.pmIn.start && time <= settings.pmIn.end) return 'PM_IN';
-  if (time >= settings.pmOut.start && time <= settings.pmOut.end) return 'PM_OUT';
-  
-  return 'UNSCHEDULED';
-};
-
 function App() {
   const [access, setAccess] = useState<AttendanceAccessRecord | null>(() => getStoredAttendanceAccess());
   const [teacherAccess, setTeacherAccess] = useState<TeacherAttendanceAccessRecord | null>(() => getStoredTeacherAttendanceAccess());
@@ -77,10 +67,13 @@ function App() {
   const monitors = [monitor1, monitor2, monitor3];
 
   const {
-    settings,
+    settings: scheduleConfig,
     updateSettings,
     activeSchoolYear,
+    isSettingsLoading,
     isSchoolYearsLoading,
+    isSettingsSaving,
+    settingsError,
     schoolYears,
     selectedSchoolYearId,
     setSelectedSchoolYearId,
@@ -204,7 +197,7 @@ function App() {
       }
 
       if (isStandbyMode) {
-        const learner = learners.find(l => {
+          const learner = learners.find(l => {
           const dbUid = normalizeRfidValue(l.rfid);
           const localUid = normalizeRfidValue(uidMappings[l.id]);
           return dbUid === scannedUid || localUid === scannedUid;
@@ -212,7 +205,8 @@ function App() {
         
         if (learner) {
           const now = new Date();
-          const type = determineAttendanceType(now, settings);
+          const decision = resolveAttendanceDecision(String(learner.grade_level || ''), now, scheduleConfig);
+          const type = decision.type;
           
           const todayStr = now.toDateString();
           const isDuplicate = attendanceLogs.some(log => {
@@ -228,13 +222,14 @@ function App() {
                 learner, 
                 type, 
                 uid: scannedUid,
+                isLate: decision.isLate,
                 isDuplicate: true,
                 time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
               };
               return next;
             });
           } else {
-            logAttendance(learner.id, type);
+            logAttendance(learner.id, type, decision.isLate);
             monitor.write(`DISPLAY|${learner.last_name}|${learner.first_name}`);
 
             setLastScanResults(prev => {
@@ -243,6 +238,7 @@ function App() {
                 learner, 
                 type, 
                 uid: scannedUid,
+                isLate: decision.isLate,
                 isDuplicate: false,
                 time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
               };
@@ -286,7 +282,7 @@ function App() {
         setTimeout(() => setScanFlash(false), 500);
       }
     });
-  }, [monitor1.logs, monitor2.logs, monitor3.logs, isStandbyMode, uidMappings, adminUids, learners, settings, logAttendance, attendanceLogs]);
+  }, [monitor1.logs, monitor2.logs, monitor3.logs, isStandbyMode, uidMappings, adminUids, learners, scheduleConfig, logAttendance, attendanceLogs]);
 
   useEffect(() => {
     const hasActive = lastScanResults.some(r => r !== null) || unknownTags.some(t => t !== null);
@@ -333,7 +329,8 @@ function App() {
 
         if (learner) {
           const now = new Date();
-          const type = determineAttendanceType(now, settings);
+          const decision = resolveAttendanceDecision(String(learner.grade_level || ''), now, scheduleConfig);
+          const type = decision.type;
           const todayStr = now.toDateString();
           const isDuplicate = attendanceLogs.some(log => {
             const logDate = new Date(log.timestamp).toDateString();
@@ -341,7 +338,7 @@ function App() {
           });
 
           if (!isDuplicate) {
-            logAttendance(learner.id, type);
+            logAttendance(learner.id, type, decision.isLate);
           }
 
           setLastScanResults(prev => {
@@ -350,6 +347,7 @@ function App() {
               learner,
               type,
               uid: scannedUid,
+              isLate: decision.isLate,
               isDuplicate,
               time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             };
@@ -417,7 +415,7 @@ function App() {
       window.removeEventListener('keydown', onKeyDown);
       clearUsbTimer();
     };
-  }, [adminUids, attendanceLogs, isStandbyMode, learners, logAttendance, settings, uidMappings]);
+  }, [adminUids, attendanceLogs, isStandbyMode, learners, logAttendance, scheduleConfig, uidMappings]);
 
   const handleSaveMapping = async () => {
     if (!selectedLearnerId || !activeRfid || conflictWarning) return;
@@ -495,7 +493,7 @@ function App() {
           onExit={() => setIsStandbyMode(false)} 
           lastScanResults={lastScanResults} 
           unknownTags={unknownTags} 
-          settings={settings}
+          settings={scheduleConfig}
         />
       </>
     );
@@ -780,12 +778,15 @@ function App() {
                   element={
                     <Settings
                       activeSchoolYearLabel={activeSchoolYear?.label || ''}
+                      isSettingsLoading={isSettingsLoading}
                       isSchoolYearsLoading={isSchoolYearsLoading}
+                      isSettingsSaving={isSettingsSaving}
+                      onScheduleConfigChange={updateSettings}
                       onSchoolYearChange={setSelectedSchoolYearId}
-                      onUpdate={updateSettings}
                       schoolYears={schoolYears}
                       selectedSchoolYearId={selectedSchoolYearId}
-                      settings={settings}
+                      scheduleConfig={scheduleConfig}
+                      settingsError={settingsError}
                     />
                   }
                 />

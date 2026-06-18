@@ -19,6 +19,8 @@ interface UsisDateTimePickerProps {
 
 const WEEK_DAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const HOURS_12 = Array.from({ length: 12 }, (_, index) => index + 1);
+const MINUTES = Array.from({ length: 60 }, (_, index) => `${index}`.padStart(2, '0'));
 
 const CalendarIcon = () => (
   <svg className="usis-date-time-picker__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -93,6 +95,38 @@ const parseDateValue = (value: string) => {
   return new Date(year, month - 1, day);
 };
 
+const parseTimeValue = (value: string) => {
+  const normalized = String(value || '').trim().toLowerCase();
+  const match = normalized.match(/^(\d{1,2}):(\d{2})(?:\s*([ap]m))?$/);
+  if (!match) return null;
+  let hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  const period = match[3];
+
+  if (Number.isNaN(hours) || Number.isNaN(minutes) || minutes < 0 || minutes > 59) return null;
+  if (period) {
+    const isPm = period === 'pm';
+    if (hours < 1 || hours > 12) return null;
+    if (hours === 12) hours = isPm ? 12 : 0;
+    else if (isPm) hours += 12;
+  } else if (hours > 23) {
+    return null;
+  }
+
+  return { hours, minutes };
+};
+
+const formatTimeValue = (value: string) => {
+  const parsed = parseTimeValue(value);
+  if (!parsed) return '';
+  const hour12 = parsed.hours % 12 || 12;
+  const period = parsed.hours >= 12 ? 'pm' : 'am';
+  return `${String(hour12).padStart(2, '0')}:${String(parsed.minutes).padStart(2, '0')} ${period}`;
+};
+
+const formatTimeValue24 = (hours: number, minutes: number) =>
+  `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+
 export function UsisDateTimePicker({
   ariaLabel,
   className = '',
@@ -116,16 +150,31 @@ export function UsisDateTimePicker({
   const monthYearPanelRef = useRef<HTMLDivElement>(null);
   const fieldLabel = label || ariaLabel;
   const useCustomCalendar = mode === 'date';
+  const useCustomTimePicker = mode === 'time';
   const [isOpen, setIsOpen] = useState(false);
   const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
+  const [timePeriod, setTimePeriod] = useState<'am' | 'pm'>(() => {
+    const parsed = parseTimeValue(value);
+    if (!parsed) return 'am';
+    return parsed.hours >= 12 ? 'pm' : 'am';
+  });
+  const [timeHour, setTimeHour] = useState(() => {
+    const parsed = parseTimeValue(value);
+    if (!parsed) return 12;
+    return parsed.hours % 12 || 12;
+  });
+  const [timeMinute, setTimeMinute] = useState(() => {
+    const parsed = parseTimeValue(value);
+    return parsed?.minutes ?? 0;
+  });
   const [popoverPosition, setPopoverPosition] = useState<{ left: number; top: number }>({ left: 0, top: 0 });
   const [guidedInputValue, setGuidedInputValue] = useState(() => (useCustomCalendar ? formatDateDisplay(value) : value));
 
   const selectedDate = useMemo(() => parseDateValue(value), [value]);
   const [viewDate, setViewDate] = useState(() => selectedDate || new Date());
   const displayValue = useMemo(
-    () => (useCustomCalendar ? guidedInputValue : value),
-    [guidedInputValue, useCustomCalendar, value]
+    () => (useCustomCalendar ? guidedInputValue : useCustomTimePicker ? formatTimeValue(value) : value),
+    [guidedInputValue, useCustomCalendar, useCustomTimePicker, value]
   );
   const hasValue = Boolean(String(displayValue || '').trim());
 
@@ -133,6 +182,15 @@ export function UsisDateTimePicker({
     if (!useCustomCalendar) return;
     setGuidedInputValue(formatDateDisplay(value));
   }, [useCustomCalendar, value]);
+
+  useEffect(() => {
+    if (!useCustomTimePicker) return;
+    const parsed = parseTimeValue(value);
+    if (!parsed) return;
+    setTimeHour(parsed.hours % 12 || 12);
+    setTimeMinute(parsed.minutes);
+    setTimePeriod(parsed.hours >= 12 ? 'pm' : 'am');
+  }, [useCustomTimePicker, value]);
 
   useEffect(() => {
     if (selectedDate) setViewDate(selectedDate);
@@ -205,6 +263,14 @@ export function UsisDateTimePicker({
   const today = new Date();
   const todayValue = formatDateValue(today);
   const activeMonthLabel = `${MONTHS[viewDate.getMonth()]} ${viewDate.getFullYear()}`;
+  const timeValue24 = `${String(
+    timePeriod === 'pm'
+      ? (timeHour % 12) + 12
+      : timeHour === 12
+        ? 0
+        : timeHour,
+  ).padStart(2, '0')}:${String(timeMinute).padStart(2, '0')}`;
+  const selectedTimeLabel = formatTimeValue(timeValue24) || timeValue24;
 
   const openPicker = () => {
     if (disabled) return;
@@ -215,6 +281,16 @@ export function UsisDateTimePicker({
       setIsMonthPickerOpen(false);
       return;
     }
+    if (useCustomTimePicker) {
+      const parsed = parseTimeValue(value);
+      if (parsed) {
+        setTimeHour(parsed.hours % 12 || 12);
+        setTimeMinute(parsed.minutes);
+        setTimePeriod(parsed.hours >= 12 ? 'pm' : 'am');
+      }
+      setIsOpen(true);
+      return;
+    }
     const input = inputRef.current;
     if (!input) return;
     input.focus();
@@ -222,11 +298,11 @@ export function UsisDateTimePicker({
   };
 
   useEffect(() => {
-    if (!useCustomCalendar || !isOpen) return;
+    if ((!useCustomCalendar && !useCustomTimePicker) || !isOpen) return;
     const updatePosition = () => {
       const controlRect = controlRef.current?.getBoundingClientRect();
       if (!controlRect) return;
-      const popoverWidth = 292;
+      const popoverWidth = useCustomTimePicker ? 352 : 292;
       const viewportPadding = 8;
       const maxLeft = Math.max(viewportPadding, window.innerWidth - popoverWidth - viewportPadding);
       const desiredLeft = Math.min(controlRect.right - popoverWidth, maxLeft);
@@ -241,7 +317,18 @@ export function UsisDateTimePicker({
       window.removeEventListener('resize', updatePosition);
       window.removeEventListener('scroll', updatePosition, true);
     };
-  }, [isOpen, useCustomCalendar]);
+  }, [isOpen, useCustomCalendar, useCustomTimePicker]);
+
+  const commitTime = (nextHour = timeHour, nextMinute = timeMinute, nextPeriod = timePeriod) => {
+    const normalizedHour =
+      nextPeriod === 'pm'
+        ? (nextHour % 12) + 12
+        : nextHour === 12
+          ? 0
+          : nextHour;
+    onChange(`${String(normalizedHour).padStart(2, '0')}:${String(nextMinute).padStart(2, '0')}`);
+    setIsOpen(false);
+  };
 
   const selectDate = (date: Date) => {
     if (isDisabledDate(date)) return;
@@ -294,18 +381,22 @@ export function UsisDateTimePicker({
                 const baseline = selectedDate || today;
                 setViewDate(clampViewDate(new Date(baseline.getFullYear(), baseline.getMonth(), 1)));
                 setIsOpen(true);
+                return;
+              }
+              if (useCustomTimePicker && !disabled) {
+                openPicker();
               }
             }}
             onClick={() => {
-              if (useCustomCalendar && !disabled) openPicker();
+              if ((useCustomCalendar || useCustomTimePicker) && !disabled) openPicker();
             }}
             placeholder=" "
             ref={inputRef}
-            readOnly={false}
-            inputMode={useCustomCalendar ? 'numeric' : undefined}
+            readOnly={useCustomCalendar || useCustomTimePicker}
+            inputMode={useCustomCalendar ? 'numeric' : useCustomTimePicker ? 'none' : undefined}
             pattern={useCustomCalendar ? '\\d{2}/\\d{2}/\\d{4}' : undefined}
             step={step}
-            type={useCustomCalendar ? 'text' : mode}
+            type={useCustomCalendar || useCustomTimePicker ? 'text' : mode}
             value={displayValue}
           />
           <label className="usis-date-time-picker__floating-label">{fieldLabel}</label>
@@ -452,6 +543,79 @@ export function UsisDateTimePicker({
               </div>,
             document.body,
           ) : null}
+          {useCustomTimePicker && isOpen && typeof document !== 'undefined'
+            ? createPortal(
+              <div
+                ref={popoverRef}
+                className="usis-calendar-popover usis-time-popover usis-calendar-popover--portal"
+                role="dialog"
+                aria-label={`${fieldLabel} time picker`}
+                style={{ left: `${popoverPosition.left}px`, top: `${popoverPosition.top}px` }}
+              >
+                <div className="usis-time-popover__header">
+                  <strong>{fieldLabel}</strong>
+                  <span>{selectedTimeLabel}</span>
+                </div>
+                <div className="usis-time-popover__body">
+                  <div className="usis-time-popover__group">
+                    <span className="usis-time-popover__group-label">Hour</span>
+                    <div className="usis-time-popover__chips">
+                      {HOURS_12.map((hour) => (
+                        <button
+                          key={hour}
+                          type="button"
+                          className={`usis-time-popover__chip${timeHour === hour ? ' is-selected' : ''}`}
+                          onClick={() => setTimeHour(hour)}
+                        >
+                          {String(hour).padStart(2, '0')}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="usis-time-popover__group">
+                    <span className="usis-time-popover__group-label">Minute</span>
+                    <div className="usis-time-popover__chips usis-time-popover__chips--minutes">
+                      {MINUTES.map((minute) => (
+                        <button
+                          key={minute}
+                          type="button"
+                          className={`usis-time-popover__chip${String(timeMinute).padStart(2, '0') === minute ? ' is-selected' : ''}`}
+                          onClick={() => setTimeMinute(Number(minute))}
+                        >
+                          {minute}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="usis-time-popover__period">
+                    <button
+                      type="button"
+                      className={`usis-time-popover__period-chip${timePeriod === 'am' ? ' is-selected' : ''}`}
+                      onClick={() => setTimePeriod('am')}
+                    >
+                      AM
+                    </button>
+                    <button
+                      type="button"
+                      className={`usis-time-popover__period-chip${timePeriod === 'pm' ? ' is-selected' : ''}`}
+                      onClick={() => setTimePeriod('pm')}
+                    >
+                      PM
+                    </button>
+                  </div>
+                </div>
+                <div className="usis-calendar-popover__actions">
+                  <button type="button" onClick={() => onChange('')}>
+                    Clear
+                  </button>
+                  <button type="button" onClick={() => commitTime()}>
+                    Set Time
+                  </button>
+                </div>
+              </div>,
+              document.body,
+            )
+            : null}
         </div>
       </label>
     </div>

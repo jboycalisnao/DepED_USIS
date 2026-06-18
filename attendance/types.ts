@@ -72,6 +72,7 @@ export interface AttendanceRecord {
   learnerId: string;
   type: AttendanceType;
   timestamp: string;
+  isLate?: boolean;
   synced?: boolean;
 }
 
@@ -131,6 +132,7 @@ export interface ScanResult {
   type: AttendanceType;
   time: string;
   uid: string;
+  isLate?: boolean;
   isDuplicate?: boolean;
 }
 
@@ -139,4 +141,40 @@ export interface SerialPort {
   close(): Promise<void>;
   readable: any;
   writable: any;
+}
+
+export interface AttendanceWindow {
+  start: string;
+  end: string;
+}
+
+export interface AttendanceGradeRules {
+  in: AttendanceWindow;
+  out?: AttendanceWindow;
+  lateAfter?: string;
+}
+
+export interface AttendanceScheduleConfig {
+  grade7To10: {
+    amIn: AttendanceGradeRules;
+    amOut: AttendanceGradeRules;
+    pmIn: AttendanceGradeRules;
+    pmOut: AttendanceGradeRules;
+  };
+  grade11: {
+    amIn: AttendanceGradeRules;
+    amOut: AttendanceGradeRules;
+  };
+  grade12: {
+    pmIn: AttendanceGradeRules;
+    pmOut: AttendanceGradeRules;
+  };
+}
+
+export interface AttendanceDecision {
+  type: AttendanceType;
+  isLate: boolean;
+  gradeBand: 'grade7To10' | 'grade11' | 'grade12';
+  label: string;
+  range: string;
 }

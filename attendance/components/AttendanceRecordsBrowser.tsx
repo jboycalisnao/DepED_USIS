@@ -576,7 +576,7 @@ const AttendanceRecordsBrowser: React.FC<Props> = ({
                                               <td>
                                                 <strong>{learner ? `${learner.last_name}, ${learner.first_name}` : record.learnerId}</strong>
                                               </td>
-                                              <td>{record.type.replace('_', ' ')}</td>
+                                              <td>{`${record.type.replace('_', ' ')}${record.isLate ? ' (Late)' : ''}`}</td>
                                               <td>{new Date(record.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</td>
                                               <td>
                                                 <span className={`attendance-records-page__sync-pill ${record.synced ? 'is-synced' : 'is-pending'}`}>

@@ -10,12 +10,35 @@ create index if not exists idx_registrar_learners_rfid
   on public.registrar_learners ((upper(trim(rfid))))
   where rfid is not null and trim(rfid) <> '';
 
+create table if not exists public.attendance_settings (
+  id smallint primary key default 1 check (id = 1),
+  selected_school_year_id text null references public.registrar_school_years(id) on update cascade on delete set null,
+  schedule_config jsonb not null default '{
+    "grade7To10": {
+      "amIn": { "in": { "start": "05:00", "end": "07:30" }, "lateAfter": "07:30" },
+      "amOut": { "in": { "start": "11:30", "end": "12:15" } },
+      "pmIn": { "in": { "start": "12:16", "end": "13:00" }, "lateAfter": "13:00" },
+      "pmOut": { "in": { "start": "17:00", "end": "19:00" } }
+    },
+    "grade11": {
+      "amIn": { "in": { "start": "05:00", "end": "07:00" }, "lateAfter": "07:00" },
+      "amOut": { "in": { "start": "12:00", "end": "23:59" } }
+    },
+    "grade12": {
+      "pmIn": { "in": { "start": "00:00", "end": "12:00" }, "lateAfter": "12:00" },
+      "pmOut": { "in": { "start": "17:00", "end": "23:59" } }
+    }
+  }'::jsonb,
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists public.attendance_records (
   id uuid primary key default gen_random_uuid(),
   learner_id uuid not null references public.registrar_learners(id) on update cascade on delete restrict,
   attendance_type text not null check (
     attendance_type in ('AM_IN', 'AM_OUT', 'PM_IN', 'PM_OUT', 'UNSCHEDULED')
   ),
+  is_late boolean not null default false,
   station_no smallint null,
   scanned_uid text null,
   logged_at timestamptz not null default now(),
@@ -45,6 +68,19 @@ alter table public.attendance_records
   alter column learner_id drop not null;
 
 alter table public.attendance_records
+  add column if not exists is_late boolean not null default false;
+
+alter table if exists public.attendance_settings
+  drop constraint if exists attendance_settings_selected_school_year_id_fkey;
+
+alter table if exists public.attendance_settings
+  alter column selected_school_year_id type text using selected_school_year_id::text;
+
+alter table if exists public.attendance_settings
+  add constraint attendance_settings_selected_school_year_id_fkey
+  foreign key (selected_school_year_id) references public.registrar_school_years(id) on update cascade on delete set null;
+
+alter table public.attendance_records
   alter column learner_id type uuid
   using (
     case
@@ -54,6 +90,38 @@ alter table public.attendance_records
       else null
     end
   );
+
+insert into public.attendance_settings (
+  id,
+  selected_school_year_id,
+  schedule_config,
+  updated_at
+)
+values (
+  1,
+  null,
+  '{
+    "grade7To10": {
+      "amIn": { "in": { "start": "05:00", "end": "07:30" }, "lateAfter": "07:30" },
+      "amOut": { "in": { "start": "11:30", "end": "12:15" } },
+      "pmIn": { "in": { "start": "12:16", "end": "13:00" }, "lateAfter": "13:00" },
+      "pmOut": { "in": { "start": "17:00", "end": "19:00" } }
+    },
+    "grade11": {
+      "amIn": { "in": { "start": "05:00", "end": "07:00" }, "lateAfter": "07:00" },
+      "amOut": { "in": { "start": "12:00", "end": "23:59" } }
+    },
+    "grade12": {
+      "pmIn": { "in": { "start": "00:00", "end": "12:00" }, "lateAfter": "12:00" },
+      "pmOut": { "in": { "start": "17:00", "end": "23:59" } }
+    }
+  }'::jsonb,
+  now()
+)
+on conflict (id) do update set
+  selected_school_year_id = excluded.selected_school_year_id,
+  schedule_config = excluded.schedule_config,
+  updated_at = now();
 
 delete from public.attendance_records
 where learner_id is null;

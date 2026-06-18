@@ -69,7 +69,9 @@ The attendance module keeps recent records in Supabase and archives older record
 
 ### Storage model
 
+- `attendance_settings` stores the singleton attendance policy row, including the selected school year and grade-based timing rules.
 - `attendance_records` remains the raw event source.
+- `attendance_records.is_late` marks late arrivals for the configured grade-based windows.
 - `attendance_daily_summary` and `attendance_monthly_summary` support historical reporting.
 - `attendance_archive_batches` stores archive batch metadata.
 - `attendance_archive_learner_summaries` stores learner-level archive summaries used by the learner portal.

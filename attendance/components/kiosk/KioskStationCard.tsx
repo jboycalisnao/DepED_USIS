@@ -61,6 +61,14 @@ const KioskStationCard: React.FC<KioskStationCardProps> = ({ index, result, unkn
                 <span className="text-[10px] font-bold leading-none text-[#123f9c]">
                   {result.learner.section_name}
                 </span>
+                {result.isLate ? (
+                  <>
+                    <span className="h-1.5 w-1.5 rounded-full bg-[#c9d2e4]" />
+                    <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[10px] font-bold leading-none text-amber-700">
+                      Late
+                    </span>
+                  </>
+                ) : null}
               </div>
             </div>
 

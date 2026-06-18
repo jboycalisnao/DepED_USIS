@@ -312,11 +312,12 @@ export const useAttendance = () => {
           Object.entries(nextUidMappings).map(([learnerId, uid]) => [learnerId, normalizeRfidValue(uid)])
         );
         const normalizedAdmins = nextAdminUids.map(uid => normalizeRfidValue(uid));
-        const normalizedLogs = nextAttendanceLogs.map((log: any) => ({
-          ...log,
-          id: log.id || generateRecordId(),
-          synced: !!log.synced
-        }));
+    const normalizedLogs = nextAttendanceLogs.map((log: any) => ({
+      ...log,
+      id: log.id || generateRecordId(),
+      isLate: !!log.isLate || !!log.is_late,
+      synced: !!log.synced
+    }));
 
         setUidMappings(normalizedMappings);
         setAdminUids(normalizedAdmins);
@@ -393,11 +394,12 @@ export const useAttendance = () => {
       return;
     }
 
-    const payload: Record<string, string> = {
+    const payload: Record<string, string | boolean> = {
       learner_id: record.learnerId,
       attendance_type: record.type,
       logged_at: record.timestamp,
       source,
+      is_late: !!record.isLate,
     };
 
     if (isUuid(record.id)) {
@@ -431,12 +433,13 @@ export const useAttendance = () => {
     }
   }, [persistAttendanceRecord]);
 
-  const logAttendance = (learnerId: string, type: AttendanceType) => {
+  const logAttendance = (learnerId: string, type: AttendanceType, isLate = false) => {
     const record: AttendanceRecord = {
       id: generateRecordId(),
       learnerId,
       type,
       timestamp: new Date().toISOString(),
+      isLate,
       synced: false
     };
 
@@ -465,6 +468,7 @@ export const useAttendance = () => {
           learnerId: normalizedLearnerId,
           type,
           timestamp: normalizedTimestamp,
+          isLate: false,
           synced: false,
         };
 

@@ -1,43 +1,138 @@
-
-import { useState, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '@deped-usis/shared-supabase';
-import { TimeSlotSettings } from '../types';
-import type { SchoolYearOption } from '../types';
+import type { AttendanceScheduleConfig, SchoolYearOption } from '../types';
+import { DEFAULT_ATTENDANCE_SCHEDULE } from '../utils/attendanceSchedule';
 
-const DEFAULT_SETTINGS: TimeSlotSettings = {
-  amIn: { start: '06:00', end: '10:00' },
-  amOut: { start: '10:01', end: '12:30' },
-  pmIn: { start: '12:31', end: '15:00' },
-  pmOut: { start: '15:01', end: '19:00' },
+type AttendanceSettingsRow = {
+  id: number;
+  selected_school_year_id: string | null;
+  schedule_config: AttendanceScheduleConfig | null;
+};
+
+const SETTINGS_ROW_ID = 1;
+const CACHE_KEY = 'attendance_settings_cache';
+const SELECTED_SCHOOL_YEAR_CACHE_KEY = 'attendance_school_year_id';
+
+const readCachedSchedule = (): AttendanceScheduleConfig => {
+  if (typeof window === 'undefined') return DEFAULT_ATTENDANCE_SCHEDULE;
+
+  const raw = window.localStorage.getItem(CACHE_KEY);
+  if (!raw) return DEFAULT_ATTENDANCE_SCHEDULE;
+
+  try {
+    const parsed = JSON.parse(raw) as Partial<AttendanceScheduleConfig>;
+    return {
+      grade7To10: parsed.grade7To10 || DEFAULT_ATTENDANCE_SCHEDULE.grade7To10,
+      grade11: parsed.grade11 || DEFAULT_ATTENDANCE_SCHEDULE.grade11,
+      grade12: parsed.grade12 || DEFAULT_ATTENDANCE_SCHEDULE.grade12,
+    };
+  } catch {
+    return DEFAULT_ATTENDANCE_SCHEDULE;
+  }
+};
+
+const readCachedSchoolYearId = () => {
+  if (typeof window === 'undefined') return '';
+  return window.localStorage.getItem(SELECTED_SCHOOL_YEAR_CACHE_KEY) || '';
+};
+
+const getActiveSchoolYearId = (schoolYears: SchoolYearOption[]) => {
+  const active = schoolYears.find((schoolYear) => schoolYear.is_active);
+  return active?.id || schoolYears[0]?.id || '';
 };
 
 export const useSettings = () => {
-  const [settings, setSettings] = useState<TimeSlotSettings>(() => {
-    const saved = localStorage.getItem('time_slot_settings');
-    if (!saved) return DEFAULT_SETTINGS;
-    try {
-      const parsed = JSON.parse(saved) as Partial<TimeSlotSettings>;
-      return {
-        amIn: parsed.amIn || DEFAULT_SETTINGS.amIn,
-        amOut: parsed.amOut || DEFAULT_SETTINGS.amOut,
-        pmIn: parsed.pmIn || DEFAULT_SETTINGS.pmIn,
-        pmOut: parsed.pmOut || DEFAULT_SETTINGS.pmOut,
-      };
-    } catch {
-      return DEFAULT_SETTINGS;
-    }
-  });
+  const [scheduleConfig, setScheduleConfig] = useState<AttendanceScheduleConfig>(() => readCachedSchedule());
   const [schoolYears, setSchoolYears] = useState<SchoolYearOption[]>([]);
-  const [selectedSchoolYearId, setSelectedSchoolYearId] = useState<string>(() => localStorage.getItem('attendance_school_year_id') || '');
+  const [selectedSchoolYearId, setSelectedSchoolYearId] = useState<string>(() => readCachedSchoolYearId());
   const [isSchoolYearsLoading, setIsSchoolYearsLoading] = useState(true);
+  const [isSettingsLoading, setIsSettingsLoading] = useState(true);
+  const [isSettingsSaving, setIsSettingsSaving] = useState(false);
+  const [settingsError, setSettingsError] = useState<string | null>(null);
+  const [hasLoadedSettings, setHasLoadedSettings] = useState(false);
+  const [hasLoadedSchoolYears, setHasLoadedSchoolYears] = useState(false);
 
   useEffect(() => {
-    localStorage.setItem('time_slot_settings', JSON.stringify(settings));
-  }, [settings]);
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(CACHE_KEY, JSON.stringify(scheduleConfig));
+  }, [scheduleConfig]);
 
   useEffect(() => {
-    localStorage.setItem('attendance_school_year_id', selectedSchoolYearId);
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(SELECTED_SCHOOL_YEAR_CACHE_KEY, selectedSchoolYearId);
   }, [selectedSchoolYearId]);
+
+  const persistSettings = useCallback(
+    async (nextSchedule: AttendanceScheduleConfig, nextSchoolYearId: string) => {
+      setIsSettingsSaving(true);
+      try {
+        const { error } = await supabase.from('attendance_settings').upsert(
+          {
+            id: SETTINGS_ROW_ID,
+            selected_school_year_id: nextSchoolYearId || null,
+            schedule_config: nextSchedule,
+            updated_at: new Date().toISOString(),
+          } satisfies AttendanceSettingsRow & { updated_at: string },
+          { onConflict: 'id' },
+        );
+
+        if (error) throw error;
+        setSettingsError(null);
+      } catch (error: any) {
+        console.error('Failed to save attendance settings:', error);
+        setSettingsError(error?.message || 'Failed to save attendance settings.');
+      } finally {
+        setIsSettingsSaving(false);
+      }
+    },
+    [],
+  );
+
+  useEffect(() => {
+    let active = true;
+
+    const loadSettings = async () => {
+      setIsSettingsLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('attendance_settings')
+          .select('id,selected_school_year_id,schedule_config')
+          .eq('id', SETTINGS_ROW_ID)
+          .maybeSingle();
+
+        if (error) throw error;
+        if (!active) return;
+
+        const row = (data as AttendanceSettingsRow | null) || null;
+        if (row?.schedule_config) {
+          setScheduleConfig({
+            grade7To10: row.schedule_config.grade7To10 || DEFAULT_ATTENDANCE_SCHEDULE.grade7To10,
+            grade11: row.schedule_config.grade11 || DEFAULT_ATTENDANCE_SCHEDULE.grade11,
+            grade12: row.schedule_config.grade12 || DEFAULT_ATTENDANCE_SCHEDULE.grade12,
+          });
+        }
+
+        if (row?.selected_school_year_id) {
+          setSelectedSchoolYearId(row.selected_school_year_id);
+        }
+
+        setHasLoadedSettings(true);
+      } catch (error: any) {
+        console.error('Failed to load attendance settings:', error);
+        if (active) {
+          setSettingsError(error?.message || 'Failed to load attendance settings.');
+        }
+      } finally {
+        if (active) setIsSettingsLoading(false);
+      }
+    };
+
+    void loadSettings();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -63,17 +158,22 @@ export const useSettings = () => {
 
         setSchoolYears(nextSchoolYears);
 
-        const activeSchoolYear = nextSchoolYears.find((schoolYear) => schoolYear.is_active) || nextSchoolYears[0] || null;
-        const savedSchoolYearId = localStorage.getItem('attendance_school_year_id') || '';
-        const nextSelectedSchoolYearId = nextSchoolYears.some((schoolYear) => schoolYear.id === savedSchoolYearId)
-          ? savedSchoolYearId
-          : activeSchoolYear?.id || '';
-
-        setSelectedSchoolYearId(nextSelectedSchoolYearId);
-      } catch (error) {
+        const fallbackSchoolYearId = getActiveSchoolYearId(nextSchoolYears);
+        setSelectedSchoolYearId((current) => {
+          const trimmedCurrent = String(current || '').trim();
+          if (!trimmedCurrent) return fallbackSchoolYearId;
+          if (!nextSchoolYears.some((schoolYear) => schoolYear.id === trimmedCurrent)) {
+            return fallbackSchoolYearId;
+          }
+          return trimmedCurrent;
+        });
+        setHasLoadedSchoolYears(true);
+      } catch (error: any) {
         if (!active) return;
         console.error('Failed to load attendance school years:', error);
+        setSettingsError(error?.message || 'Failed to load attendance school years.');
         setSchoolYears([]);
+        setHasLoadedSchoolYears(true);
       } finally {
         if (active) setIsSchoolYearsLoading(false);
       }
@@ -86,22 +186,35 @@ export const useSettings = () => {
     };
   }, []);
 
+  useEffect(() => {
+    if (!hasLoadedSettings || !hasLoadedSchoolYears) return;
+    void persistSettings(scheduleConfig, selectedSchoolYearId);
+  }, [hasLoadedSettings, hasLoadedSchoolYears, persistSettings, scheduleConfig, selectedSchoolYearId]);
+
   const activeSchoolYear = useMemo(
     () => schoolYears.find((schoolYear) => schoolYear.is_active) || schoolYears[0] || null,
     [schoolYears],
   );
 
-  const updateSettings = (newSettings: TimeSlotSettings) => {
-    setSettings(newSettings);
+  const updateSettings = (nextSettings: AttendanceScheduleConfig) => {
+    setScheduleConfig(nextSettings);
+  };
+
+  const updateSelectedSchoolYearId = (schoolYearId: string) => {
+    setSelectedSchoolYearId(schoolYearId);
   };
 
   return {
     activeSchoolYear,
     isSchoolYearsLoading,
+    isSettingsLoading,
+    isSettingsSaving,
     schoolYears,
     selectedSchoolYearId,
-    setSelectedSchoolYearId,
-    settings,
+    setSelectedSchoolYearId: updateSelectedSchoolYearId,
+    scheduleConfig,
+    settingsError,
+    settings: scheduleConfig,
     updateSettings,
   };
 };
