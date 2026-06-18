@@ -14,6 +14,7 @@ import UsisPageLoader from '../../../../../common/components/UsisPageLoader';
 import { getStoredIntegratedAdminAccess } from '../../../auth/services/integratedAdminAccess';
 import { TeachingNonTeachingBulkEditModal } from '../teaching-non-teaching/components/TeachingNonTeachingBulkEditModal';
 import { TeachingNonTeachingCredentialFormModal } from '../teaching-non-teaching/components/TeachingNonTeachingCredentialFormModal';
+import { TeachingNonTeachingCredentialPrintModal } from '../teaching-non-teaching/components/TeachingNonTeachingCredentialPrintModal';
 import { TeachingNonTeachingModuleAccessModal } from '../teaching-non-teaching/components/TeachingNonTeachingModuleAccessModal';
 import { TeachingNonTeachingSelectionToolbar } from '../teaching-non-teaching/components/TeachingNonTeachingSelectionToolbar';
 import {
@@ -26,6 +27,7 @@ import {
   type TeachingNonTeachingCredentialRecord,
 } from '../teaching-non-teaching/services/teachingNonTeachingCredentialsService';
 import { TeachingNonTeachingCredentialList } from '../teaching-non-teaching/components/TeachingNonTeachingCredentialList';
+import { openTeachingNonTeachingCredentialsPrintWindow } from '../teaching-non-teaching/utils/teachingNonTeachingCredentialPrint';
 import type { TeachingNonTeachingBulkImportResult } from '../teaching-non-teaching/utils/teachingNonTeachingCredentialWorkbook';
 import type { PersonnelType, SaveTeachingNonTeachingCredentialInput } from '../teaching-non-teaching/services/teachingNonTeachingCredentialsService';
 import { useTeachingNonTeachingSelection } from '../teaching-non-teaching/hooks/useTeachingNonTeachingSelection';
@@ -45,6 +47,9 @@ export function TeachingNonTeachingCredentialsPage() {
   const [bulkModuleAccessOpen, setBulkModuleAccessOpen] = useState(false);
   const [bulkEditOpen, setBulkEditOpen] = useState(false);
   const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
+  const [printModalOpen, setPrintModalOpen] = useState(false);
+  const [printScope, setPrintScope] = useState<'all' | 'department'>('all');
+  const [printDepartmentId, setPrintDepartmentId] = useState('');
   const [isRefreshingCoordinatorList, setIsRefreshingCoordinatorList] = useState(false);
   const [moduleSelections, setModuleSelections] = useState<UsisModuleKey[]>([]);
   const [iaPageSelections, setIaPageSelections] = useState<string[]>([]);
@@ -65,6 +70,43 @@ export function TeachingNonTeachingCredentialsPage() {
   const allowedIaPageKeys = useMemo(() => new Set(iaPageOptions.map((option) => option.key)), [iaPageOptions]);
   const normalizeIaPageSelections = (pageKeys: string[]) =>
     pageKeys.filter((pageKey) => allowedIaPageKeys.has(pageKey));
+  const printDepartmentOptions = useMemo(() => {
+    const options = departments
+      .filter((department) => department.id || department.name)
+      .map((department) => ({
+        label: department.name,
+        value: department.id,
+      }))
+      .sort((left, right) => left.label.localeCompare(right.label, undefined, { sensitivity: 'base', numeric: true }));
+
+    const hasUnassignedRows = rows.some((row) => !row.departmentId || row.departmentName === 'Not Set');
+    if (hasUnassignedRows) {
+      options.unshift({
+        label: 'Not Set / Unassigned',
+        value: '__unassigned__',
+      });
+    }
+
+    return options;
+  }, [departments, rows]);
+
+  const resolvePrintableRows = () => {
+    if (printScope === 'department') {
+      return rows.filter((row) => {
+        if (printDepartmentId === '__unassigned__') {
+          return !row.departmentId || row.departmentName === 'Not Set';
+        }
+        return row.departmentId === printDepartmentId;
+      });
+    }
+    return rows;
+  };
+
+  const openPrintModal = () => {
+    setPrintScope('all');
+    setPrintDepartmentId(printDepartmentOptions[0]?.value || '');
+    setPrintModalOpen(true);
+  };
 
   const refresh = async () => {
     if (!schoolCode) {
@@ -240,6 +282,43 @@ export function TeachingNonTeachingCredentialsPage() {
     }
   };
 
+  const handlePrintCredentials = () => {
+    const printableRows = resolvePrintableRows();
+    if (printScope === 'department' && !printDepartmentId) {
+      setStatusAlert({
+        title: 'Select Department',
+        message: 'Choose a department before printing the selected department credentials.',
+        tone: 'warning',
+      });
+      return;
+    }
+    if (printScope === 'department' && printableRows.length === 0) {
+      setStatusAlert({
+        title: 'No Records Found',
+        message: 'No credentials were found for the selected department.',
+        tone: 'warning',
+      });
+      return;
+    }
+
+    setActionLoadingMessage('Preparing print preview...');
+    const ok = openTeachingNonTeachingCredentialsPrintWindow({
+      departmentLabel: printDepartmentOptions.find((department) => department.value === printDepartmentId)?.label,
+      rows: printableRows,
+      scope: printScope,
+    });
+    setActionLoadingMessage('');
+    if (!ok) {
+      setStatusAlert({
+        title: 'Popup Blocked',
+        message: 'Allow popups for this site to print the credentials list.',
+        tone: 'warning',
+      });
+      return;
+    }
+    setPrintModalOpen(false);
+  };
+
   if (isLoading) {
     return <UsisPageLoader message="Loading teaching and non-teaching credentials..." />;
   }
@@ -263,6 +342,14 @@ export function TeachingNonTeachingCredentialsPage() {
                 </div>
               </label>
               <div className="registry-toolbar__actions">
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={openPrintModal}
+                  disabled={rows.length === 0}
+                >
+                  Print Credentials
+                </button>
                 <button
                   type="button"
                   className="secondary-button"
@@ -535,6 +622,24 @@ export function TeachingNonTeachingCredentialsPage() {
           }}
         />
       ) : null}
+
+      <TeachingNonTeachingCredentialPrintModal
+        departmentOptions={printDepartmentOptions}
+        isOpen={printModalOpen}
+        isPrinting={actionLoadingMessage === 'Preparing print preview...'}
+        onClose={() => setPrintModalOpen(false)}
+        onDepartmentChange={(value) => setPrintDepartmentId(value)}
+        onPrint={handlePrintCredentials}
+        onScopeChange={(value) => {
+          setPrintScope(value);
+          if (value === 'department' && !printDepartmentId) {
+            setPrintDepartmentId(printDepartmentOptions[0]?.value || '');
+          }
+        }}
+        printScope={printScope}
+        selectedDepartmentId={printDepartmentId}
+        totalCount={resolvePrintableRows().length}
+      />
 
       {bulkEditOpen && selectedRows.length > 0 ? (
         <TeachingNonTeachingBulkEditModal

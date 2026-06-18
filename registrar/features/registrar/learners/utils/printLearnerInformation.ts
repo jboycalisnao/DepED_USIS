@@ -1,10 +1,17 @@
 import { Section, Student } from '../../../../types';
-const USIS_SEAL_SRC = new URL('../../../../../common/assets/USIS_Icon.png', import.meta.url).href;
+import { supabase } from '../../../../lib/supabase';
+import { buildLNHSPrintSheetHeader } from '../../shared/printSheetHeader';
 
 type PrintLearnerInformationPayload = {
   learners: Student[];
   schoolYearLabel: string;
   sections: Section[];
+};
+
+type VerificationCardData = {
+  documentNo: string;
+  verificationUrl: string;
+  qrDataUrl: string;
 };
 
 const escapeHtml = (value: string) =>
@@ -34,12 +41,31 @@ const pickLearnerField = (learner: Student, keys: string[]) => {
   return firstNonEmpty(keys.map((key) => row[key]));
 };
 
-const pickFromSubmissionPayload = (learner: Student, keys: string[]) => {
-  const records = Array.isArray(learner.enrollments) ? [...learner.enrollments] : [];
-  const snapshotCarrier = records.reverse().find((record: any) => record && typeof record === 'object' && record.submissionPayload);
-  const payload = (snapshotCarrier as any)?.submissionPayload as Record<string, unknown> | undefined;
-  if (!payload) return '';
-  return firstNonEmpty(keys.map((key) => payload[key]));
+const fetchLatestSubmissionPayload = async (learner: Student) => {
+  const learnerId = toText(learner.id);
+  if (!learnerId) return null;
+
+  const { data, error } = await supabase
+    .from('registrar_learners')
+    .select('enrollment_history,enrollments')
+    .eq('id', learnerId)
+    .maybeSingle();
+
+  if (error || !data) return null;
+
+  const historySources = [
+    ...(Array.isArray((data as any).enrollment_history) ? (data as any).enrollment_history : []),
+    ...(Array.isArray((data as any).enrollments) ? (data as any).enrollments : []),
+  ];
+
+  const latestWithPayload = historySources
+    .slice()
+    .reverse()
+    .find((entry: any) => entry && typeof entry === 'object' && (entry.submissionPayload || entry.submission_payload));
+
+  return (latestWithPayload?.submissionPayload || latestWithPayload?.submission_payload || null) as
+    | Record<string, unknown>
+    | null;
 };
 
 const resolveSectionLabel = (learner: Student, sections: Section[]) => {
@@ -64,78 +90,72 @@ const yesNoText = (value: unknown) => {
   return 'N/A';
 };
 
-const buildSheetHeader = (logoSrc: string, pageNumber: number, totalPages: number, titleSuffix = '') => `
-  <table class="meta-header">
-    <tr>
-      <td class="logo-cell" rowspan="2">
-        <img
-          src="${logoSrc}"
-          alt="USIS Seal"
-          onerror="this.style.display='none';"
-        />
-      </td>
-      <td class="title-cell" rowspan="2">
-        <div class="title-main">LEON NATIONAL HIGH SCHOOL</div>
-        <div class="title-sub">USIS LEARNER INFORMATION SHEET${titleSuffix}</div>
-      </td>
-      <td class="docs-cell" rowspan="2">
-        <table class="docs-table">
-          <tr><td>Document No.</td><td>LNHS-REG-USIS-F01</td></tr>
-          <tr><td>Issue No.</td><td>1</td></tr>
-          <tr><td>Revision No.</td><td>1</td></tr>
-          <tr><td>Date of Effectivity</td><td>June 8, 2026</td></tr>
-          <tr><td>Issued by</td><td>Registrar</td></tr>
-          <tr><td>Page No.</td><td>Page ${pageNumber} of ${totalPages}</td></tr>
-        </table>
-      </td>
-    </tr>
-    <tr></tr>
-  </table>
-`;
+const buildVerificationUrl = (learner: Student) => {
+  const url = new URL('/verify-document', window.location.origin);
+  url.searchParams.set('doc', 'LNHS-REG-USIS-F01');
+  url.searchParams.set('learnerId', learner.id);
+  url.searchParams.set('lrn', learner.lrn);
+  return url.toString();
+};
 
-const buildPrintHtml = ({ learners, schoolYearLabel, sections }: PrintLearnerInformationPayload) => {
-  const logoSrc = USIS_SEAL_SRC;
+const buildVerificationCard = async (learner: Student): Promise<VerificationCardData> => {
+  const { default: QRCode } = await import('qrcode');
+  const verificationUrl = buildVerificationUrl(learner);
+  const qrDataUrl = await QRCode.toDataURL(verificationUrl, {
+    errorCorrectionLevel: 'M',
+    margin: 1,
+    width: 240,
+  });
+  return {
+    documentNo: 'LNHS-REG-USIS-F01',
+    qrDataUrl,
+    verificationUrl,
+  };
+};
+
+const buildPrintHtml = async ({ learners, schoolYearLabel, sections }: PrintLearnerInformationPayload) => {
   const sorted = [...learners].sort((a, b) =>
     `${a.lastName}, ${a.firstName}`.toUpperCase().localeCompare(`${b.lastName}, ${b.firstName}`.toUpperCase()),
   );
 
-  const pagesHtml = sorted
-    .map((learner) => {
+  const pagesHtml = (await Promise.all(sorted.map(async (learner) => {
+      const latestSubmissionPayload = await fetchLatestSubmissionPayload(learner);
       const fullName = `${learner.lastName}, ${learner.firstName}${learner.middleName ? ` ${learner.middleName}` : ''}`.trim();
       const grade = resolveGradeLabel(learner, sections);
       const section = resolveSectionLabel(learner, sections);
       const latestEnrollment = learner.enrollments?.[0];
-      const studentType = firstNonEmpty([pickLearnerField(learner, ['studentType', 'student_type']), pickFromSubmissionPayload(learner, ['studentType'])]);
-      const learnerCategory = firstNonEmpty([pickLearnerField(learner, ['learnerCategory', 'learner_category']), pickFromSubmissionPayload(learner, ['learnerCategory'])]);
-      const schoolToEnroll = firstNonEmpty([pickLearnerField(learner, ['schoolToEnroll', 'school_to_enroll']), pickFromSubmissionPayload(learner, ['schoolToEnroll'])]);
-      const schoolId = firstNonEmpty([pickLearnerField(learner, ['schoolId', 'school_id']), pickFromSubmissionPayload(learner, ['schoolId'])]);
-      const previousSchool = firstNonEmpty([pickLearnerField(learner, ['previousSchool', 'previous_school']), pickFromSubmissionPayload(learner, ['previousSchool'])]);
-      const previousSchoolYear = firstNonEmpty([pickLearnerField(learner, ['previousSchoolYear', 'previous_school_year']), pickFromSubmissionPayload(learner, ['previousSchoolYear'])]);
-      const lastGradeLevel = firstNonEmpty([pickLearnerField(learner, ['lastGradeLevel', 'last_grade_level']), pickFromSubmissionPayload(learner, ['lastGradeLevel'])]);
-      const strand = firstNonEmpty([pickLearnerField(learner, ['strand']), pickFromSubmissionPayload(learner, ['strand'])]);
-      const semester = firstNonEmpty([pickLearnerField(learner, ['semester']), pickFromSubmissionPayload(learner, ['semester'])]);
+      const studentType = firstNonEmpty([pickLearnerField(learner, ['studentType', 'student_type']), latestSubmissionPayload && firstNonEmpty([latestSubmissionPayload.studentType, latestSubmissionPayload.student_type])]);
+      const learnerCategory = firstNonEmpty([pickLearnerField(learner, ['learnerCategory', 'learner_category']), latestSubmissionPayload && firstNonEmpty([latestSubmissionPayload.learnerCategory, latestSubmissionPayload.learner_category])]);
+      const schoolToEnroll = firstNonEmpty([pickLearnerField(learner, ['schoolToEnroll', 'school_to_enroll']), latestSubmissionPayload && firstNonEmpty([latestSubmissionPayload.schoolToEnroll, latestSubmissionPayload.school_to_enroll])]);
+      const schoolId = firstNonEmpty([pickLearnerField(learner, ['schoolId', 'school_id']), latestSubmissionPayload && firstNonEmpty([latestSubmissionPayload.schoolId, latestSubmissionPayload.school_id])]);
+      const previousSchool = firstNonEmpty([pickLearnerField(learner, ['previousSchool', 'previous_school']), latestSubmissionPayload && firstNonEmpty([latestSubmissionPayload.previousSchool, latestSubmissionPayload.previous_school])]);
+      const previousSchoolYear = firstNonEmpty([pickLearnerField(learner, ['previousSchoolYear', 'previous_school_year']), latestSubmissionPayload && firstNonEmpty([latestSubmissionPayload.previousSchoolYear, latestSubmissionPayload.previous_school_year])]);
+      const lastGradeLevel = firstNonEmpty([pickLearnerField(learner, ['lastGradeLevel', 'last_grade_level']), latestSubmissionPayload && firstNonEmpty([latestSubmissionPayload.lastGradeLevel, latestSubmissionPayload.last_grade_level])]);
+      const strand = firstNonEmpty([pickLearnerField(learner, ['strand']), latestSubmissionPayload && firstNonEmpty([latestSubmissionPayload.strand])]);
+      const semester = firstNonEmpty([pickLearnerField(learner, ['semester']), latestSubmissionPayload && firstNonEmpty([latestSubmissionPayload.semester])]);
 
-      const birthCertificateNo = firstNonEmpty([pickLearnerField(learner, ['birthCertificateNo', 'birth_certificate_no']), pickFromSubmissionPayload(learner, ['birthCertificateNo'])]);
-      const extensionName = firstNonEmpty([pickLearnerField(learner, ['extensionName', 'extension_name']), pickFromSubmissionPayload(learner, ['extensionName'])]);
-      const placeOfBirth = firstNonEmpty([pickLearnerField(learner, ['placeOfBirth', 'place_of_birth']), pickFromSubmissionPayload(learner, ['placeOfBirth'])]);
-      const motherTongue = firstNonEmpty([pickLearnerField(learner, ['motherTongue', 'mother_tongue']), pickFromSubmissionPayload(learner, ['motherTongue'])]);
-      const religion = firstNonEmpty([pickLearnerField(learner, ['religion']), pickFromSubmissionPayload(learner, ['religion'])]);
-      const fourPsHouseholdId = firstNonEmpty([pickLearnerField(learner, ['fourPsHouseholdId', 'four_ps_household_id']), pickFromSubmissionPayload(learner, ['fourPsHouseholdId'])]);
+      const birthCertificateNo = firstNonEmpty([pickLearnerField(learner, ['birthCertificateNo', 'birth_certificate_no']), latestSubmissionPayload && firstNonEmpty([latestSubmissionPayload.birthCertificateNo])]);
+      const extensionName = firstNonEmpty([pickLearnerField(learner, ['extensionName', 'extension_name']), latestSubmissionPayload && firstNonEmpty([latestSubmissionPayload.extensionName])]);
+      const placeOfBirth = firstNonEmpty([pickLearnerField(learner, ['placeOfBirth', 'place_of_birth']), latestSubmissionPayload && firstNonEmpty([latestSubmissionPayload.placeOfBirth])]);
+      const motherTongue = firstNonEmpty([pickLearnerField(learner, ['motherTongue', 'mother_tongue']), latestSubmissionPayload && firstNonEmpty([latestSubmissionPayload.motherTongue])]);
+      const religion = firstNonEmpty([pickLearnerField(learner, ['religion']), latestSubmissionPayload && firstNonEmpty([latestSubmissionPayload.religion])]);
+      const fourPsHouseholdId = firstNonEmpty([pickLearnerField(learner, ['fourPsHouseholdId', 'four_ps_household_id']), latestSubmissionPayload && firstNonEmpty([latestSubmissionPayload.fourPsHouseholdId])]);
 
-      const permanentAddress = firstNonEmpty([pickLearnerField(learner, ['permanentAddress', 'permanent_address']), pickFromSubmissionPayload(learner, ['permanentAddress'])]);
-      const currentAddress = firstNonEmpty([pickLearnerField(learner, ['currentAddress', 'current_address', 'address']), pickFromSubmissionPayload(learner, ['currentAddress'])]);
+      const permanentAddress = firstNonEmpty([pickLearnerField(learner, ['permanentAddress', 'permanent_address']), latestSubmissionPayload && firstNonEmpty([latestSubmissionPayload.permanentAddress])]);
+      const currentAddress = firstNonEmpty([pickLearnerField(learner, ['currentAddress', 'current_address', 'address']), latestSubmissionPayload && firstNonEmpty([latestSubmissionPayload.currentAddress, latestSubmissionPayload.address])]);
 
-      const fatherName = firstNonEmpty([pickLearnerField(learner, ['fatherName', 'father_name']), pickFromSubmissionPayload(learner, ['fatherName'])]);
-      const fatherContact = firstNonEmpty([pickLearnerField(learner, ['fatherContact', 'father_contact']), pickFromSubmissionPayload(learner, ['fatherContact'])]);
-      const motherName = firstNonEmpty([pickLearnerField(learner, ['motherName', 'mother_name']), pickFromSubmissionPayload(learner, ['motherName'])]);
-      const motherContact = firstNonEmpty([pickLearnerField(learner, ['motherContact', 'mother_contact']), pickFromSubmissionPayload(learner, ['motherContact'])]);
-      const guardianName = firstNonEmpty([pickLearnerField(learner, ['guardianName', 'guardian_name']), pickFromSubmissionPayload(learner, ['guardianName'])]);
-      const guardianContact = firstNonEmpty([pickLearnerField(learner, ['guardianContact', 'guardian_contact', 'contactNumber', 'contact_number']), pickFromSubmissionPayload(learner, ['guardianContact'])]);
+      const fatherName = firstNonEmpty([pickLearnerField(learner, ['fatherName', 'father_name']), latestSubmissionPayload && firstNonEmpty([latestSubmissionPayload.fatherName, latestSubmissionPayload.father_name])]);
+      const fatherContact = firstNonEmpty([pickLearnerField(learner, ['fatherContact', 'father_contact']), latestSubmissionPayload && firstNonEmpty([latestSubmissionPayload.fatherContact, latestSubmissionPayload.father_contact])]);
+      const motherName = firstNonEmpty([pickLearnerField(learner, ['motherName', 'mother_name']), latestSubmissionPayload && firstNonEmpty([latestSubmissionPayload.motherName, latestSubmissionPayload.mother_name])]);
+      const motherContact = firstNonEmpty([pickLearnerField(learner, ['motherContact', 'mother_contact']), latestSubmissionPayload && firstNonEmpty([latestSubmissionPayload.motherContact, latestSubmissionPayload.mother_contact])]);
+      const guardianName = firstNonEmpty([pickLearnerField(learner, ['guardianName', 'guardian_name']), latestSubmissionPayload && firstNonEmpty([latestSubmissionPayload.guardianName, latestSubmissionPayload.guardian_name])]);
+      const guardianContact = firstNonEmpty([pickLearnerField(learner, ['guardianContact', 'guardian_contact', 'contactNumber', 'contact_number']), latestSubmissionPayload && firstNonEmpty([latestSubmissionPayload.guardianContact, latestSubmissionPayload.guardian_contact])]);
 
-      const hasSpedNeed = firstNonEmpty([pickLearnerField(learner, ['hasSpedNeed', 'has_sped_need']), pickFromSubmissionPayload(learner, ['hasSpedNeed'])]);
-      const preferredModality = firstNonEmpty([pickLearnerField(learner, ['preferredModality', 'preferred_modality']), pickFromSubmissionPayload(learner, ['preferredModality'])]);
-      const deviceAccess = firstNonEmpty([pickLearnerField(learner, ['deviceAccess', 'device_access']), pickFromSubmissionPayload(learner, ['deviceAccess'])]);
-      const hasInternet = firstNonEmpty([pickLearnerField(learner, ['hasInternet', 'has_internet']), pickFromSubmissionPayload(learner, ['hasInternet'])]);
+      const hasSpedNeed = firstNonEmpty([pickLearnerField(learner, ['hasSpedNeed', 'has_sped_need']), latestSubmissionPayload && firstNonEmpty([latestSubmissionPayload.hasSpedNeed, latestSubmissionPayload.has_sped_need])]);
+      const preferredModality = firstNonEmpty([pickLearnerField(learner, ['preferredModality', 'preferred_modality']), latestSubmissionPayload && firstNonEmpty([latestSubmissionPayload.preferredModality, latestSubmissionPayload.preferred_modality])]);
+      const deviceAccess = firstNonEmpty([pickLearnerField(learner, ['deviceAccess', 'device_access']), latestSubmissionPayload && firstNonEmpty([latestSubmissionPayload.deviceAccess, latestSubmissionPayload.device_access])]);
+      const hasInternet = firstNonEmpty([pickLearnerField(learner, ['hasInternet', 'has_internet']), latestSubmissionPayload && firstNonEmpty([latestSubmissionPayload.hasInternet, latestSubmissionPayload.has_internet])]);
+      const verificationCard = await buildVerificationCard(learner);
 
       const enrollmentHistoryRows = (learner.enrollments || [])
         .map(
@@ -153,7 +173,7 @@ const buildPrintHtml = ({ learners, schoolYearLabel, sections }: PrintLearnerInf
 
       return `
         <article class="sheet">
-          ${buildSheetHeader(logoSrc, 1, 2)}
+          ${buildLNHSPrintSheetHeader({ documentNo: 'LNHS-REG-USIS-F01', pageNumber: 1, titleText: 'USIS Learner Information Sheet', totalPages: 2 })}
           <div class="sheet-meta">
             <span>School Year: ${escapeHtml(schoolYearLabel)}</span>
             <span>Record Generated: ${escapeHtml(new Date().toLocaleString())}</span>
@@ -235,7 +255,7 @@ const buildPrintHtml = ({ learners, schoolYearLabel, sections }: PrintLearnerInf
         </article>
 
         <article class="sheet">
-          ${buildSheetHeader(logoSrc, 2, 2, ' - CONTINUATION')}
+          ${buildLNHSPrintSheetHeader({ documentNo: 'LNHS-REG-USIS-F01', pageNumber: 2, titleText: 'USIS Learner Information Sheet', titleSuffix: ' - CONTINUATION', totalPages: 2 })}
           <div class="sheet-meta">
             <span>School Year: ${escapeHtml(schoolYearLabel)}</span>
             <span>Record Generated: ${escapeHtml(new Date().toLocaleString())}</span>
@@ -264,10 +284,26 @@ const buildPrintHtml = ({ learners, schoolYearLabel, sections }: PrintLearnerInf
               </tbody>
             </table>
           </section>
+
+          <section class="verification-card">
+            <div class="verification-card__copy">
+              <h3>8. Document Verification</h3>
+              <p>This QR code opens the public verification page for this learner information sheet.</p>
+              <div class="verification-card__meta">
+                <div><strong>Document No.:</strong> ${escapeHtml(verificationCard.documentNo)}</div>
+                <div><strong>Learner ID:</strong> ${escapeHtml(fullName)}</div>
+                <div><strong>LRN:</strong> ${escapeHtml(toText(learner.lrn))}</div>
+              </div>
+              <p class="verification-card__url">${escapeHtml(verificationCard.verificationUrl)}</p>
+            </div>
+            <div class="verification-card__qr">
+              <img src="${verificationCard.qrDataUrl}" alt="Verification QR Code" />
+              <span>Scan to verify</span>
+            </div>
+          </section>
         </article>
       `;
-    })
-    .join('');
+    }))).join('');
 
   return `
     <!doctype html>
@@ -305,11 +341,13 @@ const buildPrintHtml = ({ learners, schoolYearLabel, sections }: PrintLearnerInf
           .docs-table { width: 100%; border-collapse: collapse; }
           .docs-table td {
             border: 1px solid #111;
-            padding: 2px 6px;
+            padding: 3px 5px;
             font-family: "Bookman Old Style", "Book Antiqua", serif;
-            font-size: 11px;
+            font-size: 10px;
+            line-height: 1.15;
             text-align: center;
-            white-space: nowrap;
+            white-space: normal;
+            word-break: break-word;
           }
           .docs-table td:first-child { width: 58%; font-weight: 400; }
           .docs-table td:last-child { font-weight: 700; }
@@ -328,6 +366,55 @@ const buildPrintHtml = ({ learners, schoolYearLabel, sections }: PrintLearnerInf
           .history th { background: #f2f5fa; font-weight: 700; font-size: 10px; }
           .history tbody tr:nth-child(even) { background: #fafbfc; }
           .history td:last-child, .history th:last-child { text-align: center; width: 80px; }
+          .verification-card {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 180px;
+            gap: 14px;
+            align-items: center;
+            margin-top: 10px;
+            padding: 12px;
+            border: 1px solid #111;
+            border-radius: 2px;
+            break-inside: avoid;
+          }
+          .verification-card h3 {
+            margin: 0 0 6px;
+            font-size: 11.5px;
+            font-weight: 700;
+            text-transform: uppercase;
+          }
+          .verification-card p {
+            margin: 0 0 8px;
+            font-size: 10.5px;
+            line-height: 1.4;
+          }
+          .verification-card__meta {
+            display: grid;
+            gap: 4px;
+            margin-top: 6px;
+            font-size: 10.5px;
+          }
+          .verification-card__url {
+            margin-top: 8px;
+            font-size: 9.5px;
+            word-break: break-all;
+          }
+          .verification-card__qr {
+            display: grid;
+            justify-items: center;
+            gap: 6px;
+            padding: 10px;
+            border: 1px solid #111;
+          }
+          .verification-card__qr img {
+            width: 150px;
+            height: 150px;
+            object-fit: contain;
+          }
+          .verification-card__qr span {
+            font-size: 10px;
+            font-weight: 700;
+          }
           @media print { .sheet { break-inside: avoid; } }
         </style>
       </head>
@@ -342,19 +429,21 @@ export const openLearnerInformationPrintWindow = (payload: PrintLearnerInformati
   const printWindow = window.open('about:blank', '_blank', 'width=1280,height=860');
   if (!printWindow) return false;
 
-  const html = buildPrintHtml(payload);
-  printWindow.document.open();
-  printWindow.document.write(html);
-  printWindow.document.close();
+  void (async () => {
+    const html = await buildPrintHtml(payload);
+    printWindow.document.open();
+    printWindow.document.write(html);
+    printWindow.document.close();
 
-  printWindow.onafterprint = () => {
-    printWindow.close();
-  };
+    printWindow.onafterprint = () => {
+      printWindow.close();
+    };
 
-  printWindow.onload = () => {
-    printWindow.focus();
-    printWindow.print();
-  };
+    printWindow.onload = () => {
+      printWindow.focus();
+      printWindow.print();
+    };
+  })();
 
   return true;
 };

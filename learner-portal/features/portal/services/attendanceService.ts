@@ -217,7 +217,7 @@ const buildSnapshot = (rows: RawAttendanceRecordRow[]): LearnerAttendanceSnapsho
 const fetchAllAttendanceRows = async (learnerId: string) => {
   const { data, error } = await supabase
     .from('attendance_records')
-    .select('id,attendance_type,is_late,logged_at,source,station_no,scanned_uid')
+    .select('id,attendance_type,logged_at,source,station_no,scanned_uid')
     .eq('learner_id', learnerId)
     .order('logged_at', { ascending: true });
 
@@ -231,7 +231,7 @@ const fetchAllAttendanceRows = async (learnerId: string) => {
 const fetchAttendanceRowsSince = async (learnerId: string, sinceLoggedAt: string) => {
   const { data, error } = await supabase
     .from('attendance_records')
-    .select('id,attendance_type,is_late,logged_at,source,station_no,scanned_uid')
+    .select('id,attendance_type,logged_at,source,station_no,scanned_uid')
     .eq('learner_id', learnerId)
     .gte('logged_at', sinceLoggedAt)
     .order('logged_at', { ascending: true });

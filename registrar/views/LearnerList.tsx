@@ -4,11 +4,13 @@ import { EnrollmentRecord, GradeLevel, Student } from '../types';
 import ConfirmationModal from '../components/ConfirmationModal';
 import LearnerDetailsModal from '../components/LearnerDetailsModal';
 import { openLearnerInformationPrintWindow } from '../features/registrar/learners/utils/printLearnerInformation';
+import { openSectionListPrintWindow } from '../features/registrar/learners/utils/printSectionList';
 import { sendLearnerCredentialsViaWebhook } from '../features/registrar/learners/services/sendLearnerCredentialsEmail';
 import LearnerEditModal from './learners/LearnerEditModal';
 import { getActiveLearnersForYear } from '../services/dashboardService';
 import { resolveAdviserLinkedSections, groupLearnersByLinkedSection } from './adviser-learners/utils/adviserLearnerAccess';
 import { downloadAdviserSectionWorkbook } from './adviser-learners/utils/adviserLearnerWorkbook';
+import { loadAdviserLearnerSnapshot, saveAdviserLearnerSnapshot } from './adviser-learners/utils/adviserLearnerCache';
 
 const LearnerList: React.FC = () => {
   const { learners, sections, activeSchoolYear, availableStrands, registrarAccess, removeLearner, clearSectionLearners, updateLearner, loading } = useStore();
@@ -161,10 +163,14 @@ const LearnerList: React.FC = () => {
     );
   }, [activeLearnersForYear, activeSchoolYear, isAdviserScopedAccess, registrarAccess?.coordinatorName, registrarAccess?.coordinatorUsername, sections]);
 
+  const [cachedAdviserGroups, setCachedAdviserGroups] = useState<typeof adviserSectionGroups>([]);
+  const [isAdviserCacheLoaded, setIsAdviserCacheLoaded] = useState(false);
+
   const visibleGroupedData = useMemo(() => {
     if (!isAdviserScopedAccess) return groupedData;
+    const sourceGroups = adviserSectionGroups.length > 0 ? adviserSectionGroups : cachedAdviserGroups;
     const visible: Record<string, Record<string, { students: Student[]; sectionId?: string }>> = {};
-    adviserSectionGroups.forEach((group) => {
+    sourceGroups.forEach((group) => {
       const gradeLabel = group.section.gradeLevel;
       const sectionLabel = `${group.section.name}${group.section.strand ? ` [${group.section.strand}]` : ''}`;
       if (!visible[gradeLabel]) visible[gradeLabel] = {};
@@ -174,11 +180,12 @@ const LearnerList: React.FC = () => {
       };
     });
     return visible;
-  }, [adviserSectionGroups, groupedData, isAdviserScopedAccess]);
+  }, [adviserSectionGroups, cachedAdviserGroups, groupedData, isAdviserScopedAccess]);
 
   const adviserExport = () => {
-    if (!isAdviserScopedAccess || adviserSectionGroups.length === 0) return;
-    const ok = downloadAdviserSectionWorkbook(adviserSectionGroups, activeSchoolYear.label, registrarAccess?.coordinatorName || 'Adviser');
+    const exportGroups = adviserSectionGroups.length > 0 ? adviserSectionGroups : cachedAdviserGroups;
+    if (!isAdviserScopedAccess || exportGroups.length === 0) return;
+    const ok = downloadAdviserSectionWorkbook(exportGroups, activeSchoolYear.label, registrarAccess?.coordinatorName || 'Adviser');
     if (!ok) {
       setFeedback('No learners are available to export for your linked section.');
     }
@@ -220,6 +227,40 @@ const LearnerList: React.FC = () => {
     setExpandedGrades(nextGrades);
     setExpandedSections(nextSections);
   }, [groupedData, hasSearchQuery, isAdviserScopedAccess, visibleGroupedData]);
+
+  useEffect(() => {
+    if (!isAdviserScopedAccess) return;
+    const coordinatorUsername = registrarAccess?.coordinatorUsername || '';
+    if (!coordinatorUsername) return;
+
+    if (adviserSectionGroups.length > 0) {
+      setCachedAdviserGroups(adviserSectionGroups);
+      setIsAdviserCacheLoaded(true);
+      void saveAdviserLearnerSnapshot(
+        activeSchoolYear.id,
+        activeSchoolYear.label,
+        coordinatorUsername,
+        registrarAccess?.coordinatorName || 'Adviser',
+        adviserSectionGroups,
+      );
+      return;
+    }
+
+    if (isAdviserCacheLoaded) return;
+    void loadAdviserLearnerSnapshot(activeSchoolYear.id, coordinatorUsername).then((snapshot) => {
+      if (!snapshot?.groups?.length) return;
+      setCachedAdviserGroups(snapshot.groups);
+      setIsAdviserCacheLoaded(true);
+    });
+  }, [
+    activeSchoolYear.id,
+    activeSchoolYear.label,
+    adviserSectionGroups,
+    isAdviserScopedAccess,
+    isAdviserCacheLoaded,
+    registrarAccess?.coordinatorName,
+    registrarAccess?.coordinatorUsername,
+  ]);
 
   const toggleGrade = (grade: string) => {
     const next = new Set(expandedGrades);
@@ -344,20 +385,26 @@ const LearnerList: React.FC = () => {
                                 <span className="registrar-learners-page__section-count">- {data.students.length} Learners</span>
                               </button>
 
-                              {!isAdviserScopedAccess && !isLocked && data.sectionId && (
-                                <div className="registrar-learners-page__section-actions">
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setClearingSection({ name: sectionName, id: data.sectionId! });
-                                    }}
-                                    className="registrar-learners-page__clear-btn"
-                                  >
-                                    <span className="material-symbols-outlined">person_remove</span>
-                                    Clear Section
-                                  </button>
-                                </div>
-                              )}
+                              <div className="registrar-learners-page__section-actions">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const sectionForPrint = sections.find((section) => section.id === data.sectionId);
+                                    if (!sectionForPrint) return;
+                                    const ok = openSectionListPrintWindow({
+                                      gradeLevel: grade,
+                                      learners: data.students,
+                                      schoolYearLabel: activeSchoolYear.label,
+                                      section: sectionForPrint,
+                                    });
+                                    if (!ok) setFeedback('Popup blocked. Allow popups for this site to print the section list.');
+                                  }}
+                                  className="registrar-learners-page__print-btn"
+                                >
+                                  <span className="material-symbols-outlined">print</span>
+                                  Print Section List
+                                </button>
+                              </div>
                             </div>
 
                             {expandedSections.has(sectionKey) && (
@@ -436,7 +483,7 @@ const LearnerList: React.FC = () => {
                                                         <span className="material-symbols-outlined">mail</span>
                                                       </button>
                                                       <button
-                                                        onClick={() => {
+                                                        onClick={async () => {
                                                           const ok = openLearnerInformationPrintWindow({
                                                             learners: [student],
                                                             sections,

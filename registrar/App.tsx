@@ -19,6 +19,7 @@ import PublicEnrollmentSectioningPage from './features/registrar/public-enrollme
 import EnrollmentKioskPage from './features/registrar/public-enrollment/kiosk/EnrollmentKioskPage';
 import PublicEnrollmentPage from './features/registrar/public-enrollment/components/PublicEnrollmentPage';
 import EnrollmentAnnouncementsPage from './features/registrar/enrollment-announcements/pages/EnrollmentAnnouncementsPage';
+import DocumentVerificationPage from './features/registrar/document-verification/pages/DocumentVerificationPage';
 import { useStore } from './store';
 import { UsisPortalGate } from '../common/components/UsisPortalGate';
 
@@ -27,6 +28,7 @@ const AuthenticatedRouter: React.FC = () => {
   const isKioskRoute = location.pathname === '/enroll/kiosk';
   const isPublicEnrollmentRoute = location.pathname === '/public-enrollment';
   const isSectioningRoute = location.pathname === '/enroll/sectioning';
+  const isVerificationRoute = location.pathname === '/verify-document';
 
   if (isKioskRoute) {
     return (
@@ -55,6 +57,15 @@ const AuthenticatedRouter: React.FC = () => {
     );
   }
 
+  if (isVerificationRoute) {
+    return (
+      <Routes>
+        <Route path="/verify-document" element={<DocumentVerificationPage />} />
+        <Route path="*" element={<Navigate to="/verify-document" replace />} />
+      </Routes>
+    );
+  }
+
   return (
     <Layout>
       <Routes>
@@ -62,6 +73,7 @@ const AuthenticatedRouter: React.FC = () => {
         <Route path="/learners" element={<LearnerList />} />
         <Route path="/my-section-learners" element={<AdviserLearnersPage />} />
         <Route path="/public-enrollment" element={<PublicEnrollmentPage />} />
+        <Route path="/verify-document" element={<DocumentVerificationPage />} />
         <Route path="/enroll" element={<PublicEnrollmentSubmissionsPage />} />
         <Route path="/enroll/:id" element={<PublicEnrollmentSubmissionDetailsPage />} />
         <Route path="/enroll/:id/edit" element={<PublicEnrollmentSubmissionEditPage />} />
@@ -102,6 +114,7 @@ const App: React.FC = () => {
           <Route path="/" element={<Landing />} />
           <Route path="/public-enrollment" element={<PublicEnrollmentPage />} />
           <Route path="/enroll/sectioning" element={<PublicEnrollmentSectioningPage />} />
+          <Route path="/verify-document" element={<DocumentVerificationPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>

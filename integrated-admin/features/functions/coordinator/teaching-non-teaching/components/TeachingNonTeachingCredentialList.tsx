@@ -107,6 +107,7 @@ export function TeachingNonTeachingCredentialList({
                         <col />
                         <col />
                         <col />
+                        <col />
                       </colgroup>
                       <thead>
                         <tr>
@@ -124,6 +125,7 @@ export function TeachingNonTeachingCredentialList({
                           </th>
                           <th>Name</th>
                           <th>Username</th>
+                          <th>Password</th>
                           <th>Email</th>
                           <th>Status</th>
                           <th>Module Access</th>
@@ -142,6 +144,7 @@ export function TeachingNonTeachingCredentialList({
                             </td>
                             <td><strong>{row.name}</strong></td>
                             <td>{row.username}</td>
+                            <td>{row.password || row.username}</td>
                             <td>{row.email}</td>
                             <td>{row.isActive ? 'Active' : 'Inactive'}</td>
                             <td>

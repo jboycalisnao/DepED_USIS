@@ -166,6 +166,12 @@ const normalizeEnrollmentRecord = (entry: any) => ({
   section: String(entry?.section || '').trim(),
   enrollmentDate: String(entry?.enrollmentDate || entry?.enrollment_date || entry?.created_at || '').trim(),
   status: String(entry?.status || EnrollmentStatus.ENROLLED).trim() as EnrollmentStatus,
+  submissionPayload:
+    entry?.submissionPayload && typeof entry.submissionPayload === 'object'
+      ? entry.submissionPayload
+      : entry?.submission_payload && typeof entry.submission_payload === 'object'
+        ? entry.submission_payload
+        : undefined,
 });
 const commitLearners = (nextLearners: Student[]) => {
   learners = nextLearners;

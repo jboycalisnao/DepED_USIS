@@ -208,7 +208,7 @@ export default function PublicEnrollmentSubmissionsPage() {
     isLoading,
     errorMessage,
     refresh,
-    refreshSubmissionById,
+    upsertSubmissionLocally,
     removeSubmissionById,
   } = usePublicEnrollmentSubmissions(submissionsScopeKey, activeSchoolYearLabel);
   const [query, setQuery] = useState('');
@@ -821,11 +821,13 @@ export default function PublicEnrollmentSubmissionsPage() {
       };
 
       if (editingSubmission) {
-        await updatePublicEnrollmentSubmissionRecord(editingSubmission.id, dbPayload);
-        await refreshSubmissionById(editingSubmission.id);
+        const updatedSubmission = await updatePublicEnrollmentSubmissionRecord(editingSubmission.id, dbPayload);
+        upsertSubmissionLocally(updatedSubmission);
       } else {
         const createdSubmission = await createPublicEnrollmentSubmissionRecord(dbPayload);
-        await refreshSubmissionById(createdSubmission.id);
+        if (createdSubmission.submission) {
+          upsertSubmissionLocally(createdSubmission.submission);
+        }
       }
       closeEditor();
     } catch (error: any) {
@@ -1105,7 +1107,7 @@ export default function PublicEnrollmentSubmissionsPage() {
         submissionPayload: payload as unknown as Record<string, any>,
       });
 
-      await updatePublicEnrollmentSubmissionRecord(enrollingSubmission.id, {
+      const updatedSubmission = await updatePublicEnrollmentSubmissionRecord(enrollingSubmission.id, {
         payload: appendSubmissionAudit(
           {
             ...payload,
@@ -1120,7 +1122,7 @@ export default function PublicEnrollmentSubmissionsPage() {
         ),
       });
 
-      await refreshSubmissionById(enrollingSubmission.id);
+      upsertSubmissionLocally(updatedSubmission);
       await syncLearnerStatusByLrn(lrn);
       closeEnrollModal();
     } catch (error: any) {

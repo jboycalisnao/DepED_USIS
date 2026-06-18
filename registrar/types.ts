@@ -88,6 +88,7 @@ export interface EnrollmentRecord {
   section: string;
   enrollmentDate: string;
   status: EnrollmentStatus;
+  submissionPayload?: Record<string, unknown>;
 }
 
 export interface SchoolYear {

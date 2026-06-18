@@ -1,11 +1,16 @@
 import { supabase } from '../../../../lib/supabase';
 import type { EnrollmentDraft, PublicEnrollmentSubmission } from '../types';
+import {
+  removePublicEnrollmentSubmissionsSnapshotRow,
+  upsertPublicEnrollmentSubmissionsSnapshotRow,
+} from '../utils/publicEnrollmentSubmissionsCache';
 
 export const REGISTRAR_PUBLIC_ENROLLMENT_TABLE = 'registrar_public_enrollment_submissions';
 
 type CreateSubmissionResult = {
   id: string;
   submissionReferenceId?: string;
+  submission?: PublicEnrollmentSubmission;
 };
 
 export type PublicEnrollmentSubmissionMutation = {
@@ -48,7 +53,7 @@ export async function createPublicEnrollmentSubmission(draft: EnrollmentDraft): 
   const { data, error } = await supabase
     .from(REGISTRAR_PUBLIC_ENROLLMENT_TABLE)
     .insert(payload)
-    .select('id,submission_reference_id')
+    .select('id,submission_reference_id,created_at,school_id,school_year,lrn,last_name,first_name,middle_name,grade_to_enroll,guardian_contact,payload')
     .single();
 
   if (error) {
@@ -64,6 +69,12 @@ export async function createPublicEnrollmentSubmission(draft: EnrollmentDraft): 
     });
   } catch {
     // Keep submission flow non-blocking if email queue endpoint is unavailable.
+  }
+
+  const createdRow = data as PublicEnrollmentSubmission;
+  if (createdRow?.id) {
+    const cacheScopeKey = String(createdRow.school_year || draft.schoolYear || '').trim() || 'unscoped';
+    await upsertPublicEnrollmentSubmissionsSnapshotRow(cacheScopeKey, createdRow, String(createdRow.school_year || draft.schoolYear || '').trim());
   }
 
   return { id: createdId, submissionReferenceId: String((data as any).submission_reference_id || submissionReferenceId) };
@@ -120,14 +131,15 @@ export async function createPublicEnrollmentSubmissionRecord(input: PublicEnroll
   const { data, error } = await supabase
     .from(REGISTRAR_PUBLIC_ENROLLMENT_TABLE)
     .insert(input)
-    .select('id')
+    .select('id,submission_reference_id,created_at,school_id,school_year,lrn,last_name,first_name,middle_name,grade_to_enroll,guardian_contact,payload')
     .single();
 
   if (error) {
     throw error;
   }
 
-  const createdId = String(data.id);
+  const createdRow = data as PublicEnrollmentSubmission;
+  const createdId = String(createdRow.id);
   try {
     await fetch('/api/enrollment-email-queue', {
       method: 'POST',
@@ -138,21 +150,42 @@ export async function createPublicEnrollmentSubmissionRecord(input: PublicEnroll
     // Keep submission creation non-blocking if queue endpoint is unavailable.
   }
 
-  return { id: createdId };
+  if (createdRow?.id) {
+    const cacheScopeKey = String(createdRow.school_year || input.school_year || '').trim() || 'unscoped';
+    await upsertPublicEnrollmentSubmissionsSnapshotRow(cacheScopeKey, createdRow, String(createdRow.school_year || input.school_year || '').trim());
+  }
+
+  return {
+    id: createdId,
+    submissionReferenceId: String(createdRow.submission_reference_id || ''),
+    submission: createdRow,
+  };
 }
 
 export async function updatePublicEnrollmentSubmissionRecord(
   id: string,
   input: PublicEnrollmentSubmissionMutation
-): Promise<void> {
-  const { error } = await supabase
+): Promise<PublicEnrollmentSubmission> {
+  const { data, error } = await supabase
     .from(REGISTRAR_PUBLIC_ENROLLMENT_TABLE)
     .update(input)
-    .eq('id', id);
+    .eq('id', id)
+    .select('id,submission_reference_id,created_at,school_id,school_year,lrn,last_name,first_name,middle_name,grade_to_enroll,guardian_contact,payload')
+    .single();
 
   if (error) {
     throw error;
   }
+
+  const updatedRow = data as PublicEnrollmentSubmission | null;
+  if (!updatedRow) {
+    throw new Error(`Unable to update submission "${id}".`);
+  }
+
+  const cacheScopeKey = String(updatedRow.school_year || input.school_year || '').trim() || 'unscoped';
+  await upsertPublicEnrollmentSubmissionsSnapshotRow(cacheScopeKey, updatedRow, String(updatedRow.school_year || input.school_year || '').trim());
+
+  return updatedRow;
 }
 
 export async function deletePublicEnrollmentSubmissionRecord(id: string): Promise<void> {
@@ -160,7 +193,7 @@ export async function deletePublicEnrollmentSubmissionRecord(id: string): Promis
     .from(REGISTRAR_PUBLIC_ENROLLMENT_TABLE)
     .delete()
     .eq('id', id)
-    .select('id,school_id');
+    .select('id,school_id,school_year');
 
   if (error) {
     throw error;
@@ -170,5 +203,12 @@ export async function deletePublicEnrollmentSubmissionRecord(id: string): Promis
     const mismatchError = new Error(`Delete blocked: no matching submission found for id "${id}".`);
     (mismatchError as any).code = 'NO_ROWS_DELETED';
     throw mismatchError;
+  }
+
+  const deletedRow = data[0] as Partial<PublicEnrollmentSubmission>;
+  if (deletedRow?.school_year) {
+    const cacheScopeKey = String(deletedRow.school_year || '').trim() || 'unscoped';
+    // Best-effort cache cleanup; ignored if the snapshot is absent.
+    await removePublicEnrollmentSubmissionsSnapshotRow(cacheScopeKey, id, String(deletedRow.school_year || '').trim());
   }
 }

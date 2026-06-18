@@ -1,49 +1,13 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { PublicEnrollmentSubmission } from '../types';
 import {
-  fetchPublicEnrollmentSubmissionById,
   fetchPublicEnrollmentSubmissions,
 } from '../services/publicEnrollmentSubmissions';
-
-const CACHE_PREFIX = 'registrar_public_enrollment_submissions_cache_v1';
-const CACHE_MAX_ROWS = 250;
-
-const readCache = (scopeKey: string): PublicEnrollmentSubmission[] => {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = window.localStorage.getItem(`${CACHE_PREFIX}:${scopeKey}`);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed?.rows) ? (parsed.rows as PublicEnrollmentSubmission[]) : [];
-  } catch {
-    return [];
-  }
-};
-
-const writeCache = (scopeKey: string, rows: PublicEnrollmentSubmission[]) => {
-  if (typeof window === 'undefined') return;
-  const rowsToCache = rows.slice(0, CACHE_MAX_ROWS);
-  const payload = JSON.stringify({ updatedAt: new Date().toISOString(), rows: rowsToCache });
-
-  try {
-    window.localStorage.setItem(`${CACHE_PREFIX}:${scopeKey}`, payload);
-  } catch (error) {
-    const isQuotaError =
-      error instanceof DOMException &&
-      (error.name === 'QuotaExceededError' || error.name === 'NS_ERROR_DOM_QUOTA_REACHED');
-
-    if (!isQuotaError) {
-      throw error;
-    }
-
-    try {
-      window.localStorage.removeItem(`${CACHE_PREFIX}:${scopeKey}`);
-      window.localStorage.setItem(`${CACHE_PREFIX}:${scopeKey}`, payload);
-    } catch {
-      // Swallow quota errors so refresh continues using in-memory state only.
-    }
-  }
-};
+import {
+  normalizePublicEnrollmentSubmissionsCacheScopeKey,
+  readPublicEnrollmentSubmissionsSnapshot,
+  writePublicEnrollmentSubmissionsSnapshot,
+} from '../utils/publicEnrollmentSubmissionsCache';
 
 const sortByCreatedAtDesc = (left: PublicEnrollmentSubmission, right: PublicEnrollmentSubmission) =>
   new Date(right.created_at).getTime() - new Date(left.created_at).getTime();
@@ -57,71 +21,137 @@ const upsertSubmission = (
   return filtered.sort(sortByCreatedAtDesc);
 };
 
-const normalizeCacheScopeKey = (scopeKey: string, schoolYearLabel: string) =>
-  `${scopeKey}:${String(schoolYearLabel || '').trim() || 'unscoped'}`;
-
 export function usePublicEnrollmentSubmissions(scopeKey = 'default', schoolYearLabel = '') {
-  const cacheScopeKey = normalizeCacheScopeKey(scopeKey, schoolYearLabel);
-  const hasSchoolYearScope = Boolean(String(schoolYearLabel || '').trim());
-  const [submissions, setSubmissions] = useState<PublicEnrollmentSubmission[]>(() => readCache(cacheScopeKey));
+  const cacheScopeKey = useMemo(
+    () => normalizePublicEnrollmentSubmissionsCacheScopeKey(scopeKey, schoolYearLabel),
+    [scopeKey, schoolYearLabel]
+  );
+  const [submissions, setSubmissions] = useState<PublicEnrollmentSubmission[]>(
+    () => []
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const hydratedCacheKeyRef = useRef<string | null>(null);
+
+  const persistRows = useCallback(async (rows: PublicEnrollmentSubmission[]) => {
+    await writePublicEnrollmentSubmissionsSnapshot(scopeKey, rows, schoolYearLabel);
+  }, [scopeKey, schoolYearLabel]);
+
+  const loadFromNetwork = useCallback(async (options?: { toggleLoading?: boolean }) => {
+    const normalizedSchoolYear = String(schoolYearLabel || '').trim();
+    if (!normalizedSchoolYear) {
+      setSubmissions([]);
+      if (options?.toggleLoading !== false) {
+        setIsLoading(false);
+      }
+      return [];
+    }
+
+    const rows = await fetchPublicEnrollmentSubmissions(undefined, normalizedSchoolYear);
+    setSubmissions(rows);
+    await persistRows(rows);
+    hydratedCacheKeyRef.current = cacheScopeKey;
+    if (options?.toggleLoading !== false) {
+      setIsLoading(false);
+    }
+    return rows;
+  }, [cacheScopeKey, persistRows, schoolYearLabel]);
 
   const refresh = useCallback(async (options?: { silent?: boolean }) => {
     if (!options?.silent) setIsLoading(true);
     setErrorMessage(null);
     try {
-      if (!hasSchoolYearScope) {
-        setSubmissions([]);
-        return;
-      }
-
-      const rows = await fetchPublicEnrollmentSubmissions(undefined, schoolYearLabel);
-      setSubmissions(rows);
-      writeCache(cacheScopeKey, rows);
+      await loadFromNetwork({ toggleLoading: !options?.silent });
     } catch (error: any) {
       setErrorMessage(error?.message || 'Unable to load submissions.');
+      if (!options?.silent) setIsLoading(false);
     } finally {
       if (!options?.silent) setIsLoading(false);
     }
-  }, [cacheScopeKey, hasSchoolYearScope, schoolYearLabel]);
+  }, [loadFromNetwork]);
 
-  const refreshSubmissionById = useCallback(async (submissionId: string) => {
-    const trimmedId = String(submissionId || '').trim();
-    if (!trimmedId) return null;
+  const upsertSubmissionLocally = useCallback((nextRow: PublicEnrollmentSubmission) => {
+    const trimmedId = String(nextRow?.id || '').trim();
+    if (!trimmedId) return;
 
-    try {
-      const row = await fetchPublicEnrollmentSubmissionById(trimmedId);
-      if (!row) return null;
-
-      setSubmissions((current) => upsertSubmission(current, row));
-      return row;
-    } catch (error: any) {
-      setErrorMessage(error?.message || 'Unable to load submission.');
-      return null;
-    }
-  }, []);
+    setSubmissions((current) => {
+      const nextRows = upsertSubmission(current, nextRow);
+      if (hydratedCacheKeyRef.current === cacheScopeKey) {
+        void persistRows(nextRows);
+      }
+      return nextRows;
+    });
+  }, [cacheScopeKey, persistRows]);
 
   const removeSubmissionById = useCallback((submissionId: string) => {
     const trimmedId = String(submissionId || '').trim();
     if (!trimmedId) return;
-    setSubmissions((current) => current.filter((row) => row.id !== trimmedId));
-  }, []);
+
+    setSubmissions((current) => {
+      const nextRows = current.filter((row) => row.id !== trimmedId);
+      if (hydratedCacheKeyRef.current === cacheScopeKey) {
+        void persistRows(nextRows);
+      }
+      return nextRows;
+    });
+  }, [cacheScopeKey, persistRows]);
 
   useEffect(() => {
-    const cachedRows = readCache(cacheScopeKey);
-    setSubmissions(cachedRows);
-    setIsLoading(true);
-  }, [cacheScopeKey]);
+    let cancelled = false;
+
+    const bootstrap = async () => {
+      setErrorMessage(null);
+
+      const cached = await readPublicEnrollmentSubmissionsSnapshot(scopeKey, schoolYearLabel);
+      if (cached) {
+        if (cancelled) return;
+        hydratedCacheKeyRef.current = cacheScopeKey;
+        setSubmissions(cached.rows || []);
+        setIsLoading(false);
+        return;
+      }
+
+      const normalizedSchoolYear = String(schoolYearLabel || '').trim();
+      if (!normalizedSchoolYear) {
+        if (!cancelled) {
+          setSubmissions([]);
+          setIsLoading(false);
+        }
+        return;
+      }
+
+      if (!cancelled) {
+        setIsLoading(true);
+      }
+
+      try {
+        const rows = await fetchPublicEnrollmentSubmissions(undefined, normalizedSchoolYear);
+        if (cancelled) return;
+        hydratedCacheKeyRef.current = cacheScopeKey;
+        setSubmissions(rows);
+        await persistRows(rows);
+      } catch (error: any) {
+        if (!cancelled) {
+          setErrorMessage(error?.message || 'Unable to load submissions.');
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    void bootstrap();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [cacheScopeKey, persistRows, schoolYearLabel]);
 
   useEffect(() => {
-    if (!hasSchoolYearScope) return;
-    void refresh();
-  }, [cacheScopeKey, hasSchoolYearScope, refresh]);
-
-  useEffect(() => {
-    writeCache(cacheScopeKey, submissions);
-  }, [cacheScopeKey, submissions]);
+    if (hydratedCacheKeyRef.current !== cacheScopeKey) return;
+    void persistRows(submissions);
+  }, [cacheScopeKey, persistRows, submissions]);
 
   return useMemo(
     () => ({
@@ -129,9 +159,9 @@ export function usePublicEnrollmentSubmissions(scopeKey = 'default', schoolYearL
       isLoading,
       errorMessage,
       refresh,
-      refreshSubmissionById,
+      upsertSubmissionLocally,
       removeSubmissionById,
     }),
-    [submissions, isLoading, errorMessage, refresh, refreshSubmissionById, removeSubmissionById]
+    [submissions, isLoading, errorMessage, refresh, upsertSubmissionLocally, removeSubmissionById]
   );
 }

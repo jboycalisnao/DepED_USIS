@@ -18,6 +18,7 @@ export type TeachingNonTeachingCredentialRecord = {
   personnelType: PersonnelType;
   role: string;
   schoolCode: string;
+  password?: string;
   username: string;
 };
 
@@ -85,7 +86,7 @@ export const loadTeachingNonTeachingCredentials = async (schoolCode: string): Pr
   const schoolId = await resolveSchoolUuid(schoolCode);
   const primary = await supabase
     .from('usis_core_coordinators')
-    .select('id,username,email,first_name,middle_name,last_name,employee_id,mobile_no,role,is_active,personnel_type')
+    .select('id,username,email,first_name,middle_name,last_name,employee_id,mobile_no,role,is_active,personnel_type,password_hash')
     .eq('school_id', schoolId)
     .eq('role', 'school_usis_coordinator')
     .order('created_at', { ascending: false });
@@ -93,7 +94,11 @@ export const loadTeachingNonTeachingCredentials = async (schoolCode: string): Pr
   let data: any[] = [];
   if (!primary.error) {
     data = (primary.data || []) as any[];
-  } else if (hasMissingColumnError(primary.error, 'personnel_type') || hasMissingColumnError(primary.error, 'middle_name')) {
+  } else if (
+    hasMissingColumnError(primary.error, 'personnel_type') ||
+    hasMissingColumnError(primary.error, 'middle_name') ||
+    hasMissingColumnError(primary.error, 'password_hash')
+  ) {
     const fallback = await supabase
       .from('usis_core_coordinators')
       .select('id,username,email,first_name,last_name,employee_id,mobile_no,role,is_active')
@@ -144,6 +149,7 @@ export const loadTeachingNonTeachingCredentials = async (schoolCode: string): Pr
       personnelType,
       role: toText(row.role),
       schoolCode,
+      password: toText(row.password_hash) || toText(row.username),
       username: toText(row.username),
     };
   });
