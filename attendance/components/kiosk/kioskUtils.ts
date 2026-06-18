@@ -3,9 +3,11 @@ import { AttendanceScheduleConfig } from '../../types';
 export type SessionTone = 'success' | 'warning' | 'primary' | 'neutral';
 
 export interface SessionInfo {
-  label: string;
-  range: string;
-  tone: SessionTone;
+  items: Array<{
+    label: string;
+    range: string;
+    tone: SessionTone;
+  }>;
 }
 
 export function formatSessionTimeRange(start: string, end: string) {
@@ -51,19 +53,25 @@ export function getSessionInfo(now: Date, settings: AttendanceScheduleConfig): S
     { label: 'Grade 12 PM Out', range: `${settings.grade12.pmOut.in.start} onwards`, tone: 'primary', start: settings.grade12.pmOut.in.start, end: '23:59' },
   ];
 
-  const active = windows.find((window) => isWithin(timeStr, window.start, window.end));
-  if (active) {
+  const active = windows.filter((window) => isWithin(timeStr, window.start, window.end));
+  if (active.length > 0) {
     return {
-      label: active.label,
-      range: active.range,
-      tone: active.tone,
+      items: active.map((window) => ({
+        label: window.label,
+        range: window.range,
+        tone: window.tone,
+      })),
     };
   }
 
   return {
-    label: 'Outside Scheduled Windows',
-    range: 'Grade-based attendance policy loaded',
-    tone: 'neutral',
+    items: [
+      {
+        label: 'Outside Scheduled Windows',
+        range: 'Grade-based attendance policy loaded',
+        tone: 'neutral',
+      },
+    ],
   };
 }
 

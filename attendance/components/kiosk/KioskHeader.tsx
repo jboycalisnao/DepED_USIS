@@ -24,15 +24,22 @@ const KioskHeader: React.FC<KioskHeaderProps> = ({ currentTime, session, onExit 
         <div className="text-[clamp(4.4rem,9.5vw,8.2rem)] font-black leading-none tracking-normal text-[#123f9c] font-mono tabular-nums">
           {getCurrentTimeString(currentTime)}
         </div>
-        <div className={`mt-3 inline-flex max-w-[92vw] flex-wrap items-center justify-center gap-3 rounded-md border px-5 py-3 ${getSessionToneClasses(session.tone)}`}>
-          <span className="material-symbols-outlined text-[18px] leading-none">event_seat</span>
-          <span className="text-[11px] md:text-[12px] font-bold">
-            {session.label}
-          </span>
-          <span className="h-1.5 w-1.5 rounded-full bg-current opacity-25" />
-          <span className="text-[11px] md:text-[12px] font-bold">
-            {session.range}
-          </span>
+        <div className="mt-3 flex max-w-[92vw] flex-wrap items-center justify-center gap-2">
+          {session.items.map((item) => (
+            <div
+              key={`${item.label}-${item.range}`}
+              className={`inline-flex items-center gap-3 rounded-md border px-5 py-3 ${getSessionToneClasses(item.tone)}`}
+            >
+              <span className="material-symbols-outlined text-[18px] leading-none">event_seat</span>
+              <span className="text-[11px] md:text-[12px] font-bold">
+                {item.label}
+              </span>
+              <span className="h-1.5 w-1.5 rounded-full bg-current opacity-25" />
+              <span className="text-[11px] md:text-[12px] font-bold">
+                {item.range}
+              </span>
+            </div>
+          ))}
         </div>
       </div>
 
