@@ -394,20 +394,39 @@ export const useAttendance = () => {
       return;
     }
 
-    const payload: Record<string, string | boolean> = {
+    const basePayload: Record<string, string | boolean> = {
       learner_id: record.learnerId,
       attendance_type: record.type,
       logged_at: record.timestamp,
       source,
-      is_late: !!record.isLate,
     };
 
     if (isUuid(record.id)) {
-      payload.id = record.id;
+      basePayload.id = record.id;
     }
 
-    const { error } = await supabase.from('attendance_records').insert(payload);
-    if (error) throw error;
+    const payloadWithLate = {
+      ...basePayload,
+      is_late: !!record.isLate,
+    };
+
+    const insertWithFallback = async (payload: Record<string, string | boolean>) => {
+      const { error } = await supabase.from('attendance_records').insert(payload);
+      if (!error) return;
+      const missingLateColumn =
+        String(error?.message || '').toLowerCase().includes('is_late') ||
+        String(error?.details || '').toLowerCase().includes('is_late') ||
+        String(error?.hint || '').toLowerCase().includes('is_late');
+      if (missingLateColumn && 'is_late' in payload) {
+        const { is_late: _ignored, ...fallbackPayload } = payload as Record<string, string | boolean>;
+        const fallbackResult = await supabase.from('attendance_records').insert(fallbackPayload);
+        if (fallbackResult.error) throw fallbackResult.error;
+        return;
+      }
+      throw error;
+    };
+
+    await insertWithFallback(payloadWithLate);
   }, [hasAttendanceRecordForDay]);
 
   const markAsSynced = (recordId: string) => {
