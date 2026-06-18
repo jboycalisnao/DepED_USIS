@@ -1,6 +1,13 @@
 import React, { useMemo, useState } from 'react';
-import { AttendanceDailySummaryRow, AttendanceMonthlySummaryRow, AttendanceRecord, Learner } from '../types';
+import {
+  AttendanceDailySummaryRow,
+  AttendanceMonthlySummaryRow,
+  AttendanceRecord,
+  AttendanceScheduleConfig,
+  Learner,
+} from '../types';
 import ConfirmationModal from './ConfirmationModal';
+import { isAttendanceRecordLate } from '../utils/attendanceSchedule';
 
 type SearchScope =
   | { kind: 'month'; monthKey: string; fromDate: string; toDate: string; label: string }
@@ -9,6 +16,7 @@ type SearchScope =
 type Props = {
   logs: AttendanceRecord[];
   learners: Learner[]; 
+  scheduleConfig: AttendanceScheduleConfig;
   onDelete?: (record: AttendanceRecord) => Promise<void> | void;
   refreshAttendanceStatusByRange: (fromDate: string, toDate: string) => Promise<Set<string>>;
 };
@@ -254,6 +262,7 @@ const sumMonthlyRows = (rows: AttendanceMonthlySummaryRow[]) =>
 const AttendanceRecordsBrowser: React.FC<Props> = ({
   logs,
   learners,
+  scheduleConfig,
   onDelete,
   refreshAttendanceStatusByRange,
 }) => {
@@ -571,17 +580,26 @@ const AttendanceRecordsBrowser: React.FC<Props> = ({
                                       <tbody>
                                         {dayRawRecords.map((record) => {
                                           const learner = learnerMap.get(record.learnerId);
+                                          const isLate = isAttendanceRecordLate(record, learner, scheduleConfig);
                                           return (
                                             <tr key={record.id}>
                                               <td>
                                                 <strong>{learner ? `${learner.last_name}, ${learner.first_name}` : record.learnerId}</strong>
                                               </td>
-                                              <td>{`${record.type.replace('_', ' ')}${record.isLate ? ' (Late)' : ''}`}</td>
+                                              <td>
+                                                <div className="attendance-records-page__type-cell">
+                                                  <span>{record.type.replace('_', ' ')}</span>
+                                                  {isLate ? <span className="attendance-records-page__late-pill">Late</span> : null}
+                                                </div>
+                                              </td>
                                               <td>{new Date(record.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</td>
                                               <td>
-                                                <span className={`attendance-records-page__sync-pill ${record.synced ? 'is-synced' : 'is-pending'}`}>
-                                                  {getSyncStatusLabel(record)}
-                                                </span>
+                                                <div className="attendance-records-page__status-cell">
+                                                  <span className={`attendance-records-page__sync-pill ${record.synced ? 'is-synced' : 'is-pending'}`}>
+                                                    {getSyncStatusLabel(record)}
+                                                  </span>
+                                                  {isLate ? <span className="attendance-records-page__late-pill attendance-records-page__late-pill--status">Late</span> : null}
+                                                </div>
                                               </td>
                                               {canDelete ? (
                                                 <td className="attendance-records-page__raw-table-action-cell">

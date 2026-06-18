@@ -1129,6 +1129,34 @@ body {
   color: #b36b00;
 }
 
+.attendance-records-page__type-cell,
+.attendance-records-page__status-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.attendance-records-page__late-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(184, 28, 28, 0.16);
+  background: #fff1f1;
+  color: #b42318;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.attendance-records-page__late-pill--status {
+  min-height: 24px;
+}
+
 .attendance-records-page__days {
   display: grid;
   gap: 10px;

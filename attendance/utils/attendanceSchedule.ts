@@ -1,4 +1,4 @@
-import type { AttendanceDecision, AttendanceScheduleConfig, AttendanceType } from '../types';
+import type { AttendanceDecision, AttendanceRecord, AttendanceScheduleConfig, AttendanceType, Learner } from '../types';
 
 const timeToMinutes = (value: string) => {
   const [hours, minutes] = String(value || '')
@@ -169,4 +169,16 @@ export const resolveAttendanceDecision = (
   }
 
   return makeDecision(gradeBand, 'UNSCHEDULED', false, defaultRange);
+};
+
+export const isAttendanceRecordLate = (
+  record: AttendanceRecord,
+  learner: Learner | undefined,
+  schedule: AttendanceScheduleConfig = DEFAULT_ATTENDANCE_SCHEDULE,
+) => {
+  if (record.isLate) return true;
+  const gradeLevel = String(learner?.grade_level || '');
+  if (!gradeLevel) return false;
+  const decision = resolveAttendanceDecision(gradeLevel, new Date(record.timestamp), schedule);
+  return decision.isLate;
 };

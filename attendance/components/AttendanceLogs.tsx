@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   AttendanceRecord,
   AttendanceType,
+  AttendanceScheduleConfig,
   Learner,
 } from '../types';
 import AttendanceRecordsBrowser from './AttendanceRecordsBrowser';
@@ -10,6 +11,7 @@ import { ManualAttendanceModal, type ManualAttendanceFormValue } from './ManualA
 interface AttendanceLogsProps {
   logs: AttendanceRecord[];
   learners: Learner[];
+  scheduleConfig: AttendanceScheduleConfig;
   onDelete: (record: AttendanceRecord) => Promise<void> | void;
   onAddManualRecord: (learnerId: string, type: AttendanceType, timestamp: string) => Promise<{ ok: boolean; error: string | null }>;
   refreshAttendanceStatusByRange: (fromDate: string, toDate: string) => Promise<Set<string>>;
@@ -18,6 +20,7 @@ interface AttendanceLogsProps {
 const AttendanceLogs: React.FC<AttendanceLogsProps> = ({
   logs,
   learners,
+  scheduleConfig,
   onDelete,
   onAddManualRecord,
   refreshAttendanceStatusByRange,
@@ -116,6 +119,7 @@ const AttendanceLogs: React.FC<AttendanceLogsProps> = ({
         <AttendanceRecordsBrowser
           logs={logs}
           learners={learners}
+          scheduleConfig={scheduleConfig}
           onDelete={onDelete}
           refreshAttendanceStatusByRange={refreshAttendanceStatusByRange}
         />

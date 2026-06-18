@@ -33,7 +33,9 @@ import TeacherSectionAttendancePage from './features/teacher/components/TeacherS
 import { resolveAttendanceDecision } from './utils/attendanceSchedule';
 import {
   ATTENDANCE_DEFAULT_PATH,
+  ATTENDANCE_KIOSK_PATH,
   ATTENDANCE_LAST_PATH_KEY,
+  ATTENDANCE_LAST_NON_KIOSK_PATH_KEY,
   resolveAttendancePath,
 } from './utils/attendanceRoutePersistence';
 
@@ -106,7 +108,6 @@ function App() {
     refreshAttendanceStatusByRange,
   } = useAttendance();
 
-  const [isStandbyMode, setIsStandbyMode] = useState(false);
   const currentView: 'registrar' | 'attendance' | 'summary' | 'settings' = useMemo(() => {
     if (location.pathname.startsWith('/records')) return 'attendance';
     if (location.pathname.startsWith('/summary')) return 'summary';
@@ -114,6 +115,7 @@ function App() {
     return 'registrar';
   }, [location.pathname]);
   const isTeacherRoute = location.pathname.startsWith('/teacher');
+  const isKioskRoute = location.pathname.startsWith(ATTENDANCE_KIOSK_PATH);
 
   const [baudRates, setBaudRates] = useState<number[]>(() => {
     return [0, 1, 2].map(i => {
@@ -189,14 +191,16 @@ function App() {
       if (adminUids.includes(scannedUid)) {
         setScanFlash(true);
         setTimeout(() => setScanFlash(false), 300);
-        
-        const entering = !isStandbyMode;
-        setIsStandbyMode(entering);
-        
+        if (isKioskRoute) {
+          const fallbackPath = window.localStorage.getItem(ATTENDANCE_LAST_NON_KIOSK_PATH_KEY) || ATTENDANCE_DEFAULT_PATH;
+          navigate(resolveAttendancePath(fallbackPath, ATTENDANCE_DEFAULT_PATH));
+        } else {
+          navigate(ATTENDANCE_KIOSK_PATH);
+        }
         return;
       }
 
-      if (isStandbyMode) {
+      if (isKioskRoute) {
           const learner = learners.find(l => {
           const dbUid = normalizeRfidValue(l.rfid);
           const localUid = normalizeRfidValue(uidMappings[l.id]);
@@ -282,7 +286,7 @@ function App() {
         setTimeout(() => setScanFlash(false), 500);
       }
     });
-  }, [monitor1.logs, monitor2.logs, monitor3.logs, isStandbyMode, uidMappings, adminUids, learners, scheduleConfig, logAttendance, attendanceLogs]);
+  }, [monitor1.logs, monitor2.logs, monitor3.logs, isKioskRoute, uidMappings, adminUids, learners, scheduleConfig, logAttendance, attendanceLogs, navigate]);
 
   useEffect(() => {
     const hasActive = lastScanResults.some(r => r !== null) || unknownTags.some(t => t !== null);
@@ -315,12 +319,16 @@ function App() {
       if (adminUids.includes(scannedUid)) {
         setScanFlash(true);
         setTimeout(() => setScanFlash(false), 300);
-        const entering = !isStandbyMode;
-        setIsStandbyMode(entering);
+        if (isKioskRoute) {
+          const fallbackPath = window.localStorage.getItem(ATTENDANCE_LAST_NON_KIOSK_PATH_KEY) || ATTENDANCE_DEFAULT_PATH;
+          navigate(resolveAttendancePath(fallbackPath, ATTENDANCE_DEFAULT_PATH));
+        } else {
+          navigate(ATTENDANCE_KIOSK_PATH);
+        }
         return;
       }
 
-      if (isStandbyMode) {
+      if (isKioskRoute) {
         const learner = learners.find(l => {
           const dbUid = normalizeRfidValue(l.rfid);
           const localUid = normalizeRfidValue(uidMappings[l.id]);
@@ -415,7 +423,7 @@ function App() {
       window.removeEventListener('keydown', onKeyDown);
       clearUsbTimer();
     };
-  }, [adminUids, attendanceLogs, isStandbyMode, learners, logAttendance, scheduleConfig, uidMappings]);
+  }, [adminUids, attendanceLogs, isKioskRoute, learners, logAttendance, scheduleConfig, uidMappings, navigate]);
 
   const handleSaveMapping = async () => {
     if (!selectedLearnerId || !activeRfid || conflictWarning) return;
@@ -479,18 +487,25 @@ function App() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if (isTeacherRoute) return;
+    const currentPath = resolveAttendancePath(`${location.pathname}${location.search}${location.hash}`, ATTENDANCE_DEFAULT_PATH);
     window.localStorage.setItem(
       ATTENDANCE_LAST_PATH_KEY,
-      resolveAttendancePath(`${location.pathname}${location.search}${location.hash}`, ATTENDANCE_DEFAULT_PATH)
+      currentPath
     );
-  }, [isTeacherRoute, location.hash, location.pathname, location.search]);
+    if (!isKioskRoute) {
+      window.localStorage.setItem(ATTENDANCE_LAST_NON_KIOSK_PATH_KEY, currentPath);
+    }
+  }, [isKioskRoute, isTeacherRoute, location.hash, location.pathname, location.search]);
 
-  if (isStandbyMode) {
+  if (isKioskRoute) {
     return (
       <>
         <UsisPortalGate moduleKey="attendance" />
         <KioskMode 
-          onExit={() => setIsStandbyMode(false)} 
+          onExit={() => {
+            const fallbackPath = window.localStorage.getItem(ATTENDANCE_LAST_NON_KIOSK_PATH_KEY) || ATTENDANCE_DEFAULT_PATH;
+            navigate(resolveAttendancePath(fallbackPath, ATTENDANCE_DEFAULT_PATH));
+          }} 
           lastScanResults={lastScanResults} 
           unknownTags={unknownTags} 
           settings={scheduleConfig}
@@ -659,7 +674,11 @@ function App() {
           <div className="attendance-content space-y-8">
             <div className="attendance-toolbar">
               <button
-                onClick={() => setIsStandbyMode(true)}
+                onClick={() => {
+                  const currentPath = resolveAttendancePath(`${location.pathname}${location.search}${location.hash}`, ATTENDANCE_DEFAULT_PATH);
+                  window.localStorage.setItem(ATTENDANCE_LAST_NON_KIOSK_PATH_KEY, currentPath);
+                  navigate(ATTENDANCE_KIOSK_PATH);
+                }}
                 className="attendance-toolbar__kiosk"
                 type="button"
               >
@@ -763,6 +782,7 @@ function App() {
                     <AttendanceLogs
                       logs={attendanceLogs}
                       learners={learners}
+                      scheduleConfig={scheduleConfig}
                       onDelete={deleteRecord}
                       onAddManualRecord={addManualAttendanceRecord}
                       refreshAttendanceStatusByRange={refreshAttendanceStatusByRange}
