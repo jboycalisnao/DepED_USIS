@@ -261,11 +261,15 @@ create table if not exists registrar_enrollment_form_schedule (
   start_date date,
   end_date date,
   information_verification_and_update_enabled boolean not null default false,
+  learner_profile_editing_enabled boolean not null default false,
   updated_at timestamptz not null default now()
 );
 
 alter table if exists registrar_enrollment_form_schedule
   add column if not exists information_verification_and_update_enabled boolean not null default false;
+
+alter table if exists registrar_enrollment_form_schedule
+  add column if not exists learner_profile_editing_enabled boolean not null default false;
 
 create index if not exists idx_registrar_enrollment_form_schedule_enabled
   on registrar_enrollment_form_schedule(enabled);
@@ -671,6 +675,43 @@ create index if not exists idx_ia_portal_controls_enabled on ia_portal_controls(
 create index if not exists idx_ia_portal_controls_mode on ia_portal_controls(mode);
 
 -- =========================================================
+-- Learner Portal Notifications
+-- =========================================================
+create table if not exists ia_learner_portal_notifications (
+  id uuid primary key default gen_random_uuid(),
+  notification_key text not null unique,
+  title text not null,
+  message text not null,
+  is_active boolean not null default true,
+  is_pinned boolean not null default false,
+  sort_order integer not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_ia_learner_portal_notifications_active
+  on ia_learner_portal_notifications(is_active, is_pinned, sort_order);
+
+-- =========================================================
+-- Learner Portal Important Dates
+-- =========================================================
+create table if not exists ia_learner_portal_important_dates (
+  id uuid primary key default gen_random_uuid(),
+  date_key text not null unique,
+  title text not null,
+  details text not null,
+  due_date date,
+  is_active boolean not null default true,
+  is_pinned boolean not null default false,
+  sort_order integer not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_ia_learner_portal_important_dates_active
+  on ia_learner_portal_important_dates(is_active, is_pinned, sort_order, due_date);
+
+-- =========================================================
 -- Learner Portal Help Desk Tickets
 -- =========================================================
 create table if not exists learner_portal_help_tickets (
@@ -898,6 +939,16 @@ for each row execute function set_updated_at();
 drop trigger if exists trg_ia_portal_controls_updated_at on ia_portal_controls;
 create trigger trg_ia_portal_controls_updated_at
 before update on ia_portal_controls
+for each row execute function set_updated_at();
+
+drop trigger if exists trg_ia_learner_portal_notifications_updated_at on ia_learner_portal_notifications;
+create trigger trg_ia_learner_portal_notifications_updated_at
+before update on ia_learner_portal_notifications
+for each row execute function set_updated_at();
+
+drop trigger if exists trg_ia_learner_portal_important_dates_updated_at on ia_learner_portal_important_dates;
+create trigger trg_ia_learner_portal_important_dates_updated_at
+before update on ia_learner_portal_important_dates
 for each row execute function set_updated_at();
 
 drop trigger if exists trg_registrar_enrollment_email_settings_updated_at on registrar_enrollment_email_settings;

@@ -31,12 +31,62 @@ export type MerchControlSectionSnapshot = {
   learners: MerchControlSectionLearnerRecord[];
 };
 
+type ActiveSchoolYearSectionRecord = {
+  gradeLevel: string;
+  sectionId: string;
+  sectionName: string;
+  schoolYearId: string;
+};
+
 const toText = (value: unknown) => String(value || '').trim();
 const formatLearnerName = (row: any) => {
   const first = toText(row?.first_name);
   const middle = toText(row?.middle_name);
   const last = toText(row?.last_name);
   return [last, first, middle].filter(Boolean).join(', ').replace(', ,', ',') || 'Unnamed Learner';
+};
+
+const loadActiveSchoolYearId = async () => {
+  const activeSchoolYearResult = await supabase
+    .from('registrar_school_years')
+    .select('id')
+    .eq('is_active', true)
+    .limit(1)
+    .maybeSingle();
+
+  if (activeSchoolYearResult.error || !activeSchoolYearResult.data?.id) {
+    throw new Error('Active school year not found.');
+  }
+
+  return toText(activeSchoolYearResult.data.id);
+};
+
+const loadActiveSchoolYearSections = async (schoolYearId: string, gradeLevel?: string) => {
+  const normalizedSchoolYearId = toText(schoolYearId);
+  if (!normalizedSchoolYearId) return [];
+
+  let query = supabase
+    .from('registrar_sections')
+    .select('id,name,grade_level,school_year_id')
+    .eq('school_year_id', normalizedSchoolYearId)
+    .order('grade_level', { ascending: true })
+    .order('name', { ascending: true });
+
+  if (gradeLevel) {
+    query = query.eq('grade_level', gradeLevel);
+  }
+
+  const sectionsResult = await query;
+  if (sectionsResult.error) {
+    throw new Error(sectionsResult.error.message || 'Unable to load active school year sections.');
+  }
+
+  return (sectionsResult.data || []).map((row: any) => ({
+    gradeLevel: toText(row.grade_level) || 'Unassigned',
+    sectionId: toText(row.id),
+    sectionName: toText(row.name) || 'Unnamed Section',
+    schoolYearId: toText(row.school_year_id) || normalizedSchoolYearId,
+  })) as ActiveSchoolYearSectionRecord[];
 };
 
 const resolveCredentialSectionId = async (params: { learnerId: string; learnerLrn: string }) => {
@@ -83,6 +133,7 @@ export const fetchMerchControlSectionSnapshot = async (params: {
     };
   }
 
+  const activeSchoolYearId = await loadActiveSchoolYearId();
   const isGradeScope = sectionId.startsWith(GRADE_SCOPE_PREFIX);
   const gradeLevelScope = isGradeScope ? sectionId.slice(GRADE_SCOPE_PREFIX.length).trim() : '';
   const sectionIds: string[] = [];
@@ -93,27 +144,32 @@ export const fetchMerchControlSectionSnapshot = async (params: {
   if (isGradeScope) {
     gradeLevel = gradeLevelScope;
     sectionName = `${gradeLevelScope} (All Sections)`;
-    const sectionsResult = await supabase
-      .from('registrar_sections')
-      .select('id,name')
-      .eq('grade_level', gradeLevelScope)
-      .limit(500);
-    if (sectionsResult.error) throw new Error(sectionsResult.error.message || 'Unable to load grade-level sections.');
-    (sectionsResult.data || []).forEach((row: any) => {
-      const sectionId = toText(row.id);
-      if (sectionId) {
-        sectionIds.push(sectionId);
-        sectionNameById.set(sectionId, toText(row.name) || 'Unnamed Section');
-      }
+    const sections = await loadActiveSchoolYearSections(activeSchoolYearId, gradeLevelScope);
+    sections.forEach((row) => {
+      if (!row.sectionId) return;
+      sectionIds.push(row.sectionId);
+      sectionNameById.set(row.sectionId, row.sectionName || 'Unnamed Section');
     });
   } else {
     const sectionResult = await supabase
       .from('registrar_sections')
-      .select('id,name,grade_level')
+      .select('id,name,grade_level,school_year_id')
       .eq('id', sectionId)
       .limit(1)
       .maybeSingle();
     if (sectionResult.error) throw new Error(sectionResult.error.message || 'Unable to load assigned class section.');
+    const sectionSchoolYearId = toText(sectionResult.data?.school_year_id);
+    if (sectionSchoolYearId !== activeSchoolYearId) {
+      return {
+        gradeLevel: toText(sectionResult.data?.grade_level),
+        hasAccess: true,
+        isGradeRepresentative: isGradeScope,
+        learners: [],
+        sectionId,
+        sectionGroups: [],
+        sectionName: toText(sectionResult.data?.name),
+      };
+    }
     sectionName = toText(sectionResult.data?.name);
     gradeLevel = toText(sectionResult.data?.grade_level);
     if (sectionId) {

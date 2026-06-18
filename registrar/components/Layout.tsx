@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useStore } from '../store';
 import { RegistrarHeader } from './shell/RegistrarHeader';
 import { RegistrarFooter } from './shell/RegistrarFooter';
@@ -7,13 +7,14 @@ import { registrarNavItems } from './layout/nav/registrarNavItems';
 import { UsisSideNav } from '../../common/components/UsisSideNav';
 import { UsisBreadcrumbBar } from '../../common/components/UsisBreadcrumbBar';
 import { resolveCoordinatorDepartmentAccess } from '../../common/auth/coordinatorDepartmentAccess';
+import { resolveAdviserLinkedSections } from '../views/adviser-learners/utils/adviserLearnerAccess';
 
 interface LayoutProps {
   children: React.ReactNode;
 }
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
-  const { logout, registrarAccess } = useStore();
+  const { logout, registrarAccess, sections, activeSchoolYear } = useStore();
   const location = useLocation();
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [departmentLabel, setDepartmentLabel] = useState(
@@ -23,6 +24,18 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     itemPath === '/' ? location.pathname === '/' : location.pathname === itemPath || location.pathname.startsWith(`${itemPath}/`);
 
   const currentSection = registrarNavItems.find((item) => isPathActive(item.path)) || registrarNavItems[0];
+  const adviserLinkedSections = resolveAdviserLinkedSections(
+    sections,
+    registrarAccess?.coordinatorName || '',
+    registrarAccess?.coordinatorUsername || '',
+    activeSchoolYear,
+  );
+  const isAdviserScopedAccess =
+    registrarAccess?.coordinatorRole === 'school_usis_coordinator' &&
+    adviserLinkedSections.length > 0;
+  const visibleNavItems = isAdviserScopedAccess
+    ? registrarNavItems.filter((item) => item.path === '/learners')
+    : registrarNavItems.filter((item) => item.path !== '/my-section-learners' || adviserLinkedSections.length > 0);
 
   useEffect(() => {
     let cancelled = false;
@@ -42,6 +55,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       cancelled = true;
     };
   }, [registrarAccess?.userId, registrarAccess?.departmentName]);
+
+  if (isAdviserScopedAccess && location.pathname !== '/learners') {
+    return <Navigate to="/learners" replace />;
+  }
 
   return (
     <div className="registrar-shell">
@@ -72,7 +89,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           />
           <div className="registrar-layout">
             <UsisSideNav
-              items={registrarNavItems}
+              items={visibleNavItems}
               onLogout={logout}
               ariaLabel="Registrar sections"
               isMobileOpen={isMobileNavOpen}

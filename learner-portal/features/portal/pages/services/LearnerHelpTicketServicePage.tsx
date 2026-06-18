@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useLocation } from 'react-router-dom';
 import { UsisSearchableSelect } from '../../../../../common/components/ui/UsisSearchableSelect';
 import { fetchLearnerProfile } from '../../services/learnerProfile';
 import type { LearnerPortalAccessRecord } from '../../../auth/services/learnerAccess';
@@ -50,7 +51,21 @@ const formatTicketDate = (value: string) => {
   return date.toLocaleString();
 };
 
+const buildMainInfoCorrectionDetails = (input: { fullName: string; lrn: string; birthDate: string }) => {
+  return [
+    'Please correct my main learner information in the registrar record.',
+    '',
+    `Learner Name: ${input.fullName || 'N/A'}`,
+    `LRN: ${input.lrn || 'N/A'}`,
+    `Birth Date: ${input.birthDate || 'N/A'}`,
+    '',
+    'Requested correction: Please review and update the record only through registrar verification.',
+  ].join('\n');
+};
+
 export function LearnerHelpTicketServicePage({ session }: { session: LearnerPortalAccessRecord }) {
+  const location = useLocation();
+  const isMainInfoCorrectionRequest = new URLSearchParams(location.search).get('reason') === 'main-info-correction';
   const [draft, setDraft] = useState<LearnerHelpTicketDraft>(initialDraft);
   const [learnerFieldsLocked, setLearnerFieldsLocked] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -79,6 +94,15 @@ export function LearnerHelpTicketServicePage({ session }: { session: LearnerPort
           section: profile.sectionName || '',
           subject: '',
         };
+        if (isMainInfoCorrectionRequest) {
+          nextDraft.category = 'Records Assistance';
+          nextDraft.subject = 'Main information correction request';
+          nextDraft.details = buildMainInfoCorrectionDetails({
+            birthDate: profile.birthDate || '',
+            fullName: toDisplayName(profile.firstName, profile.middleName, profile.lastName) || session.learnerName,
+            lrn: profile.lrn || session.lrn,
+          });
+        }
         setDraft(nextDraft);
         setLearnerFieldsLocked(true);
         setError('');
@@ -89,6 +113,15 @@ export function LearnerHelpTicketServicePage({ session }: { session: LearnerPort
           learnerId: session.learnerId,
           learnerLrn: session.lrn,
           learnerName: session.learnerName,
+          category: isMainInfoCorrectionRequest ? 'Records Assistance' : '',
+          subject: isMainInfoCorrectionRequest ? 'Main information correction request' : '',
+          details: isMainInfoCorrectionRequest
+            ? buildMainInfoCorrectionDetails({
+                birthDate: '',
+                fullName: session.learnerName,
+                lrn: session.lrn,
+              })
+            : '',
         });
         setLearnerFieldsLocked(false);
         setError('Learner profile details could not be loaded right now. You can still complete the ticket manually.');
@@ -100,7 +133,7 @@ export function LearnerHelpTicketServicePage({ session }: { session: LearnerPort
     return () => {
       cancelled = true;
     };
-  }, [session.learnerId, session.learnerName, session.lrn]);
+  }, [isMainInfoCorrectionRequest, session.learnerId, session.learnerName, session.lrn]);
 
   useEffect(() => {
     let cancelled = false;
@@ -164,6 +197,12 @@ export function LearnerHelpTicketServicePage({ session }: { session: LearnerPort
             <p>Your name, grade level, and section are loaded from the registrar record when available.</p>
         </header>
         <div className="portal-panel__body learner-help-ticket-page__body">
+          {isMainInfoCorrectionRequest ? (
+            <div className="notice-box learner-hint__box">
+              <strong>Main Information Correction</strong>
+              <span>This ticket is prefilled for name, LRN, or birth date corrections.</span>
+            </div>
+          ) : null}
           {isLoadingProfile ? <p className="learner-services-history__state">Loading learner details...</p> : null}
           {isLoadingTickets ? <p className="learner-services-history__state">Loading submitted tickets...</p> : null}
           {error ? <div className="notice-box"><strong>Profile Notice</strong><span>{error}</span></div> : null}

@@ -7,6 +7,8 @@ import { openLearnerInformationPrintWindow } from '../features/registrar/learner
 import { sendLearnerCredentialsViaWebhook } from '../features/registrar/learners/services/sendLearnerCredentialsEmail';
 import LearnerEditModal from './learners/LearnerEditModal';
 import { getActiveLearnersForYear } from '../services/dashboardService';
+import { resolveAdviserLinkedSections, groupLearnersByLinkedSection } from './adviser-learners/utils/adviserLearnerAccess';
+import { downloadAdviserSectionWorkbook } from './adviser-learners/utils/adviserLearnerWorkbook';
 
 const LearnerList: React.FC = () => {
   const { learners, sections, activeSchoolYear, availableStrands, registrarAccess, removeLearner, clearSectionLearners, updateLearner, loading } = useStore();
@@ -22,6 +24,20 @@ const LearnerList: React.FC = () => {
   const [sendingCredentialsStudent, setSendingCredentialsStudent] = useState<Student | null>(null);
 
   const isLocked = activeSchoolYear.isLocked;
+  const isAdviserScopedAccess =
+    registrarAccess?.coordinatorRole === 'school_usis_coordinator' &&
+    resolveAdviserLinkedSections(
+      sections,
+      registrarAccess?.coordinatorName || '',
+      registrarAccess?.coordinatorUsername || '',
+      activeSchoolYear,
+    ).length > 0;
+  const adviserLinkedSections = resolveAdviserLinkedSections(
+    sections,
+    registrarAccess?.coordinatorName || '',
+    registrarAccess?.coordinatorUsername || '',
+    activeSchoolYear,
+  );
 
   const baseActiveLearnersForYear = useMemo(() => getActiveLearnersForYear(learners, sections, activeSchoolYear), [learners, sections, activeSchoolYear]);
 
@@ -134,9 +150,52 @@ const LearnerList: React.FC = () => {
     return groups;
   }, [activeLearnersForYear, sections, activeSchoolYear]);
 
+  const adviserSectionGroups = useMemo(() => {
+    if (!isAdviserScopedAccess) return [];
+    return groupLearnersByLinkedSection(
+      activeLearnersForYear,
+      sections,
+      registrarAccess?.coordinatorName || '',
+      registrarAccess?.coordinatorUsername || '',
+      activeSchoolYear,
+    );
+  }, [activeLearnersForYear, activeSchoolYear, isAdviserScopedAccess, registrarAccess?.coordinatorName, registrarAccess?.coordinatorUsername, sections]);
+
+  const visibleGroupedData = useMemo(() => {
+    if (!isAdviserScopedAccess) return groupedData;
+    const visible: Record<string, Record<string, { students: Student[]; sectionId?: string }>> = {};
+    adviserSectionGroups.forEach((group) => {
+      const gradeLabel = group.section.gradeLevel;
+      const sectionLabel = `${group.section.name}${group.section.strand ? ` [${group.section.strand}]` : ''}`;
+      if (!visible[gradeLabel]) visible[gradeLabel] = {};
+      visible[gradeLabel][sectionLabel] = {
+        students: group.learners,
+        sectionId: group.section.id,
+      };
+    });
+    return visible;
+  }, [adviserSectionGroups, groupedData, isAdviserScopedAccess]);
+
+  const adviserExport = () => {
+    if (!isAdviserScopedAccess || adviserSectionGroups.length === 0) return;
+    const ok = downloadAdviserSectionWorkbook(adviserSectionGroups, activeSchoolYear.label, registrarAccess?.coordinatorName || 'Adviser');
+    if (!ok) {
+      setFeedback('No learners are available to export for your linked section.');
+    }
+  };
+
   const hasSearchQuery = searchTerm.trim().length > 0;
 
   useEffect(() => {
+    if (isAdviserScopedAccess) {
+      setExpandedGrades(new Set(Object.keys(visibleGroupedData)));
+      setExpandedSections(new Set(
+        Object.entries(visibleGroupedData).flatMap(([grade, sectionsByGrade]) =>
+          Object.keys(sectionsByGrade).map((sectionName) => grade + sectionName),
+        ),
+      ));
+      return;
+    }
     if (!hasSearchQuery) {
       setExpandedGrades(new Set());
       setExpandedSections(new Set());
@@ -160,7 +219,7 @@ const LearnerList: React.FC = () => {
 
     setExpandedGrades(nextGrades);
     setExpandedSections(nextSections);
-  }, [groupedData, hasSearchQuery]);
+  }, [groupedData, hasSearchQuery, isAdviserScopedAccess, visibleGroupedData]);
 
   const toggleGrade = (grade: string) => {
     const next = new Set(expandedGrades);
@@ -188,43 +247,60 @@ const LearnerList: React.FC = () => {
   return (
     <div className="registrar-learners-page">
       <div className="registrar-learners-page__search">
-        <div className="registrar-learners-page__search-field">
-          <label className="floating-field">
-            <div className="floating-field__control registrar-learners-page__search-control" data-has-value={hasSearchQuery ? 'true' : 'false'}>
-              <input
-                type="text"
-                placeholder=" "
-                className="registrar-learners-page__search-input"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-              <span className="registrar-learners-page__search-label">
-                <span className="material-symbols-outlined" aria-hidden="true">search</span>
-                <span>Search Learners</span>
+        {isAdviserScopedAccess ? (
+          <>
+            <div className="registrar-learners-page__meta-box registrar-learners-page__meta-box--wide">
+              <span className="registrar-learners-page__meta-label">Linked Section</span>
+              <span className="registrar-learners-page__meta-value">
+                {adviserLinkedSections.map((section) => section.name).join(', ')}
               </span>
-              {hasSearchQuery && (
-                <button
-                  type="button"
-                  className="registrar-search-clear-btn"
-                  onClick={() => setSearchTerm('')}
-                  aria-label="Clear learner search"
-                  title="Clear"
-                >
-                  <span className="material-symbols-outlined" aria-hidden="true">close</span>
-                </button>
-              )}
             </div>
-          </label>
-        </div>
-        <div className="registrar-learners-page__meta-box">
-          <span className="registrar-learners-page__meta-label">Active Registry</span>
-          <span className="registrar-learners-page__meta-value">{baseActiveLearnersForYear.length}</span>
-        </div>
+            <button type="button" className="secondary-button" onClick={adviserExport} disabled={loading || adviserSectionGroups.length === 0}>
+              <span className="material-symbols-outlined" aria-hidden="true">download</span>
+              Download Excel
+            </button>
+          </>
+        ) : (
+          <>
+            <div className="registrar-learners-page__search-field">
+              <label className="floating-field">
+                <div className="floating-field__control registrar-learners-page__search-control" data-has-value={hasSearchQuery ? 'true' : 'false'}>
+                  <input
+                    type="text"
+                    placeholder=" "
+                    className="registrar-learners-page__search-input"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                  <span className="registrar-learners-page__search-label">
+                    <span className="material-symbols-outlined" aria-hidden="true">search</span>
+                    <span>Search Learners</span>
+                  </span>
+                  {hasSearchQuery && (
+                    <button
+                      type="button"
+                      className="registrar-search-clear-btn"
+                      onClick={() => setSearchTerm('')}
+                      aria-label="Clear learner search"
+                      title="Clear"
+                    >
+                      <span className="material-symbols-outlined" aria-hidden="true">close</span>
+                    </button>
+                  )}
+                </div>
+              </label>
+            </div>
+            <div className="registrar-learners-page__meta-box">
+              <span className="registrar-learners-page__meta-label">Active Registry</span>
+              <span className="registrar-learners-page__meta-value">{baseActiveLearnersForYear.length}</span>
+            </div>
+          </>
+        )}
       </div>
 
       <div className="registrar-learners-page__groups">
-        {Object.keys(groupedData).length > 0 ? (
-          Object.keys(groupedData)
+        {Object.keys(visibleGroupedData).length > 0 ? (
+          Object.keys(visibleGroupedData)
             .sort((a, b) => {
               const order = Object.values(GradeLevel);
               return order.indexOf(a as GradeLevel) - order.indexOf(b as GradeLevel);
@@ -242,14 +318,14 @@ const LearnerList: React.FC = () => {
                     </div>
                     <div>
                       <h3 className="registrar-learners-page__grade-name">{grade}</h3>
-                      <p className="registrar-learners-page__grade-count">{Object.keys(groupedData[grade]).length} Active Sections</p>
+                      <p className="registrar-learners-page__grade-count">{Object.keys(visibleGroupedData[grade]).length} Active Sections</p>
                     </div>
                   </div>
                 </button>
 
                 {expandedGrades.has(grade) && (
                   <div className="registrar-learners-page__sections">
-                    {(Object.entries(groupedData[grade]) as [string, { students: Student[]; sectionId?: string }][])
+                    {(Object.entries(visibleGroupedData[grade]) as [string, { students: Student[]; sectionId?: string }][])
                       .sort((a, b) => a[0].localeCompare(b[0]))
                       .map(([sectionName, data]) => {
                         const sectionKey = grade + sectionName;
@@ -268,7 +344,7 @@ const LearnerList: React.FC = () => {
                                 <span className="registrar-learners-page__section-count">- {data.students.length} Learners</span>
                               </button>
 
-                              {!isLocked && data.sectionId && (
+                              {!isAdviserScopedAccess && !isLocked && data.sectionId && (
                                 <div className="registrar-learners-page__section-actions">
                                   <button
                                     onClick={(e) => {
@@ -292,7 +368,7 @@ const LearnerList: React.FC = () => {
                                       <th>LRN</th>
                                       <th>Name</th>
                                       <th>Username</th>
-                                      <th>Password</th>
+                                      {!isAdviserScopedAccess ? <th>Password</th> : null}
                                       <th>Login</th>
                                       <th className="align-center">Sex</th>
                                       <th className="align-right">Actions</th>
@@ -305,7 +381,7 @@ const LearnerList: React.FC = () => {
                                       return (
                                         <React.Fragment key={gender}>
                                           <tr className="registrar-learners-page__gender-row">
-                                            <td colSpan={7}>
+                                            <td colSpan={isAdviserScopedAccess ? 6 : 7}>
                                               <span>{gender} - {students.length}</span>
                                             </td>
                                           </tr>
@@ -316,28 +392,32 @@ const LearnerList: React.FC = () => {
                                                 <div className="name">{student.lastName}, {student.firstName} {student.middleName || ''}</div>
                                               </td>
                                               <td>{student.loginUsername || 'Not Set'}</td>
-                                              <td className="mono">
-                                                {student.loginPassword
-                                                  ? revealedPasswordLearnerId === student.id
-                                                    ? student.loginPassword
-                                                    : '*'.repeat(Math.min(student.loginPassword.length, 10))
-                                                  : 'Not Set'}
-                                              </td>
+                                              {!isAdviserScopedAccess ? (
+                                                <td className="mono">
+                                                  {student.loginPassword
+                                                    ? revealedPasswordLearnerId === student.id
+                                                      ? student.loginPassword
+                                                      : '*'.repeat(Math.min(student.loginPassword.length, 10))
+                                                    : 'Not Set'}
+                                                </td>
+                                              ) : null}
                                               <td><span className="login-state">{student.loginStatus || 'Active'}</span></td>
                                               <td className="align-center">
                                                 <span className={`gender-badge ${student.gender === 'Male' ? 'male' : 'female'}`}>{student.gender}</span>
                                               </td>
                                               <td className="align-right">
                                                 <div className="row-actions">
-                                                  <button
-                                                    onClick={() => setRevealedPasswordLearnerId((current) => (current === student.id ? null : student.id))}
-                                                    className="icon-btn"
-                                                    title={revealedPasswordLearnerId === student.id ? 'Hide Password' : 'Reveal Password'}
-                                                  >
-                                                    <span className="material-symbols-outlined">
-                                                      {revealedPasswordLearnerId === student.id ? 'visibility_off' : 'visibility'}
-                                                    </span>
-                                                  </button>
+                                                  {!isAdviserScopedAccess ? (
+                                                    <button
+                                                      onClick={() => setRevealedPasswordLearnerId((current) => (current === student.id ? null : student.id))}
+                                                      className="icon-btn"
+                                                      title={revealedPasswordLearnerId === student.id ? 'Hide Password' : 'Reveal Password'}
+                                                    >
+                                                      <span className="material-symbols-outlined">
+                                                        {revealedPasswordLearnerId === student.id ? 'visibility_off' : 'visibility'}
+                                                      </span>
+                                                    </button>
+                                                  ) : null}
                                                   <button
                                                     onClick={() => openEditStudent(student)}
                                                     className="icon-btn"
@@ -345,29 +425,33 @@ const LearnerList: React.FC = () => {
                                                   >
                                                     <span className="material-symbols-outlined">edit</span>
                                                   </button>
-                                                  <button
-                                                    onClick={() => openSendCredentials(student)}
-                                                    className="icon-btn registrar-learners-page__email-btn"
-                                                    title={student.email ? 'Send Credentials Email' : 'Learner email is not set'}
-                                                    disabled={!student.email}
-                                                  >
-                                                    <span className="material-symbols-outlined">mail</span>
-                                                  </button>
-                                                  <button
-                                                    onClick={() => {
-                                                      const ok = openLearnerInformationPrintWindow({
-                                                        learners: [student],
-                                                        sections,
-                                                        schoolYearLabel: activeSchoolYear.label,
-                                                      });
-                                                      if (!ok) setFeedback('Popup blocked. Allow popups for this site to print learner information sheet.');
-                                                    }}
-                                                    className="icon-btn"
-                                                    title="Print Learner Information"
-                                                  >
-                                                    <span className="material-symbols-outlined">print</span>
-                                                  </button>
-                                                  {!isLocked && (
+                                                  {!isAdviserScopedAccess ? (
+                                                    <>
+                                                      <button
+                                                        onClick={() => openSendCredentials(student)}
+                                                        className="icon-btn registrar-learners-page__email-btn"
+                                                        title={student.email ? 'Send Credentials Email' : 'Learner email is not set'}
+                                                        disabled={!student.email}
+                                                      >
+                                                        <span className="material-symbols-outlined">mail</span>
+                                                      </button>
+                                                      <button
+                                                        onClick={() => {
+                                                          const ok = openLearnerInformationPrintWindow({
+                                                            learners: [student],
+                                                            sections,
+                                                            schoolYearLabel: activeSchoolYear.label,
+                                                          });
+                                                          if (!ok) setFeedback('Popup blocked. Allow popups for this site to print learner information sheet.');
+                                                        }}
+                                                        className="icon-btn"
+                                                        title="Print Learner Information"
+                                                      >
+                                                        <span className="material-symbols-outlined">print</span>
+                                                      </button>
+                                                    </>
+                                                  ) : null}
+                                                  {!isAdviserScopedAccess && !isLocked && (
                                                     <button onClick={() => setDeletingStudent(student)} className="icon-btn danger">
                                                       <span className="material-symbols-outlined">delete</span>
                                                     </button>
@@ -393,36 +477,40 @@ const LearnerList: React.FC = () => {
         ) : (
           <div className="registrar-learners-page__empty">
             <span className="material-symbols-outlined">group_off</span>
-            <p>No learners registered for this year</p>
+            <p>{isAdviserScopedAccess ? 'No learners are linked to your section for this school year.' : 'No learners registered for this year'}</p>
           </div>
         )}
       </div>
 
-      <ConfirmationModal
-        isOpen={!!deletingStudent}
-        type="danger"
-        title="Remove Learner"
-        message={`Delete ${deletingStudent?.lastName}, ${deletingStudent?.firstName} from the central registry?`}
-        onConfirm={async () => {
-          if (deletingStudent) await removeLearner(deletingStudent.id);
-          setDeletingStudent(null);
-        }}
-        onCancel={() => setDeletingStudent(null)}
-        isLoading={loading}
-      />
+      {!isAdviserScopedAccess ? (
+        <>
+          <ConfirmationModal
+            isOpen={!!deletingStudent}
+            type="danger"
+            title="Remove Learner"
+            message={`Delete ${deletingStudent?.lastName}, ${deletingStudent?.firstName} from the central registry?`}
+            onConfirm={async () => {
+              if (deletingStudent) await removeLearner(deletingStudent.id);
+              setDeletingStudent(null);
+            }}
+            onCancel={() => setDeletingStudent(null)}
+            isLoading={loading}
+          />
 
-      <ConfirmationModal
-        isOpen={!!clearingSection}
-        type="accent"
-        title="Purge Section List"
-        message={`Remove ALL learners currently enrolled in "${clearingSection?.name}"? The section itself will remain, but the registry will be cleared.`}
-        onConfirm={async () => {
-          if (clearingSection) await clearSectionLearners(clearingSection.id);
-          setClearingSection(null);
-        }}
-        onCancel={() => setClearingSection(null)}
-        isLoading={loading}
-      />
+          <ConfirmationModal
+            isOpen={!!clearingSection}
+            type="accent"
+            title="Purge Section List"
+            message={`Remove ALL learners currently enrolled in "${clearingSection?.name}"? The section itself will remain, but the registry will be cleared.`}
+            onConfirm={async () => {
+              if (clearingSection) await clearSectionLearners(clearingSection.id);
+              setClearingSection(null);
+            }}
+            onCancel={() => setClearingSection(null)}
+            isLoading={loading}
+          />
+        </>
+      ) : null}
 
       <LearnerDetailsModal student={selectedStudent} history={derivedHistory} onClose={() => setSelectedStudent(null)} />
       <LearnerEditModal
@@ -435,31 +523,33 @@ const LearnerList: React.FC = () => {
         onSuccess={(message) => setFeedback(message)}
         onSubmit={updateLearner}
       />
-      <ConfirmationModal
-        isOpen={!!sendingCredentialsStudent}
-        type="accent"
-        title="Send Credentials Email"
-        message={`Send login credentials to ${sendingCredentialsStudent?.lastName}, ${sendingCredentialsStudent?.firstName}? This will use ${sendingCredentialsStudent?.email || sendingCredentialsStudent?.microsoftUpn || 'the learner email address on record'}.`}
-        onConfirm={async () => {
-          if (!sendingCredentialsStudent) return;
-          try {
-            const section = sections.find((entry) => String(entry.id || '').trim() === String(sendingCredentialsStudent.sectionId || '').trim());
-            const result = await sendLearnerCredentialsViaWebhook({
-              learner: sendingCredentialsStudent,
-              schoolId: String(registrarAccess?.schoolId || '302522').trim(),
-              schoolYearLabel: activeSchoolYear.label,
-              sectionLabel: section ? `${section.name}${section.strand ? ` [${section.strand}]` : ''}` : 'Unassigned',
-            });
-            setFeedback(result?.message || 'Learner credentials email sent.');
-          } catch (error: any) {
-            setFeedback(error?.message || 'Unable to send learner credentials email.');
-          } finally {
-            setSendingCredentialsStudent(null);
-          }
-        }}
-        onCancel={() => setSendingCredentialsStudent(null)}
-        isLoading={loading}
-      />
+      {!isAdviserScopedAccess ? (
+        <ConfirmationModal
+          isOpen={!!sendingCredentialsStudent}
+          type="accent"
+          title="Send Credentials Email"
+          message={`Send login credentials to ${sendingCredentialsStudent?.lastName}, ${sendingCredentialsStudent?.firstName}? This will use ${sendingCredentialsStudent?.email || sendingCredentialsStudent?.microsoftUpn || 'the learner email address on record'}.`}
+          onConfirm={async () => {
+            if (!sendingCredentialsStudent) return;
+            try {
+              const section = sections.find((entry) => String(entry.id || '').trim() === String(sendingCredentialsStudent.sectionId || '').trim());
+              const result = await sendLearnerCredentialsViaWebhook({
+                learner: sendingCredentialsStudent,
+                schoolId: String(registrarAccess?.schoolId || '302522').trim(),
+                schoolYearLabel: activeSchoolYear.label,
+                sectionLabel: section ? `${section.name}${section.strand ? ` [${section.strand}]` : ''}` : 'Unassigned',
+              });
+              setFeedback(result?.message || 'Learner credentials email sent.');
+            } catch (error: any) {
+              setFeedback(error?.message || 'Unable to send learner credentials email.');
+            } finally {
+              setSendingCredentialsStudent(null);
+            }
+          }}
+          onCancel={() => setSendingCredentialsStudent(null)}
+          isLoading={loading}
+        />
+      ) : null}
       <ConfirmationModal
         isOpen={!!feedback}
         type="accent"

@@ -9,6 +9,7 @@ type UsisBreadcrumbBarProps = {
   profileSubtitle?: string | null;
   onLogout?: () => void;
   leftActions?: React.ReactNode;
+  rightActions?: React.ReactNode;
 };
 
 export function UsisBreadcrumbBar({
@@ -19,6 +20,7 @@ export function UsisBreadcrumbBar({
   profileSubtitle,
   onLogout,
   leftActions,
+  rightActions,
 }: UsisBreadcrumbBarProps) {
   return (
     <section className="usis-breadcrumb-bar" aria-label="Current subsystem page">
@@ -33,14 +35,17 @@ export function UsisBreadcrumbBar({
             <span className="usis-breadcrumb__current">{currentLabel}</span>
           </p>
         </div>
-        {profileName && onLogout ? (
-          <UsisProfileTrigger
-            name={profileName}
-            role={profileRole || 'School Coordinator'}
-            subtitle={profileSubtitle || undefined}
-            onLogout={onLogout}
-          />
-        ) : null}
+        <div className="usis-breadcrumb-bar__right-group">
+          {rightActions ? <div className="usis-breadcrumb-bar__right-actions">{rightActions}</div> : null}
+          {profileName && onLogout ? (
+            <UsisProfileTrigger
+              name={profileName}
+              role={profileRole || 'School Coordinator'}
+              subtitle={profileSubtitle || undefined}
+              onLogout={onLogout}
+            />
+          ) : null}
+        </div>
       </div>
     </section>
   );

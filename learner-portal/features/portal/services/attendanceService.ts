@@ -15,6 +15,7 @@ export type LearnerAttendanceTap = {
   type: LearnerAttendanceTapType;
   loggedAt: string;
   displayTime: string;
+  isLate: boolean;
   source: string;
   stationNo: string;
   scannedUid: string;
@@ -43,6 +44,7 @@ export type LearnerAttendanceSnapshot = {
 type RawAttendanceRecordRow = {
   id: string;
   attendance_type: string;
+  is_late?: boolean | null;
   logged_at: string;
   source: string | null;
   station_no: number | string | null;
@@ -117,6 +119,7 @@ const tapTypeLabelMap: Record<LearnerAttendanceTapType, string> = {
 const createTap = (
   type: LearnerAttendanceTapType,
   loggedAt: string,
+  isLate = false,
   source = 'rfid',
   stationNo = '',
   scannedUid = '',
@@ -124,6 +127,7 @@ const createTap = (
   type,
   loggedAt,
   displayTime: formatTimeInManila(loggedAt),
+  isLate: Boolean(isLate),
   source: toText(source) || 'rfid',
   stationNo: toText(stationNo),
   scannedUid: toText(scannedUid),
@@ -161,6 +165,7 @@ const buildSnapshot = (rows: RawAttendanceRecordRow[]): LearnerAttendanceSnapsho
       createTap(
         normalizeAttendanceType(row.attendance_type),
         row.logged_at,
+        Boolean(row.is_late),
         row.source || 'rfid',
         row.station_no == null ? '' : String(row.station_no),
         row.scanned_uid || '',
@@ -212,7 +217,7 @@ const buildSnapshot = (rows: RawAttendanceRecordRow[]): LearnerAttendanceSnapsho
 const fetchAllAttendanceRows = async (learnerId: string) => {
   const { data, error } = await supabase
     .from('attendance_records')
-    .select('id,attendance_type,logged_at,source,station_no,scanned_uid')
+    .select('id,attendance_type,is_late,logged_at,source,station_no,scanned_uid')
     .eq('learner_id', learnerId)
     .order('logged_at', { ascending: true });
 
@@ -226,7 +231,7 @@ const fetchAllAttendanceRows = async (learnerId: string) => {
 const fetchAttendanceRowsSince = async (learnerId: string, sinceLoggedAt: string) => {
   const { data, error } = await supabase
     .from('attendance_records')
-    .select('id,attendance_type,logged_at,source,station_no,scanned_uid')
+    .select('id,attendance_type,is_late,logged_at,source,station_no,scanned_uid')
     .eq('learner_id', learnerId)
     .gte('logged_at', sinceLoggedAt)
     .order('logged_at', { ascending: true });

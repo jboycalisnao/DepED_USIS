@@ -1678,3 +1678,115 @@
     grid-template-columns: 1fr;
   }
 }
+
+.registrar-adviser-learners-page {
+  display: grid;
+  gap: 20px;
+}
+
+.registrar-adviser-learners-page__head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.registrar-adviser-learners-page__summary {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.registrar-adviser-learners-page__summary h3 {
+  margin: 0;
+  color: var(--deped-blue);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.registrar-adviser-learners-page__summary p,
+.registrar-adviser-learners-page__section-head p {
+  margin: 0;
+  color: var(--deped-muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.registrar-adviser-learners-page__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.registrar-adviser-learners-page__toolbar .secondary-button {
+  min-height: 44px;
+}
+
+.registrar-adviser-learners-page__sections {
+  display: grid;
+  gap: 18px;
+}
+
+.registrar-adviser-learners-page__section-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.registrar-adviser-learners-page__section-head h3 {
+  margin: 0;
+  color: var(--deped-ink);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.registrar-adviser-learners-page__notice {
+  margin-bottom: 0;
+}
+
+.registrar-adviser-learners-page__empty {
+  display: grid;
+  place-items: center;
+  gap: 12px;
+  min-height: 220px;
+  padding: 28px;
+  border: 1px dashed rgba(18, 35, 61, 0.16);
+  border-radius: 14px;
+  background: #fbfcff;
+  color: var(--deped-muted);
+  text-align: center;
+}
+
+.registrar-adviser-learners-page__empty .material-symbols-outlined {
+  font-size: 38px;
+  color: var(--deped-blue);
+}
+
+.registrar-learners-page__empty-row {
+  padding: 18px;
+  color: var(--deped-muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+@media (max-width: 720px) {
+  .registrar-adviser-learners-page__head,
+  .registrar-adviser-learners-page__section-head {
+    align-items: stretch;
+  }
+
+  .registrar-adviser-learners-page__toolbar {
+    justify-content: flex-start;
+  }
+
+  .registrar-adviser-learners-page__toolbar .secondary-button {
+    width: 100%;
+  }
+}

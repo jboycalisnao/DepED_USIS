@@ -25,6 +25,20 @@
   margin-right: 4px;
 }
 
+.usis-breadcrumb-bar__right-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+  min-width: 0;
+}
+
+.usis-breadcrumb-bar__right-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .usis-breadcrumb {
   display: inline-flex;
   align-items: center;
@@ -56,5 +70,9 @@
   .usis-breadcrumb-bar__row {
     justify-content: space-between;
     gap: 12px;
+  }
+
+  .usis-breadcrumb-bar__right-group {
+    gap: 8px;
   }
 }

@@ -9,6 +9,7 @@ type PortalSchedule = {
   start_date: string | null;
   end_date: string | null;
   information_verification_and_update_enabled: boolean;
+  learner_profile_editing_enabled: boolean;
   updated_at?: string;
 };
 
@@ -19,6 +20,7 @@ const DEFAULT_SCHEDULE: PortalSchedule = {
   start_date: null,
   end_date: null,
   information_verification_and_update_enabled: false,
+  learner_profile_editing_enabled: false,
 };
 
 function ToggleSwitch({ checked, disabled = false, onClick, ariaLabel }: { checked: boolean; disabled?: boolean; onClick: () => void; ariaLabel: string }) {
@@ -48,6 +50,7 @@ const EnrollmentPortalControls: React.FC = () => {
             start_date: ((data as any).start_date as string | null) || null,
             end_date: ((data as any).end_date as string | null) || null,
             information_verification_and_update_enabled: !!(data as any).information_verification_and_update_enabled,
+            learner_profile_editing_enabled: !!(data as any).learner_profile_editing_enabled,
             updated_at: (data as any).updated_at || undefined,
           });
           return;
@@ -78,6 +81,7 @@ const EnrollmentPortalControls: React.FC = () => {
         start_date: next.start_date || null,
         end_date: next.end_date || null,
         information_verification_and_update_enabled: next.information_verification_and_update_enabled,
+        learner_profile_editing_enabled: next.learner_profile_editing_enabled,
         updated_at: new Date().toISOString(),
       };
       const { error } = await supabase.from('registrar_enrollment_form_schedule').upsert(payload, { onConflict: 'id' });
@@ -139,13 +143,34 @@ const EnrollmentPortalControls: React.FC = () => {
           />
         </div>
 
+        <div className="settings-enrollment-controls__row">
+          <div>
+            <p>Learner Profile Self-Service Editing</p>
+            <small>Allow learners to edit guardian, parent, contact, and address fields from the profile page while registrar-only fields stay locked.</small>
+          </div>
+          <ToggleSwitch
+            checked={schedule.learner_profile_editing_enabled}
+            disabled={isLoading}
+            onClick={() =>
+              saveSchedule(
+                {
+                  ...schedule,
+                  learner_profile_editing_enabled: !schedule.learner_profile_editing_enabled,
+                },
+                `Learner profile self-service editing is now ${!schedule.learner_profile_editing_enabled ? 'enabled' : 'disabled'}.`,
+              )
+            }
+            ariaLabel="Toggle learner profile self-service editing"
+          />
+        </div>
+
         <div className="settings-enrollment-controls__dates">
           <label className="floating-field"><div className="floating-field__control"><input type="date" value={schedule.start_date || ''} onChange={(event) => setSchedule((c) => ({ ...c, start_date: event.target.value || null }))} placeholder=" " disabled={!schedule.use_date_range || isLoading} /><span>Start Date</span></div></label>
           <label className="floating-field"><div className="floating-field__control"><input type="date" value={schedule.end_date || ''} onChange={(event) => setSchedule((c) => ({ ...c, end_date: event.target.value || null }))} placeholder=" " disabled={!schedule.use_date_range || isLoading} /><span>End Date</span></div></label>
         </div>
 
         <div className="settings-enrollment-controls__actions">
-          <button type="button" className="primary-button" disabled={isLoading} onClick={() => saveSchedule(schedule, 'Enrollment Portal date range saved.')}>Save Date Range</button>
+          <button type="button" className="primary-button" disabled={isLoading} onClick={() => saveSchedule(schedule, 'Enrollment Portal settings saved.')}>Save Portal Settings</button>
         </div>
       </div>
 

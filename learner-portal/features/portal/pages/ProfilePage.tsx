@@ -1,24 +1,65 @@
 import type { LearnerPortalAccessRecord } from '../../auth/services/learnerAccess';
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { fetchLearnerProfile, type LearnerProfileRecord } from '../services/learnerProfile';
+import { clearLearnerPortalCache } from '../services/learnerPortalCache';
+import {
+  fetchLearnerPortalProfileEditingEnabled,
+  updateLearnerPortalProfileFields,
+  type LearnerProfileEditableFields,
+} from '../services/learnerPortalProfileEditing';
 
 type ProfilePageProps = {
   session: LearnerPortalAccessRecord;
 };
 
 export function ProfilePage({ session }: ProfilePageProps) {
+  const navigate = useNavigate();
   const [profile, setProfile] = useState<LearnerProfileRecord | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [profileEditingEnabled, setProfileEditingEnabled] = useState(false);
+  const [editDraft, setEditDraft] = useState<LearnerProfileEditableFields | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
+
+  const toEditableDraft = (record: LearnerProfileRecord): LearnerProfileEditableFields => ({
+    address: record.address || '',
+    contactNumber: record.contactNumber || '',
+    email: record.email || '',
+    fatherName: record.fatherName || '',
+    guardianName: record.guardianName || '',
+    motherName: record.motherName || '',
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadSettings = async () => {
+      try {
+        const enabled = await fetchLearnerPortalProfileEditingEnabled();
+        if (!cancelled) setProfileEditingEnabled(enabled);
+      } catch {
+        if (!cancelled) setProfileEditingEnabled(false);
+      }
+    };
+    void loadSettings();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
     const run = async () => {
       setIsLoading(true);
       setError(null);
+      setSaveFeedback(null);
       try {
         const record = await fetchLearnerProfile({ learnerId: session.learnerId, lrn: session.lrn });
-        if (!cancelled) setProfile(record);
+        if (!cancelled) {
+          setProfile(record);
+          setEditDraft(toEditableDraft(record));
+        }
       } catch (fetchError: any) {
         if (!cancelled) setError(fetchError?.message || 'Unable to load learner profile.');
       } finally {
@@ -45,6 +86,37 @@ export function ProfilePage({ session }: ProfilePageProps) {
       .map((token) => token.charAt(0).toUpperCase())
       .join('');
 
+  const handleOpenCorrectionRequest = () => {
+    navigate('/services/help-ticket?reason=main-info-correction');
+  };
+
+  const handleSaveProfile = async () => {
+    if (!profile || !editDraft) return;
+    setIsSaving(true);
+    setSaveFeedback(null);
+    try {
+      await updateLearnerPortalProfileFields({
+        learnerId: profile.id || session.learnerId,
+        lrn: profile.lrn || session.lrn,
+        fields: editDraft,
+      });
+      setProfile((current) =>
+        current
+          ? {
+              ...current,
+              ...editDraft,
+            }
+          : current,
+      );
+      clearLearnerPortalCache();
+      setSaveFeedback('Profile contact details saved.');
+    } catch (saveError: any) {
+      setSaveFeedback(saveError?.message || 'Unable to save learner profile changes.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
     <section className="section-shell">
       <div className="portal-panel learner-tab-panel">
@@ -65,6 +137,13 @@ export function ProfilePage({ session }: ProfilePageProps) {
         <article className="notice-box learner-hint__box">
           <strong>System Notice</strong>
           <span>{error}</span>
+        </article>
+      ) : null}
+
+      {saveFeedback ? (
+        <article className="notice-box learner-hint__box">
+          <strong>Profile Update</strong>
+          <span>{saveFeedback}</span>
         </article>
       ) : null}
 
@@ -111,7 +190,7 @@ export function ProfilePage({ session }: ProfilePageProps) {
                 <div className="learner-profile-fields">
                   <article><span>Guardian Name</span><strong>{show(profile?.guardianName || '')}</strong></article>
                   <article><span>Father Name</span><strong>{show(profile?.fatherName || '')}</strong></article>
-                  <article><span>Mother Name</span><strong>{show(profile?.motherName || '')}</strong></article>
+                  <article><span>Mother Maiden Name</span><strong>{show(profile?.motherName || '')}</strong></article>
                 </div>
               </section>
 
@@ -122,6 +201,100 @@ export function ProfilePage({ session }: ProfilePageProps) {
                   <article><span>Login Status</span><strong>{show(profile?.loginStatus || session.loginStatus)}</strong></article>
                 </div>
               </section>
+
+              {profileEditingEnabled ? (
+                <section className="learner-profile-card learner-profile-card--editor">
+                  <div className="learner-profile-card__header">
+                    <h4>Editable Contact Details</h4>
+                    <p>Update guardian, parent, contact, and address information here. Name, LRN, and birth date remain registrar-controlled.</p>
+                  </div>
+
+                  <div className="floating-field-grid floating-field-grid--two learner-profile-edit-grid">
+                    <label className="floating-field">
+                      <div className="floating-field__control">
+                        <input
+                          value={editDraft?.guardianName || ''}
+                          onChange={(event) => setEditDraft((current) => (current ? { ...current, guardianName: event.target.value } : current))}
+                          placeholder=" "
+                          disabled={isSaving || !editDraft}
+                        />
+                        <span>Guardian Name</span>
+                      </div>
+                    </label>
+                    <label className="floating-field">
+                      <div className="floating-field__control">
+                        <input
+                          value={editDraft?.fatherName || ''}
+                          onChange={(event) => setEditDraft((current) => (current ? { ...current, fatherName: event.target.value } : current))}
+                          placeholder=" "
+                          disabled={isSaving || !editDraft}
+                        />
+                        <span>Father Name</span>
+                      </div>
+                    </label>
+                    <label className="floating-field">
+                      <div className="floating-field__control">
+                        <input
+                          value={editDraft?.motherName || ''}
+                          onChange={(event) => setEditDraft((current) => (current ? { ...current, motherName: event.target.value } : current))}
+                          placeholder=" "
+                          disabled={isSaving || !editDraft}
+                        />
+                        <span>Mother Maiden Name</span>
+                      </div>
+                    </label>
+                    <label className="floating-field">
+                      <div className="floating-field__control">
+                        <input
+                          value={editDraft?.contactNumber || ''}
+                          onChange={(event) => setEditDraft((current) => (current ? { ...current, contactNumber: event.target.value } : current))}
+                          placeholder=" "
+                          disabled={isSaving || !editDraft}
+                        />
+                        <span>Contact Number</span>
+                      </div>
+                    </label>
+                    <label className="floating-field">
+                      <div className="floating-field__control">
+                        <input
+                          value={editDraft?.email || ''}
+                          onChange={(event) => setEditDraft((current) => (current ? { ...current, email: event.target.value } : current))}
+                          placeholder=" "
+                          disabled={isSaving || !editDraft}
+                        />
+                        <span>Email</span>
+                      </div>
+                    </label>
+                    <label className="floating-field floating-field--full">
+                      <div className="floating-field__control">
+                        <textarea
+                          value={editDraft?.address || ''}
+                          onChange={(event) => setEditDraft((current) => (current ? { ...current, address: event.target.value } : current))}
+                          placeholder=" "
+                          rows={3}
+                          disabled={isSaving || !editDraft}
+                        />
+                        <span>Address</span>
+                      </div>
+                    </label>
+                  </div>
+
+                  <div className="form-actions learner-profile-edit-actions">
+                    <button type="button" className="secondary-button" onClick={handleOpenCorrectionRequest}>
+                      Request main information correction
+                    </button>
+                    <button type="button" className="primary-button" disabled={isSaving || !editDraft} onClick={() => void handleSaveProfile()}>
+                      {isSaving ? 'Saving...' : 'Save Contact Details'}
+                    </button>
+                  </div>
+                </section>
+              ) : (
+                <article className="notice-box learner-hint__box">
+                  <strong>Profile Editing</strong>
+                  <span>Guardian, parent, contact, and address editing is currently managed by the registrar.</span>
+                </article>
+              )}
+
             </div>
           </div>
         </div>

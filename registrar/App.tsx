@@ -9,6 +9,7 @@ import SectionManagement from './views/SectionManagement';
 import Settings from './views/Settings';
 import Credentials from './views/Credentials';
 import CredentialDetailPage from './views/credentials/CredentialDetailPage';
+import AdviserLearnersPage from './views/adviser-learners/AdviserLearnersPage';
 import Landing from './views/Landing';
 import PublicEnrollmentSubmissionsPage from './features/registrar/public-enrollment/admin/components/PublicEnrollmentSubmissionsPage';
 import PublicEnrollmentSubmissionDetailsPage from './features/registrar/public-enrollment/admin/components/PublicEnrollmentSubmissionDetailsPage';
@@ -59,6 +60,7 @@ const AuthenticatedRouter: React.FC = () => {
       <Routes>
         <Route path="/" element={<Dashboard />} />
         <Route path="/learners" element={<LearnerList />} />
+        <Route path="/my-section-learners" element={<AdviserLearnersPage />} />
         <Route path="/public-enrollment" element={<PublicEnrollmentPage />} />
         <Route path="/enroll" element={<PublicEnrollmentSubmissionsPage />} />
         <Route path="/enroll/:id" element={<PublicEnrollmentSubmissionDetailsPage />} />

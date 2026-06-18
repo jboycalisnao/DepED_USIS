@@ -29,6 +29,7 @@ import { LearnerLoginPage } from './features/auth/pages/LearnerLoginPage';
 import { LearnerCredentialPage } from './features/auth/pages/LearnerCredentialPage';
 import { UsisPortalGate } from '../common/components/UsisPortalGate';
 import { LearnerPortalSeo } from './components/ui/LearnerPortalSeo';
+import { LearnerPortalNotificationsTrigger } from './features/portal/components/LearnerPortalNotificationsTrigger';
 
 const LEARNER_PORTAL_BASENAME = '/learner-portal';
 
@@ -74,6 +75,7 @@ function LearnerPortalShell({
               profileRole="Learner"
               profileSubtitle={session.lrn ? `LRN: ${session.lrn}` : undefined}
               onLogout={onLogout}
+              rightActions={<LearnerPortalNotificationsTrigger learnerName={session.learnerName} />}
               leftActions={(
                 <button
                   type="button"

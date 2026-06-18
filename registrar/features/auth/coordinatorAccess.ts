@@ -5,6 +5,7 @@ import { resolveCoordinatorDepartmentAccess } from '../../../common/auth/coordin
 export interface RegistrarCoordinatorAccess {
   accountSource: 'usis_core_coordinators';
   userId: string;
+  coordinatorUsername: string;
   coordinatorName: string;
   coordinatorRole: string;
   departmentName: string;
@@ -162,6 +163,7 @@ export const resolveRegistrarCoordinatorAccess = async (
       record: {
         accountSource: candidate.source,
         userId: candidate.data.id,
+        coordinatorUsername: candidate.data.username || normalizedUsername,
         coordinatorName: formatCoordinatorDisplayName(
           candidate.data.first_name,
           candidate.data.middle_name,

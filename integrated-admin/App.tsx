@@ -32,6 +32,8 @@ import { MerchOrderControlPage } from './features/functions/merchandise/MerchOrd
 import { MerchOrderPaymentPage } from './features/functions/merchandise/MerchOrderPaymentPage';
 import { MerchOrderCountsPage } from './features/functions/merchandise/MerchOrderCountsPage';
 import { PortalControlsPage } from './features/functions/portal-controls/pages/PortalControlsPage';
+import { LearnerPortalNotificationsPage } from './features/functions/portal-controls/pages/LearnerPortalNotificationsPage';
+import { LearnerPortalImportantDatesPage } from './features/functions/portal-controls/pages/LearnerPortalImportantDatesPage';
 import { ElectionFunctionPage } from './features/functions/election/ElectionFunctionPage';
 import { ElectionAdminConsolePage } from './features/functions/election/ElectionAdminConsolePage';
 import { HelpDeskTicketsPage } from './features/functions/help-desk/pages/HelpDeskTicketsPage';
@@ -51,6 +53,9 @@ const iaPathToPageKey: Record<string, string> = {
   '/functions/order-payment': 'ia.merch.payment',
   '/functions/order-counts': 'ia.merch.order_counts',
   '/functions/portal-controls': 'ia.portal_controls',
+  '/functions/portal-controls/controls': 'ia.portal_controls',
+  '/functions/portal-controls/learner-portal': 'ia.portal_controls',
+  '/functions/portal-controls/important-dates': 'ia.portal_controls',
   '/functions/election/admin-console': 'ia.election.admin_console',
   '/functions/election/dashboard': 'ia.election.dashboard',
   '/functions/election/candidates': 'ia.election.candidates',
@@ -128,6 +133,11 @@ const iaNavItems: UsisSideNavItem[] = [
     path: '/functions/portal-controls',
     label: 'Portal Controls',
     icon: 'tune',
+    children: [
+      { path: '/functions/portal-controls/controls', label: 'Controls', icon: 'tune' },
+      { path: '/functions/portal-controls/learner-portal', label: 'Learner Portal', icon: 'campaign' },
+      { path: '/functions/portal-controls/important-dates', label: 'Important Dates', icon: 'event' },
+    ],
   },
   {
     path: '/functions/help-desk',
@@ -419,6 +429,9 @@ function IntegratedAdminShell() {
                       <Route path="/functions/grades-subjects/subject-management" element={<SubjectManagementPage />} />
                       <Route path="/functions/grades-subjects/time-slots" element={<TimeSlotsPage />} />
                       <Route path="/functions/portal-controls" element={<PortalControlsPage />} />
+                      <Route path="/functions/portal-controls/controls" element={<PortalControlsPage />} />
+                      <Route path="/functions/portal-controls/learner-portal" element={<LearnerPortalNotificationsPage />} />
+                      <Route path="/functions/portal-controls/important-dates" element={<LearnerPortalImportantDatesPage />} />
                       <Route path="/functions/election" element={<ElectionFunctionPage />}>
                         <Route index element={<Navigate to="dashboard" replace />} />
                         <Route path="admin-console" element={<Navigate to="dashboard" replace />} />
