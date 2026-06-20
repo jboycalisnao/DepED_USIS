@@ -25,6 +25,7 @@ import { StudentSupportServicePage } from './features/portal/pages/services/Stud
 import { PtaFeeServicePage } from './features/portal/pages/services/PtaFeeServicePage';
 import { MerchServicePage } from './features/portal/pages/services/MerchServicePage';
 import { MerchControlServicePage } from './features/portal/pages/services/MerchControlServicePage';
+import { IdServicePage } from './features/portal/pages/services/IdServicePage';
 import { LearnerLoginPage } from './features/auth/pages/LearnerLoginPage';
 import { LearnerCredentialPage } from './features/auth/pages/LearnerCredentialPage';
 import { UsisPortalGate } from '../common/components/UsisPortalGate';
@@ -112,6 +113,7 @@ function LearnerPortalShell({
                 <Route path="/services/help-ticket" element={<LearnerHelpTicketServicePage session={session} />} />
                 <Route path="/services/pta-fee" element={<PtaFeeServicePage session={session} />} />
                 <Route path="/services/merch" element={<MerchServicePage session={session} />} />
+                <Route path="/services/id" element={<IdServicePage session={session} />} />
                 <Route path="/services/merch-control" element={<MerchControlServicePage session={session} />} />
                 <Route path="/profile" element={<ProfilePage session={session} />} />
                 <Route path="*" element={<Navigate to="/" replace />} />

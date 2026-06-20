@@ -314,43 +314,50 @@
 .integrated-admin-app .ia-teaching-credential-table td {
   padding-left: 6px;
   padding-right: 6px;
+  word-break: break-word;
   overflow-wrap: anywhere;
 }
 
 .integrated-admin-app .ia-teaching-credential-table th:nth-child(1),
 .integrated-admin-app .ia-teaching-credential-table td:nth-child(1) {
-  width: 14%;
+  width: 4%;
 }
 
 .integrated-admin-app .ia-teaching-credential-table th:nth-child(2),
 .integrated-admin-app .ia-teaching-credential-table td:nth-child(2) {
-  width: 18%;
+  width: 30%;
   padding-left: 4px;
+  white-space: normal;
 }
 
 .integrated-admin-app .ia-teaching-credential-table th:nth-child(3),
 .integrated-admin-app .ia-teaching-credential-table td:nth-child(3) {
-  width: 12%;
+  width: 15%;
+  white-space: normal;
 }
 
 .integrated-admin-app .ia-teaching-credential-table th:nth-child(4),
 .integrated-admin-app .ia-teaching-credential-table td:nth-child(4) {
-  width: 16%;
+  width: 15%;
+  white-space: normal;
 }
 
 .integrated-admin-app .ia-teaching-credential-table th:nth-child(5),
 .integrated-admin-app .ia-teaching-credential-table td:nth-child(5) {
   width: 8%;
+  white-space: normal;
 }
 
 .integrated-admin-app .ia-teaching-credential-table th:nth-child(6),
 .integrated-admin-app .ia-teaching-credential-table td:nth-child(6) {
-  width: 29%;
+  width: 20%;
+  white-space: normal;
 }
 
 .integrated-admin-app .ia-teaching-credential-table th:nth-child(7),
 .integrated-admin-app .ia-teaching-credential-table td:nth-child(7) {
-  width: 13%;
+  width: 8%;
+  white-space: nowrap;
 }
 
 .integrated-admin-app .ia-teaching-credential-table .modal-record__chips {

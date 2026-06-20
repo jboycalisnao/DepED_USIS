@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { LearnerPortalAccessRecord } from '../../../auth/services/learnerAccess';
 import { fetchLearnerPtaFeeSnapshot, type LearnerPtaFeeSnapshot } from '../../services/ptaFeeService';
-import { fetchEnrollmentSnapshot } from '../../services/enrollmentHistoryService';
+import { fetchEnrollmentSnapshot, type EnrollmentHistoryItem } from '../../services/enrollmentHistoryService';
 import { openSoaPrintWindow } from '../../../../../common/utils/statementOfAccountPrint';
 import { UsisSearchableSelect } from '../../../../../common/components/ui/UsisSearchableSelect';
 
@@ -52,9 +52,12 @@ export function PtaFeeServicePage({ session }: PtaFeeServicePageProps) {
       try {
         const enrollmentSnapshot = await fetchEnrollmentSnapshot({ learnerId: session.learnerId, lrn: session.lrn });
         if (cancelled) return;
+        const enrollmentRows = [enrollmentSnapshot.currentEnrollment, ...enrollmentSnapshot.history].filter(
+          (entry): entry is EnrollmentHistoryItem => Boolean(entry),
+        );
         const years = Array.from(
           new Set(
-            enrollmentSnapshot.history
+            enrollmentRows
               .map((entry) => String(entry.schoolYear || '').trim())
               .filter(Boolean)
           )

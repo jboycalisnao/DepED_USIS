@@ -95,7 +95,7 @@ export function MerchandiseControlPage() {
       description: record.description || '',
       imageUrl: record.imageUrl || '',
       isPublished: record.isPublished,
-      isPreOrder: record.isPreOrder,
+      isPreOrder: record.sku.trim().toUpperCase() === 'ID-001' ? true : record.isPreOrder,
       name: record.name,
       orderPeriodId: record.orderPeriodId || '',
       price: String(record.price),
@@ -345,8 +345,12 @@ export function MerchandiseControlPage() {
                               type="button"
                               className="registry-icon-btn registry-icon-btn--danger"
                               aria-label={`Delete ${record.name}`}
-                              title="Delete"
-                              onClick={() => setPendingDeleteRecord(record)}
+                              disabled={record.sku.trim().toUpperCase() === 'ID-001'}
+                              onClick={() => {
+                                if (record.sku.trim().toUpperCase() === 'ID-001') return;
+                                setPendingDeleteRecord(record);
+                              }}
+                              title={record.sku.trim().toUpperCase() === 'ID-001' ? 'ID-001 cannot be deleted.' : 'Delete'}
                             >
                               <span className="material-symbols-outlined" aria-hidden="true">delete</span>
                             </button>
@@ -454,10 +458,12 @@ export function MerchandiseControlPage() {
       <UsisAlertModal
         open={Boolean(pendingDeleteRecord)}
         title="Delete Product"
-        message={`Delete ${pendingDeleteRecord?.name || 'this product'} from merchandise listing?`}
+        message={pendingDeleteRecord?.sku.trim().toUpperCase() === 'ID-001'
+          ? 'ID-001 is protected and cannot be deleted.'
+          : `Delete ${pendingDeleteRecord?.name || 'this product'} from merchandise listing?`}
         tone="danger"
         confirmLabel={isDeleting ? 'Deleting...' : 'Delete'}
-        onConfirm={isDeleting ? undefined : handleDelete}
+        onConfirm={isDeleting || pendingDeleteRecord?.sku.trim().toUpperCase() === 'ID-001' ? undefined : handleDelete}
         onClose={() => {
           if (isDeleting) return;
           setPendingDeleteRecord(null);

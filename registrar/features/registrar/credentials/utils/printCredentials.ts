@@ -95,6 +95,7 @@ const buildPrintHtml = ({
 
       return `
         <article class="sheet">
+          <div class="watermark" aria-hidden="true">CONFIDENTIAL</div>
           <table class="meta-header">
             <tr>
               <td class="logo-cell" rowspan="2">
@@ -155,7 +156,7 @@ const buildPrintHtml = ({
         <style>
           @page { size: A4 portrait; margin: 10mm; }
           body { margin: 0; font-family: "Segoe UI", Arial, sans-serif; color: #111827; background: #fff; }
-          .sheet { width: 100%; page-break-after: always; }
+          .sheet { width: 100%; page-break-after: always; position: relative; overflow: hidden; }
           .sheet:last-child { page-break-after: auto; }
           .meta-header { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
           .meta-header td, .meta-header th { border: 1px solid #111; padding: 4px 6px; }
@@ -203,6 +204,26 @@ const buildPrintHtml = ({
           .col-pass { width: 20%; }
           .col-stat { width: 10%; text-align: center; }
           .footer-note { margin-top: 6px; font-size: 10px; color: #4f6380; }
+          .watermark {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transform: rotate(-28deg);
+            font-size: 54px;
+            font-weight: 700;
+            letter-spacing: 8px;
+            color: rgba(170, 20, 20, 0.22);
+            mix-blend-mode: multiply;
+            pointer-events: none;
+            user-select: none;
+            z-index: 2;
+          }
+          .sheet > *:not(.watermark) {
+            position: relative;
+            z-index: 1;
+          }
           @media print { .sheet { break-inside: avoid; } }
         </style>
       </head>

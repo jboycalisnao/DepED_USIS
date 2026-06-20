@@ -1,5 +1,5 @@
 import { supabase } from '@deped-usis/shared-supabase';
-import { getCachedLearnerData, resolveLearnerCacheKey, setCachedLearnerData } from './learnerPortalCache';
+import { resolveLearnerCacheKey, setCachedLearnerData } from './learnerPortalCache';
 
 type QuarterGrades = {
   firstQuarter: string;
@@ -126,7 +126,6 @@ export async function fetchLearnerGradesSnapshot(input: { learnerId?: string; lr
   const learnerId = toText(input.learnerId);
   const lrn = toText(input.lrn);
   const cacheKey = resolveLearnerCacheKey({ learnerId, lrn });
-  const cached = getCachedLearnerData<LearnerGradesSnapshot>('learner-grades', cacheKey);
 
   let learnerQuery = supabase
     .from('registrar_learners')
@@ -209,15 +208,6 @@ export async function fetchLearnerGradesSnapshot(input: { learnerId?: string; lr
     rows,
     sectionName: resolvedSectionName,
   };
-
-  if (cached) {
-    const hasVisibleGrade = snapshot.rows.some((row) =>
-      [row.firstQuarter, row.secondQuarter, row.thirdQuarter, row.fourthQuarter].some((value) => value !== '--' && value !== ''),
-    );
-    if (!hasVisibleGrade && cached.rows?.length) {
-      return cached;
-    }
-  }
 
   setCachedLearnerData('learner-grades', cacheKey, snapshot);
   return snapshot;

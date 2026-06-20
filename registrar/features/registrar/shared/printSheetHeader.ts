@@ -38,7 +38,7 @@ export const buildLNHSPrintSheetHeader = ({
       </td>
       <td class="docs-cell" rowspan="2">
         <table class="docs-table">
-          <tr><td>Document No.</td><td>${escapeHtml(documentNo)}</td></tr>
+          <tr><td>Document No.</td><td style="white-space:nowrap; word-break:normal; overflow-wrap:normal;">${escapeHtml(documentNo)}</td></tr>
           <tr><td>Issue No.</td><td>1</td></tr>
           <tr><td>Revision No.</td><td>1</td></tr>
           <tr><td>Date of Effectivity</td><td>June 8, 2026</td></tr>

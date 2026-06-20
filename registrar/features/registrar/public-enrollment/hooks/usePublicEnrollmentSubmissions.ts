@@ -40,6 +40,10 @@ export function usePublicEnrollmentSubmissions(scopeKey = 'default', schoolYearL
   const loadFromNetwork = useCallback(async (options?: { toggleLoading?: boolean }) => {
     const normalizedSchoolYear = String(schoolYearLabel || '').trim();
     if (!normalizedSchoolYear) {
+      console.info('[PublicEnrollmentSubmissions] Skipped network fetch: no active school year.', {
+        scopeKey,
+        schoolYearLabel,
+      });
       setSubmissions([]);
       if (options?.toggleLoading !== false) {
         setIsLoading(false);
@@ -47,7 +51,17 @@ export function usePublicEnrollmentSubmissions(scopeKey = 'default', schoolYearL
       return [];
     }
 
+    console.info('[PublicEnrollmentSubmissions] Fetching submissions from database.', {
+      scopeKey,
+      schoolYearLabel: normalizedSchoolYear,
+      source: options?.toggleLoading === false ? 'silent-refresh' : 'load-from-network',
+    });
     const rows = await fetchPublicEnrollmentSubmissions(undefined, normalizedSchoolYear);
+    console.info('[PublicEnrollmentSubmissions] Database fetch completed.', {
+      scopeKey,
+      schoolYearLabel: normalizedSchoolYear,
+      rowCount: rows.length,
+    });
     setSubmissions(rows);
     await persistRows(rows);
     hydratedCacheKeyRef.current = cacheScopeKey;
@@ -61,6 +75,10 @@ export function usePublicEnrollmentSubmissions(scopeKey = 'default', schoolYearL
     if (!options?.silent) setIsLoading(true);
     setErrorMessage(null);
     try {
+      console.info('[PublicEnrollmentSubmissions] Manual refresh requested.', {
+        scopeKey,
+        schoolYearLabel,
+      });
       await loadFromNetwork({ toggleLoading: !options?.silent });
     } catch (error: any) {
       setErrorMessage(error?.message || 'Unable to load submissions.');
@@ -104,6 +122,11 @@ export function usePublicEnrollmentSubmissions(scopeKey = 'default', schoolYearL
 
       const cached = await readPublicEnrollmentSubmissionsSnapshot(scopeKey, schoolYearLabel);
       if (cached) {
+        console.info('[PublicEnrollmentSubmissions] Loaded submissions from local cache on boot.', {
+          scopeKey,
+          schoolYearLabel,
+          rowCount: cached.rows?.length || 0,
+        });
         if (cancelled) return;
         hydratedCacheKeyRef.current = cacheScopeKey;
         setSubmissions(cached.rows || []);
@@ -111,6 +134,10 @@ export function usePublicEnrollmentSubmissions(scopeKey = 'default', schoolYearL
         return;
       }
 
+      console.info('[PublicEnrollmentSubmissions] No local cache found on boot; fetching from database.', {
+        scopeKey,
+        schoolYearLabel,
+      });
       const normalizedSchoolYear = String(schoolYearLabel || '').trim();
       if (!normalizedSchoolYear) {
         if (!cancelled) {

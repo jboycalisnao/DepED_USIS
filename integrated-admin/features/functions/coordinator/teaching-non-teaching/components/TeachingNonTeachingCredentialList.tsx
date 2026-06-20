@@ -107,7 +107,6 @@ export function TeachingNonTeachingCredentialList({
                         <col />
                         <col />
                         <col />
-                        <col />
                       </colgroup>
                       <thead>
                         <tr>
@@ -126,7 +125,6 @@ export function TeachingNonTeachingCredentialList({
                           <th>Name</th>
                           <th>Username</th>
                           <th>Password</th>
-                          <th>Email</th>
                           <th>Status</th>
                           <th>Module Access</th>
                           <th>Actions</th>
@@ -145,7 +143,6 @@ export function TeachingNonTeachingCredentialList({
                             <td><strong>{row.name}</strong></td>
                             <td>{row.username}</td>
                             <td>{row.password || row.username}</td>
-                            <td>{row.email}</td>
                             <td>{row.isActive ? 'Active' : 'Inactive'}</td>
                             <td>
                               <div className="modal-record__chips">

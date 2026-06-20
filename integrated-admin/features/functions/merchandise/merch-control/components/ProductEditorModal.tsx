@@ -1,4 +1,5 @@
 import { UsisSearchableSelect } from '../../../../../../common/components/ui/UsisSearchableSelect';
+import { UsisChoiceOption } from '../../../../../../common/components/ui/UsisChoiceOption';
 import type { MerchandiseOrderPeriodRecord } from '../../services/merchandiseControlService';
 import { APPAREL_SIZE_KEYS, PRESET_CATEGORY_OPTIONS, type ProductModalState } from '../productForm';
 
@@ -26,6 +27,7 @@ export function ProductEditorModal({
   orderPeriods,
 }: Props) {
   if (!isOpen) return null;
+  const isProtectedIdSku = modalState.sku.trim().toUpperCase() === 'ID-001';
 
   return (
     <div className="modal-overlay modal-overlay--high" role="presentation">
@@ -42,11 +44,11 @@ export function ProductEditorModal({
         </div>
         <form className="modal-dialog__body registry-form" onSubmit={onSave}>
           <div className="floating-field-grid floating-field-grid--two">
-            <label className="floating-field"><div className="floating-field__control"><input value={modalState.sku} onChange={(event) => onSetModalState((current) => ({ ...current, sku: event.target.value }))} required placeholder=" " /><span>SKU</span></div></label>
-            <label className="floating-field"><div className="floating-field__control"><input value={modalState.name} onChange={(event) => onSetModalState((current) => ({ ...current, name: event.target.value }))} required placeholder=" " /><span>Product Name</span></div></label>
+            <label className="floating-field"><div className="floating-field__control"><input value={modalState.sku} onChange={(event) => onSetModalState((current) => ({ ...current, sku: event.target.value }))} required placeholder=" " disabled={isProtectedIdSku} /><span>SKU</span></div></label>
+            <label className="floating-field"><div className="floating-field__control"><input value={modalState.name} onChange={(event) => onSetModalState((current) => ({ ...current, name: event.target.value }))} required placeholder=" " disabled={isProtectedIdSku} /><span>Product Name</span></div></label>
           </div>
           <div className="floating-field-grid floating-field-grid--two">
-            <UsisSearchableSelect ariaLabel="Category" allowTyping={false} floatingLabel label="Category" options={PRESET_CATEGORY_OPTIONS} value={modalState.categoryName} onChange={(value) => onSetModalState((current) => ({ ...current, categoryName: value }))} />
+            <UsisSearchableSelect ariaLabel="Category" allowTyping={false} floatingLabel label="Category" options={PRESET_CATEGORY_OPTIONS} value={modalState.categoryName} onChange={(value) => onSetModalState((current) => ({ ...current, categoryName: value }))} disabled={isProtectedIdSku} />
             <label className="floating-field"><div className="floating-field__control"><input value={modalState.imageUrl} onChange={(event) => onSetModalState((current) => ({ ...current, imageUrl: event.target.value }))} placeholder=" " /><span>Image URL</span></div></label>
           </div>
           <label className="floating-field"><div className="floating-field__control"><input value={modalState.price} onChange={(event) => onSetModalState((current) => ({ ...current, price: event.target.value }))} required inputMode="decimal" placeholder=" " /><span>Price (PHP)</span></div></label>
@@ -65,12 +67,42 @@ export function ProductEditorModal({
             <div className="integrated-admin-merch-size-picker" role="group" aria-label="Available sizes">
               {APPAREL_SIZE_KEYS.map((sizeKey) => {
                 const selected = modalState.availableSizes.includes(sizeKey);
-                return <button key={sizeKey} type="button" className={`integrated-admin-merch-size-pill${selected ? ' is-selected' : ''}`} aria-pressed={selected} onClick={() => onToggleAvailableSize(sizeKey)}>{sizeKey}</button>;
+                const disabled = isProtectedIdSku;
+                return (
+                  <button
+                    key={sizeKey}
+                    type="button"
+                    className={`integrated-admin-merch-size-pill${selected ? ' is-selected' : ''}${disabled ? ' is-disabled' : ''}`}
+                    aria-pressed={selected}
+                    disabled={disabled}
+                    onClick={() => onToggleAvailableSize(sizeKey)}
+                    title={disabled ? 'ID-001 is always pre-order.' : undefined}
+                  >
+                    {sizeKey}
+                  </button>
+                );
               })}
             </div>
           </div>
-          <label className="registry-radio-option"><input type="checkbox" checked={modalState.isPreOrder} onChange={(event) => onSetModalState((current) => ({ ...current, isPreOrder: event.target.checked }))} /><span>Pre-order product (no stock fields)</span></label>
-          <label className="registry-radio-option"><input type="checkbox" checked={modalState.isPublished} onChange={(event) => onSetModalState((current) => ({ ...current, isPublished: event.target.checked }))} /><span>Published and visible in Merch module</span></label>
+          <div className="registry-choice-group registry-choice-group--stacked">
+            <UsisChoiceOption
+              checked={modalState.isPreOrder || isProtectedIdSku}
+              controlType="checkbox"
+              label="Pre-order product"
+              name="product-pre-order"
+              onChange={(checked) => onSetModalState((current) => ({ ...current, isPreOrder: isProtectedIdSku ? true : checked }))}
+              stacked
+              description="No stock fields"
+            />
+            <UsisChoiceOption
+              checked={modalState.isPublished}
+              controlType="checkbox"
+              label="Published and visible"
+              name="product-published"
+              onChange={(checked) => onSetModalState((current) => ({ ...current, isPublished: checked }))}
+              stacked
+            />
+          </div>
           {!modalState.isPreOrder && !isCategoryApparel ? <label className="floating-field"><div className="floating-field__control"><input value={modalState.stockQty} onChange={(event) => onSetModalState((current) => ({ ...current, stockQty: event.target.value }))} required inputMode="numeric" placeholder=" " /><span>Stock Quantity</span></div></label> : null}
           {!modalState.isPreOrder && isCategoryApparel ? (
             <div className="integrated-admin-merch-sizes">

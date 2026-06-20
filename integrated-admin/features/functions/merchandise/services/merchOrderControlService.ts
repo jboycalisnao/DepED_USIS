@@ -108,6 +108,7 @@ const generateOrderReferenceNo = async (orderPeriodLabel: string) => {
     const existing = await supabase
       .from('merch_orders')
       .select('id')
+      .eq('order_kind', 'merch')
       .eq('reference_no', candidate)
       .limit(1)
       .maybeSingle();
@@ -175,6 +176,7 @@ const getOrderStatusSnapshot = async (orderId: string) => {
   const { data, error } = await supabase
     .from('merch_orders')
     .select('order_status')
+    .eq('order_kind', 'merch')
     .eq('id', orderId)
     .limit(1)
     .maybeSingle();
@@ -201,6 +203,7 @@ export const loadMerchOrderControlRecords = async (): Promise<MerchOrderControlR
         merch_order_items(quantity, selected_size, merch_products(name, price, merch_order_periods(label)))
       `,
     )
+    .eq('order_kind', 'merch')
     .order('created_at', { ascending: false });
 
   if (primaryResult.error) {
@@ -224,6 +227,7 @@ export const loadMerchOrderControlRecords = async (): Promise<MerchOrderControlR
           merch_order_items(quantity, selected_size, merch_products(name, price, merch_order_periods(label)))
         `,
       )
+      .eq('order_kind', 'merch')
       .order('created_at', { ascending: false });
     if (fallbackResult.error) throw new Error('Unable to load merch orders.');
     rows = fallbackResult.data || [];
@@ -392,6 +396,7 @@ export const updateMerchOrderStatus = async (
 ) => {
   const currentStatusResult = await supabase
     .from('merch_orders')
+    .eq('order_kind', 'merch')
     .select('order_status')
     .eq('id', orderId)
     .limit(1)
@@ -405,6 +410,7 @@ export const updateMerchOrderStatus = async (
 
   let updateQuery = supabase
     .from('merch_orders')
+    .eq('order_kind', 'merch')
     .update({ order_status: orderStatus })
     .eq('id', orderId);
   if (options?.expectedFromStatus) {
@@ -498,7 +504,7 @@ export const loadActiveSchoolYearLearners = async (): Promise<MerchActiveLearner
 export const createManualMerchOrder = async (payload: MerchManualOrderPayload) => {
   const productOrderPeriod = await supabase
     .from('merch_products')
-    .select('merch_order_periods(label)')
+    .select('merch_order_periods(id,label)')
     .eq('id', payload.productId)
     .limit(1)
     .maybeSingle();
@@ -511,6 +517,8 @@ export const createManualMerchOrder = async (payload: MerchManualOrderPayload) =
   const orderInsertBase: any = {
     learner_lrn: payload.learnerLrn.trim() || null,
     learner_name: payload.learnerName.trim() || null,
+    order_kind: 'merch',
+    order_period_id: productOrderPeriod.data?.merch_order_periods?.id || null,
     notes: payload.notes.trim() || null,
     order_status: 'Pending',
     order_source: 'integrated_admin',
@@ -527,6 +535,7 @@ export const createManualMerchOrder = async (payload: MerchManualOrderPayload) =
       .from('merch_orders')
       .insert([orderInsert])
       .select('id')
+      .eq('order_kind', 'merch')
       .single();
 
     if (!orderResult.error && orderResult.data?.id) break;
@@ -538,6 +547,7 @@ export const createManualMerchOrder = async (payload: MerchManualOrderPayload) =
         .from('merch_orders')
         .insert([orderInsertBase])
         .select('id')
+        .eq('order_kind', 'merch')
         .single();
       break;
     }
@@ -575,6 +585,7 @@ export const deleteMerchOrderRecord = async (orderId: string) => {
   const { error } = await supabase
     .from('merch_orders')
     .delete()
+    .eq('order_kind', 'merch')
     .eq('id', orderId);
   if (error) throw new Error('Unable to remove merch order.');
 
@@ -773,7 +784,8 @@ export const loadMerchOrderAuditTrail = async (orderId: string): Promise<MerchOr
 export const loadMerchOrderCountsSummary = async (selectedOrderPeriod = ''): Promise<MerchOrderCountsSummary> => {
   const { data, error } = await supabase
     .from('merch_orders')
-    .select('id,order_status,order_source,merch_order_items(merch_products(merch_order_periods(label)))');
+    .select('id,order_status,order_source,merch_order_items(merch_products(merch_order_periods(label)))')
+    .eq('order_kind', 'merch');
 
   if (error) throw new Error('Unable to load order count summary.');
 

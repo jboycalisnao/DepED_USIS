@@ -77,6 +77,9 @@ export function LearnerPortalSeo({ isAuthenticated }: LearnerPortalSeoProps) {
       } else if (location.pathname === '/services') {
         title = 'Services | USIS School Portal';
         description = 'Open learner services such as attendance, documents, enrollment history, and support.';
+      } else if (location.pathname === '/services/id') {
+        title = 'ID Request | USIS School Portal';
+        description = 'Request a learner ID creation during the active school order period.';
       } else if (location.pathname === '/services/help-ticket') {
         title = 'Help Ticket | USIS School Portal';
         description = 'Submit a learner help ticket using registrar profile details and school support categories.';

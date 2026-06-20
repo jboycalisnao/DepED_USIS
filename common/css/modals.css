@@ -139,7 +139,7 @@
   min-height: 44px;
   padding: 0 16px;
   border: 1px solid rgba(18, 35, 61, 0.14);
-  border-radius: 10px;
+  border-radius: 0.375rem;
   background: var(--deped-white);
   color: var(--deped-ink);
   font-size: var(--usis-helper-size);

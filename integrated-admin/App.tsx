@@ -29,6 +29,7 @@ import { SubjectManagementPage } from './features/functions/grades-subjects/subj
 import { TimeSlotsPage } from './features/functions/grades-subjects/time-slots/pages/TimeSlotsPage';
 import { MerchandiseControlPage } from './features/functions/merchandise/MerchandiseControlPage';
 import { MerchOrderControlPage } from './features/functions/merchandise/MerchOrderControlPage';
+import { IdOrdersPage } from './features/functions/merchandise/id-orders/pages/IdOrdersPage';
 import { MerchOrderPaymentPage } from './features/functions/merchandise/MerchOrderPaymentPage';
 import { MerchOrderCountsPage } from './features/functions/merchandise/MerchOrderCountsPage';
 import { PortalControlsPage } from './features/functions/portal-controls/pages/PortalControlsPage';
@@ -50,6 +51,7 @@ const iaPathToPageKey: Record<string, string> = {
   '/functions/grades-subjects/time-slots': 'ia.grades_subjects.time_slots',
   '/functions/merchandise-control': 'ia.merch.merchandise_control',
   '/functions/merch-control': 'ia.merch.orders',
+  '/functions/id-orders': 'ia.merch.id_orders',
   '/functions/order-payment': 'ia.merch.payment',
   '/functions/order-counts': 'ia.merch.order_counts',
   '/functions/portal-controls': 'ia.portal_controls',
@@ -114,6 +116,7 @@ const iaNavItems: UsisSideNavItem[] = [
     children: [
       { path: '/functions/merchandise-control', label: 'Merchandise Control', icon: 'storefront' },
       { path: '/functions/merch-control', label: 'Orders', icon: 'shopping_bag' },
+      { path: '/functions/id-orders', label: 'ID Orders', icon: 'badge' },
       { path: '/functions/order-payment', label: 'Payment', icon: 'payments' },
       { path: '/functions/order-counts', label: 'Order Counts', icon: 'monitoring' },
     ],
@@ -414,6 +417,7 @@ function IntegratedAdminShell() {
                       </Route>
                       <Route path="/functions/merchandise-control" element={<MerchandiseControlPage />} />
                       <Route path="/functions/merch-control" element={<MerchOrderControlPage />} />
+                      <Route path="/functions/id-orders" element={<IdOrdersPage />} />
                       <Route path="/functions/order-payment" element={<MerchOrderPaymentPage />} />
                       <Route path="/functions/order-counts" element={<MerchOrderCountsPage />} />
                       <Route

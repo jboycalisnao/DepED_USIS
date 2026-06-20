@@ -210,6 +210,7 @@ export const fetchMerchControlSectionSnapshot = async (params: {
   if (lrnList.length > 0) {
     const ordersResult = await supabase
       .from('merch_orders')
+      .eq('order_kind', 'merch')
       .select('learner_lrn,created_at,order_status')
       .in('learner_lrn', lrnList)
       .order('created_at', { ascending: false });

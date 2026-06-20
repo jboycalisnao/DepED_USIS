@@ -1,4 +1,6 @@
 export type LearnerServiceItem = {
+  disabledMessage?: string;
+  isDisabled?: boolean;
   title: string;
   description: string;
   path: string;
@@ -57,6 +59,38 @@ const MERCH_CONTROL_SERVICE: LearnerServiceItem = {
   actionLabel: 'Open Merch Control',
 };
 
-export const buildLearnerServicesCatalog = (hasMerchControl: boolean): LearnerServiceItem[] => (
-  hasMerchControl ? [...BASE_SERVICES, MERCH_CONTROL_SERVICE] : BASE_SERVICES
-);
+const ID_SERVICE: LearnerServiceItem = {
+  title: 'ID',
+  description: 'Request a learner ID creation during an open order period.',
+  path: '/services/id',
+  actionLabel: 'Request ID',
+};
+
+export const buildLearnerServicesCatalog = (options: {
+  canRequestId: boolean;
+  hasMerchControl: boolean;
+  isIdPublished: boolean;
+}): LearnerServiceItem[] => {
+  const services = [...BASE_SERVICES];
+  services.push(
+    !options.isIdPublished
+      ? {
+          ...ID_SERVICE,
+          actionLabel: 'Unavailable',
+          disabledMessage: 'ID service is not published yet.',
+          isDisabled: true,
+        }
+      : options.canRequestId
+      ? ID_SERVICE
+      : {
+          ...ID_SERVICE,
+          actionLabel: 'Unavailable',
+          disabledMessage: 'No valid order period is available.',
+          isDisabled: true,
+        },
+  );
+  if (options.hasMerchControl) {
+    services.push(MERCH_CONTROL_SERVICE);
+  }
+  return services;
+};

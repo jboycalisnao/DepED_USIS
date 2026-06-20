@@ -62,6 +62,82 @@ create index if not exists idx_merch_products_category on merch_products(categor
 create index if not exists idx_merch_products_published on merch_products(is_published);
 create index if not exists idx_merch_products_order_period on merch_products(order_period_id);
 
+create or replace function merch_protect_id_product()
+returns trigger as $$
+begin
+  if tg_op = 'DELETE' then
+    if old.sku = 'ID-001' then
+      raise exception 'ID-001 is a protected merch product and cannot be deleted.';
+    end if;
+    return old;
+  end if;
+
+  if tg_op = 'UPDATE' and old.sku = 'ID-001' and new.sku <> old.sku then
+    raise exception 'ID-001 SKU cannot be changed.';
+  end if;
+
+  if new.sku = 'ID-001' then
+    new.is_preorder := true;
+  end if;
+
+  return new;
+end;
+$$ language plpgsql;
+
+drop trigger if exists trg_merch_products_protect_id on merch_products;
+create trigger trg_merch_products_protect_id
+before insert or update or delete on merch_products
+for each row execute function merch_protect_id_product();
+
+insert into merch_categories (code, name, is_active)
+values ('school_essentials', 'School Essentials', true)
+on conflict (code) do update
+set
+  name = excluded.name,
+  is_active = excluded.is_active,
+  updated_at = now();
+
+insert into merch_products (
+  sku,
+  name,
+  slug,
+  description,
+  category_id,
+  price,
+  stock_qty,
+  is_preorder,
+  order_period_id,
+  pre_order_cutoff_date,
+  available_sizes,
+  size_stock_json,
+  is_published,
+  is_featured,
+  sort_order
+)
+select
+  'ID-001',
+  'ID',
+  'id',
+  'Learner ID creation request product.',
+  c.id,
+  0.00,
+  0,
+  true,
+  null,
+  null,
+  '{}'::text[],
+  '{}'::jsonb,
+  true,
+  false,
+  10
+from merch_categories c
+where c.code = 'school_essentials'
+  and not exists (
+    select 1
+    from merch_products p
+    where p.sku = 'ID-001'
+  );
+
 -- =========================================================
 -- Product Media
 -- =========================================================
@@ -108,15 +184,33 @@ create table if not exists merch_orders (
   learner_id uuid,
   learner_lrn text,
   learner_name text,
-  order_status text not null default 'Pending' check (order_status in ('Pending', 'Approved', 'Rejected', 'Fulfilled')),
+  guardian_contact_number text,
+  order_kind text not null default 'merch' check (order_kind in ('merch', 'id')),
+    order_status text not null default 'Pending' check (
+      (order_kind = 'merch' and order_status in ('Pending', 'Approved', 'Rejected', 'Fulfilled'))
+      or
+      (order_kind = 'id' and order_status in ('pending', 'done', 'released', 'for correction'))
+    ),
   order_source text not null default 'learner_portal' check (order_source in ('learner_portal', 'integrated_admin')),
+  order_period_id uuid references merch_order_periods(id) on update cascade on delete set null,
   notes text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
+alter table if exists merch_orders
+  add column if not exists order_kind text not null default 'merch';
+
+alter table if exists merch_orders
+  add column if not exists guardian_contact_number text;
+
+alter table if exists merch_orders
+  add column if not exists order_period_id uuid references merch_order_periods(id) on update cascade on delete set null;
+
 create index if not exists idx_merch_orders_created_at on merch_orders(created_at desc);
 create index if not exists idx_merch_orders_status on merch_orders(order_status);
+create index if not exists idx_merch_orders_kind on merch_orders(order_kind);
+create index if not exists idx_merch_orders_period on merch_orders(order_period_id);
 create unique index if not exists uq_merch_orders_reference_no on merch_orders(reference_no);
 
 create table if not exists merch_order_items (
@@ -166,7 +260,7 @@ create table if not exists merch_order_status_audit (
   id uuid primary key default gen_random_uuid(),
   order_id uuid not null references merch_orders(id) on update cascade on delete cascade,
   from_status text,
-  to_status text not null check (to_status in ('Pending', 'Approved', 'Rejected', 'Fulfilled')),
+    to_status text not null check (to_status in ('Pending', 'Approved', 'Rejected', 'Fulfilled', 'pending', 'done', 'released', 'for correction')),
   changed_source text not null check (changed_source in ('learner_portal', 'integrated_admin')),
   changed_by text,
   notes text,
@@ -468,8 +562,9 @@ values
   ('ia.grades_subjects.time_slots', 'Time Slots', 'Grades & Subjects', true, 40),
   ('ia.merch.merchandise_control', 'Merchandise Control', 'Merch', true, 10),
   ('ia.merch.orders', 'Orders', 'Merch', true, 20),
-  ('ia.merch.payment', 'Payment', 'Merch', true, 30),
-  ('ia.merch.order_counts', 'Order Counts', 'Merch', true, 40),
+  ('ia.merch.id_orders', 'ID Orders', 'Merch', true, 30),
+  ('ia.merch.payment', 'Payment', 'Merch', true, 40),
+  ('ia.merch.order_counts', 'Order Counts', 'Merch', true, 50),
   ('ia.portal_controls', 'Portal Controls', 'Portal Controls', true, 10),
   ('ia.election.admin_console', 'Admin Console', 'Election', true, 10),
   ('ia.election.dashboard', 'Dashboard', 'Election', true, 20),

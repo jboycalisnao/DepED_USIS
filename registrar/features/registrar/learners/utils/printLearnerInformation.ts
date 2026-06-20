@@ -41,7 +41,7 @@ const pickLearnerField = (learner: Student, keys: string[]) => {
   return firstNonEmpty(keys.map((key) => row[key]));
 };
 
-const fetchLatestSubmissionPayload = async (learner: Student) => {
+const fetchLatestSubmissionPayloadFromHistory = async (learner: Student) => {
   const learnerId = toText(learner.id);
   if (!learnerId) return null;
 
@@ -66,6 +66,54 @@ const fetchLatestSubmissionPayload = async (learner: Student) => {
   return (latestWithPayload?.submissionPayload || latestWithPayload?.submission_payload || null) as
     | Record<string, unknown>
     | null;
+};
+
+const fetchLatestSubmissionPayloadByLrn = async (lrn: string) => {
+  const trimmedLrn = toText(lrn);
+  if (!trimmedLrn) return null;
+
+  const [directRowsResult, payloadRowsResult] = await Promise.all([
+    supabase
+      .from('registrar_public_enrollment_submissions')
+      .select('id,created_at,payload')
+      .eq('lrn', trimmedLrn)
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('registrar_public_enrollment_submissions')
+      .select('id,created_at,payload')
+      .filter('payload->>lrn', 'eq', trimmedLrn)
+      .order('created_at', { ascending: false }),
+  ]);
+
+  if (directRowsResult.error && payloadRowsResult.error) return null;
+
+  const combinedRows = [
+    ...((directRowsResult.data as Array<Record<string, unknown>> | null | undefined) || []),
+    ...((payloadRowsResult.data as Array<Record<string, unknown>> | null | undefined) || []),
+  ];
+
+  const dedupedRows = Array.from(
+    combinedRows.reduce((acc, entry) => {
+      const key = toText(entry.id) || `${toText(entry.created_at)}::${JSON.stringify(entry.payload || {})}`;
+      if (!acc.has(key)) acc.set(key, entry);
+      return acc;
+    }, new Map<string, Record<string, unknown>>()).values(),
+  );
+
+  const latestRow = dedupedRows.sort(
+    (left, right) => new Date(toText(right.created_at)).getTime() - new Date(toText(left.created_at)).getTime(),
+  )[0];
+
+  return (latestRow?.payload && typeof latestRow.payload === 'object' ? latestRow.payload : null) as
+    | Record<string, unknown>
+    | null;
+};
+
+const fetchLatestSubmissionPayload = async (learner: Student) => {
+  const latestFromHistory = await fetchLatestSubmissionPayloadFromHistory(learner);
+  if (latestFromHistory) return latestFromHistory;
+
+  return await fetchLatestSubmissionPayloadByLrn(learner.lrn);
 };
 
 const resolveSectionLabel = (learner: Student, sections: Section[]) => {
@@ -170,6 +218,20 @@ const buildPrintHtml = async ({ learners, schoolYearLabel, sections }: PrintLear
           `,
         )
         .join('');
+      const latestEnrollmentSnapshot = latestEnrollment
+        ? `
+          <section class="block">
+            <h3>7. Latest Enrollment Snapshot</h3>
+            <div class="grid two">
+              <p><strong>School Year:</strong> ${escapeHtml(toOptionalText(latestEnrollment.schoolYear))}</p>
+              <p><strong>Grade Level:</strong> ${escapeHtml(toOptionalText(latestEnrollment.gradeLevel))}</p>
+              <p><strong>Section:</strong> ${escapeHtml(toOptionalText(latestEnrollment.section))}</p>
+              <p><strong>Enrollment Date:</strong> ${escapeHtml(toOptionalText(latestEnrollment.enrollmentDate))}</p>
+              <p><strong>Status:</strong> ${escapeHtml(toOptionalText(latestEnrollment.status))}</p>
+            </div>
+          </section>
+        `
+        : '';
 
       return `
         <article class="sheet">
@@ -252,6 +314,16 @@ const buildPrintHtml = async ({ learners, schoolYearLabel, sections }: PrintLear
             </div>
           </section>
 
+          <section class="block">
+            <h3>6. Portal Credentials</h3>
+            <div class="grid two">
+              <p><strong>Username:</strong> ${escapeHtml(toText(learner.loginUsername || learner.lrn))}</p>
+              <p><strong>Login Status:</strong> ${escapeHtml(toText(learner.loginStatus || 'Active'))}</p>
+            </div>
+          </section>
+
+          ${latestEnrollmentSnapshot}
+
         </article>
 
         <article class="sheet">
@@ -261,14 +333,7 @@ const buildPrintHtml = async ({ learners, schoolYearLabel, sections }: PrintLear
             <span>Record Generated: ${escapeHtml(new Date().toLocaleString())}</span>
           </div>
           <section class="block">
-            <h3>6. Portal Credentials</h3>
-            <div class="grid two">
-              <p><strong>Username:</strong> ${escapeHtml(toText(learner.loginUsername || learner.lrn))}</p>
-              <p><strong>Login Status:</strong> ${escapeHtml(toText(learner.loginStatus || 'Active'))}</p>
-            </div>
-          </section>
-          <section class="block">
-            <h3>7. Enrollment History</h3>
+            <h3>9. Enrollment History</h3>
             <table class="history">
               <thead>
                 <tr>
@@ -287,12 +352,12 @@ const buildPrintHtml = async ({ learners, schoolYearLabel, sections }: PrintLear
 
           <section class="verification-card">
             <div class="verification-card__copy">
-              <h3>8. Document Verification</h3>
+              <h3>10. Document Verification</h3>
               <p>This QR code opens the public verification page for this learner information sheet.</p>
               <div class="verification-card__meta">
                 <div><strong>Document No.:</strong> ${escapeHtml(verificationCard.documentNo)}</div>
-                <div><strong>Learner ID:</strong> ${escapeHtml(fullName)}</div>
                 <div><strong>LRN:</strong> ${escapeHtml(toText(learner.lrn))}</div>
+                <div><strong>Current Section:</strong> ${escapeHtml(toText(section))}</div>
               </div>
               <p class="verification-card__url">${escapeHtml(verificationCard.verificationUrl)}</p>
             </div>
@@ -301,6 +366,7 @@ const buildPrintHtml = async ({ learners, schoolYearLabel, sections }: PrintLear
               <span>Scan to verify</span>
             </div>
           </section>
+
         </article>
       `;
     }))).join('');
@@ -312,8 +378,8 @@ const buildPrintHtml = async ({ learners, schoolYearLabel, sections }: PrintLear
         <meta charset="utf-8" />
         <title>USIS Learner Information Sheet</title>
         <style>
-          @page { size: A4 portrait; margin: 10mm; }
-          body { margin: 0; font-family: "Segoe UI", Arial, sans-serif; color: #111827; background: #fff; }
+          @page { size: A4 portrait; margin: 8mm; }
+          body { margin: 0; font-family: "Segoe UI", Arial, sans-serif; color: #111827; background: #fff; font-size: 9.5px; line-height: 1.3; }
           .sheet { width: 100%; page-break-after: always; }
           .sheet:last-child { page-break-after: auto; }
           .meta-header { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
@@ -351,71 +417,75 @@ const buildPrintHtml = async ({ learners, schoolYearLabel, sections }: PrintLear
           }
           .docs-table td:first-child { width: 58%; font-weight: 400; }
           .docs-table td:last-child { font-weight: 700; }
-          .sheet-meta { margin: 6px 0 10px; font-size: 10.5px; color: #334155; display: flex; justify-content: space-between; gap: 8px; }
-          .block { border: 1px solid #111; margin-bottom: 10px; border-radius: 2px; overflow: hidden; }
-          .block h3 { margin: 0; padding: 6px 8px; font-size: 11.5px; font-weight: 700; background: #f2f5fa; border-bottom: 1px solid #111; text-transform: uppercase; letter-spacing: 0.03em; }
+          .sheet-meta { margin: 6px 0 8px; font-size: 9.25px; color: #334155; display: flex; justify-content: space-between; gap: 8px; }
+          .block { border: 1px solid #111; margin-bottom: 8px; border-radius: 2px; overflow: hidden; }
+          .block h3 { margin: 0; padding: 5px 7px; font-size: 10.25px; font-weight: 700; background: #f2f5fa; border-bottom: 1px solid #111; text-transform: uppercase; letter-spacing: 0.02em; }
           .grid { display: grid; gap: 0; }
-          .grid p { margin: 0; padding: 7px 8px; border-top: 1px solid #d9dfe8; font-size: 10.5px; line-height: 1.35; min-height: 18px; }
-          .grid p strong { font-weight: 700; color: #0f172a; display: inline-block; min-width: 138px; }
+          .grid p { margin: 0; padding: 6px 7px; border-top: 1px solid #d9dfe8; font-size: 9.25px; line-height: 1.28; min-height: 18px; }
+          .grid p strong { font-weight: 700; color: #0f172a; display: inline-block; min-width: 118px; }
           .grid.two { grid-template-columns: 1fr 1fr; }
           .grid.three { grid-template-columns: 1fr 1fr 1fr; }
           .grid.two p:nth-child(odd), .grid.three p { border-right: 1px solid #d9dfe8; }
           .grid.three p:nth-child(3n) { border-right: 0; }
-          .history { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 10px; }
-          .history th, .history td { border: 1px solid #111; padding: 5px 6px; text-align: left; vertical-align: top; }
-          .history th { background: #f2f5fa; font-weight: 700; font-size: 10px; }
+          .history { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 9.25px; }
+          .history th, .history td { border: 1px solid #111; padding: 6px 6px; text-align: left; vertical-align: top; }
+          .history th { background: #f2f5fa; font-weight: 700; font-size: 9.25px; }
           .history tbody tr:nth-child(even) { background: #fafbfc; }
           .history td:last-child, .history th:last-child { text-align: center; width: 80px; }
           .verification-card {
             display: grid;
-            grid-template-columns: minmax(0, 1fr) 180px;
-            gap: 14px;
+            grid-template-columns: minmax(0, 1fr) 132px;
+            gap: 10px;
             align-items: center;
-            margin-top: 10px;
-            padding: 12px;
+            margin-top: 8px;
+            padding: 10px 12px;
             border: 1px solid #111;
             border-radius: 2px;
             break-inside: avoid;
           }
           .verification-card h3 {
-            margin: 0 0 6px;
-            font-size: 11.5px;
+            margin: 0 0 7px;
+            font-size: 9.5px;
             font-weight: 700;
             text-transform: uppercase;
           }
           .verification-card p {
-            margin: 0 0 8px;
-            font-size: 10.5px;
+            margin: 0 0 9px;
+            font-size: 9px;
             line-height: 1.4;
           }
           .verification-card__meta {
             display: grid;
-            gap: 4px;
-            margin-top: 6px;
-            font-size: 10.5px;
+            gap: 5px;
+            margin-top: 7px;
+            font-size: 9px;
           }
           .verification-card__url {
-            margin-top: 8px;
-            font-size: 9.5px;
+            margin-top: 9px;
+            font-size: 8px;
             word-break: break-all;
           }
           .verification-card__qr {
             display: grid;
             justify-items: center;
-            gap: 6px;
-            padding: 10px;
+            gap: 7px;
+            padding: 9px;
             border: 1px solid #111;
           }
           .verification-card__qr img {
-            width: 150px;
-            height: 150px;
+            width: 120px;
+            height: 120px;
             object-fit: contain;
           }
           .verification-card__qr span {
-            font-size: 10px;
+            font-size: 9px;
             font-weight: 700;
           }
-          @media print { .sheet { break-inside: avoid; } }
+          @media print {
+            .sheet { break-inside: avoid; }
+            .block { break-inside: avoid; }
+            .verification-card { break-inside: avoid; }
+          }
         </style>
       </head>
       <body>

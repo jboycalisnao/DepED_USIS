@@ -4,7 +4,7 @@ import { EnrollmentRecord, GradeLevel, Student } from '../types';
 import ConfirmationModal from '../components/ConfirmationModal';
 import LearnerDetailsModal from '../components/LearnerDetailsModal';
 import { openLearnerInformationPrintWindow } from '../features/registrar/learners/utils/printLearnerInformation';
-import { openSectionListPrintWindow } from '../features/registrar/learners/utils/printSectionList';
+import { openGradeLevelSectionListPrintWindow, openSectionListPrintWindow } from '../features/registrar/learners/utils/printSectionList';
 import { sendLearnerCredentialsViaWebhook } from '../features/registrar/learners/services/sendLearnerCredentialsEmail';
 import LearnerEditModal from './learners/LearnerEditModal';
 import { getActiveLearnersForYear } from '../services/dashboardService';
@@ -276,6 +276,33 @@ const LearnerList: React.FC = () => {
     setExpandedSections(next);
   };
 
+  const printGradeLevelList = (grade: string) => {
+    const gradeSections = Object.entries(visibleGroupedData[grade] || {})
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([sectionName, data]) => {
+        const sectionForPrint = sections.find((section) => section.id === data.sectionId);
+        return sectionForPrint
+          ? {
+              section: sectionForPrint,
+              learners: data.students,
+            }
+          : null;
+      })
+      .filter(Boolean) as Array<{ section: Section; learners: Student[] }>;
+
+    if (gradeSections.length === 0) {
+      setFeedback('No section data available for this grade level.');
+      return;
+    }
+
+    const ok = openGradeLevelSectionListPrintWindow({
+      gradeLevel: grade,
+      schoolYearLabel: activeSchoolYear.label,
+      sections: gradeSections,
+    });
+    if (!ok) setFeedback('Popup blocked. Allow popups for this site to print the grade-level section list.');
+  };
+
   const GENDER_ORDER = ['Male', 'Female', 'Other'];
   const openEditStudent = (student: Student) => {
     setEditingStudent(student);
@@ -347,22 +374,40 @@ const LearnerList: React.FC = () => {
               return order.indexOf(a as GradeLevel) - order.indexOf(b as GradeLevel);
             })
             .map((grade) => (
+              (() => {
+                const totalLearners = Object.values(visibleGroupedData[grade]).reduce((sum, entry) => sum + entry.students.length, 0);
+                const totalSections = Object.keys(visibleGroupedData[grade]).length;
+
+                return (
               <div key={grade} className="registrar-learners-page__grade">
-                <button
-                  onClick={() => toggleGrade(grade)}
-                  className="registrar-learners-page__grade-toggle"
-                  aria-expanded={expandedGrades.has(grade)}
-                >
-                  <div className="registrar-learners-page__grade-title">
-                    <div className="registrar-learners-page__grade-icon">
-                      <span className="material-symbols-outlined">{expandedGrades.has(grade) ? 'keyboard_arrow_down' : 'keyboard_arrow_right'}</span>
+                <div className="registrar-learners-page__grade-head">
+                  <button
+                    onClick={() => toggleGrade(grade)}
+                    className="registrar-learners-page__grade-toggle"
+                    aria-expanded={expandedGrades.has(grade)}
+                  >
+                    <div className="registrar-learners-page__grade-title">
+                      <div className="registrar-learners-page__grade-icon">
+                        <span className="material-symbols-outlined">{expandedGrades.has(grade) ? 'keyboard_arrow_down' : 'keyboard_arrow_right'}</span>
+                      </div>
+                      <div>
+                        <h3 className="registrar-learners-page__grade-name">{grade}</h3>
+                        <p className="registrar-learners-page__grade-count">{totalLearners} Total Learners in {totalSections} Sections</p>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="registrar-learners-page__grade-name">{grade}</h3>
-                      <p className="registrar-learners-page__grade-count">{Object.keys(visibleGroupedData[grade]).length} Active Sections</p>
-                    </div>
+                  </button>
+                  <div className="registrar-learners-page__grade-actions">
+                    <button
+                      type="button"
+                      className="registrar-learners-page__print-btn"
+                      onClick={() => printGradeLevelList(grade)}
+                      disabled={Object.keys(visibleGroupedData[grade] || {}).length === 0}
+                    >
+                      <span className="material-symbols-outlined">print</span>
+                      Print Grade List
+                    </button>
                   </div>
-                </button>
+                </div>
 
                 {expandedGrades.has(grade) && (
                   <div className="registrar-learners-page__sections">
@@ -520,6 +565,8 @@ const LearnerList: React.FC = () => {
                   </div>
                 )}
               </div>
+                );
+              })()
             ))
         ) : (
           <div className="registrar-learners-page__empty">

@@ -150,6 +150,7 @@ export const fetchLearnerMerchOrders = async (params: {
   const queryWithSource = applyLearnerFilter(
     supabase
       .from('merch_orders')
+      .eq('order_kind', 'merch')
       .select(
         `
           id,
@@ -178,6 +179,7 @@ export const fetchLearnerMerchOrders = async (params: {
     const fallbackResult = await applyLearnerFilter(
       supabase
         .from('merch_orders')
+        .eq('order_kind', 'merch')
         .select(
           `
             id,
@@ -251,7 +253,7 @@ export const placeLearnerMerchOrder = async (payload: PlaceLearnerMerchOrderPayl
 
   const { data: product, error: productError } = await supabase
     .from('merch_products')
-    .select('is_preorder, pre_order_cutoff_date, merch_order_periods(label, end_date)')
+    .select('is_preorder, pre_order_cutoff_date, merch_order_periods(id,label,end_date)')
     .eq('id', payload.productId)
     .limit(1)
     .maybeSingle();
@@ -273,6 +275,8 @@ export const placeLearnerMerchOrder = async (payload: PlaceLearnerMerchOrderPayl
     learner_id: uuidPattern.test(learnerId) ? learnerId : null,
     learner_lrn: payload.learnerLrn,
     learner_name: payload.learnerName,
+    order_kind: 'merch',
+    order_period_id: product?.merch_order_periods?.id || null,
     notes: payload.notes.trim() || null,
     order_status: 'Pending',
   };
@@ -376,6 +380,7 @@ export const updateLearnerMerchOrder = async (payload: UpdateLearnerMerchOrderPa
   const orderResult = await applyLearnerFilter(
     supabase
       .from('merch_orders')
+      .eq('order_kind', 'merch')
       .select('id, order_source, merch_order_items(quantity, selected_size, merch_products(id, name, is_preorder, pre_order_cutoff_date, merch_order_periods(end_date)))')
       .eq('id', payload.orderId)
       .limit(1)
@@ -418,6 +423,7 @@ export const updateLearnerMerchOrder = async (payload: UpdateLearnerMerchOrderPa
 
   const { error: orderError } = await supabase
     .from('merch_orders')
+    .eq('order_kind', 'merch')
     .update({
       notes: payload.notes.trim() || null,
       updated_at: new Date().toISOString(),
@@ -450,6 +456,7 @@ export const deleteLearnerMerchOrder = async (payload: DeleteLearnerMerchOrderPa
   const existing = await applyLearnerFilter(
     supabase
       .from('merch_orders')
+      .eq('order_kind', 'merch')
       .select('id, order_source')
       .eq('id', payload.orderId)
       .limit(1)
@@ -464,6 +471,7 @@ export const deleteLearnerMerchOrder = async (payload: DeleteLearnerMerchOrderPa
 
   const { error } = await supabase
     .from('merch_orders')
+    .eq('order_kind', 'merch')
     .delete()
     .eq('id', payload.orderId);
   if (error) throw new Error('Unable to delete order.');

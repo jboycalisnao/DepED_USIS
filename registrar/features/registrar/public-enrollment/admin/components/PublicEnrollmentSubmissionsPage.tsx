@@ -4,6 +4,7 @@ import { usePublicEnrollmentSubmissions } from '../../hooks/usePublicEnrollmentS
 import { useStore } from '../../../../../store';
 import { supabase } from '../../../../../lib/supabase';
 import UsisPageLoader from '../../../../../../common/components/UsisPageLoader';
+import { createPolicyPassword } from '../../../../../views/credentials/credentialsHelpers';
 import { SearchableSelect } from '../../../../../components/ui/SearchableSelect';
 import ConfirmationModal from '../../../../../components/ConfirmationModal';
 import TopCenterAlert from '../../../../../components/TopCenterAlert';
@@ -104,6 +105,27 @@ function buildContinuingLearnerFields(existingLearner: any, mergedHistory: any[]
     microsoft_license_sku_id: existingLearner?.microsoft_license_sku_id ?? existingLearner?.microsoftLicenseSkuId ?? null,
     microsoft_created_at: existingLearner?.microsoft_created_at ?? existingLearner?.microsoftCreatedAt ?? null,
     microsoft_last_synced_at: existingLearner?.microsoft_last_synced_at ?? existingLearner?.microsoftLastSyncedAt ?? null,
+  };
+}
+
+function buildEnrollmentPortalCredentials(existingLearner: any, learner: {
+  lrn: string;
+  firstName: string;
+  lastName: string;
+}) {
+  const loginUsername = String(existingLearner?.login_username || existingLearner?.loginUsername || '').trim() || learner.lrn;
+  const loginPassword =
+    String(existingLearner?.login_password_plain || existingLearner?.loginPassword || '').trim() ||
+    createPolicyPassword({
+      lrn: learner.lrn,
+      firstName: learner.firstName,
+      lastName: learner.lastName,
+    } as any);
+
+  return {
+    login_username: loginUsername,
+    login_password_plain: loginPassword,
+    login_status: String(existingLearner?.login_status || existingLearner?.loginStatus || '').trim() || 'Active',
   };
 }
 
@@ -483,6 +505,50 @@ export default function PublicEnrollmentSubmissionsPage() {
     return Array.from(groups.entries()).sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric: true }));
   }, [filtered]);
 
+  const gradeSubmissionCounts = useMemo(() => {
+    const counts = new Map<string, { enrolled: number; pending: number }>();
+
+    filtered.forEach((row) => {
+      const grade = (row.grade_to_enroll || 'Unspecified').trim() || 'Unspecified';
+      const hasAssignedSection = Boolean((row.payload as any)?.assignedSectionId || (row.payload as any)?.assignedSectionName);
+      const rowLrn = (row.lrn || row.payload?.lrn || '').trim();
+      const isExistingLearner = rowLrn ? existingLearnerLrns.has(rowLrn) : false;
+      const learnerSectionStatus = hasAssignedSection
+        ? 'Enrolled'
+        : isExistingLearner
+          ? 'Previous Learner'
+          : 'Pending';
+
+      const current = counts.get(grade) || { enrolled: 0, pending: 0 };
+      if (learnerSectionStatus === 'Enrolled') current.enrolled += 1;
+      if (learnerSectionStatus === 'Pending') current.pending += 1;
+      counts.set(grade, current);
+    });
+
+    return counts;
+  }, [existingLearnerLrns, filtered]);
+
+  const gradeLatestSubmissionMap = useMemo(() => {
+    const latestByGrade = new Map<string, string>();
+
+    filtered.forEach((row) => {
+      const grade = (row.grade_to_enroll || 'Unspecified').trim() || 'Unspecified';
+      const currentLatest = latestByGrade.get(grade);
+      const rowDate = row.created_at ? new Date(row.created_at) : null;
+      if (!rowDate || Number.isNaN(rowDate.getTime())) return;
+      if (!currentLatest) {
+        latestByGrade.set(grade, row.created_at);
+        return;
+      }
+      const latestDate = new Date(currentLatest);
+      if (Number.isNaN(latestDate.getTime()) || rowDate.getTime() > latestDate.getTime()) {
+        latestByGrade.set(grade, row.created_at);
+      }
+    });
+
+    return latestByGrade;
+  }, [filtered]);
+
   const printableRowsByGrade = useMemo(() => {
     const rowsMap = new Map<string, EnrollmentEnrolleePrintRow[]>();
 
@@ -531,7 +597,7 @@ export default function PublicEnrollmentSubmissionsPage() {
     setCollapsedGrades((current) => {
       const next = { ...current };
       groupedByGrade.forEach(([grade]) => {
-        if (typeof next[grade] !== 'boolean') next[grade] = false;
+        if (typeof next[grade] !== 'boolean') next[grade] = true;
       });
       return next;
     });
@@ -1091,6 +1157,14 @@ export default function PublicEnrollmentSubmissionsPage() {
       });
 
       Object.assign(upsertPayload, buildContinuingLearnerFields(existingLearner, learnerHistory));
+      Object.assign(
+        upsertPayload,
+        buildEnrollmentPortalCredentials(existingLearner, {
+          lrn,
+          firstName: (enrollingSubmission.first_name || payload.firstName || '').trim() || 'Learner',
+          lastName: (enrollingSubmission.last_name || payload.lastName || '').trim() || 'Learner',
+        }),
+      );
 
       const { error: upsertError } = await supabase.from('registrar_learners').upsert(upsertPayload, { onConflict: 'lrn' });
       if (upsertError) throw upsertError;
@@ -1265,15 +1339,33 @@ export default function PublicEnrollmentSubmissionsPage() {
         {isLoading ? (
           <div className="table-card"><table className="usis-table"><tbody><tr><td>Loading submissions...</td></tr></tbody></table></div>
         ) : groupedByGrade.length ? (
-          groupedByGrade.map(([grade, rows]) => (
-            <div key={grade} className="table-card">
-              <button
-                type="button"
-                onClick={() => setCollapsedGrades((current) => ({ ...current, [grade]: !current[grade] }))}
-                style={{ width: '100%', padding: '10px 14px', fontWeight: 800, color: 'var(--deped-blue)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-              >
-                <span>{grade} ({rows.length})</span>
-                <span className="material-symbols-outlined">{collapsedGrades[grade] ? 'expand_more' : 'expand_less'}</span>
+    groupedByGrade.map(([grade, rows]) => (
+      <div key={grade} className="table-card">
+        <button
+          type="button"
+          onClick={() => setCollapsedGrades((current) => ({ ...current, [grade]: !current[grade] }))}
+          className="registrar-public-enrollment-submissions__grade-toggle"
+        >
+          <span className="registrar-public-enrollment-submissions__grade-toggle-copy">
+            <span className="registrar-public-enrollment-submissions__grade-toggle-title">{grade}</span>
+            <span className="registrar-public-enrollment-submissions__grade-toggle-count">{rows.length} submissions</span>
+            {gradeLatestSubmissionMap.get(grade) ? (
+              <span className="registrar-public-enrollment-submissions__grade-toggle-latest">
+                Latest submission: {formatDate(gradeLatestSubmissionMap.get(grade)!)}
+              </span>
+            ) : null}
+          </span>
+          <span className="registrar-public-enrollment-submissions__grade-toggle-tags" aria-label={`${grade} summary`}>
+            <span className="registrar-public-enrollment-submissions__grade-toggle-tag registrar-public-enrollment-submissions__grade-toggle-tag--success">
+              Enrolled {(gradeSubmissionCounts.get(grade)?.enrolled || 0)}
+                  </span>
+                  <span className="registrar-public-enrollment-submissions__grade-toggle-tag registrar-public-enrollment-submissions__grade-toggle-tag--warning">
+                    Pending {(gradeSubmissionCounts.get(grade)?.pending || 0)}
+                  </span>
+                  <span className="material-symbols-outlined" aria-hidden="true">
+                    {collapsedGrades[grade] ? 'expand_more' : 'expand_less'}
+                  </span>
+                </span>
               </button>
               {!collapsedGrades[grade] && (
               <table className="usis-table">

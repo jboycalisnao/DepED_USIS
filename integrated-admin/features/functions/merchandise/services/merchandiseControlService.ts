@@ -56,6 +56,27 @@ const asNumber = (value: unknown, fallback = 0) => {
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
+const normalizeText = (value: unknown) => String(value || '').trim();
+const parseOrderPeriodDate = (value: unknown) => {
+  const text = normalizeText(value);
+  if (!text) return null;
+  const parsed = new Date(`${text}T00:00:00`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
+const isOrderPeriodWithinWindow = (startDate: unknown, endDate: unknown) => {
+  const start = parseOrderPeriodDate(startDate);
+  const end = parseOrderPeriodDate(endDate);
+  const today = new Date();
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
+  if (start && todayStart < start) return false;
+  if (end && todayStart > end) return false;
+  return true;
+};
+
+const isProtectedIdSku = (sku: string) => String(sku || '').trim().toUpperCase() === 'ID-001';
+
 const resolveCategoryId = async (categoryName: string) => {
   const normalizedName = categoryName.trim();
   if (!normalizedName) return null;
@@ -166,6 +187,8 @@ export const saveMerchandiseControlRecord = async (payload: MerchandiseControlPa
   const categoryId = await resolveCategoryId(payload.categoryName);
   const slugBase = slugify(payload.name || payload.sku || 'merch-item');
   const slug = payload.productId ? slugBase : `${slugBase}-${Date.now()}`;
+  const isIdProduct = isProtectedIdSku(payload.sku);
+  const nextIsPreOrder = isIdProduct ? true : payload.isPreOrder;
 
   if (payload.productId) {
     const { error } = await supabase
@@ -173,7 +196,7 @@ export const saveMerchandiseControlRecord = async (payload: MerchandiseControlPa
       .update({
         category_id: categoryId,
         is_published: payload.isPublished,
-        is_preorder: payload.isPreOrder,
+        is_preorder: nextIsPreOrder,
         order_period_id: payload.orderPeriodId || null,
         pre_order_cutoff_date: null,
         available_sizes: payload.availableSizes,
@@ -197,7 +220,7 @@ export const saveMerchandiseControlRecord = async (payload: MerchandiseControlPa
         {
           category_id: categoryId,
           is_published: payload.isPublished,
-          is_preorder: payload.isPreOrder,
+          is_preorder: nextIsPreOrder,
           order_period_id: payload.orderPeriodId || null,
           pre_order_cutoff_date: null,
           available_sizes: payload.availableSizes,
@@ -257,13 +280,40 @@ export const loadMerchOrderPeriods = async (): Promise<MerchandiseOrderPeriodRec
     .select('id,label,start_date,end_date,is_active')
     .order('start_date', { ascending: false });
   if (error) throw new Error('Unable to load merch order periods.');
-  return (data || []).map((row: any) => ({
-    endDate: String(row.end_date || ''),
-    id: String(row.id || ''),
-    isActive: Boolean(row.is_active),
-    label: String(row.label || ''),
-    startDate: String(row.start_date || ''),
-  }));
+
+  const periods = (data || []).map((row: any) => {
+    const startDate = normalizeText(row.start_date);
+    const endDate = normalizeText(row.end_date);
+    const withinWindow = isOrderPeriodWithinWindow(startDate, endDate);
+    const originalIsActive = Boolean(row.is_active);
+    return {
+      endDate,
+      id: normalizeText(row.id),
+      isActive: originalIsActive && withinWindow,
+      label: normalizeText(row.label),
+      startDate,
+      originalIsActive,
+      withinWindow,
+    };
+  });
+
+  const expiredActivePeriods = periods.filter((period: any) => period.originalIsActive && !period.withinWindow);
+  if (expiredActivePeriods.length > 0) {
+    const updates = await Promise.all(
+      expiredActivePeriods.map((period: any) =>
+        supabase
+          .from('merch_order_periods')
+          .update({ is_active: false })
+          .eq('id', period.id),
+      ),
+    );
+    const failedUpdate = updates.find((result) => result.error);
+    if (failedUpdate?.error) {
+      console.warn('Unable to auto-disable expired merch order period.', failedUpdate.error);
+    }
+  }
+
+  return periods.map(({ originalIsActive, withinWindow, ...period }) => period);
 };
 
 export const createMerchOrderPeriod = async (payload: {
@@ -275,7 +325,7 @@ export const createMerchOrderPeriod = async (payload: {
   const { error } = await supabase.from('merch_order_periods').insert([
     {
       end_date: payload.endDate,
-      is_active: payload.isActive,
+      is_active: payload.isActive && isOrderPeriodWithinWindow(payload.startDate, payload.endDate),
       label: payload.label.trim(),
       start_date: payload.startDate,
     },
@@ -296,7 +346,7 @@ export const updateMerchOrderPeriod = async (
     .from('merch_order_periods')
     .update({
       end_date: payload.endDate,
-      is_active: payload.isActive,
+      is_active: payload.isActive && isOrderPeriodWithinWindow(payload.startDate, payload.endDate),
       label: payload.label.trim(),
       start_date: payload.startDate,
     })
@@ -310,6 +360,18 @@ export const removeMerchOrderPeriod = async (periodId: string) => {
 };
 
 export const deleteMerchandiseControlRecord = async (productId: string) => {
+  const protectedRecord = await supabase
+    .from('merch_products')
+    .select('sku')
+    .eq('id', productId)
+    .limit(1)
+    .maybeSingle();
+  if (protectedRecord.error) {
+    throw new Error('Unable to verify merchandise product.');
+  }
+  if (isProtectedIdSku(protectedRecord.data?.sku || '')) {
+    throw new Error('ID-001 is protected and cannot be deleted.');
+  }
   const { error } = await supabase.from('merch_products').delete().eq('id', productId);
   if (error) {
     throw new Error('Unable to delete merchandise product.');

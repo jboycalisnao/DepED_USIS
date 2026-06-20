@@ -54,6 +54,101 @@ body {
   vertical-align: top;
 }
 
+.integrated-admin-app .registry-inline-status-select {
+  width: 100%;
+  min-width: 140px;
+  max-width: 190px;
+  min-height: 34px;
+  padding: 6px 10px;
+  border: 1px solid rgba(18, 35, 61, 0.16);
+  border-radius: 6px;
+  background: #ffffff;
+  color: var(--deped-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.integrated-admin-app .registry-status--pending {
+  background-color: #fff1ef;
+  border-color: #f4c1b8;
+  color: #b42318;
+}
+
+.integrated-admin-app .registry-status--done {
+  background-color: #ecfdf3;
+  border-color: #a6f4c5;
+  color: #027a48;
+}
+
+.integrated-admin-app .registry-status--released {
+  background-color: #eef4ff;
+  border-color: #bfd0ef;
+  color: var(--deped-blue);
+}
+
+.integrated-admin-app .registry-status--correction {
+  background-color: #fffaeb;
+  border-color: #fedf89;
+  color: #b54708;
+}
+
+.integrated-admin-app .registry-table tbody tr.registry-status--pending td {
+  background: #fff8f7;
+}
+
+.integrated-admin-app .registry-table tbody tr.registry-status--done td {
+  background: #f0fdf6;
+}
+
+.integrated-admin-app .registry-table tbody tr.registry-status--released td {
+  background: #f4f8ff;
+}
+
+.integrated-admin-app .registry-table tbody tr.registry-status--correction td {
+  background: #fffbea;
+}
+
+.integrated-admin-app .registry-table tbody tr.registry-status--pending:hover td {
+  background: #ffeceb;
+}
+
+.integrated-admin-app .registry-table tbody tr.registry-status--done:hover td {
+  background: #e1f8ea;
+}
+
+.integrated-admin-app .registry-table tbody tr.registry-status--released:hover td {
+  background: #eaf1ff;
+}
+
+.integrated-admin-app .registry-table tbody tr.registry-status--correction:hover td {
+  background: #fff4d8;
+}
+
+.integrated-admin-app .registry-inline-status-select:disabled {
+  opacity: 0.72;
+  cursor: wait;
+}
+
+.integrated-admin-app .registry-inline-status-select option.registry-status--pending {
+  background: #fff1ef;
+  color: #b42318;
+}
+
+.integrated-admin-app .registry-inline-status-select option.registry-status--done {
+  background: #ecfdf3;
+  color: #027a48;
+}
+
+.integrated-admin-app .registry-inline-status-select option.registry-status--released {
+  background: #eef4ff;
+  color: var(--deped-blue);
+}
+
+.integrated-admin-app .registry-inline-status-select option.registry-status--correction {
+  background: #fffaeb;
+  color: #b54708;
+}
+
 .integrated-admin-app .registry-table tbody tr:hover {
   background: #fbfdff;
 }

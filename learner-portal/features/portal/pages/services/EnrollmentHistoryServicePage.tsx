@@ -10,10 +10,32 @@ type EnrollmentHistoryServicePageProps = {
   session: LearnerPortalAccessRecord;
 };
 
+const REFERENCE_SCHOOL_YEAR = '2025-2026';
+
+const parseSchoolYearStart = (value: string) => {
+  const match = String(value || '').trim().match(/(20\d{2})\s*-\s*(20\d{2})/);
+  if (!match) return null;
+  return Number(match[1]);
+};
+
+const isBeyondReferenceSchoolYear = (value: string) => {
+  const startYear = parseSchoolYearStart(value);
+  if (!startYear) return false;
+  return startYear > 2025;
+};
+
 export function EnrollmentHistoryServicePage({ session }: EnrollmentHistoryServicePageProps) {
-  const [snapshot, setSnapshot] = useState<EnrollmentSnapshot>({ history: [], currentStatus: 'Loading' });
+  const [snapshot, setSnapshot] = useState<EnrollmentSnapshot>({ history: [], currentEnrollment: null, currentStatus: 'Loading' });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const records = [
+    ...(snapshot.currentEnrollment ? [snapshot.currentEnrollment] : []),
+    ...snapshot.history,
+  ];
+  const latestRecord = records[0] || null;
+  const hasRecordsBeyondReference = records.some((record) => isBeyondReferenceSchoolYear(record.schoolYear));
+  const policyMessage = 'USIS records are only from School Year 2025-2026 onwards.';
 
   useEffect(() => {
     let cancelled = false;
@@ -52,41 +74,83 @@ export function EnrollmentHistoryServicePage({ session }: EnrollmentHistoryServi
           <p>
             Current Enrollment Status: <strong>{snapshot.currentStatus || 'N/A'}</strong>
           </p>
+          {!isLoading && !error && latestRecord ? (
+            <div className="learner-services-history__tags" aria-label="Enrollment reference tags">
+              <span className="learner-services-history__tag">
+                Reference School Year: <strong>{REFERENCE_SCHOOL_YEAR}</strong>
+              </span>
+              <span className="learner-services-history__tag">
+                Latest record shown: <strong>{latestRecord.schoolYear || 'N/A'}</strong>
+              </span>
+              <span className="learner-services-history__tag">
+                {hasRecordsBeyondReference ? 'Records beyond the reference year are present.' : 'No records beyond the reference year.'}
+              </span>
+            </div>
+          ) : null}
         </header>
 
-        {isLoading ? <p className="learner-services-history__state">Loading enrollment history.</p> : null}
-        {error ? <p className="learner-services-history__state">{error}</p> : null}
-        {!isLoading && !error && snapshot.history.length === 0 ? (
-          <p className="learner-services-history__state">No enrollment history record found.</p>
-        ) : null}
+        <div className="learner-services-history__records">
+          {!isLoading && !error && snapshot.currentEnrollment ? (
+            <article className="learner-services-history__item">
+              <p>
+                <span>School Year</span>
+                <strong>{snapshot.currentEnrollment.schoolYear || 'N/A'}</strong>
+              </p>
+              <p>
+                <span>Grade Level</span>
+                <strong>{snapshot.currentEnrollment.gradeLevel || 'N/A'}</strong>
+              </p>
+              <p>
+                <span>Section</span>
+                <strong>{snapshot.currentEnrollment.section || 'N/A'}</strong>
+              </p>
+              <p>
+                <span>Status</span>
+                <strong>{snapshot.currentEnrollment.status || 'N/A'}</strong>
+              </p>
+              <p>
+                <span>Enrollment Date</span>
+                <strong>{formatEnrollmentDate(snapshot.currentEnrollment.enrollmentDate)}</strong>
+              </p>
+            </article>
+          ) : null}
 
-        {!isLoading && !error && snapshot.history.length > 0 ? (
-          <div className="learner-services-history__list">
-            {snapshot.history.map((item, index) => (
-              <article key={`${item.schoolYear}-${item.section}-${index}`} className="learner-services-history__item">
-                <p>
-                  <span>School Year</span>
-                  <strong>{item.schoolYear || 'N/A'}</strong>
-                </p>
-                <p>
-                  <span>Grade Level</span>
-                  <strong>{item.gradeLevel || 'N/A'}</strong>
-                </p>
-                <p>
-                  <span>Section</span>
-                  <strong>{item.section || 'N/A'}</strong>
-                </p>
-                <p>
-                  <span>Status</span>
-                  <strong>{item.status || 'N/A'}</strong>
-                </p>
-                <p>
-                  <span>Enrollment Date</span>
-                  <strong>{formatEnrollmentDate(item.enrollmentDate)}</strong>
-                </p>
-              </article>
-            ))}
-          </div>
+          {isLoading ? <p className="learner-services-history__state">Loading enrollment history.</p> : null}
+          {error ? <p className="learner-services-history__state">{error}</p> : null}
+          {!isLoading && !error && snapshot.history.length > 0 ? (
+            <div className="learner-services-history__list">
+              {snapshot.history.map((item, index) => (
+                <article key={`${item.schoolYear}-${item.section}-${index}`} className="learner-services-history__item">
+                  <p>
+                    <span>School Year</span>
+                    <strong>{item.schoolYear || 'N/A'}</strong>
+                  </p>
+                  <p>
+                    <span>Grade Level</span>
+                    <strong>{item.gradeLevel || 'N/A'}</strong>
+                  </p>
+                  <p>
+                    <span>Section</span>
+                    <strong>{item.section || 'N/A'}</strong>
+                  </p>
+                  <p>
+                    <span>Status</span>
+                    <strong>{item.status || 'N/A'}</strong>
+                  </p>
+                  <p>
+                    <span>Enrollment Date</span>
+                    <strong>{formatEnrollmentDate(item.enrollmentDate)}</strong>
+                  </p>
+                </article>
+              ))}
+            </div>
+          ) : null}
+        </div>
+
+        {!isLoading && !error ? (
+          <p className="learner-services-history__state learner-services-history__policy-note">
+            {policyMessage}
+          </p>
         ) : null}
       </section>
     </section>

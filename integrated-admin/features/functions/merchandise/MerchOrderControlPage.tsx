@@ -5,6 +5,7 @@ import UsisPageLoader from '../../../../common/components/UsisPageLoader';
 import { ManualOrderOverrideModal } from './order-control/components/ManualOrderOverrideModal';
 import { OrderControlSectionTable } from './order-control/components/OrderControlSectionTable';
 import { OrderDetailAuditModal } from './order-control/components/OrderDetailAuditModal';
+import { loadCachedMerchOrdersPageSnapshot, saveCachedMerchOrdersPageSnapshot } from './utils/merchOrdersPageCache';
 import {
   createManualMerchOrder,
   deleteMerchOrderRecord,
@@ -30,6 +31,7 @@ export function MerchOrderControlPage() {
   const [learners, setLearners] = useState<MerchActiveLearnerOption[]>([]);
   const [products, setProducts] = useState<MerchProductOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [learnerSearch, setLearnerSearch] = useState('');
   const [selectedLearnerId, setSelectedLearnerId] = useState('');
@@ -43,11 +45,32 @@ export function MerchOrderControlPage() {
   const [isAuditLoading, setIsAuditLoading] = useState(false);
   const [detailStatusValue, setDetailStatusValue] = useState('');
   const [orderSearch, setOrderSearch] = useState('');
+  const [lastSyncedAt, setLastSyncedAt] = useState('');
   const [alert, setAlert] = useState<{ title: string; message: string; tone: 'success' | 'danger' } | null>(null);
+
+  const hydrateFromCache = async () => {
+    setIsLoading(true);
+    try {
+      const cached = await loadCachedMerchOrdersPageSnapshot();
+      if (cached) {
+        setRecords(cached.records || []);
+        setLearners(cached.learners || []);
+        setProducts(cached.products || []);
+        setLastSyncedAt(cached.updatedAt || '');
+        if (!selectedProductId && (cached.products || []).length > 0) {
+          setSelectedProductId(cached.products[0].id);
+        }
+      }
+    } catch (error) {
+      console.error('MerchOrderControlPage cache hydrate failed:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const refresh = async (options?: { silent?: boolean }) => {
     const silent = Boolean(options?.silent);
-    if (!silent) setIsLoading(true);
+    if (!silent) setIsRefreshing(true);
     try {
       const [rows, activeLearners, merchProducts] = await Promise.all([
         loadMerchOrderControlRecords(),
@@ -60,15 +83,21 @@ export function MerchOrderControlPage() {
       if (!selectedProductId && merchProducts.length > 0) {
         setSelectedProductId(merchProducts[0].id);
       }
+      setLastSyncedAt(new Date().toISOString());
+      await saveCachedMerchOrdersPageSnapshot(rows, activeLearners, merchProducts);
+      if (!silent) {
+        setAlert({ title: 'Refresh Complete', message: 'Merch orders were reloaded from the database and saved locally.', tone: 'success' });
+      }
     } catch (error: any) {
+      console.error('MerchOrderControlPage refresh failed:', error);
       setAlert({ title: 'Load Failed', message: error?.message || 'Unable to load merch orders.', tone: 'danger' });
     } finally {
-      if (!silent) setIsLoading(false);
+      if (!silent) setIsRefreshing(false);
     }
   };
 
   useEffect(() => {
-    void refresh();
+    void hydrateFromCache();
   }, []);
 
   useEffect(() => {
@@ -81,7 +110,7 @@ export function MerchOrderControlPage() {
     setIsSaving(true);
     try {
       await updateMerchOrderStatus(orderId, value);
-      await refresh();
+      await refresh({ silent: true });
       setAlert({ title: 'Saved', message: 'Order status updated.', tone: 'success' });
     } catch (error: any) {
       setAlert({ title: 'Save Failed', message: error?.message || 'Unable to update order status.', tone: 'danger' });
@@ -222,7 +251,7 @@ export function MerchOrderControlPage() {
     setIsSaving(true);
     try {
       await deleteMerchOrderRecord(orderId);
-      await refresh();
+      await refresh({ silent: true });
       setAlert({ title: 'Removed', message: 'Merch order deleted.', tone: 'success' });
     } catch (error: any) {
       setAlert({ title: 'Delete Failed', message: error?.message || 'Unable to remove order.', tone: 'danger' });
@@ -259,32 +288,50 @@ export function MerchOrderControlPage() {
         <div className="section-card__bar" />
         <div className="section-card__content">
           <div className="integrated-admin-merch-orders-toolbar">
-            <div className="integrated-admin-merch-orders-search">
-              <div className="floating-field">
-                <div className="floating-field__control">
-                  <input
-                    data-has-value={orderSearch.trim().length > 0 ? 'true' : 'false'}
-                    onChange={(event) => setOrderSearch(event.target.value)}
-                    placeholder=" "
-                    value={orderSearch}
-                  />
-                  <span>Search Orders (Learner, LRN, Product, Grade, Section, Status)</span>
+            <div className="integrated-admin-merch-orders-toolbar__filters">
+              <div className="integrated-admin-merch-orders-search">
+                <div className="floating-field">
+                  <div className="floating-field__control">
+                    <input
+                      data-has-value={orderSearch.trim().length > 0 ? 'true' : 'false'}
+                      onChange={(event) => setOrderSearch(event.target.value)}
+                      placeholder=" "
+                      value={orderSearch}
+                    />
+                    <span>Search Orders (Learner, LRN, Product, Grade, Section, Status)</span>
+                  </div>
                 </div>
               </div>
             </div>
             <div className="integrated-admin-merch-order-manual-trigger">
               <button
+                className="secondary-button"
+                onClick={() => void refresh()}
+                type="button"
+                disabled={isRefreshing || isLoading}
+              >
+                {isRefreshing ? 'Refreshing...' : 'Refresh'}
+              </button>
+              <button
                 className="primary-button"
                 onClick={() => setIsManualModalOpen(true)}
                 type="button"
+                disabled={isRefreshing}
               >
                 Manual Learner Order Override
               </button>
             </div>
           </div>
+          {lastSyncedAt ? (
+            <p className="integrated-admin-merch-orders-cache-note">
+              Last synced: {new Date(lastSyncedAt).toLocaleString()}
+            </p>
+          ) : null}
           <UsisGradeSectionList
             className="integrated-admin-merch-groups"
-            emptyMessage="No merch orders found."
+            emptyMessage={records.length === 0
+              ? 'No cached merch orders found. Use Refresh to load records from the database.'
+              : 'No merch orders found.'}
             expandAll={normalizedOrderSearch.length > 0}
             grades={gradeListData}
           />

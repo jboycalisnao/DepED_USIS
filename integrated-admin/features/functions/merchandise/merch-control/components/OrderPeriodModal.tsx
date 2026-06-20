@@ -3,6 +3,25 @@ import type { MerchandiseOrderPeriodRecord } from '../../services/merchandiseCon
 
 type Draft = { endDate: string; isActive: boolean; label: string; startDate: string };
 
+const normalizeText = (value: unknown) => String(value || '').trim();
+const parseOrderPeriodDate = (value: unknown) => {
+  const text = normalizeText(value);
+  if (!text) return null;
+  const parsed = new Date(`${text}T00:00:00`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
+const isWithinWindow = (startDate: unknown, endDate: unknown) => {
+  const start = parseOrderPeriodDate(startDate);
+  const end = parseOrderPeriodDate(endDate);
+  const today = new Date();
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
+  if (start && todayStart < start) return false;
+  if (end && todayStart > end) return false;
+  return true;
+};
+
 type Props = {
   editingOrderPeriodId: string | null;
   isOpen: boolean;
@@ -74,50 +93,65 @@ export function OrderPeriodModal(props: Props) {
             <div className="integrated-admin-order-period-list">
               {periods.length === 0 ? <p className="integrated-admin-order-period-list__empty">No order periods found.</p> : periods.map((period) => (
                 <article key={period.id} className="integrated-admin-order-period-item">
-                  {editingOrderPeriodId === period.id ? (
-                    <div className="integrated-admin-order-period-item__edit">
-                      <label className="floating-field"><div className="floating-field__control"><input value={orderPeriodEditDraft.label} onChange={(event) => setOrderPeriodEditDraft((current) => ({ ...current, label: event.target.value }))} required placeholder=" " /><span>Order Period Label</span></div></label>
-                      <div className="floating-field-grid floating-field-grid--two">
-                        <UsisDateTimePicker ariaLabel="Order period start" label="Start Date" mode="date" value={orderPeriodEditDraft.startDate} onChange={(value) => setOrderPeriodEditDraft((current) => ({ ...current, startDate: value }))} />
-                        <UsisDateTimePicker ariaLabel="Order period end" label="End Date" mode="date" value={orderPeriodEditDraft.endDate} onChange={(value) => setOrderPeriodEditDraft((current) => ({ ...current, endDate: value }))} />
-                      </div>
-                      <label className="integrated-admin-order-period-switch integrated-admin-order-period-switch--compact integrated-admin-order-period-item__toggle">
-                        <input
-                          type="checkbox"
-                          checked={orderPeriodEditDraft.isActive}
-                          onChange={(event) => setOrderPeriodEditDraft((current) => ({ ...current, isActive: event.target.checked }))}
-                        />
-                        <span className="integrated-admin-order-period-switch__visual" aria-hidden="true">
-                          <span className="integrated-admin-order-period-switch__thumb" />
-                        </span>
-                        <span className="integrated-admin-order-period-switch__text">{orderPeriodEditDraft.isActive ? 'Active' : 'Inactive'}</span>
-                      </label>
-                      <div className="integrated-admin-order-period-item__actions">
-                        <button type="button" className="secondary-button" disabled={orderPeriodActionId === period.id} onClick={onCancelEdit}>Cancel</button>
-                        <button type="button" className="modal-dialog__blue" disabled={orderPeriodActionId === period.id} onClick={() => onSaveEdit(period.id)}>{orderPeriodActionId === period.id ? 'Saving...' : 'Save'}</button>
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="integrated-admin-order-period-item__meta"><strong>{period.label}</strong><span>{new Date(period.startDate).toLocaleDateString()} - {new Date(period.endDate).toLocaleDateString()}</span></div>
-                      <div className="integrated-admin-order-period-item__actions">
+                  {(() => {
+                    const periodWithinWindow = isWithinWindow(period.startDate, period.endDate);
+                    const draftWithinWindow = editingOrderPeriodId === period.id
+                      ? isWithinWindow(orderPeriodEditDraft.startDate, orderPeriodEditDraft.endDate)
+                      : periodWithinWindow;
+                    const toggleDisabled = orderPeriodActionId === period.id || !draftWithinWindow;
+                    const statusText = periodWithinWindow
+                      ? (period.isActive ? 'Active' : 'Inactive')
+                      : 'Inactive (outside dates)';
+
+                    return editingOrderPeriodId === period.id ? (
+                      <div className="integrated-admin-order-period-item__edit">
+                        <label className="floating-field"><div className="floating-field__control"><input value={orderPeriodEditDraft.label} onChange={(event) => setOrderPeriodEditDraft((current) => ({ ...current, label: event.target.value }))} required placeholder=" " /><span>Order Period Label</span></div></label>
+                        <div className="floating-field-grid floating-field-grid--two">
+                          <UsisDateTimePicker ariaLabel="Order period start" label="Start Date" mode="date" value={orderPeriodEditDraft.startDate} onChange={(value) => setOrderPeriodEditDraft((current) => ({ ...current, startDate: value }))} />
+                          <UsisDateTimePicker ariaLabel="Order period end" label="End Date" mode="date" value={orderPeriodEditDraft.endDate} onChange={(value) => setOrderPeriodEditDraft((current) => ({ ...current, endDate: value }))} />
+                        </div>
                         <label className="integrated-admin-order-period-switch integrated-admin-order-period-switch--compact integrated-admin-order-period-item__toggle">
                           <input
                             type="checkbox"
-                            checked={period.isActive}
-                            disabled={orderPeriodActionId === period.id}
-                            onChange={() => onToggleActive(period)}
+                            checked={draftWithinWindow ? orderPeriodEditDraft.isActive : false}
+                            disabled={toggleDisabled}
+                            onChange={(event) => setOrderPeriodEditDraft((current) => ({ ...current, isActive: event.target.checked }))}
                           />
                           <span className="integrated-admin-order-period-switch__visual" aria-hidden="true">
                             <span className="integrated-admin-order-period-switch__thumb" />
                           </span>
-                          <span className="integrated-admin-order-period-switch__text">{period.isActive ? 'Active' : 'Inactive'}</span>
+                          <span className="integrated-admin-order-period-switch__text">
+                            {draftWithinWindow ? (orderPeriodEditDraft.isActive ? 'Active' : 'Inactive') : 'Inactive (outside dates)'}
+                          </span>
                         </label>
-                        <button type="button" className="secondary-button" disabled={orderPeriodActionId === period.id} onClick={() => onBeginEdit(period)}>Edit</button>
-                        <button type="button" className="secondary-button" disabled={orderPeriodActionId === period.id} onClick={() => onDelete(period)}>Delete</button>
+                        {!draftWithinWindow ? <p className="integrated-admin-order-period-item__note">This period is outside the date window and will remain inactive until the dates are valid.</p> : null}
+                        <div className="integrated-admin-order-period-item__actions">
+                          <button type="button" className="secondary-button" disabled={orderPeriodActionId === period.id} onClick={onCancelEdit}>Cancel</button>
+                          <button type="button" className="modal-dialog__blue" disabled={orderPeriodActionId === period.id} onClick={() => onSaveEdit(period.id)}>{orderPeriodActionId === period.id ? 'Saving...' : 'Save'}</button>
+                        </div>
                       </div>
-                    </>
-                  )}
+                    ) : (
+                      <>
+                        <div className="integrated-admin-order-period-item__meta"><strong>{period.label}</strong><span>{new Date(period.startDate).toLocaleDateString()} - {new Date(period.endDate).toLocaleDateString()}</span></div>
+                        <div className="integrated-admin-order-period-item__actions">
+                          <label className="integrated-admin-order-period-switch integrated-admin-order-period-switch--compact integrated-admin-order-period-item__toggle">
+                            <input
+                              type="checkbox"
+                              checked={periodWithinWindow ? period.isActive : false}
+                              disabled={toggleDisabled}
+                              onChange={() => onToggleActive(period)}
+                            />
+                            <span className="integrated-admin-order-period-switch__visual" aria-hidden="true">
+                              <span className="integrated-admin-order-period-switch__thumb" />
+                            </span>
+                            <span className="integrated-admin-order-period-switch__text">{statusText}</span>
+                          </label>
+                          <button type="button" className="secondary-button" disabled={orderPeriodActionId === period.id} onClick={() => onBeginEdit(period)}>Edit</button>
+                          <button type="button" className="secondary-button" disabled={orderPeriodActionId === period.id} onClick={() => onDelete(period)}>Delete</button>
+                        </div>
+                      </>
+                    );
+                  })()}
                 </article>
               ))}
             </div>

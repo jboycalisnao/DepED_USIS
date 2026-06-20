@@ -374,6 +374,77 @@
   border-color: #b6d4fe;
 }
 
+.registrar-public-enrollment-submissions__grade-toggle {
+  width: 100%;
+  padding: 10px 14px;
+  border: 0;
+  background: #f8fbff;
+  color: var(--deped-blue);
+  font-weight: 800;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  text-align: left;
+}
+
+.registrar-public-enrollment-submissions__grade-toggle-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.registrar-public-enrollment-submissions__grade-toggle-title {
+  font-size: 15px;
+  line-height: 1.2;
+}
+
+.registrar-public-enrollment-submissions__grade-toggle-count {
+  color: var(--deped-muted);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.registrar-public-enrollment-submissions__grade-toggle-latest {
+  color: var(--deped-muted);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.35;
+}
+
+.registrar-public-enrollment-submissions__grade-toggle-tags {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.registrar-public-enrollment-submissions__grade-toggle-tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.registrar-public-enrollment-submissions__grade-toggle-tag--success {
+  color: #0f5132;
+  background: #d1e7dd;
+  border: 1px solid #badbcc;
+}
+
+.registrar-public-enrollment-submissions__grade-toggle-tag--warning {
+  color: #664d03;
+  background: #fff3cd;
+  border: 1px solid #ffecb5;
+}
+
 .registrar-public-enrollment-submissions__status-dot {
   width: 10px;
   height: 10px;
@@ -551,6 +622,18 @@
 
   .registrar-public-enrollment-submissions__status-action {
     width: 100%;
+  }
+
+  .registrar-public-enrollment-submissions__grade-toggle {
+    align-items: flex-start;
+  }
+
+  .registrar-public-enrollment-submissions__grade-toggle-tags {
+    justify-content: flex-start;
+  }
+
+  .registrar-public-enrollment-submissions__grade-toggle-latest {
+    word-break: break-word;
   }
 
   .registrar-public-enrollment-submissions__audit-item {
