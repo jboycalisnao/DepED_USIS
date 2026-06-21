@@ -104,6 +104,19 @@
   line-height: 1.6;
 }
 
+.registrar-public-enrollment__sync-note {
+  margin: 8px 0 0;
+  color: var(--deped-muted);
+  font-size: var(--usis-helper-size);
+  line-height: 1.4;
+}
+
+.registrar-public-enrollment__sync-stack {
+  display: grid;
+  gap: 2px;
+  margin-top: 8px;
+}
+
 .registrar-public-enrollment__same-address {
   margin-top: 12px;
 }

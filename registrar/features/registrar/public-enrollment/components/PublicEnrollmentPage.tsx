@@ -4,7 +4,6 @@ import { RegistrarHeader } from '../../../../components/shell/RegistrarHeader';
 import { RegistrarFooter } from '../../../../components/shell/RegistrarFooter';
 import { UsisSearchableSelect } from '../../../../../common/components/ui/UsisSearchableSelect';
 import { supabase } from '../../../../lib/supabase';
-import UsisPageLoader from '../../../../../common/components/UsisPageLoader';
 import {
   deviceOptions,
   gradeLevelOptions,
@@ -470,10 +469,6 @@ export default function PublicEnrollmentPage() {
     }
   };
 
-  if (isPageLoading) {
-    return <UsisPageLoader message="Loading public enrollment form..." />;
-  }
-
   return (
     <>
       <RegistrarHeader />
@@ -486,6 +481,7 @@ export default function PublicEnrollmentPage() {
                   <p className="registrar-public-enrollment__eyebrow">Public Enrollment</p>
                   <h2>Basic Education Enrollment Form</h2>
                   <p>This form is not for sale. Revised based on DepEd enrollment template.</p>
+                  {isPageLoading ? <p className="registrar-public-enrollment__sync-note">Loading reference data in the background...</p> : null}
                 </div>
                 <div className="registrar-public-enrollment__hero-meta">
                   <div className="registrar-public-enrollment__hero-chip">

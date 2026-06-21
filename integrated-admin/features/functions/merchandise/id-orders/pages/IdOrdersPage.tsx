@@ -137,6 +137,11 @@ export function IdOrdersPage() {
   }, []);
 
   useEffect(() => {
+    if (isLoading) return;
+    void saveCachedIdOrdersSnapshot(records, schoolYearLabel);
+  }, [isLoading, records, schoolYearLabel]);
+
+  useEffect(() => {
     if (!selectedOrderPeriodId) return;
     if (records.some((row) => row.orderPeriodId === selectedOrderPeriodId)) return;
     setSelectedOrderPeriodId('');

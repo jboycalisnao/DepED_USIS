@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { PublicEnrollmentSubmission } from '../types';
 import {
   fetchPublicEnrollmentSubmissions,
 } from '../services/publicEnrollmentSubmissions';
 import {
   normalizePublicEnrollmentSubmissionsCacheScopeKey,
+  peekPublicEnrollmentSubmissionsSnapshot,
   readPublicEnrollmentSubmissionsSnapshot,
   writePublicEnrollmentSubmissionsSnapshot,
 } from '../utils/publicEnrollmentSubmissionsCache';
@@ -26,16 +27,29 @@ export function usePublicEnrollmentSubmissions(scopeKey = 'default', schoolYearL
     () => normalizePublicEnrollmentSubmissionsCacheScopeKey(scopeKey, schoolYearLabel),
     [scopeKey, schoolYearLabel]
   );
-  const [submissions, setSubmissions] = useState<PublicEnrollmentSubmission[]>(
-    () => []
+  const initialSnapshot = useMemo(
+    () => peekPublicEnrollmentSubmissionsSnapshot(scopeKey, schoolYearLabel),
+    [scopeKey, schoolYearLabel]
   );
-  const [isLoading, setIsLoading] = useState(true);
+  const [submissions, setSubmissions] = useState<PublicEnrollmentSubmission[]>(
+    () => initialSnapshot?.rows || []
+  );
+  const [isLoading, setIsLoading] = useState(() => !initialSnapshot);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [lastLoadedFromDbAt, setLastLoadedFromDbAt] = useState(() => initialSnapshot?.lastLoadedFromDbAt || '');
+  const [lastSavedToCacheAt, setLastSavedToCacheAt] = useState(() => initialSnapshot?.updatedAt || '');
   const hydratedCacheKeyRef = useRef<string | null>(null);
+  const submissionsRef = useRef<PublicEnrollmentSubmission[]>([]);
 
   const persistRows = useCallback(async (rows: PublicEnrollmentSubmission[]) => {
-    await writePublicEnrollmentSubmissionsSnapshot(scopeKey, rows, schoolYearLabel);
-  }, [scopeKey, schoolYearLabel]);
+    const payload = await writePublicEnrollmentSubmissionsSnapshot(scopeKey, rows, schoolYearLabel, lastLoadedFromDbAt);
+    setLastSavedToCacheAt(payload.updatedAt || new Date().toISOString());
+    return payload;
+  }, [lastLoadedFromDbAt, scopeKey, schoolYearLabel]);
+
+  useEffect(() => {
+    submissionsRef.current = submissions;
+  }, [submissions]);
 
   const loadFromNetwork = useCallback(async (options?: { toggleLoading?: boolean }) => {
     const normalizedSchoolYear = String(schoolYearLabel || '').trim();
@@ -45,6 +59,7 @@ export function usePublicEnrollmentSubmissions(scopeKey = 'default', schoolYearL
         schoolYearLabel,
       });
       setSubmissions([]);
+      setLastLoadedFromDbAt('');
       if (options?.toggleLoading !== false) {
         setIsLoading(false);
       }
@@ -62,14 +77,21 @@ export function usePublicEnrollmentSubmissions(scopeKey = 'default', schoolYearL
       schoolYearLabel: normalizedSchoolYear,
       rowCount: rows.length,
     });
-    setSubmissions(rows);
-    await persistRows(rows);
+    const loadedAt = new Date().toISOString();
+    startTransition(() => {
+      setSubmissions(rows);
+      setLastLoadedFromDbAt(loadedAt);
+    });
+    await writePublicEnrollmentSubmissionsSnapshot(scopeKey, rows, schoolYearLabel, loadedAt);
+    startTransition(() => {
+      setLastSavedToCacheAt(new Date().toISOString());
+    });
     hydratedCacheKeyRef.current = cacheScopeKey;
     if (options?.toggleLoading !== false) {
       setIsLoading(false);
     }
     return rows;
-  }, [cacheScopeKey, persistRows, schoolYearLabel]);
+  }, [cacheScopeKey, schoolYearLabel, scopeKey]);
 
   const refresh = useCallback(async (options?: { silent?: boolean }) => {
     if (!options?.silent) setIsLoading(true);
@@ -118,9 +140,10 @@ export function usePublicEnrollmentSubmissions(scopeKey = 'default', schoolYearL
     let cancelled = false;
 
     const bootstrap = async () => {
+      const normalizedSchoolYear = String(schoolYearLabel || '').trim();
       setErrorMessage(null);
 
-      const cached = await readPublicEnrollmentSubmissionsSnapshot(scopeKey, schoolYearLabel);
+      const cached = peekPublicEnrollmentSubmissionsSnapshot(scopeKey, schoolYearLabel) || await readPublicEnrollmentSubmissionsSnapshot(scopeKey, schoolYearLabel);
       if (cached) {
         console.info('[PublicEnrollmentSubmissions] Loaded submissions from local cache on boot.', {
           scopeKey,
@@ -129,8 +152,20 @@ export function usePublicEnrollmentSubmissions(scopeKey = 'default', schoolYearL
         });
         if (cancelled) return;
         hydratedCacheKeyRef.current = cacheScopeKey;
-        setSubmissions(cached.rows || []);
+        startTransition(() => {
+          setSubmissions(cached.rows || []);
+          setLastLoadedFromDbAt(cached.lastLoadedFromDbAt || '');
+          setLastSavedToCacheAt(cached.updatedAt || '');
+        });
         setIsLoading(false);
+        return;
+      }
+
+      if (!normalizedSchoolYear) {
+        if (!cancelled) {
+          hydratedCacheKeyRef.current = null;
+          setIsLoading(false);
+        }
         return;
       }
 
@@ -138,15 +173,6 @@ export function usePublicEnrollmentSubmissions(scopeKey = 'default', schoolYearL
         scopeKey,
         schoolYearLabel,
       });
-      const normalizedSchoolYear = String(schoolYearLabel || '').trim();
-      if (!normalizedSchoolYear) {
-        if (!cancelled) {
-          setSubmissions([]);
-          setIsLoading(false);
-        }
-        return;
-      }
-
       if (!cancelled) {
         setIsLoading(true);
       }
@@ -155,8 +181,15 @@ export function usePublicEnrollmentSubmissions(scopeKey = 'default', schoolYearL
         const rows = await fetchPublicEnrollmentSubmissions(undefined, normalizedSchoolYear);
         if (cancelled) return;
         hydratedCacheKeyRef.current = cacheScopeKey;
-        setSubmissions(rows);
-        await persistRows(rows);
+        const loadedAt = new Date().toISOString();
+        startTransition(() => {
+          setSubmissions(rows);
+          setLastLoadedFromDbAt(loadedAt);
+        });
+        await writePublicEnrollmentSubmissionsSnapshot(scopeKey, rows, schoolYearLabel, loadedAt);
+        startTransition(() => {
+          setLastSavedToCacheAt(new Date().toISOString());
+        });
       } catch (error: any) {
         if (!cancelled) {
           setErrorMessage(error?.message || 'Unable to load submissions.');
@@ -180,15 +213,36 @@ export function usePublicEnrollmentSubmissions(scopeKey = 'default', schoolYearL
     void persistRows(submissions);
   }, [cacheScopeKey, persistRows, submissions]);
 
+  useEffect(() => {
+    const flushSnapshot = () => {
+      if (hydratedCacheKeyRef.current !== cacheScopeKey) return;
+      void writePublicEnrollmentSubmissionsSnapshot(scopeKey, submissionsRef.current, schoolYearLabel, lastLoadedFromDbAt).then((payload) => {
+        setLastSavedToCacheAt(payload.updatedAt || new Date().toISOString());
+      });
+    };
+
+    const onPageHide = () => {
+      flushSnapshot();
+    };
+
+    window.addEventListener('pagehide', onPageHide);
+    return () => {
+      window.removeEventListener('pagehide', onPageHide);
+      flushSnapshot();
+    };
+  }, [cacheScopeKey, lastLoadedFromDbAt, scopeKey, schoolYearLabel]);
+
   return useMemo(
     () => ({
       submissions,
       isLoading,
       errorMessage,
+      lastLoadedFromDbAt,
+      lastSavedToCacheAt,
       refresh,
       upsertSubmissionLocally,
       removeSubmissionById,
     }),
-    [submissions, isLoading, errorMessage, refresh, upsertSubmissionLocally, removeSubmissionById]
+    [submissions, isLoading, errorMessage, lastLoadedFromDbAt, lastSavedToCacheAt, refresh, upsertSubmissionLocally, removeSubmissionById]
   );
 }

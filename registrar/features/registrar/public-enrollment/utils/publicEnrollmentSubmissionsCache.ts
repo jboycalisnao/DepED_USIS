@@ -1,6 +1,7 @@
 import type { PublicEnrollmentSubmission } from '../types';
 
 type PublicEnrollmentSubmissionsCachePayload = {
+  lastLoadedFromDbAt: string;
   updatedAt: string;
   rows: PublicEnrollmentSubmission[];
 };
@@ -51,6 +52,7 @@ const readLegacyLocalSnapshot = (scopeKey: string, schoolYearLabel = ''): Public
       const parsed = JSON.parse(raw) as Partial<PublicEnrollmentSubmissionsCachePayload>;
       if (!Array.isArray(parsed.rows) || !parsed.updatedAt) continue;
       return {
+        lastLoadedFromDbAt: String(parsed.lastLoadedFromDbAt || ''),
         updatedAt: String(parsed.updatedAt),
         rows: parsed.rows as PublicEnrollmentSubmission[],
       };
@@ -101,6 +103,7 @@ const readIndexedSnapshot = async (key: string): Promise<PublicEnrollmentSubmiss
         return;
       }
       resolve({
+        lastLoadedFromDbAt: String(parsed.lastLoadedFromDbAt || ''),
         updatedAt: String(parsed.updatedAt),
         rows: parsed.rows as PublicEnrollmentSubmission[],
       });
@@ -124,6 +127,18 @@ const writeIndexedSnapshot = async (key: string, payload: PublicEnrollmentSubmis
   });
 };
 
+export const peekPublicEnrollmentSubmissionsSnapshot = (
+  scopeKey: string,
+  schoolYearLabel = ''
+): PublicEnrollmentSubmissionsCachePayload | null => {
+  const keys = getPublicEnrollmentSubmissionsCacheKeys(scopeKey, schoolYearLabel);
+  for (const key of keys) {
+    const snapshot = memorySnapshots.get(key);
+    if (snapshot) return snapshot;
+  }
+  return null;
+};
+
 export const readPublicEnrollmentSubmissionsSnapshot = async (
   scopeKey: string,
   schoolYearLabel = ''
@@ -136,7 +151,12 @@ export const readPublicEnrollmentSubmissionsSnapshot = async (
 
   const legacySnapshot = readLegacyLocalSnapshot(scopeKey, schoolYearLabel);
   if (legacySnapshot) {
-    await writePublicEnrollmentSubmissionsSnapshot(scopeKey, legacySnapshot.rows, schoolYearLabel);
+    await writePublicEnrollmentSubmissionsSnapshot(
+      scopeKey,
+      legacySnapshot.rows,
+      schoolYearLabel,
+      legacySnapshot.lastLoadedFromDbAt
+    );
     return legacySnapshot;
   }
 
@@ -147,13 +167,18 @@ export const writePublicEnrollmentSubmissionsSnapshot = async (
   scopeKey: string,
   rows: PublicEnrollmentSubmission[],
   schoolYearLabel = '',
+  lastLoadedFromDbAt = '',
 ) => {
+  const keys = getPublicEnrollmentSubmissionsCacheKeys(scopeKey, schoolYearLabel);
+  const primaryKey = keys[0];
+  const existingSnapshot = memorySnapshots.get(primaryKey) || await readIndexedSnapshot(primaryKey);
   const payload: PublicEnrollmentSubmissionsCachePayload = {
+    lastLoadedFromDbAt: String(lastLoadedFromDbAt || existingSnapshot?.lastLoadedFromDbAt || ''),
     updatedAt: new Date().toISOString(),
     rows: normalizeRows(rows),
   };
 
-  for (const key of getPublicEnrollmentSubmissionsCacheKeys(scopeKey, schoolYearLabel)) {
+  for (const key of keys) {
     memorySnapshots.set(key, payload);
     await writeIndexedSnapshot(key, payload);
   }
