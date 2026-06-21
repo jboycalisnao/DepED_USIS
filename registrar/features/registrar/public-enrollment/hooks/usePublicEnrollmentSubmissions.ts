@@ -38,14 +38,19 @@ export function usePublicEnrollmentSubmissions(scopeKey = 'default', schoolYearL
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [lastLoadedFromDbAt, setLastLoadedFromDbAt] = useState(() => initialSnapshot?.lastLoadedFromDbAt || '');
   const [lastSavedToCacheAt, setLastSavedToCacheAt] = useState(() => initialSnapshot?.updatedAt || '');
+  const lastLoadedFromDbAtRef = useRef(initialSnapshot?.lastLoadedFromDbAt || '');
   const hydratedCacheKeyRef = useRef<string | null>(null);
   const submissionsRef = useRef<PublicEnrollmentSubmission[]>([]);
 
   const persistRows = useCallback(async (rows: PublicEnrollmentSubmission[]) => {
-    const payload = await writePublicEnrollmentSubmissionsSnapshot(scopeKey, rows, schoolYearLabel, lastLoadedFromDbAt);
+    const payload = await writePublicEnrollmentSubmissionsSnapshot(scopeKey, rows, schoolYearLabel, lastLoadedFromDbAtRef.current);
     setLastSavedToCacheAt(payload.updatedAt || new Date().toISOString());
     return payload;
-  }, [lastLoadedFromDbAt, scopeKey, schoolYearLabel]);
+  }, [scopeKey, schoolYearLabel]);
+
+  useEffect(() => {
+    lastLoadedFromDbAtRef.current = lastLoadedFromDbAt;
+  }, [lastLoadedFromDbAt]);
 
   useEffect(() => {
     submissionsRef.current = submissions;
@@ -78,6 +83,7 @@ export function usePublicEnrollmentSubmissions(scopeKey = 'default', schoolYearL
       rowCount: rows.length,
     });
     const loadedAt = new Date().toISOString();
+    lastLoadedFromDbAtRef.current = loadedAt;
     startTransition(() => {
       setSubmissions(rows);
       setLastLoadedFromDbAt(loadedAt);
@@ -154,6 +160,7 @@ export function usePublicEnrollmentSubmissions(scopeKey = 'default', schoolYearL
         hydratedCacheKeyRef.current = cacheScopeKey;
         startTransition(() => {
           setSubmissions(cached.rows || []);
+          lastLoadedFromDbAtRef.current = cached.lastLoadedFromDbAt || '';
           setLastLoadedFromDbAt(cached.lastLoadedFromDbAt || '');
           setLastSavedToCacheAt(cached.updatedAt || '');
         });
@@ -182,6 +189,7 @@ export function usePublicEnrollmentSubmissions(scopeKey = 'default', schoolYearL
         if (cancelled) return;
         hydratedCacheKeyRef.current = cacheScopeKey;
         const loadedAt = new Date().toISOString();
+        lastLoadedFromDbAtRef.current = loadedAt;
         startTransition(() => {
           setSubmissions(rows);
           setLastLoadedFromDbAt(loadedAt);
@@ -206,7 +214,7 @@ export function usePublicEnrollmentSubmissions(scopeKey = 'default', schoolYearL
     return () => {
       cancelled = true;
     };
-  }, [cacheScopeKey, persistRows, schoolYearLabel]);
+  }, [cacheScopeKey, schoolYearLabel, scopeKey]);
 
   useEffect(() => {
     if (hydratedCacheKeyRef.current !== cacheScopeKey) return;
@@ -216,7 +224,7 @@ export function usePublicEnrollmentSubmissions(scopeKey = 'default', schoolYearL
   useEffect(() => {
     const flushSnapshot = () => {
       if (hydratedCacheKeyRef.current !== cacheScopeKey) return;
-      void writePublicEnrollmentSubmissionsSnapshot(scopeKey, submissionsRef.current, schoolYearLabel, lastLoadedFromDbAt).then((payload) => {
+      void writePublicEnrollmentSubmissionsSnapshot(scopeKey, submissionsRef.current, schoolYearLabel, lastLoadedFromDbAtRef.current).then((payload) => {
         setLastSavedToCacheAt(payload.updatedAt || new Date().toISOString());
       });
     };

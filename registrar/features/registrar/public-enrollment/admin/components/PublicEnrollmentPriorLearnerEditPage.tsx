@@ -5,6 +5,7 @@ import { useStore } from '../../../../../store';
 import UsisPageLoader from '../../../../../../common/components/UsisPageLoader';
 import type { EnrollmentDraft } from '../../types';
 import { validatePublicEnrollmentDraft } from '../../utils/validation';
+import { logEnrollmentBandwidthEstimate } from '../../utils/enrollmentBandwidthLog';
 import { deviceOptions, gradeLevelOptions, learnerCategoryOptions, modalityOptions, religionOptions, semesterOptions, studentTypeOptions } from '../../data/enrollmentOptions';
 import EnrollmentDraftFormSections from '../../shared/EnrollmentDraftFormSections';
 import { normalizeLearnerType } from '../../shared/learnerType';
@@ -446,6 +447,26 @@ export default function PublicEnrollmentPriorLearnerEditPage() {
         section: '',
         status: 'Information Updated',
         submissionPayload: draft as unknown as Record<string, any>,
+      });
+      logEnrollmentBandwidthEstimate({
+        action: 'Prior learner editor saved',
+        meta: {
+          learnerId: resolvedLearnerId,
+          schoolYear: draft.schoolYear || 'unscoped',
+          source: 'registrar-prior-learner-editor',
+        },
+        request: {
+          learnerUpdate: updatePayload,
+          enrollmentHistoryEntry: {
+            learnerId: resolvedLearnerId,
+            schoolYear: draft.schoolYear || '',
+            gradeLevel: draft.gradeToEnroll || '',
+            section: '',
+            status: 'Information Updated',
+            submissionPayload: draft,
+          },
+        },
+        response: { learnerId: resolvedLearnerId, historyStatus: 'Information Updated' },
       });
 
       navigate('/enroll');

@@ -22,6 +22,7 @@ import {
 } from '../../services/sectioningAccessCodes';
 import { publishEnrollmentKioskState, type EnrollmentKioskSelectedLearner } from '../../kiosk/enrollmentKioskSync';
 import { validatePublicEnrollmentDraft } from '../../utils/validation';
+import { logEnrollmentBandwidthEstimate } from '../../utils/enrollmentBandwidthLog';
 import {
   deviceOptions,
   gradeLevelOptions,
@@ -277,7 +278,7 @@ export default function PublicEnrollmentSubmissionsPage() {
     return () => {
       window.cancelAnimationFrame(frame);
     };
-  }, [deferredSubmissions, effectiveSchoolYearLabel]);
+  }, [effectiveSchoolYearLabel]);
 
   const activeSchoolYearSubmissions = useMemo(() => {
     if (!isBodyReady || !activeYearNormalized) return [];
@@ -934,6 +935,26 @@ export default function PublicEnrollmentSubmissionsPage() {
         status: 'Information Updated',
         submissionPayload: draftEditor as unknown as Record<string, any>,
       });
+      logEnrollmentBandwidthEstimate({
+        action: 'Prior learner record updated',
+        meta: {
+          learnerId: editingPriorLearner.id,
+          schoolYear: draftEditor.schoolYear || 'unscoped',
+          source: 'registrar-admin-prior-learner',
+        },
+        request: {
+          updatePayload,
+          enrollmentHistoryEntry: {
+            learnerId: editingPriorLearner.id,
+            schoolYear: draftEditor.schoolYear || '',
+            gradeLevel: draftEditor.gradeToEnroll || '',
+            section: '',
+            status: 'Information Updated',
+            submissionPayload: draftEditor,
+          },
+        },
+        response: { learnerId: editingPriorLearner.id, historyStatus: 'Information Updated' },
+      });
 
       setTopAlert({
         title: 'Learner Updated',
@@ -1180,6 +1201,42 @@ export default function PublicEnrollmentSubmissionsPage() {
         ),
       });
 
+      logEnrollmentBandwidthEstimate({
+        action: 'Submission enrolled to learner records',
+        meta: {
+          submissionId: enrollingSubmission.id,
+          learnerId: resolvedLearnerId,
+          schoolYear: enrolledSchoolYear || 'unscoped',
+          source: 'registrar-enrollment-page',
+        },
+        request: {
+          learnerUpsert: upsertPayload,
+          enrollmentHistoryEntry: {
+            learnerId: resolvedLearnerId,
+            schoolYear: enrolledSchoolYear,
+            gradeLevel: gradeToEnroll,
+            section: String(sectionInfo.name || ''),
+            status: 'Enrolled',
+            submissionPayload: payload,
+          },
+          submissionUpdate: {
+            payload: appendSubmissionAudit(
+              {
+                ...payload,
+                consent: true,
+                assignedSectionId: selectedSectionId,
+                assignedSectionName: String(sectionInfo.name || '').trim(),
+              } as EnrollmentDraft,
+              {
+                action: existingLearner?.id ? 'Learner Re-enrolled' : 'Learner Enrolled',
+                detail: `Assigned to ${String(sectionInfo.name || 'section')} (${gradeToEnroll}) for ${String(schoolYearInfo?.label || enrollingSubmission.school_year || payload.schoolYear || 'active school year')}.`,
+              }
+            ),
+          },
+        },
+        response: { submissionId: updatedSubmission.id, learnerId: resolvedLearnerId, section: String(sectionInfo.name || '') },
+      });
+
       upsertSubmissionLocally(updatedSubmission);
       await syncLearnerStatusByLrn(lrn);
       closeEnrollModal();
@@ -1236,6 +1293,27 @@ export default function PublicEnrollmentSubmissionsPage() {
         section: '',
         status: 'Information Updated',
         submissionPayload: payload as unknown as Record<string, any>,
+      });
+      logEnrollmentBandwidthEstimate({
+        action: 'Submission learner information updated',
+        meta: {
+          submissionId: row.id,
+          learnerId: String(existingLearner.id),
+          schoolYear: (row.school_year || payload.schoolYear || '').trim() || 'unscoped',
+          source: 'registrar-submissions-page',
+        },
+        request: {
+          learnerUpdate: updatePayload,
+          enrollmentHistoryEntry: {
+            learnerId: String(existingLearner.id),
+            schoolYear: (row.school_year || payload.schoolYear || '').trim(),
+            gradeLevel: (row.grade_to_enroll || payload.gradeToEnroll || '').trim(),
+            section: '',
+            status: 'Information Updated',
+            submissionPayload: payload,
+          },
+        },
+        response: { learnerId: String(existingLearner.id), submissionId: row.id },
       });
 
       setTopAlert({

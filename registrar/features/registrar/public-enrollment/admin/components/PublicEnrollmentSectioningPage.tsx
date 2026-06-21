@@ -5,6 +5,7 @@ import { SearchableSelect } from '../../../../../components/ui/SearchableSelect'
 import type { EnrollmentDraft, PublicEnrollmentSubmission } from '../../types';
 import { validateSectioningAccessCode } from '../../services/sectioningAccessCodes';
 import { updatePublicEnrollmentSubmissionRecord } from '../../services/publicEnrollmentSubmissions';
+import { logEnrollmentBandwidthEstimate } from '../../utils/enrollmentBandwidthLog';
 import { useStore } from '../../../../../store';
 import { RegistrarHeader } from '../../../../../components/shell/RegistrarHeader';
 import { RegistrarFooter } from '../../../../../components/shell/RegistrarFooter';
@@ -183,6 +184,44 @@ export default function PublicEnrollmentSectioningPage() {
         grade_to_enroll: row.grade_to_enroll,
         guardian_contact: row.guardian_contact,
         payload: nextPayload,
+      });
+
+      logEnrollmentBandwidthEstimate({
+        action: 'Submission section assigned',
+        meta: {
+          submissionId: row.id,
+          learnerId: resolvedLearnerId,
+          schoolYear: activeSchoolYear || String(row.school_year || payload.schoolYear || '').trim() || 'unscoped',
+          source: 'registrar-sectioning',
+        },
+        request: {
+          learnerUpsert: upsertPayload,
+          enrollmentHistoryEntry: {
+            learner_id: resolvedLearnerId,
+            school_year: activeSchoolYear || String(row.school_year || payload.schoolYear || '').trim() || '',
+            grade_level: String(unlockedGradeLevel || row.grade_to_enroll || payload.gradeToEnroll || '').trim() || null,
+            section: String(selectedSection.name || '').trim() || null,
+            status: 'Enrolled',
+            submission_payload: nextPayload,
+            source: 'registrar.sectioning',
+          },
+          submissionUpdate: {
+            school_id: row.school_id,
+            school_year: row.school_year,
+            lrn: row.lrn,
+            last_name: row.last_name,
+            first_name: row.first_name,
+            middle_name: row.middle_name,
+            grade_to_enroll: row.grade_to_enroll,
+            guardian_contact: row.guardian_contact,
+            payload: nextPayload,
+          },
+        },
+        response: {
+          submissionId: row.id,
+          learnerId: resolvedLearnerId,
+          section: selectedSection.name,
+        },
       });
 
       setSubmissions((current) =>

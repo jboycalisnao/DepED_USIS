@@ -4,6 +4,7 @@ import {
   removePublicEnrollmentSubmissionsSnapshotRow,
   upsertPublicEnrollmentSubmissionsSnapshotRow,
 } from '../utils/publicEnrollmentSubmissionsCache';
+import { logEnrollmentBandwidthEstimate } from '../utils/enrollmentBandwidthLog';
 
 export const REGISTRAR_PUBLIC_ENROLLMENT_TABLE = 'registrar_public_enrollment_submissions';
 
@@ -76,6 +77,16 @@ export async function createPublicEnrollmentSubmission(draft: EnrollmentDraft): 
     const cacheScopeKey = String(createdRow.school_year || draft.schoolYear || '').trim() || 'unscoped';
     await upsertPublicEnrollmentSubmissionsSnapshotRow(cacheScopeKey, createdRow, String(createdRow.school_year || draft.schoolYear || '').trim());
   }
+  logEnrollmentBandwidthEstimate({
+    action: 'Public submission created',
+    meta: {
+      submissionId: createdId,
+      schoolYear: String(createdRow?.school_year || draft.schoolYear || '').trim() || 'unscoped',
+      source: 'public-enrollment-form',
+    },
+    request: payload,
+    response: createdRow,
+  });
 
   return { id: createdId, submissionReferenceId: String((data as any).submission_reference_id || submissionReferenceId) };
 }
@@ -154,6 +165,16 @@ export async function createPublicEnrollmentSubmissionRecord(input: PublicEnroll
     const cacheScopeKey = String(createdRow.school_year || input.school_year || '').trim() || 'unscoped';
     await upsertPublicEnrollmentSubmissionsSnapshotRow(cacheScopeKey, createdRow, String(createdRow.school_year || input.school_year || '').trim());
   }
+  logEnrollmentBandwidthEstimate({
+    action: 'Registrar submission created',
+    meta: {
+      submissionId: createdId,
+      schoolYear: String(createdRow?.school_year || input.school_year || '').trim() || 'unscoped',
+      source: 'registrar-admin',
+    },
+    request: input,
+    response: createdRow,
+  });
 
   return {
     id: createdId,
@@ -184,6 +205,16 @@ export async function updatePublicEnrollmentSubmissionRecord(
 
   const cacheScopeKey = String(updatedRow.school_year || input.school_year || '').trim() || 'unscoped';
   await upsertPublicEnrollmentSubmissionsSnapshotRow(cacheScopeKey, updatedRow, String(updatedRow.school_year || input.school_year || '').trim());
+  logEnrollmentBandwidthEstimate({
+    action: 'Registrar submission updated',
+    meta: {
+      submissionId: String(updatedRow.id || id),
+      schoolYear: String(updatedRow.school_year || input.school_year || '').trim() || 'unscoped',
+      source: 'registrar-admin',
+    },
+    request: { id, ...input },
+    response: updatedRow,
+  });
 
   return updatedRow;
 }
@@ -211,4 +242,14 @@ export async function deletePublicEnrollmentSubmissionRecord(id: string): Promis
     // Best-effort cache cleanup; ignored if the snapshot is absent.
     await removePublicEnrollmentSubmissionsSnapshotRow(cacheScopeKey, id, String(deletedRow.school_year || '').trim());
   }
+  logEnrollmentBandwidthEstimate({
+    action: 'Registrar submission deleted',
+    meta: {
+      submissionId: id,
+      schoolYear: String(deletedRow?.school_year || '').trim() || 'unscoped',
+      source: 'registrar-admin',
+    },
+    request: { id },
+    response: deletedRow,
+  });
 }
