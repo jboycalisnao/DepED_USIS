@@ -1,6 +1,7 @@
 import { Section, Student } from '../../../../types';
 import { supabase } from '../../../../lib/supabase';
 import { buildLNHSPrintSheetHeader } from '../../shared/printSheetHeader';
+import { fetchLearnerEnrollmentSnapshot } from './enrollmentHistorySnapshot';
 
 type PrintLearnerInformationPayload = {
   learners: Student[];
@@ -26,6 +27,13 @@ const toText = (value: unknown) => String(value || '').trim();
 const toOptionalText = (value: unknown) => {
   const text = toText(value);
   return text || 'N/A';
+};
+
+const formatEnrollmentDate = (value: string) => {
+  if (!value) return 'Date unavailable';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString();
 };
 
 const firstNonEmpty = (sources: unknown[]) => {
@@ -168,10 +176,11 @@ const buildPrintHtml = async ({ learners, schoolYearLabel, sections }: PrintLear
 
   const pagesHtml = (await Promise.all(sorted.map(async (learner) => {
       const latestSubmissionPayload = await fetchLatestSubmissionPayload(learner);
+      const enrollmentSnapshot = await fetchLearnerEnrollmentSnapshot(learner, schoolYearLabel);
       const fullName = `${learner.lastName}, ${learner.firstName}${learner.middleName ? ` ${learner.middleName}` : ''}`.trim();
       const grade = resolveGradeLabel(learner, sections);
       const section = resolveSectionLabel(learner, sections);
-      const latestEnrollment = learner.enrollments?.[0];
+      const latestEnrollment = enrollmentSnapshot.currentEnrollment || enrollmentSnapshot.history[0] || null;
       const studentType = firstNonEmpty([pickLearnerField(learner, ['studentType', 'student_type']), latestSubmissionPayload && firstNonEmpty([latestSubmissionPayload.studentType, latestSubmissionPayload.student_type])]);
       const learnerCategory = firstNonEmpty([pickLearnerField(learner, ['learnerCategory', 'learner_category']), latestSubmissionPayload && firstNonEmpty([latestSubmissionPayload.learnerCategory, latestSubmissionPayload.learner_category])]);
       const schoolToEnroll = firstNonEmpty([pickLearnerField(learner, ['schoolToEnroll', 'school_to_enroll']), latestSubmissionPayload && firstNonEmpty([latestSubmissionPayload.schoolToEnroll, latestSubmissionPayload.school_to_enroll])]);
@@ -205,14 +214,14 @@ const buildPrintHtml = async ({ learners, schoolYearLabel, sections }: PrintLear
       const hasInternet = firstNonEmpty([pickLearnerField(learner, ['hasInternet', 'has_internet']), latestSubmissionPayload && firstNonEmpty([latestSubmissionPayload.hasInternet, latestSubmissionPayload.has_internet])]);
       const verificationCard = await buildVerificationCard(learner);
 
-      const enrollmentHistoryRows = (learner.enrollments || [])
+      const enrollmentHistoryRows = enrollmentSnapshot.history
         .map(
           (record) => `
             <tr>
               <td>${escapeHtml(toText(record.schoolYear))}</td>
               <td>${escapeHtml(toText(record.gradeLevel))}</td>
               <td>${escapeHtml(toText(record.section))}</td>
-              <td>${escapeHtml(toText(record.enrollmentDate))}</td>
+              <td>${escapeHtml(formatEnrollmentDate(record.enrollmentDate))}</td>
               <td>${escapeHtml(toText(record.status))}</td>
             </tr>
           `,
@@ -226,7 +235,7 @@ const buildPrintHtml = async ({ learners, schoolYearLabel, sections }: PrintLear
               <p><strong>School Year:</strong> ${escapeHtml(toOptionalText(latestEnrollment.schoolYear))}</p>
               <p><strong>Grade Level:</strong> ${escapeHtml(toOptionalText(latestEnrollment.gradeLevel))}</p>
               <p><strong>Section:</strong> ${escapeHtml(toOptionalText(latestEnrollment.section))}</p>
-              <p><strong>Enrollment Date:</strong> ${escapeHtml(toOptionalText(latestEnrollment.enrollmentDate))}</p>
+              <p><strong>Enrollment Date:</strong> ${escapeHtml(formatEnrollmentDate(latestEnrollment.enrollmentDate))}</p>
               <p><strong>Status:</strong> ${escapeHtml(toOptionalText(latestEnrollment.status))}</p>
             </div>
           </section>

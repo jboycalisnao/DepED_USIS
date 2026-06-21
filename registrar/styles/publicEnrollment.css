@@ -565,6 +565,36 @@
   flex: 0 0 14px;
 }
 
+.registrar-public-enrollment-submissions__header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+}
+
+.registrar-public-enrollment-submissions__header-copy {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.registrar-public-enrollment-submissions__header-copy h2 {
+  margin: 0;
+}
+
+.registrar-public-enrollment-submissions__header-copy p {
+  margin: 0;
+}
+
+.registrar-public-enrollment-submissions__header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+  align-items: center;
+}
+
 .registrar-public-enrollment-submissions .modal-dialog__body {
   padding-right: 28px;
 }
@@ -656,6 +686,23 @@
   .registrar-public-enrollment-submissions__audit-side {
     justify-content: flex-start;
   }
+
+  .registrar-name-check-modal__layout,
+  .registrar-name-check-modal__result-card {
+    grid-template-columns: 1fr;
+  }
+
+  .registrar-name-check-modal__summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .registrar-public-enrollment-submissions__header-row {
+    flex-direction: column;
+  }
+
+  .registrar-public-enrollment-submissions__header-actions {
+    justify-content: flex-start;
+  }
 }
 
 /* Normalize floating input/select heights across submission and learner edit modals */
@@ -716,6 +763,225 @@
 .registrar-print-enrollees-modal .floating-field__control select {
   min-height: 56px;
   height: 56px;
+}
+
+.registrar-name-check-modal {
+  width: min(100%, 1080px);
+}
+
+.registrar-name-check-modal .modal-dialog__body {
+  display: grid;
+  gap: 16px;
+}
+
+.registrar-name-check-modal__layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(260px, 0.7fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.registrar-name-check-modal__panel,
+.registrar-name-check-modal__summary,
+.registrar-name-check-modal__results {
+  border: 1px solid rgba(18, 35, 61, 0.14);
+  border-radius: 0.375rem;
+  background: #ffffff;
+}
+
+.registrar-name-check-modal__panel {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+}
+
+.registrar-name-check-modal__field textarea {
+  width: 100%;
+  min-height: 320px;
+  resize: vertical;
+  border: 1px solid rgba(18, 35, 61, 0.16);
+  border-radius: 0.375rem;
+  padding: 18px 14px 12px;
+  font: inherit;
+  line-height: 1.45;
+  color: #10203b;
+  background: #fbfcff;
+}
+
+.registrar-name-check-modal__field textarea:focus {
+  outline: none;
+  border-color: rgba(0, 56, 168, 0.45);
+  box-shadow: 0 0 0 3px rgba(0, 56, 168, 0.12);
+}
+
+.registrar-name-check-modal__hint,
+.registrar-name-check-modal__summary-note,
+.registrar-name-check-modal__result-copy p,
+.registrar-name-check-modal__empty,
+.registrar-name-check-modal__results-head span {
+  margin: 0;
+  font-size: 13px;
+  color: var(--deped-muted);
+  line-height: 1.45;
+}
+
+.registrar-name-check-modal__summary {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.registrar-name-check-modal__summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.registrar-name-check-modal__summary-grid div {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid rgba(18, 35, 61, 0.12);
+  border-radius: 0.375rem;
+  background: #f9fbff;
+}
+
+.registrar-name-check-modal__summary-grid strong {
+  font-size: 22px;
+  line-height: 1;
+  color: var(--deped-blue);
+}
+
+.registrar-name-check-modal__summary-grid span {
+  font-size: 12px;
+  color: var(--deped-muted);
+}
+
+.registrar-name-check-modal__results {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.registrar-name-check-modal__results-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.registrar-name-check-modal__results-head h4 {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.2;
+}
+
+.registrar-name-check-modal__result-list {
+  display: grid;
+  gap: 10px;
+}
+
+.registrar-name-check-modal__result-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 0.8fr);
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid rgba(18, 35, 61, 0.12);
+  border-radius: 0.375rem;
+  background: #fbfcff;
+}
+
+.registrar-name-check-modal__result-card--unmatched {
+  grid-template-columns: 1fr auto;
+  align-items: center;
+}
+
+.registrar-name-check-modal__result-card--close {
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  border-color: rgba(138, 90, 0, 0.22);
+  background: #fffaf0;
+}
+
+.registrar-name-check-modal__result-copy {
+  display: grid;
+  gap: 6px;
+}
+
+.registrar-name-check-modal__result-copy strong {
+  font-size: 15px;
+  line-height: 1.25;
+  color: #10203b;
+}
+
+.registrar-name-check-modal__badge {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.registrar-name-check-modal__badge--exact {
+  color: #146c43;
+  background: #e8f6ee;
+}
+
+.registrar-name-check-modal__badge--close {
+  color: #8a5a00;
+  background: #fff5da;
+}
+
+.registrar-name-check-modal__badge--none {
+  color: #8f1d1d;
+  background: #fdecec;
+}
+
+.registrar-name-check-modal__result-meta {
+  display: grid;
+  gap: 8px;
+}
+
+.registrar-name-check-modal__result-meta div {
+  display: grid;
+  gap: 2px;
+}
+
+.registrar-name-check-modal__result-meta span {
+  font-size: 12px;
+  color: var(--deped-muted);
+}
+
+.registrar-name-check-modal__result-meta strong {
+  font-size: 13px;
+  color: #10203b;
+  word-break: break-word;
+}
+
+.registrar-name-check-modal__result-card--unmatched strong {
+  font-size: 15px;
+  color: #10203b;
+}
+
+.registrar-name-check-modal__result-card--unmatched span {
+  font-size: 12px;
+  color: var(--deped-muted);
+  white-space: nowrap;
+}
+
+.registrar-name-check-modal__result-card--close span {
+  font-size: 12px;
+  color: #8a5a00;
+  white-space: nowrap;
+}
+
+.registrar-name-check-modal__empty {
+  border: 1px dashed rgba(18, 35, 61, 0.18);
+  border-radius: 0.375rem;
+  padding: 14px;
+  background: #fbfcff;
 }
 
 /* Sectioning page uses compact in-table selects; keep toggle inside field and prevent split overflow. */

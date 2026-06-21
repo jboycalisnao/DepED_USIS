@@ -8,6 +8,7 @@ import { SearchableSelect } from '../../../../../components/ui/SearchableSelect'
 import ConfirmationModal from '../../../../../components/ConfirmationModal';
 import TopCenterAlert from '../../../../../components/TopCenterAlert';
 import PrintEnrollmentGradeModal from './PrintEnrollmentGradeModal';
+import EnrollmentSubmissionNameCheckModal from './EnrollmentSubmissionNameCheckModal';
 import type { EnrollmentDraft, PublicEnrollmentSubmission } from '../../types';
 import { openEnrollmentEnrolleesPrintWindow, type EnrollmentEnrolleePrintRow } from '../utils/printEnrollmentEnrolleesList';
 import {
@@ -261,6 +262,7 @@ export default function PublicEnrollmentSubmissionsPage() {
   const [editingPriorLearner, setEditingPriorLearner] = useState<PriorLearnerEditorRecord | null>(null);
   const [isSectioningAccessModalOpen, setIsSectioningAccessModalOpen] = useState(false);
   const [isPrintEnrolleesModalOpen, setIsPrintEnrolleesModalOpen] = useState(false);
+  const [isNameCheckModalOpen, setIsNameCheckModalOpen] = useState(false);
   const [selectedPrintGrade, setSelectedPrintGrade] = useState('');
   const [sectioningCodes, setSectioningCodes] = useState<SectioningAccessCodeRow[]>([]);
   const [sectioningGradeLevels, setSectioningGradeLevels] = useState<string[]>([]);
@@ -1331,20 +1333,69 @@ export default function PublicEnrollmentSubmissionsPage() {
   return (
     <section className="portal-panel registrar-public-enrollment-submissions">
       <header className="portal-panel__header">
-        <h2>Online Enrollment Submissions</h2>
-        <p>Public enrollment form submissions received via the online enrollment page.</p>
-        <div className="registrar-public-enrollment-submissions__sync-stack">
-          <p className="registrar-public-enrollment-submissions__sync-note">
-            Last loaded from database: {formatDate(lastLoadedFromDbAt) || 'Not yet loaded from database'}
-          </p>
-          <p className="registrar-public-enrollment-submissions__sync-note">
-            Last saved to cache: {formatDate(lastSavedToCacheAt) || 'Not yet saved to cache'}
-          </p>
-          {isLoading || !isBodyReady ? (
-            <p className="registrar-public-enrollment-submissions__sync-note">
-              Loading submissions in the background...
-            </p>
-          ) : null}
+        <div className="registrar-public-enrollment-submissions__header-row">
+          <div className="registrar-public-enrollment-submissions__header-copy">
+            <h2>Online Enrollment Submissions</h2>
+            <p>Public enrollment form submissions received via the online enrollment page.</p>
+            <div className="registrar-public-enrollment-submissions__sync-stack">
+              <p className="registrar-public-enrollment-submissions__sync-note">
+                Last loaded from database: {formatDate(lastLoadedFromDbAt) || 'Not yet loaded from database'}
+              </p>
+              <p className="registrar-public-enrollment-submissions__sync-note">
+                Last saved to cache: {formatDate(lastSavedToCacheAt) || 'Not yet saved to cache'}
+              </p>
+              {isLoading || !isBodyReady ? (
+                <p className="registrar-public-enrollment-submissions__sync-note">
+                  Loading submissions in the background...
+                </p>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="registrar-public-enrollment-submissions__header-actions">
+            <button type="button" className="secondary-button" style={{ minHeight: 56 }} onClick={openKioskWindow}>
+              Open Enrollment Kiosk
+            </button>
+            <button type="button" className="secondary-button" style={{ minHeight: 56 }} onClick={() => void openSectioningAccessModal()}>
+              Sectioning Access
+            </button>
+            <button type="button" className="secondary-button" style={{ minHeight: 56 }} onClick={openPrintEnrolleesModal} disabled={!isBodyReady || !groupedByGrade.length}>
+              Print Enrollees List
+            </button>
+            <button
+              type="button"
+              className="secondary-button"
+              style={{ minHeight: 56 }}
+              onClick={() => setIsNameCheckModalOpen(true)}
+              disabled={!isBodyReady}
+            >
+              Check Section List
+            </button>
+            <button
+              type="button"
+              className="secondary-button"
+              style={{ minHeight: 56 }}
+              onClick={async () => {
+                setIsRefreshing(true);
+                try {
+                  await refresh({ silent: true });
+                } finally {
+                  setIsRefreshing(false);
+                }
+              }}
+              disabled={isLoading || isRefreshing}
+            >
+              {isRefreshing ? (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                  <span className="registrar-public-enrollment-submissions__refresh-spinner" aria-hidden="true" />
+                  Refreshing...
+                </span>
+              ) : (
+                'Refresh'
+              )}
+            </button>
+            <div className="status-badge status-badge--open" style={{ minHeight: 56, display: 'flex', alignItems: 'center' }} aria-label="Submission count">{filtered.length} shown</div>
+          </div>
         </div>
       </header>
 
@@ -1356,39 +1407,6 @@ export default function PublicEnrollmentSubmissionsPage() {
               <span>Search name / LRN / grade</span>
             </div>
           </label>
-          <button type="button" className="secondary-button" style={{ minHeight: 56 }} onClick={openKioskWindow}>
-            Open Enrollment Kiosk
-          </button>
-          <button type="button" className="secondary-button" style={{ minHeight: 56 }} onClick={() => void openSectioningAccessModal()}>
-            Sectioning Access
-          </button>
-          <button type="button" className="secondary-button" style={{ minHeight: 56 }} onClick={openPrintEnrolleesModal} disabled={!isBodyReady || !groupedByGrade.length}>
-            Print Enrollees List
-          </button>
-          <button
-            type="button"
-            className="secondary-button"
-            style={{ minHeight: 56 }}
-            onClick={async () => {
-              setIsRefreshing(true);
-              try {
-                await refresh({ silent: true });
-              } finally {
-                setIsRefreshing(false);
-              }
-            }}
-            disabled={isLoading || isRefreshing}
-          >
-            {isRefreshing ? (
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                <span className="registrar-public-enrollment-submissions__refresh-spinner" aria-hidden="true" />
-                Refreshing...
-              </span>
-            ) : (
-              'Refresh'
-            )}
-          </button>
-          <div className="status-badge status-badge--open" style={{ minHeight: 56, display: 'flex', alignItems: 'center' }} aria-label="Submission count">{filtered.length} shown</div>
         </div>
         <div className="form-grid" style={{ gridTemplateColumns: 'minmax(420px, 1fr) minmax(220px, auto)', alignItems: 'stretch' }}>
           <SearchableSelect
@@ -1581,6 +1599,13 @@ export default function PublicEnrollmentSubmissionsPage() {
         onGradeChange={setSelectedPrintGrade}
         onClose={() => setIsPrintEnrolleesModalOpen(false)}
         onPrint={printEnrolleesList}
+      />
+
+      <EnrollmentSubmissionNameCheckModal
+        isOpen={isNameCheckModalOpen}
+        schoolYearLabel={effectiveSchoolYearLabel}
+        submissions={activeSchoolYearSubmissions}
+        onClose={() => setIsNameCheckModalOpen(false)}
       />
 
       {isEditorOpen && (
