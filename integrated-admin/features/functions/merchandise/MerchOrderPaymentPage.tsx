@@ -377,18 +377,35 @@ export function MerchOrderPaymentPage() {
     void refreshOutstandingBalances(records);
   }, [cacheReady]);
 
-  const syncOutstandingBalanceFromPayments = (
-    row: MerchOrderControlRecord,
-    payments: MerchOrderPaymentRecord[] = [],
-  ) => {
-    const postedTotal = payments
-      .filter((entry) => entry.paymentStatus === 'posted')
-      .reduce((sum, entry) => sum + entry.paymentAmount, 0);
-    setOrderOutstandingBalanceById((current) => ({
-      ...current,
-      [row.id]: Math.max(0, row.orderAmount - postedTotal),
-    }));
-  };
+    const syncOutstandingBalanceFromPayments = (
+      row: MerchOrderControlRecord,
+      payments: MerchOrderPaymentRecord[] = [],
+    ) => {
+      const postedTotal = payments
+        .filter((entry) => entry.paymentStatus === 'posted')
+        .reduce((sum, entry) => sum + entry.paymentAmount, 0);
+      setOrderOutstandingBalanceById((current) => ({
+        ...current,
+        [row.id]: Math.max(0, row.orderAmount - postedTotal),
+      }));
+      if (selectedPaymentOrderId === row.id) {
+        const outstanding = Math.max(0, row.orderAmount - postedTotal);
+        setSelectedPaymentOrderMetrics({
+          orderAmount: row.orderAmount,
+          paid: Math.max(0, row.orderAmount - outstanding),
+          outstanding,
+          balanceAfter: outstanding,
+        });
+      }
+      setSelectedOrderDetail((current) =>
+        current && current.id === row.id
+          ? {
+              ...current,
+              outstandingBalance: Math.max(0, row.orderAmount - postedTotal),
+            }
+          : current,
+      );
+    };
 
   const filteredRows = useMemo(() => {
     const normalized = search.trim().toLowerCase();
@@ -488,38 +505,24 @@ export function MerchOrderPaymentPage() {
         : current,
     );
   };
-  const openAddPaymentForOrder = (row: MerchOrderControlRecord) => {
-    setEditingHistoryPaymentId('');
-    setSelectedLearnerPaymentSummary(null);
-    setSelectedPaymentOrderId(row.id);
-    const currentOutstanding = Math.max(0, orderOutstandingBalanceById[row.id] ?? row.orderAmount);
-    setPaymentAmount(String(currentOutstanding.toFixed(2)));
+    const openAddPaymentForOrder = (row: MerchOrderControlRecord) => {
+      setEditingHistoryPaymentId('');
+      setSelectedLearnerPaymentSummary(null);
+      setSelectedPaymentOrderId(row.id);
+      const currentOutstanding = Math.max(0, orderOutstandingBalanceById[row.id] ?? row.orderAmount);
+      setPaymentAmount(String(currentOutstanding.toFixed(2)));
     setReceiptNo('');
     setPaymentNotes('');
-    setAddPaymentAmountError('');
-    setIsPaymentOrderLocked(true);
-    setSelectedPaymentOrderMetrics({
-      orderAmount: row.orderAmount,
-      paid: 0,
-      outstanding: currentOutstanding,
-      balanceAfter: currentOutstanding,
-    });
-    void (async () => {
-      const payments = await loadMerchOrderPayments(row.id);
-      const paid = payments
-        .filter((entry) => entry.paymentStatus === 'posted')
-        .reduce((sum, entry) => sum + entry.paymentAmount, 0);
-      const outstanding = Math.max(0, row.orderAmount - paid);
-      setPaymentAmount(String(outstanding.toFixed(2)));
+      setAddPaymentAmountError('');
+      setIsPaymentOrderLocked(true);
       setSelectedPaymentOrderMetrics({
         orderAmount: row.orderAmount,
-        paid,
-        outstanding,
-        balanceAfter: outstanding,
+        paid: Math.max(0, row.orderAmount - currentOutstanding),
+        outstanding: currentOutstanding,
+        balanceAfter: currentOutstanding,
       });
-    })();
-    setIsAddPaymentModalOpen(true);
-  };
+      setIsAddPaymentModalOpen(true);
+    };
   const openAddPaymentForLearner = (summary: LearnerPaymentSummary) => {
     setEditingHistoryPaymentId('');
     setSelectedLearnerPaymentSummary(summary);
@@ -693,7 +696,18 @@ export function MerchOrderPaymentPage() {
           receiptNo: receiptNo.trim(),
         });
         if (selectedOrderDetail) {
-          await loadPaymentHistory(selectedOrderDetail.id);
+          const nextPaymentRows = selectedOrderPayments.map((entry) =>
+            entry.id === editingHistoryPaymentId
+              ? {
+                  ...entry,
+                  paymentAmount: amountValue,
+                  paymentNotes: paymentNotes.trim(),
+                  receiptNo: receiptNo.trim(),
+                }
+              : entry,
+          );
+          setSelectedOrderPayments(nextPaymentRows);
+          syncOutstandingBalanceFromPayments(selectedOrderDetail, nextPaymentRows);
         }
         setEditingHistoryPaymentId('');
         setIsAddPaymentModalOpen(false);
@@ -711,23 +725,18 @@ export function MerchOrderPaymentPage() {
           tone: 'success',
         });
         return;
-      }
-      if (selectedLearnerPaymentSummary) {
-        const amountValue = Number(paymentAmount);
-        const rowPaymentBalances = await Promise.all(
-          selectedLearnerPaymentSummary.rows.map(async (row) => {
-            const payments = await loadMerchOrderPayments(row.id);
-            const postedTotal = payments
-              .filter((entry) => entry.paymentStatus === 'posted')
-              .reduce((sum, entry) => sum + entry.paymentAmount, 0);
-            return { row, remaining: Math.max(0, row.orderAmount - postedTotal) };
-          }),
-        );
-        const totalOutstanding = rowPaymentBalances.reduce((sum, item) => sum + item.remaining, 0);
-        if (amountValue > totalOutstanding) {
-          setAlert({
-            title: 'Invalid Payment Amount',
-            message: `Payment amount cannot be greater than learner outstanding total (PHP ${totalOutstanding.toFixed(2)}).`,
+        }
+        if (selectedLearnerPaymentSummary) {
+          const amountValue = Number(paymentAmount);
+          const rowPaymentBalances = selectedLearnerPaymentSummary.rows.map((row) => ({
+            row,
+            remaining: Math.max(0, orderOutstandingBalanceById[row.id] ?? row.orderAmount),
+          }));
+          const totalOutstanding = rowPaymentBalances.reduce((sum, item) => sum + item.remaining, 0);
+          if (amountValue > totalOutstanding) {
+            setAlert({
+              title: 'Invalid Payment Amount',
+              message: `Payment amount cannot be greater than learner outstanding total (PHP ${totalOutstanding.toFixed(2)}).`,
             tone: 'danger',
           });
           return;
@@ -840,20 +849,19 @@ export function MerchOrderPaymentPage() {
     try {
       const orderId = await deleteMerchOrderPayment(entry.id);
       const remainingPostedPayments = selectedOrderPayments.filter((payment) => payment.id !== entry.id);
-      const nextRecords = records.map((current) =>
-        current.id === orderId ? { ...current } : current,
-      );
-      setRecords(nextRecords);
-      await saveCachedMerchOrdersPageSnapshot(nextRecords, cachedLearners, cachedProducts, lastLoadedFromDbAt);
-      setSelectedOrderPayments(remainingPostedPayments);
-      setSelectedOrderDetail({ ...selectedOrderDetail });
-      syncOutstandingBalanceFromPayments(selectedOrderDetail, remainingPostedPayments);
-      void loadPaymentHistory(orderId);
-      setAlert({
-        title: 'Payment Deleted',
-        message: 'Selected payment history record deleted.',
-        tone: 'success',
-      });
+        const nextRecords = records.map((current) =>
+          current.id === orderId ? { ...current } : current,
+        );
+        setRecords(nextRecords);
+        await saveCachedMerchOrdersPageSnapshot(nextRecords, cachedLearners, cachedProducts, lastLoadedFromDbAt);
+        setSelectedOrderPayments(remainingPostedPayments);
+        setSelectedOrderDetail({ ...selectedOrderDetail });
+        syncOutstandingBalanceFromPayments(selectedOrderDetail, remainingPostedPayments);
+        setAlert({
+          title: 'Payment Deleted',
+          message: 'Selected payment history record deleted.',
+          tone: 'success',
+        });
     } catch (error: any) {
       setAlert({ title: 'Delete Failed', message: error?.message || 'Unable to delete payment record.', tone: 'danger' });
     } finally {

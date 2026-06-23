@@ -40,6 +40,18 @@ function upsertLink(rel: string, id: string, href: string) {
   element.href = href;
 }
 
+function normalizePortalPathname(pathname: string) {
+  const rawPath = String(pathname || '').split('?')[0].split('#')[0].trim() || '/';
+  const collapsed = rawPath.replace(/\/{2,}/g, '/');
+  const trimmed = collapsed.replace(/\/index\.html?$/i, '').replace(/\/+$/g, '');
+
+  if (!trimmed || trimmed === '/') {
+    return '/learner-portal';
+  }
+
+  return trimmed.startsWith('/learner-portal') ? trimmed : `/learner-portal${trimmed.startsWith('/') ? trimmed : `/${trimmed}`}`;
+}
+
 type LearnerPortalSeoProps = {
   isAuthenticated: boolean;
 };
@@ -56,7 +68,7 @@ export function LearnerPortalSeo({ isAuthenticated }: LearnerPortalSeoProps) {
     const sharedDescription =
       'Learner self-service access portal for grades, attendance, services, and school records.';
     const imageUrl = getAbsoluteUrl('/common/assets/Web-Kit_Header_Logo.png');
-    const canonicalUrl = `${window.location.origin}${location.pathname}`;
+    const canonicalUrl = `${window.location.origin}${normalizePortalPathname(location.pathname)}`;
 
     let title = baseTitle;
     let description = sharedDescription;
@@ -99,6 +111,7 @@ export function LearnerPortalSeo({ isAuthenticated }: LearnerPortalSeoProps) {
     document.title = title;
     upsertMeta('name', 'description', description);
     upsertMeta('name', 'robots', robots);
+    upsertMeta('name', 'viewport', 'width=device-width, initial-scale=1, viewport-fit=cover');
     upsertMeta('property', 'og:type', 'website');
     upsertMeta('property', 'og:site_name', 'DepED USIS');
     upsertMeta('property', 'og:title', title);
