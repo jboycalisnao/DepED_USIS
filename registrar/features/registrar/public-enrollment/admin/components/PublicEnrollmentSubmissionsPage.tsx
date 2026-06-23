@@ -11,6 +11,7 @@ import PrintEnrollmentGradeModal from './PrintEnrollmentGradeModal';
 import EnrollmentSubmissionNameCheckModal from './EnrollmentSubmissionNameCheckModal';
 import type { EnrollmentDraft, PublicEnrollmentSubmission } from '../../types';
 import { openEnrollmentEnrolleesPrintWindow, type EnrollmentEnrolleePrintRow } from '../utils/printEnrollmentEnrolleesList';
+import { sendLearnerCredentialsViaWebhook } from '../../../learners/services/sendLearnerCredentialsEmail';
 import {
   createPublicEnrollmentSubmissionRecord,
   deletePublicEnrollmentSubmissionRecord,
@@ -1176,13 +1177,17 @@ export default function PublicEnrollmentSubmissionsPage() {
       const { error: upsertError } = await supabase.from('registrar_learners').upsert(upsertPayload, { onConflict: 'lrn' });
       if (upsertError) throw upsertError;
 
-      const { data: resolvedLearner } = await supabase.from('registrar_learners').select('id').eq('lrn', lrn).maybeSingle();
-      const resolvedLearnerId = String((resolvedLearner as any)?.id || existingLearner?.id || '').trim();
-      if (!resolvedLearnerId) throw new Error('Unable to resolve learner id for enrollment history insert.');
-      await insertEnrollmentHistoryRow({
-        learnerId: resolvedLearnerId,
-        schoolYear: enrolledSchoolYear,
-        gradeLevel: gradeToEnroll,
+        const { data: resolvedLearner } = await supabase
+          .from('registrar_learners')
+          .select('id,lrn,first_name,last_name,middle_name,email,login_username,login_password_plain,microsoft_upn,birth_date,gender,address,contact_number,guardian_name,father_name,mother_name,status,section_id,school_id')
+          .eq('lrn', lrn)
+          .maybeSingle();
+        const resolvedLearnerId = String((resolvedLearner as any)?.id || existingLearner?.id || '').trim();
+        if (!resolvedLearnerId) throw new Error('Unable to resolve learner id for enrollment history insert.');
+        await insertEnrollmentHistoryRow({
+          learnerId: resolvedLearnerId,
+          schoolYear: enrolledSchoolYear,
+          gradeLevel: gradeToEnroll,
         section: String(sectionInfo.name || ''),
         status: 'Enrolled',
         submissionPayload: payload as unknown as Record<string, any>,
@@ -1239,13 +1244,54 @@ export default function PublicEnrollmentSubmissionsPage() {
         response: { submissionId: updatedSubmission.id, learnerId: resolvedLearnerId, section: String(sectionInfo.name || '') },
       });
 
-      upsertSubmissionLocally(updatedSubmission);
-      await syncLearnerStatusByLrn(lrn);
-      closeEnrollModal();
-    } catch (error: any) {
-      setEnrollError(error?.message || 'Unable to enroll submission to learner records.');
-    } finally {
-      setIsEnrolling(false);
+        upsertSubmissionLocally(updatedSubmission);
+        await syncLearnerStatusByLrn(lrn);
+        const learnerEmail = String((resolvedLearner as any)?.email || (upsertPayload as any)?.email || '').trim();
+        if (learnerEmail) {
+          try {
+            const learnerPayload = {
+              id: String((resolvedLearner as any)?.id || resolvedLearnerId || crypto.randomUUID()),
+              lrn: String((resolvedLearner as any)?.lrn || lrn || ''),
+              firstName: String((resolvedLearner as any)?.first_name || enrollingSubmission.first_name || payload.firstName || ''),
+              lastName: String((resolvedLearner as any)?.last_name || enrollingSubmission.last_name || payload.lastName || ''),
+              middleName: String((resolvedLearner as any)?.middle_name || payload.middleName || ''),
+              email: learnerEmail,
+              loginUsername: String((resolvedLearner as any)?.login_username || upsertPayload.login_username || lrn || ''),
+              loginPassword: String((resolvedLearner as any)?.login_password_plain || upsertPayload.login_password_plain || ''),
+              microsoftUpn: String((resolvedLearner as any)?.microsoft_upn || upsertPayload.microsoft_upn || ''),
+              birthDate: String((resolvedLearner as any)?.birth_date || payload.birthDate || ''),
+              gender: String((resolvedLearner as any)?.gender || payload.gender || ''),
+              address: String((resolvedLearner as any)?.address || payload.currentAddress || payload.permanentAddress || ''),
+              contactNumber: String((resolvedLearner as any)?.contact_number || payload.learnerContact || ''),
+              guardian_name: String((resolvedLearner as any)?.guardian_name || payload.guardianName || ''),
+              father_name: String((resolvedLearner as any)?.father_name || payload.fatherName || ''),
+              mother_name: String((resolvedLearner as any)?.mother_name || payload.motherName || ''),
+              status: String((resolvedLearner as any)?.status || 'Enrolled'),
+              sectionId: String((resolvedLearner as any)?.section_id || selectedSectionId || ''),
+              schoolYear: enrolledSchoolYear,
+            } as any;
+            await sendLearnerCredentialsViaWebhook({
+              learner: learnerPayload,
+              schoolId: String(enrollingSubmission.school_id || payload.schoolId || schoolId).trim(),
+              schoolYearLabel: enrolledSchoolYear,
+              sectionLabel: String(sectionInfo.name || ''),
+            });
+            setTopAlert({
+              title: 'Credentials Email',
+              message: 'Learner credentials email was sent using the Registrar email settings.',
+            });
+          } catch (emailError: any) {
+            setTopAlert({
+              title: 'Credentials Email',
+              message: emailError?.message || 'Enrollment completed, but credentials email could not be sent.',
+            });
+          }
+        }
+        closeEnrollModal();
+      } catch (error: any) {
+        setEnrollError(error?.message || 'Unable to enroll submission to learner records.');
+      } finally {
+        setIsEnrolling(false);
     }
   };
 
