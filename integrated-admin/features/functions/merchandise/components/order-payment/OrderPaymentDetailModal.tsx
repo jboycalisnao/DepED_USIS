@@ -1,45 +1,58 @@
 import type { MerchOrderAuditRecord, MerchOrderControlRecord, MerchOrderPaymentRecord } from '../../services/merchOrderControlService';
+import { getMerchOrderStatusLabel } from '../../order-control/utils/orderStatus';
+import { MerchPaymentReceiptDownloadButton } from '../../../../../../common/components/merch/MerchPaymentReceiptDownloadButton';
+
+const formatAuditStatusLabel = (value: string) => {
+  const label = getMerchOrderStatusLabel(value);
+  return label === 'Unknown' ? String(value || '-').trim() || 'Unknown' : label;
+};
+
+const formatAuditSourceLabel = (value: string) => {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (!normalized) return 'Unknown Source';
+  if (normalized === 'learner_portal') return 'Learner Portal';
+  if (normalized === 'integrated_admin') return 'IA Override';
+  return normalized
+    .split(/[_\s-]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+};
 
 type Props = {
-  detailModalView: 'payment' | 'record' | 'audit';
-  detailPaymentAmount: string;
-  detailPaymentAmountError: string;
-  detailPaymentBalance: number;
-  detailPaymentNotes: string;
-  detailReceiptNo: string;
-  detailRemainingBalance: number;
-  editingPaymentId: string;
+  detailModalView: 'payment' | 'audit';
   isAuditLoading: boolean;
   isOpen: boolean;
   isPaymentsLoading: boolean;
   isSaving: boolean;
-  onAmountChange: (value: string) => void;
-  onDeletePayment: () => void;
+  onDeleteHistory: (row: MerchOrderPaymentRecord) => void;
   onEditHistory: (row: MerchOrderPaymentRecord) => void;
-  onNotesChange: (value: string) => void;
   onClose: () => void;
-  onPrimaryAction: () => void;
-  onReceiptNoChange: (value: string) => void;
-  onSetView: (view: 'payment' | 'record' | 'audit') => void;
+  onSetView: (view: 'payment' | 'audit') => void;
   order: MerchOrderControlRecord | null;
   paymentHistoryEntries: MerchOrderPaymentRecord[];
   selectedOrderAudit: MerchOrderAuditRecord[];
-  totalPaidAmount: number;
 };
 
 export function OrderPaymentDetailModal(props: Props) {
   const {
-    detailModalView, detailPaymentAmount, detailPaymentAmountError, detailPaymentBalance, detailPaymentNotes, detailReceiptNo,
-    detailRemainingBalance, editingPaymentId, isAuditLoading, isOpen, isPaymentsLoading, isSaving, onAmountChange,
-    onClose, onDeletePayment, onEditHistory, onNotesChange, onPrimaryAction, onReceiptNoChange, onSetView,
-    order, paymentHistoryEntries, selectedOrderAudit, totalPaidAmount,
+    detailModalView, isAuditLoading, isOpen, isPaymentsLoading, isSaving, onClose, onDeleteHistory, onEditHistory, onSetView,
+    order, paymentHistoryEntries, selectedOrderAudit,
   } = props;
 
   if (!isOpen || !order) return null;
 
+  const resolvedGradeSection = [order.gradeLevel, order.sectionName].filter(Boolean).join(' - ') || 'Unassigned';
+  const paymentAuditEntries = selectedOrderAudit.filter((log) => String(log.notes || '').trim().toLowerCase().startsWith('payment posted'));
+  const paymentAuditEntriesAscending = [...paymentAuditEntries].reverse();
+  const fallbackPostedBy =
+    paymentAuditEntriesAscending.find((log) => String(log.changedBy || '').trim())?.changedBy ||
+    selectedOrderAudit.find((log) => String(log.changedBy || '').trim())?.changedBy ||
+    'Unknown Actor';
+
   return (
     <div className="modal-overlay modal-overlay--high" role="presentation">
-      <div className="modal-backdrop" onClick={() => (isSaving ? undefined : onSetView('record'))} />
+      <div className="modal-backdrop" onClick={onClose} />
       <div className="modal-dialog modal-dialog--wide integrated-admin-merch-order-detail-modal" role="dialog" aria-modal="true" aria-label="Order payment details">
         <div className="modal-dialog__header">
           <div className="modal-dialog__title-group">
@@ -48,7 +61,6 @@ export function OrderPaymentDetailModal(props: Props) {
           </div>
           <div className="integrated-admin-order-payment-view-switch" role="tablist" aria-label="Order payment views">
             <button type="button" className={`integrated-admin-order-payment-view-switch__btn ${detailModalView === 'payment' ? 'is-active' : ''}`} onClick={() => onSetView('payment')}>Payment History</button>
-            <button type="button" className={`integrated-admin-order-payment-view-switch__btn ${detailModalView === 'record' ? 'is-active' : ''}`} onClick={() => onSetView('record')}>Record Entry</button>
             <button type="button" className={`integrated-admin-order-payment-view-switch__btn ${detailModalView === 'audit' ? 'is-active' : ''}`} onClick={() => onSetView('audit')}>Audit Trail</button>
             <button type="button" className="integrated-admin-order-payment-view-switch__close" onClick={onClose} aria-label="Close order payment modal">
               <span className="material-symbols-outlined" aria-hidden="true">close</span>
@@ -56,83 +68,100 @@ export function OrderPaymentDetailModal(props: Props) {
           </div>
         </div>
         <div className="modal-dialog__body modal-record">
-          {detailModalView === 'record' ? (
-            <section className="modal-record__section">
-              <h4>Order Snapshot</h4>
-              <div className="modal-record__summary">
-                <div className="modal-record__meta">
-                  <span><strong>{order.referenceNo || '-'}</strong></span>
-                  <span>{order.learnerName || '-'}</span>
-                  <span>{order.gradeLevel} - {order.sectionName}</span>
-                  <span>LRN: {order.learnerLrn || '-'}</span>
-                </div>
-                <div className="modal-record__grid">
-                  <div className="modal-record__field">
-                    <span>Order Amount</span>
-                    <strong>PHP {order.orderAmount.toFixed(2)}</strong>
-                  </div>
-                  <div className="modal-record__field">
-                    <span>Paid</span>
-                    <strong>PHP {totalPaidAmount.toFixed(2)}</strong>
-                  </div>
-                  <div className="modal-record__field">
-                    <span>Balance</span>
-                    <strong>PHP {detailRemainingBalance.toFixed(2)}</strong>
-                  </div>
-                  <div className="modal-record__field">
-                    <span>Balance After This Pay</span>
-                    <strong>PHP {detailPaymentBalance.toFixed(2)}</strong>
-                  </div>
-                </div>
-              </div>
-            </section>
-          ) : null}
-
-          {detailModalView === 'record' ? (
-            <section className="modal-record__section">
-              <h4>Record Payment Entry</h4>
-              <div className="registry-form integrated-admin-payment-form">
-                <div className="floating-field-grid floating-field-grid--two">
-                  <label className="floating-field">
-                    <div className="floating-field__control">
-                      <input value={detailPaymentAmount} onChange={(e) => onAmountChange(e.target.value)} inputMode="decimal" placeholder=" " />
-                      <span>Payment Amount</span>
-                    </div>
-                    {detailPaymentAmountError ? <small className="integrated-admin-payment-form__error">{detailPaymentAmountError}</small> : null}
-                  </label>
-                  <label className="floating-field">
-                    <div className="floating-field__control">
-                      <input value={detailReceiptNo} onChange={(e) => onReceiptNoChange(e.target.value)} placeholder=" " />
-                      <span>Receipt No. (Optional)</span>
-                    </div>
-                  </label>
-                </div>
-                <label className="floating-field">
-                  <div className="floating-field__control">
-                    <textarea value={detailPaymentNotes} onChange={(e) => onNotesChange(e.target.value)} rows={3} placeholder=" " />
-                    <span>Payment Notes (Optional)</span>
-                  </div>
-                </label>
-              </div>
-            </section>
-          ) : null}
-
           {detailModalView === 'payment' ? (
             <section className="modal-record__section modal-record__section--full">
               <h4>Payment History</h4>
               <div className="integrated-admin-merch-order-audit">
-                {isPaymentsLoading ? <p>Loading payment history...</p> : paymentHistoryEntries.length === 0 ? <p>No payment history found for this order.</p> : (
-                  paymentHistoryEntries.map((entry, index) => (
-                    <div key={`${entry.id}-${index}`} className="integrated-admin-merch-order-audit__item integrated-admin-merch-order-audit__item--split">
-                      <strong>Payment History No. {index + 1}</strong>
-                      <small>Transaction No: {entry.transactionNo}</small>
-                      <span>{entry.paidAt ? new Date(entry.paidAt).toLocaleString() : '-'}</span>
-                      <small>Amount: PHP {entry.paymentAmount.toFixed(2)}</small>
-                      {entry.receiptNo ? <small>Receipt No: {entry.receiptNo}</small> : null}
-                      {entry.paymentNotes ? <small>{entry.paymentNotes}</small> : null}
-                      <button type="button" className="primary-button integrated-admin-history-edit-btn" onClick={() => onEditHistory(entry)} disabled={isSaving}>Edit</button>
-                    </div>
-                  ))
+                  {isPaymentsLoading ? <p>Loading payment history...</p> : paymentHistoryEntries.length === 0 ? <p>No payment history found for this order.</p> : (
+                    paymentHistoryEntries.map((entry, index) => {
+                      const entryPostedBy =
+                        entry.postedBy ||
+                        paymentAuditEntriesAscending[index]?.changedBy ||
+                        fallbackPostedBy;
+                      const paidThroughEntry = paymentHistoryEntries
+                        .slice(0, index + 1)
+                        .reduce((sum, current) => sum + current.paymentAmount, 0);
+                      const balanceAfterPayment = Math.max(0, Number(order.orderAmount || 0) - paidThroughEntry);
+
+                    return (
+                      <div key={`${entry.id}-${index}`} className="integrated-admin-merch-order-audit__item integrated-admin-merch-order-audit__item--split">
+                        <div className="integrated-admin-merch-order-audit__header-grid">
+                          <div className="integrated-admin-merch-order-audit__entry-meta">
+                            <strong>Payment History No. {index + 1}</strong>
+                            <small>Transaction No: {entry.transactionNo}</small>
+                            <span>{entry.paidAt ? new Date(entry.paidAt).toLocaleString() : '-'}</span>
+                          </div>
+                          <div className="integrated-admin-merch-order-audit__amount-stack">
+                            <span className="integrated-admin-merch-order-audit__source integrated-admin-merch-order-audit__source--amount">
+                              PHP {entry.paymentAmount.toFixed(2)}
+                            </span>
+                            <small>Posted By: {entryPostedBy}</small>
+                            <div className="integrated-admin-merch-order-audit__actions">
+                              <MerchPaymentReceiptDownloadButton
+                                ariaLabel={`Download receipt for payment history ${index + 1}`}
+                                className="integrated-admin-history-icon-btn"
+                                mode="print"
+                                showLabel={false}
+                                title="Print receipt"
+                                payload={{
+                                  balanceAfterPayment,
+                                  gradeSection: resolvedGradeSection,
+                                  learnerLrn: order.learnerLrn || '',
+                                  learnerName: order.learnerName || '',
+                                  orderAmount: Number(order.orderAmount || 0),
+                                  paymentHistoryRows: paymentHistoryEntries.map((payment) => ({
+                                    amount: payment.paymentAmount,
+                                    date: payment.paidAt || payment.createdAt,
+                                    notes: payment.paymentNotes || '',
+                                    postedBy: payment.postedBy || 'Unknown Actor',
+                                    receiptNo: payment.receiptNo || '',
+                                    referenceNo: order.referenceNo || order.id,
+                                    status: payment.paymentStatus,
+                                    transactionNo: payment.transactionNo || '',
+                                  })),
+                                  outstandingBalance: balanceAfterPayment,
+                                  paidAt: entry.paidAt || entry.createdAt,
+                                  paymentAmount: entry.paymentAmount,
+                                  paymentMethod: entry.paymentMethod,
+                                  paymentNotes: entry.paymentNotes || '',
+                                  paymentStatus: entry.paymentStatus,
+                                  postedBy: entryPostedBy,
+                                  productName: order.productName || '',
+                                  referenceNo: order.referenceNo || order.id,
+                                  receiptNo: entry.receiptNo || '',
+                                  schoolName: 'DepED USIS',
+                                  sourceLabel: 'Integrated Admin',
+                                  transactionNo: entry.transactionNo || '',
+                                }}
+                              />
+                              <button
+                                type="button"
+                                className="integrated-admin-history-icon-btn"
+                                onClick={() => onEditHistory(entry)}
+                                disabled={isSaving}
+                                aria-label={`Edit payment history ${index + 1}`}
+                                title="Edit payment"
+                              >
+                                <span className="material-symbols-outlined" aria-hidden="true">edit</span>
+                              </button>
+                              <button
+                                type="button"
+                                className="integrated-admin-history-icon-btn integrated-admin-history-icon-btn--danger"
+                                onClick={() => onDeleteHistory(entry)}
+                                disabled={isSaving}
+                                aria-label={`Delete payment history ${index + 1}`}
+                                title="Delete payment"
+                              >
+                                <span className="material-symbols-outlined" aria-hidden="true">delete</span>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                        {entry.receiptNo ? <small>Receipt No: {entry.receiptNo}</small> : null}
+                        {entry.paymentNotes ? <small>{entry.paymentNotes}</small> : null}
+                      </div>
+                    );
+                  })
                 )}
               </div>
             </section>
@@ -144,29 +173,28 @@ export function OrderPaymentDetailModal(props: Props) {
               <div className="integrated-admin-merch-order-audit">
                 {isAuditLoading ? <p>Loading audit trail...</p> : selectedOrderAudit.length === 0 ? <p>No audit logs found for this order.</p> : (
                   selectedOrderAudit.map((log, index) => (
-                    <div key={`${log.createdAt}-${index}`} className="integrated-admin-merch-order-audit__item">
-                      <strong>{log.fromStatus ? `${log.fromStatus} -> ${log.toStatus}` : `Created as ${log.toStatus}`}</strong>
-                      <span>{log.createdAt ? new Date(log.createdAt).toLocaleString() : '-'} | {log.changedBy || log.source || 'Unknown Actor'}</span>
-                      {log.notes ? <small>{log.notes}</small> : null}
+                    <div key={`${log.createdAt}-${index}`} className="integrated-admin-merch-order-audit__item integrated-admin-merch-order-audit__item--formatted">
+                      <div className="integrated-admin-merch-order-audit__headline">
+                        <strong>
+                          {log.fromStatus
+                            ? `${formatAuditStatusLabel(log.fromStatus)} -> ${formatAuditStatusLabel(log.toStatus)}`
+                            : `Created as ${formatAuditStatusLabel(log.toStatus)}`}
+                        </strong>
+                        <span className="integrated-admin-merch-order-audit__source">
+                          {formatAuditSourceLabel(log.source)}
+                        </span>
+                      </div>
+                      <div className="integrated-admin-merch-order-audit__meta">
+                        <span>{log.createdAt ? new Date(log.createdAt).toLocaleString() : '-'}</span>
+                        <span>{log.changedBy || 'Unknown Actor'}</span>
+                      </div>
+                      {log.notes ? <small className="integrated-admin-merch-order-audit__notes">{log.notes}</small> : null}
                     </div>
                   ))
                 )}
               </div>
             </section>
           ) : null}
-        </div>
-        <div className="modal-dialog__actions">
-          {detailModalView === 'record' ? (
-            <>
-              <button type="button" onClick={onDeletePayment} disabled={isSaving}>Delete Payment</button>
-              <button type="button" className="modal-dialog__blue" onClick={() => onSetView('payment')}>Payment History</button>
-              <button type="button" className="modal-dialog__blue" disabled={isSaving || Boolean(detailPaymentAmountError)} onClick={onPrimaryAction}>
-                {editingPaymentId ? 'Update Payment History' : order.orderStatus === 'Approved' ? 'Edit Payment Record' : 'Save Payment Record'}
-              </button>
-            </>
-          ) : (
-            <button type="button" className="modal-dialog__blue" onClick={() => onSetView('record')}>Back To Record Entry</button>
-          )}
         </div>
       </div>
     </div>

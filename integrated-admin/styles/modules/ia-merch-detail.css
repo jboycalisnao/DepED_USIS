@@ -13,7 +13,7 @@
   min-height: 36px;
   padding: 0 12px;
   border: 1px solid rgba(18, 35, 61, 0.14);
-  border-radius: 6px;
+  border-radius: 0.375rem;
   background: #ffffff;
   color: var(--deped-ink);
   font-size: 13px;
@@ -35,7 +35,7 @@
   min-width: 36px;
   padding: 0;
   border: 1px solid rgba(18, 35, 61, 0.14);
-  border-radius: 6px;
+  border-radius: 0.375rem;
   background: #ffffff;
   color: var(--deped-blue);
   cursor: pointer;
@@ -43,4 +43,10 @@
 
 .integrated-admin-order-payment-view-switch__close:hover {
   background: #eef4ff;
+}
+
+.integrated-admin-order-payment-view-switch__close:disabled,
+.integrated-admin-order-payment-view-switch__btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }

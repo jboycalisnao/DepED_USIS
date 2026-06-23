@@ -1,5 +1,5 @@
-import { UsisSearchableSelect } from '../../../../../../common/components/ui/UsisSearchableSelect';
 import type { MerchOrderAuditRecord, MerchOrderControlRecord } from '../../services/merchOrderControlService';
+import { getMerchOrderStatusClass, getMerchOrderStatusLabel } from '../utils/orderStatus';
 
 type Props = {
   isAuditLoading: boolean;
@@ -43,16 +43,18 @@ export function OrderDetailAuditModal({
           <section className="modal-record__section">
             <h4>Manual Status Change</h4>
             <div className="integrated-admin-order-detail-status-row">
-              <UsisSearchableSelect
-                ariaLabel="Order status"
-                allowTyping={false}
-                className="integrated-admin-order-detail-status-select"
-                floatingLabel
-                label="Status"
-                onChange={onStatusChange}
-                options={statusOptions.map((option) => ({ label: option, value: option }))}
+              <select
+                aria-label="Order status"
+                className={`integrated-admin-order-status-select integrated-admin-order-detail-status-select ${getMerchOrderStatusClass(orderStatusValue)}`}
+                onChange={(event) => onStatusChange(event.target.value)}
                 value={orderStatusValue}
-              />
+              >
+                {statusOptions.map((option) => (
+                  <option key={option} value={option} className={getMerchOrderStatusClass(option)}>
+                    {getMerchOrderStatusLabel(option)}
+                  </option>
+                ))}
+              </select>
               <button
                 type="button"
                 className="primary-button integrated-admin-order-detail-status-save"
@@ -97,7 +99,7 @@ export function OrderDetailAuditModal({
               </div>
               <div className="modal-record__field">
                 <span>Status</span>
-                <strong>{order.orderStatus}</strong>
+                <strong>{getMerchOrderStatusLabel(order.orderStatus)}</strong>
               </div>
               <div className="modal-record__field">
                 <span>Date</span>
@@ -124,7 +126,11 @@ export function OrderDetailAuditModal({
               ) : (
                 orderAudit.map((log, index) => (
                   <div key={`${log.createdAt}-${index}`} className="integrated-admin-merch-order-audit__item">
-                    <strong>{log.fromStatus ? `${log.fromStatus} -> ${log.toStatus}` : `Created as ${log.toStatus}`}</strong>
+                    <strong>
+                      {log.fromStatus
+                        ? `${getMerchOrderStatusLabel(log.fromStatus)} -> ${getMerchOrderStatusLabel(log.toStatus)}`
+                        : `Created as ${getMerchOrderStatusLabel(log.toStatus)}`}
+                    </strong>
                     <span>{log.createdAt ? new Date(log.createdAt).toLocaleString() : '-'} | {log.changedBy || log.source || 'Unknown Actor'}</span>
                     {log.notes ? <small>{log.notes}</small> : null}
                   </div>

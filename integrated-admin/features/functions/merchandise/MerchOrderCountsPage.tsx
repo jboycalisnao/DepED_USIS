@@ -2,43 +2,104 @@ import { useEffect, useMemo, useState } from 'react';
 import { UsisAlertModal } from '../../../../common/components/UsisAlertModal';
 import { UsisSearchableSelect } from '../../../../common/components/ui/UsisSearchableSelect';
 import UsisPageLoader from '../../../../common/components/UsisPageLoader';
-import { loadMerchOrderCountsSummary, type MerchOrderCountsSummary } from './services/merchOrderControlService';
+import { loadCachedMerchOrdersPageSnapshot } from './utils/merchOrdersPageCache';
+import { getMerchOrderStatusLabel, normalizeMerchOrderStatus } from './order-control/utils/orderStatus';
+import type { MerchOrderControlRecord } from './services/merchOrderControlService';
 
-const defaultSummary: MerchOrderCountsSummary = {
-  countsBySource: [],
-  countsByStatus: [],
-  orderPeriodOptions: [],
-  selectedOrderPeriod: '',
-  totalOrders: 0,
+type MerchOrderCountsSummary = {
+  countsBySource: Array<{ count: number; source: string }>;
+  countsByStatus: Array<{ count: number; status: string }>;
+  orderPeriodOptions: string[];
+  totalOrders: number;
+};
+
+const buildSummary = (records: MerchOrderControlRecord[], selectedOrderPeriod: string): MerchOrderCountsSummary => {
+  const periodSet = new Set<string>();
+  const statusMap = new Map<string, number>();
+  const sourceMap = new Map<string, number>();
+
+  records.forEach((row) => {
+    const status = normalizeMerchOrderStatus(row.orderStatus);
+    if (!['confirmed', 'released'].includes(status)) {
+      return;
+    }
+
+    const items = [row.orderPeriodLabel || ''].filter(Boolean);
+    items.forEach((label) => periodSet.add(label));
+
+    if (selectedOrderPeriod && !items.includes(selectedOrderPeriod)) {
+      return;
+    }
+
+    const sourceRaw = String(row.orderSource || '').trim();
+    const source = sourceRaw === 'integrated_admin'
+      ? 'Integrated Admin'
+      : sourceRaw === 'learner_portal'
+        ? 'Learner Portal'
+        : 'Unknown';
+
+    statusMap.set(status, (statusMap.get(status) || 0) + 1);
+    sourceMap.set(source, (sourceMap.get(source) || 0) + 1);
+  });
+
+  const countsByStatus = Array.from(statusMap.entries())
+    .map(([status, count]) => ({ status, count }))
+    .sort((a, b) => b.count - a.count || a.status.localeCompare(b.status));
+  const countsBySource = Array.from(sourceMap.entries())
+    .map(([source, count]) => ({ source, count }))
+    .sort((a, b) => b.count - a.count || a.source.localeCompare(b.source));
+
+  return {
+    countsBySource,
+    countsByStatus,
+    orderPeriodOptions: Array.from(periodSet).sort((a, b) => a.localeCompare(b)),
+    totalOrders: countsByStatus.reduce((sum, entry) => sum + entry.count, 0),
+  };
 };
 
 export function MerchOrderCountsPage() {
   const [isLoading, setIsLoading] = useState(true);
-  const [summary, setSummary] = useState<MerchOrderCountsSummary>(defaultSummary);
+  const [records, setRecords] = useState<MerchOrderControlRecord[]>([]);
   const [selectedOrderPeriod, setSelectedOrderPeriod] = useState('');
   const [alert, setAlert] = useState<{ title: string; message: string; tone: 'success' | 'danger' } | null>(null);
 
-  const loadSummary = async (periodLabel: string) => {
-    setIsLoading(true);
-    try {
-      const result = await loadMerchOrderCountsSummary(periodLabel);
-      setSummary(result);
-    } catch (error: any) {
-      setAlert({
-        title: 'Load Failed',
-        message: error?.message || 'Unable to load order count dashboard.',
-        tone: 'danger',
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   useEffect(() => {
-    void loadSummary(selectedOrderPeriod);
-  }, [selectedOrderPeriod]);
+    let cancelled = false;
+    const run = async () => {
+      setIsLoading(true);
+      try {
+        const snapshot = await loadCachedMerchOrdersPageSnapshot();
+        if (!snapshot) {
+          if (!cancelled) {
+            setRecords([]);
+            setAlert({
+              title: 'Cache Missing',
+              message: 'No local merch cache is available yet. Open the Orders page and refresh it first.',
+              tone: 'danger',
+            });
+          }
+          return;
+        }
+        if (!cancelled) {
+          setRecords((snapshot.records || []).map((row) => ({ ...row })));
+        }
+      } catch (error: any) {
+        if (!cancelled) {
+          setAlert({ title: 'Load Failed', message: error?.message || 'Unable to load order count dashboard.', tone: 'danger' });
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
-  const statusOptions = useMemo(
+  const summary = useMemo(() => buildSummary(records, selectedOrderPeriod), [records, selectedOrderPeriod]);
+
+  const orderPeriodOptions = useMemo(
     () => [
       { label: 'All Order Periods', value: '' },
       ...summary.orderPeriodOptions.map((label) => ({ label, value: label })),
@@ -64,7 +125,7 @@ export function MerchOrderCountsPage() {
                 allowTyping={false}
                 floatingLabel
                 label="Order Period"
-                options={statusOptions}
+                options={orderPeriodOptions}
                 value={selectedOrderPeriod}
                 onChange={setSelectedOrderPeriod}
               />
@@ -98,7 +159,7 @@ export function MerchOrderCountsPage() {
                   <tbody>
                     {summary.countsByStatus.map((row) => (
                       <tr key={row.status}>
-                        <td>{row.status}</td>
+                        <td>{getMerchOrderStatusLabel(row.status)}</td>
                         <td>{row.count}</td>
                       </tr>
                     ))}

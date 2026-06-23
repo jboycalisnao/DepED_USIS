@@ -1,5 +1,7 @@
 import { supabase } from '@deped-usis/shared-supabase';
 
+export type LearnerMerchOrderStatus = 'pending' | 'confirmed' | 'released' | 'refund';
+
 export type LearnerMerchProduct = {
   availableSizes: string[];
   categoryName: string;
@@ -26,6 +28,7 @@ export type PlaceLearnerMerchOrderPayload = {
 export type LearnerMerchOrderRecord = {
   availableSizes: string[];
   createdAt: string;
+  gradeLevel: string;
   notes: string;
   orderId: string;
   orderPeriodLabel: string;
@@ -33,11 +36,36 @@ export type LearnerMerchOrderRecord = {
   orderSource: 'integrated_admin' | 'learner_portal' | 'unknown';
   orderStatus: string;
   preOrderCutoffDate: string | null;
+  sectionName: string;
   productId: string;
   productName: string;
+  paymentTotalAmount: number;
+  productPrice: number;
   quantity: number;
+  learnerId: string;
+  learnerLrn: string;
+  learnerName: string;
   referenceNo: string;
   selectedSize: string;
+  outstandingBalance: number;
+  totalAmount: number;
+};
+
+export type LearnerMerchOrderPaymentRecord = {
+  createdAt: string;
+  id: string;
+  orderId: string;
+  paidAt: string;
+  paymentAmount: number;
+  paymentMethod: string;
+  paymentNotes: string;
+  paymentStatus: 'posted' | 'voided';
+  postedBy: string;
+  receiptNo: string;
+  transactionNo: string;
+  updatedAt: string;
+  voidedAt: string;
+  voidedBy: string;
 };
 
 export type UpdateLearnerMerchOrderPayload = {
@@ -55,12 +83,55 @@ export type DeleteLearnerMerchOrderPayload = {
   orderId: string;
 };
 
+const LEGACY_STATUS_MAP: Record<string, LearnerMerchOrderStatus> = {
+  approved: 'confirmed',
+  confirmed: 'confirmed',
+  fulfilled: 'released',
+  released: 'released',
+  pending: 'pending',
+  rejected: 'refund',
+  refund: 'refund',
+  refunded: 'refund',
+};
+
+const STATUS_LABELS: Record<LearnerMerchOrderStatus, string> = {
+  pending: 'Pending',
+  confirmed: 'Confirmed',
+  released: 'Released',
+  refund: 'Refund',
+};
+
+const DB_STATUS_MAP: Record<LearnerMerchOrderStatus, string> = {
+  pending: 'Pending',
+  confirmed: 'Approved',
+  released: 'Fulfilled',
+  refund: 'Rejected',
+};
+
+export const normalizeLearnerMerchOrderStatus = (value: unknown): LearnerMerchOrderStatus => {
+  const cleaned = String(value || '').trim().toLowerCase();
+  return LEGACY_STATUS_MAP[cleaned] || 'pending';
+};
+
+export const getLearnerMerchOrderStatusLabel = (value: unknown) => {
+  return STATUS_LABELS[normalizeLearnerMerchOrderStatus(value)];
+};
+
+export const getLearnerMerchOrderStatusClass = (value: unknown) => {
+  return `learner-merch-status-chip--${normalizeLearnerMerchOrderStatus(value)}`;
+};
+
+export const toLearnerMerchOrderDbStatus = (value: unknown) => {
+  return DB_STATUS_MAP[normalizeLearnerMerchOrderStatus(value)];
+};
+
 const makeOrderPeriodPrefix = (label: string) => {
   const cleaned = String(label || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
   if (!cleaned) return 'ORD';
   return cleaned.slice(0, 3).padEnd(3, 'X');
 };
 const MAX_REFERENCE_RETRY = 5;
+const ID_SERVICE_SKU = 'ID-001';
 const isUniqueViolation = (error: any, columnHint: string) => {
   const code = String(error?.code || '').toLowerCase();
   const message = String(error?.message || '').toLowerCase();
@@ -113,24 +184,30 @@ const addMerchOrderAudit = async (params: {
 export const fetchLearnerMerchCatalog = async (): Promise<LearnerMerchProduct[]> => {
   const { data, error } = await supabase
     .from('merch_published_products')
-    .select('id, name, description, price, stock_qty, category_name, primary_image_url, is_preorder, pre_order_cutoff_date, available_sizes, sort_order')
+    .select('id, sku, name, description, price, stock_qty, category_name, primary_image_url, is_preorder, pre_order_cutoff_date, available_sizes, sort_order')
     .order('sort_order', { ascending: true, nullsFirst: false })
     .order('name', { ascending: true });
 
   if (error) throw new Error('Unable to load merchandise catalog.');
 
-  return (data || []).map((row: any) => ({
-    availableSizes: Array.isArray(row.available_sizes) ? row.available_sizes.map((value: unknown) => String(value)) : [],
-    categoryName: String(row.category_name || 'Uncategorized'),
-    description: String(row.description || ''),
-    id: String(row.id || ''),
-    imageUrl: typeof row.primary_image_url === 'string' ? row.primary_image_url : null,
-    isPreOrder: Boolean(row.is_preorder),
-    name: String(row.name || ''),
-    price: Number(row.price || 0),
-    preOrderCutoffDate: row.pre_order_cutoff_date ? String(row.pre_order_cutoff_date) : null,
-    stockQty: Number(row.stock_qty || 0),
-  }));
+  return (data || [])
+    .filter((row: any) => {
+      const sku = String(row.sku || '').trim().toUpperCase();
+      const name = String(row.name || '').trim().toLowerCase();
+      return sku !== ID_SERVICE_SKU && name !== 'school essentials';
+    })
+    .map((row: any) => ({
+      availableSizes: Array.isArray(row.available_sizes) ? row.available_sizes.map((value: unknown) => String(value)) : [],
+      categoryName: String(row.category_name || 'Uncategorized'),
+      description: String(row.description || ''),
+      id: String(row.id || ''),
+      imageUrl: typeof row.primary_image_url === 'string' ? row.primary_image_url : null,
+      isPreOrder: Boolean(row.is_preorder),
+      name: String(row.name || ''),
+      price: Number(row.price || 0),
+      preOrderCutoffDate: row.pre_order_cutoff_date ? String(row.pre_order_cutoff_date) : null,
+      stockQty: Number(row.stock_qty || 0),
+    }));
 };
 
 export const fetchLearnerMerchOrders = async (params: {
@@ -150,7 +227,6 @@ export const fetchLearnerMerchOrders = async (params: {
   const queryWithSource = applyLearnerFilter(
     supabase
       .from('merch_orders')
-      .eq('order_kind', 'merch')
       .select(
         `
           id,
@@ -159,9 +235,11 @@ export const fetchLearnerMerchOrders = async (params: {
           order_status,
           order_source,
           notes,
-          merch_order_items(quantity, selected_size, merch_products(id, name, available_sizes, is_preorder, pre_order_cutoff_date, merch_order_periods(label, end_date)))
+          merch_order_items(quantity, selected_size, merch_products(id, name, price, available_sizes, is_preorder, pre_order_cutoff_date, merch_order_periods(label, end_date))),
+          merch_order_payments(payment_amount, payment_status)
         `,
       )
+      .eq('order_kind', 'merch')
       .order('created_at', { ascending: false }),
   );
 
@@ -179,16 +257,17 @@ export const fetchLearnerMerchOrders = async (params: {
     const fallbackResult = await applyLearnerFilter(
       supabase
         .from('merch_orders')
-        .eq('order_kind', 'merch')
         .select(
           `
             id,
             created_at,
             order_status,
             notes,
-            merch_order_items(quantity, selected_size, merch_products(id, name, available_sizes, is_preorder, pre_order_cutoff_date, merch_order_periods(label, end_date)))
+            merch_order_items(quantity, selected_size, merch_products(id, name, price, available_sizes, is_preorder, pre_order_cutoff_date, merch_order_periods(label, end_date))),
+            merch_order_payments(payment_amount, payment_status)
           `,
         )
+        .eq('order_kind', 'merch')
         .order('created_at', { ascending: false }),
     );
     if (fallbackResult.error) throw new Error('Unable to load your merch orders.');
@@ -199,27 +278,42 @@ export const fetchLearnerMerchOrders = async (params: {
 
   return (data || []).flatMap((row: any) => {
     const items = Array.isArray(row.merch_order_items) ? row.merch_order_items : [];
+    const payments = Array.isArray(row.merch_order_payments) ? row.merch_order_payments : [];
     const source = String(row.order_source || '').trim();
     const normalizedSource: LearnerMerchOrderRecord['orderSource'] =
       source === 'integrated_admin' || source === 'learner_portal' ? source : 'unknown';
 
+    const paymentTotalAmount = payments.reduce((sum: number, payment: any) => {
+      if (String(payment?.payment_status || '').trim().toLowerCase() === 'voided') return sum;
+      return sum + Number(payment?.payment_amount || 0);
+    }, 0);
+
     if (items.length === 0) {
-      return [
+          return [
         {
           availableSizes: [],
           createdAt: String(row.created_at || ''),
+          gradeLevel: '',
+          learnerId: '',
+          learnerLrn: '',
+          learnerName: '',
           notes: String(row.notes || ''),
           orderId: String(row.id || ''),
           orderPeriodLabel: '',
           orderPeriodEndDate: null,
           orderSource: normalizedSource,
-          orderStatus: String(row.order_status || 'Pending'),
+          orderStatus: normalizeLearnerMerchOrderStatus(row.order_status),
           preOrderCutoffDate: null,
+          sectionName: '',
           productId: '',
           productName: 'Unknown Product',
+          paymentTotalAmount,
+          productPrice: 0,
           quantity: 0,
           referenceNo: String(row.reference_no || ''),
           selectedSize: '',
+          outstandingBalance: 0,
+          totalAmount: 0,
         } satisfies LearnerMerchOrderRecord,
       ];
     }
@@ -229,20 +323,62 @@ export const fetchLearnerMerchOrders = async (params: {
         ? item.merch_products.available_sizes.map((value: unknown) => String(value))
         : [],
       createdAt: String(row.created_at || ''),
+      gradeLevel: '',
+      learnerId: '',
+      learnerLrn: '',
+      learnerName: '',
       notes: String(row.notes || ''),
       orderId: String(row.id || ''),
       orderPeriodLabel: String(item?.merch_products?.merch_order_periods?.label || ''),
       orderPeriodEndDate: item?.merch_products?.merch_order_periods?.end_date ? String(item.merch_products.merch_order_periods.end_date) : null,
       orderSource: normalizedSource,
-      orderStatus: String(row.order_status || 'Pending'),
+      orderStatus: normalizeLearnerMerchOrderStatus(row.order_status),
       preOrderCutoffDate: item?.merch_products?.pre_order_cutoff_date ? String(item.merch_products.pre_order_cutoff_date) : null,
+      sectionName: '',
       productId: String(item?.merch_products?.id || ''),
       productName: String(item?.merch_products?.name || 'Unknown Product'),
+      paymentTotalAmount,
+      productPrice: Number(item?.merch_products?.price || 0),
       quantity: Number(item.quantity || 0),
       referenceNo: String(row.reference_no || ''),
       selectedSize: String(item.selected_size || ''),
+      outstandingBalance: Math.max(Number(item?.merch_products?.price || 0) * Number(item.quantity || 0) - paymentTotalAmount, 0),
+      totalAmount: Number(item?.merch_products?.price || 0) * Number(item.quantity || 0),
     } satisfies LearnerMerchOrderRecord));
   });
+};
+
+export const fetchLearnerMerchOrderPayments = async (orderId: string): Promise<LearnerMerchOrderPaymentRecord[]> => {
+  const trimmedOrderId = String(orderId || '').trim();
+  if (!trimmedOrderId) return [];
+
+  const { data, error } = await supabase
+    .from('merch_order_payments')
+    .select(
+      'id,order_id,paid_at,payment_amount,payment_method,payment_notes,payment_status,posted_by,receipt_no,transaction_no,created_at,updated_at,voided_at,voided_by',
+    )
+    .eq('order_id', trimmedOrderId)
+    .order('paid_at', { ascending: false, nullsFirst: false })
+    .order('created_at', { ascending: false });
+
+  if (error) throw new Error(error.message || 'Unable to load payment history.');
+
+  return (data || []).map((row: any) => ({
+    createdAt: String(row.created_at || ''),
+    id: String(row.id || ''),
+    orderId: String(row.order_id || ''),
+    paidAt: String(row.paid_at || ''),
+    paymentAmount: Number(row.payment_amount || 0),
+    paymentMethod: String(row.payment_method || ''),
+    paymentNotes: String(row.payment_notes || ''),
+    paymentStatus: String(row.payment_status || '').toLowerCase() === 'voided' ? 'voided' : 'posted',
+    postedBy: String(row.posted_by || ''),
+    receiptNo: String(row.receipt_no || ''),
+    transactionNo: String(row.transaction_no || ''),
+    updatedAt: String(row.updated_at || ''),
+    voidedAt: String(row.voided_at || ''),
+    voidedBy: String(row.voided_by || ''),
+  })) satisfies LearnerMerchOrderPaymentRecord[];
 };
 
 export const placeLearnerMerchOrder = async (payload: PlaceLearnerMerchOrderPayload) => {
@@ -278,7 +414,7 @@ export const placeLearnerMerchOrder = async (payload: PlaceLearnerMerchOrderPayl
     order_kind: 'merch',
     order_period_id: product?.merch_order_periods?.id || null,
     notes: payload.notes.trim() || null,
-    order_status: 'Pending',
+    order_status: toLearnerMerchOrderDbStatus('pending'),
   };
 
   const orderPeriodLabel = String(product?.merch_order_periods?.label || 'ORD');
@@ -358,7 +494,7 @@ export const placeLearnerMerchOrder = async (payload: PlaceLearnerMerchOrderPayl
     notes: 'Order placed from School Portal merch service.',
     orderId: String(orderRow.id),
     source: 'learner_portal',
-    toStatus: 'Pending',
+    toStatus: toLearnerMerchOrderDbStatus('pending'),
   });
 };
 
@@ -380,8 +516,8 @@ export const updateLearnerMerchOrder = async (payload: UpdateLearnerMerchOrderPa
   const orderResult = await applyLearnerFilter(
     supabase
       .from('merch_orders')
-      .eq('order_kind', 'merch')
       .select('id, order_source, merch_order_items(quantity, selected_size, merch_products(id, name, is_preorder, pre_order_cutoff_date, merch_order_periods(end_date)))')
+      .eq('order_kind', 'merch')
       .eq('id', payload.orderId)
       .limit(1)
       .maybeSingle(),
@@ -423,11 +559,11 @@ export const updateLearnerMerchOrder = async (payload: UpdateLearnerMerchOrderPa
 
   const { error: orderError } = await supabase
     .from('merch_orders')
-    .eq('order_kind', 'merch')
     .update({
       notes: payload.notes.trim() || null,
       updated_at: new Date().toISOString(),
     })
+    .eq('order_kind', 'merch')
     .eq('id', payload.orderId);
   if (orderError) throw new Error('Unable to update order details.');
 
@@ -436,7 +572,7 @@ export const updateLearnerMerchOrder = async (payload: UpdateLearnerMerchOrderPa
     notes: 'Order updated from School Portal merch service.',
     orderId: payload.orderId,
     source: 'learner_portal',
-    toStatus: 'Pending',
+    toStatus: toLearnerMerchOrderDbStatus('pending'),
   });
 };
 
@@ -456,8 +592,8 @@ export const deleteLearnerMerchOrder = async (payload: DeleteLearnerMerchOrderPa
   const existing = await applyLearnerFilter(
     supabase
       .from('merch_orders')
-      .eq('order_kind', 'merch')
       .select('id, order_source')
+      .eq('order_kind', 'merch')
       .eq('id', payload.orderId)
       .limit(1)
       .maybeSingle(),
@@ -471,8 +607,8 @@ export const deleteLearnerMerchOrder = async (payload: DeleteLearnerMerchOrderPa
 
   const { error } = await supabase
     .from('merch_orders')
-    .eq('order_kind', 'merch')
     .delete()
+    .eq('order_kind', 'merch')
     .eq('id', payload.orderId);
   if (error) throw new Error('Unable to delete order.');
 };

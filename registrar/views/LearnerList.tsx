@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '../store';
 import { EnrollmentRecord, GradeLevel, Student } from '../types';
 import ConfirmationModal from '../components/ConfirmationModal';
@@ -24,6 +24,7 @@ const LearnerList: React.FC = () => {
   const [feedback, setFeedback] = useState<string | null>(null);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [sendingCredentialsStudent, setSendingCredentialsStudent] = useState<Student | null>(null);
+  const previousHasSearchQueryRef = useRef(false);
 
   const isLocked = activeSchoolYear.isLocked;
   const isAdviserScopedAccess =
@@ -195,37 +196,45 @@ const LearnerList: React.FC = () => {
 
   useEffect(() => {
     if (isAdviserScopedAccess) {
-      setExpandedGrades(new Set(Object.keys(visibleGroupedData)));
-      setExpandedSections(new Set(
+      const nextGrades = new Set(Object.keys(visibleGroupedData));
+      const nextSections = new Set(
         Object.entries(visibleGroupedData).flatMap(([grade, sectionsByGrade]) =>
           Object.keys(sectionsByGrade).map((sectionName) => grade + sectionName),
         ),
-      ));
+      );
+      setExpandedGrades(nextGrades);
+      setExpandedSections(nextSections);
+      previousHasSearchQueryRef.current = hasSearchQuery;
       return;
     }
-    if (!hasSearchQuery) {
+
+    if (hasSearchQuery) {
+      const nextGrades = new Set<string>();
+      const nextSections = new Set<string>();
+
+      Object.entries(groupedData).forEach(([grade, sectionsByGrade]) => {
+        const hasMatchingStudents = Object.values(sectionsByGrade).some((entry) => entry.students.length > 0);
+        if (!hasMatchingStudents) return;
+
+        nextGrades.add(grade);
+        Object.entries(sectionsByGrade).forEach(([sectionName, entry]) => {
+          if (entry.students.length > 0) {
+            nextSections.add(grade + sectionName);
+          }
+        });
+      });
+
+      setExpandedGrades(nextGrades);
+      setExpandedSections(nextSections);
+      previousHasSearchQueryRef.current = true;
+      return;
+    }
+
+    if (previousHasSearchQueryRef.current) {
       setExpandedGrades(new Set());
       setExpandedSections(new Set());
-      return;
     }
-
-    const nextGrades = new Set<string>();
-    const nextSections = new Set<string>();
-
-    Object.entries(groupedData).forEach(([grade, sectionsByGrade]) => {
-      const hasMatchingStudents = Object.values(sectionsByGrade).some((entry) => entry.students.length > 0);
-      if (!hasMatchingStudents) return;
-
-      nextGrades.add(grade);
-      Object.entries(sectionsByGrade).forEach(([sectionName, entry]) => {
-        if (entry.students.length > 0) {
-          nextSections.add(grade + sectionName);
-        }
-      });
-    });
-
-    setExpandedGrades(nextGrades);
-    setExpandedSections(nextSections);
+    previousHasSearchQueryRef.current = false;
   }, [groupedData, hasSearchQuery, isAdviserScopedAccess, visibleGroupedData]);
 
   useEffect(() => {

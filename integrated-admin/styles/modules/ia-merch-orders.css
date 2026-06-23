@@ -1,4 +1,13 @@
-﻿.integrated-admin-merch-order-manual {
+﻿.integrated-admin-function__header {
+  margin-bottom: 12px;
+  border: 1px solid rgba(0, 56, 168, 0.16);
+  border-bottom: 3px solid var(--deped-blue);
+  border-radius: 6px;
+  background: #f7fbff;
+  padding: 14px 16px;
+}
+
+.integrated-admin-merch-order-manual {
   display: grid;
   gap: 10px;
   margin-bottom: 12px;
@@ -84,13 +93,202 @@
   height: 64px;
 }
 
+.integrated-admin-merch-orders__header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+}
+
+.integrated-admin-merch-orders__header-copy {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.integrated-admin-merch-orders__header-copy h2 {
+  margin: 0;
+  color: var(--deped-blue);
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.08;
+}
+
+.integrated-admin-merch-orders__header-copy p {
+  margin: 0;
+  color: var(--deped-muted);
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.45;
+}
+
+.integrated-admin-merch-orders__sync-stack {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid rgba(0, 56, 168, 0.12);
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.integrated-admin-merch-orders__sync-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--deped-muted);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.35;
+}
+
+.integrated-admin-merch-orders__sync-divider {
+  color: #7d8ca8;
+}
+
+.integrated-admin-merch-orders__sync-note {
+  margin: 0;
+  color: var(--deped-muted);
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.integrated-admin-merch-orders__header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: flex-end;
+  padding-top: 2px;
+}
+
 .integrated-admin-merch-orders-cache-note {
   margin: 10px 0 0;
   color: var(--deped-muted);
   font-size: 13px;
 }
 
+.integrated-admin-merch-orders-sync-notes {
+  display: grid;
+  gap: 4px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid rgba(0, 56, 168, 0.16);
+  border-radius: 6px;
+  background: #f7faff;
+}
+
+.integrated-admin-merch-orders-sync-notes .integrated-admin-merch-orders-cache-note {
+  margin: 0;
+}
+
+.integrated-admin-workbook-review-modal__summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.integrated-admin-workbook-review-modal__stat {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid var(--deped-line);
+  border-radius: 6px;
+  background: #f9fbff;
+}
+
+.integrated-admin-workbook-review-modal__stat span {
+  color: var(--deped-muted);
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.integrated-admin-workbook-review-modal__stat strong {
+  color: var(--deped-blue);
+  font-size: 16px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.integrated-admin-workbook-review-modal__notice {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-left: 4px solid var(--deped-blue);
+  background: #f7faff;
+  color: var(--deped-blue);
+  border-radius: 6px;
+}
+
+.integrated-admin-workbook-review-modal__notice p {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+.integrated-admin-workbook-review-modal__issues {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+  max-height: 280px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.integrated-admin-workbook-review-modal__issue {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid var(--deped-line);
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.integrated-admin-workbook-review-modal__issue--warning {
+  border-left: 4px solid #d97706;
+}
+
+.integrated-admin-workbook-review-modal__issue--error {
+  border-left: 4px solid #c81e1e;
+}
+
+.integrated-admin-workbook-review-modal__issue-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.integrated-admin-workbook-review-modal__issue-head strong {
+  color: var(--deped-blue);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.integrated-admin-workbook-review-modal__issue-head span,
+.integrated-admin-workbook-review-modal__issue p {
+  color: var(--deped-muted);
+  font-size: 13px;
+  font-weight: 400;
+  margin: 0;
+}
+
 @media (max-width: 900px) {
+  .integrated-admin-function__header {
+    padding: 12px;
+  }
+
+  .integrated-admin-merch-orders__header-row {
+    flex-direction: column;
+  }
+
+  .integrated-admin-merch-orders__header-actions {
+    justify-content: flex-start;
+  }
+
   .integrated-admin-merch-orders-toolbar {
     flex-wrap: wrap;
   }
@@ -108,11 +306,15 @@
   .integrated-admin-merch-orders-toolbar .integrated-admin-merch-order-manual-trigger {
     margin-left: auto;
   }
+
+  .integrated-admin-workbook-review-modal__summary {
+    grid-template-columns: 1fr;
+  }
 }
 
 .integrated-admin-order-payment-toolbar {
   display: flex;
-  align-items: flex-end;
+  align-items: stretch;
   gap: 10px;
   margin-bottom: 14px;
 }
@@ -120,11 +322,32 @@
 .integrated-admin-order-payment-toolbar__search {
   flex: 1;
   min-width: 0;
+  display: flex;
+  width: 100%;
 }
 
 .integrated-admin-order-payment-toolbar__add-btn {
-  min-height: 58px;
-  height: 58px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-height: 64px;
+  height: 64px;
+  padding: 0 18px;
+  line-height: 1;
+  white-space: nowrap;
+  align-self: stretch;
+}
+
+.integrated-admin-order-payment-toolbar__search .floating-field__control {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 64px;
+  height: 64px;
+}
+
+.integrated-admin-order-payment-toolbar__search .floating-field__control input {
+  width: 100%;
 }
 
 .integrated-admin-order-payment-table-wrap {
@@ -170,7 +393,7 @@
 
 .integrated-admin-order-payment-summary {
   border: 1px solid var(--deped-line);
-  border-radius: 6px;
+  border-radius: 0.375rem;
   background: #f8fafc;
   padding: 10px 12px;
   display: grid;
@@ -186,6 +409,276 @@
 .integrated-admin-order-payment-summary span {
   color: var(--deped-muted);
   font-size: 13px;
+}
+
+.modal-record__section {
+  border: 1px solid var(--deped-line);
+  border-radius: 0.375rem;
+  background: #ffffff;
+  padding: 12px;
+}
+
+.modal-record__section--full {
+  grid-column: 1 / -1;
+}
+
+.modal-record__section--disabled {
+  background: #f6f8fb;
+  border-color: rgba(148, 163, 184, 0.32);
+  color: #475467;
+  opacity: 0.96;
+}
+
+.modal-record__section h4 {
+  margin: 0 0 10px;
+  color: var(--deped-blue);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.modal-record__summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.modal-record__meta {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  color: var(--deped-muted);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.modal-record__reference strong {
+  color: var(--deped-blue);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.modal-record__details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  align-items: center;
+  color: var(--deped-muted);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.modal-record__details span + span::before {
+  content: '•';
+  margin-right: 14px;
+  color: #98a2b3;
+}
+
+.modal-record__grid,
+.modal-record__fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  align-self: start;
+}
+
+.modal-record__field {
+  border: 1px solid rgba(0, 56, 168, 0.12);
+  border-radius: 0.375rem;
+  background: #f8fbff;
+  padding: 10px 12px;
+  display: grid;
+  gap: 4px;
+}
+
+.modal-record__field span {
+  color: var(--deped-muted);
+  font-size: 13px;
+}
+
+.modal-record__field strong {
+  color: var(--deped-blue);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+@media (max-width: 760px) {
+  .modal-record__summary {
+    grid-template-columns: 1fr;
+  }
+
+  .modal-record__meta {
+    gap: 4px;
+  }
+
+  .modal-record__details {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .modal-record__details span + span::before {
+    content: '';
+    margin-right: 0;
+  }
+}
+
+.integrated-admin-merch-order-audit {
+  display: grid;
+  gap: 8px;
+}
+
+.integrated-admin-merch-order-audit__item {
+  border: 1px solid var(--deped-line);
+  border-radius: 0.375rem;
+  background: #fbfcff;
+  padding: 10px 12px;
+  display: grid;
+  gap: 6px;
+}
+
+.integrated-admin-merch-order-audit__item--formatted {
+  gap: 5px;
+}
+
+.integrated-admin-merch-order-audit__item--split {
+  gap: 6px;
+}
+
+.integrated-admin-merch-order-audit__header-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+}
+
+.integrated-admin-merch-order-audit__entry-meta {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.integrated-admin-merch-order-audit__entry-meta strong {
+  color: var(--deped-blue);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.integrated-admin-merch-order-audit__entry-meta small,
+.integrated-admin-merch-order-audit__entry-meta span {
+  color: var(--deped-muted);
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.integrated-admin-merch-order-audit__headline {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.integrated-admin-merch-order-audit__headline strong {
+  color: var(--deped-blue);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.integrated-admin-merch-order-audit__source {
+  color: #18498f;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  text-transform: none;
+}
+
+.integrated-admin-merch-order-audit__source--amount {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.integrated-admin-merch-order-audit__amount-stack {
+  display: grid;
+  justify-items: end;
+  gap: 4px;
+  text-align: right;
+}
+
+.integrated-admin-merch-order-audit__amount-stack small {
+  color: var(--deped-muted);
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.integrated-admin-merch-order-audit__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  color: var(--deped-muted);
+  font-size: 13px;
+}
+
+.integrated-admin-merch-order-audit__meta span + span::before {
+  content: '•';
+  margin-right: 8px;
+  color: #98a2b3;
+}
+
+.integrated-admin-merch-order-audit__notes {
+  color: #344054;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.integrated-admin-merch-order-audit__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  justify-content: flex-end;
+  align-self: end;
+  width: 100%;
+  margin-top: 4px;
+}
+
+.integrated-admin-history-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0;
+  border: 1px solid rgba(0, 56, 168, 0.22);
+  border-radius: 0.375rem;
+  background: #eef4ff;
+  color: var(--deped-blue);
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease, opacity 120ms ease;
+}
+
+.integrated-admin-history-icon-btn:hover {
+  background: #e3edff;
+  border-color: rgba(0, 56, 168, 0.36);
+}
+
+.integrated-admin-history-icon-btn--danger {
+  border-color: rgba(220, 38, 38, 0.22);
+  background: #fff2f2;
+  color: #b42318;
+}
+
+.integrated-admin-history-icon-btn--danger:hover {
+  background: #ffe7e7;
+  border-color: rgba(220, 38, 38, 0.34);
+}
+
+.integrated-admin-history-icon-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.integrated-admin-history-icon-btn .material-symbols-outlined {
+  font-size: 18px;
+  line-height: 1;
 }
 
 .integrated-admin-order-source-tag {
@@ -227,26 +720,77 @@
   color: #344054;
 }
 
-.integrated-admin-order-status-tag {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 28px;
-  padding: 0 12px;
-  border-radius: 999px;
-  border: 1px solid #b7e4c7;
-  background: #ecfdf3;
-  color: #027a48;
-  font-size: 13px;
-  font-weight: 700;
-  line-height: 1;
-  white-space: nowrap;
+.integrated-admin-order-status-cell {
+  min-width: 132px;
 }
 
-.integrated-admin-order-status-tag--approved {
-  border-color: #b7e4c7;
-  background: #ecfdf3;
-  color: #027a48;
+.integrated-admin-order-status-select {
+  width: 100%;
+  min-height: 32px;
+  padding: 6px 28px 6px 10px;
+  border: 1px solid #b9c9ea;
+  border-radius: 6px;
+  background: #ffffff;
+  color: var(--deped-blue);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.2;
+  outline: none;
+  cursor: pointer;
+}
+
+.integrated-admin-order-status-select--pending {
+  border-color: #d6b94f;
+  background: #fff7d8;
+  color: #7a5b00;
+}
+
+.integrated-admin-order-status-select--confirmed {
+  border-color: #7ea6e9;
+  background: #eaf2ff;
+  color: #18498f;
+}
+
+.integrated-admin-order-status-select--released {
+  border-color: #8fd9ab;
+  background: #e8faef;
+  color: #0c6b3d;
+}
+
+.integrated-admin-order-status-select--refund {
+  border-color: #f3a3a3;
+  background: #fdecea;
+  color: #b42318;
+}
+
+.integrated-admin-order-status-select option.integrated-admin-order-status-select--pending {
+  background: #fff7d8;
+  color: #7a5b00;
+}
+
+.integrated-admin-order-status-select option.integrated-admin-order-status-select--confirmed {
+  background: #eaf2ff;
+  color: #18498f;
+}
+
+.integrated-admin-order-status-select option.integrated-admin-order-status-select--released {
+  background: #e8faef;
+  color: #0c6b3d;
+}
+
+.integrated-admin-order-status-select option.integrated-admin-order-status-select--refund {
+  background: #fdecea;
+  color: #b42318;
+}
+
+.integrated-admin-order-status-select:focus {
+  border-color: #2f6bdb;
+  box-shadow: 0 0 0 3px rgba(47, 107, 219, 0.15);
+}
+
+.integrated-admin-order-status-select:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
 }
 
 .integrated-admin-order-payment-summary--metrics {
@@ -269,7 +813,7 @@
 
 .integrated-admin-order-payment-summary__metric {
   border: 1px solid rgba(0, 56, 168, 0.22);
-  border-radius: 6px;
+  border-radius: 0.375rem;
   border-top: 3px solid var(--deped-blue);
   background: #f7faff;
   padding: 9px 10px;
@@ -292,8 +836,44 @@
   gap: 10px;
   padding: 12px;
   border: 1px solid var(--deped-line);
-  border-radius: 6px;
+  border-radius: 0.375rem;
   background: #fcfdff;
+}
+
+.integrated-admin-payment-form__heading-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.integrated-admin-payment-form__heading-row h4 {
+  margin: 0;
+  padding-top: 4px;
+}
+
+.integrated-admin-payment-form__row {
+  display: grid;
+  gap: 10px;
+}
+
+.integrated-admin-payment-form__field {
+  min-width: 0;
+}
+
+.integrated-admin-payment-form__field--heading {
+  width: min(260px, 100%);
+  margin: 0;
+}
+
+.integrated-admin-payment-form__field--amount .floating-field__control input {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.integrated-admin-payment-form__field--amount .floating-field__control span {
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .integrated-admin-payment-form__title {
@@ -304,13 +884,20 @@
 
 .integrated-admin-payment-form__intro {
   border: 1px solid rgba(0, 56, 168, 0.18);
-  border-radius: 6px;
+  border-radius: 0.375rem;
   border-left: 4px solid var(--deped-blue);
   background: #f3f8ff;
   padding: 9px 12px;
   display: grid;
   gap: 1px;
   margin: 0;
+}
+
+.integrated-admin-payment-form__intro--disabled {
+  border-color: rgba(148, 163, 184, 0.35);
+  border-left-color: #94a3b8;
+  background: #f4f6f8;
+  color: #475467;
 }
 
 .integrated-admin-payment-form__intro strong {
@@ -332,11 +919,43 @@
   font-weight: 600;
 }
 
+.integrated-admin-payment-form__save-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.integrated-admin-payment-form__saving-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.45);
+  border-top-color: #fff;
+  border-radius: 999px;
+  animation: integrated-admin-payment-form__spin 0.8s linear infinite;
+}
+
+@keyframes integrated-admin-payment-form__spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 760px) {
+  .integrated-admin-payment-form__heading-row {
+    flex-direction: column;
+  }
+
+  .integrated-admin-payment-form__field--heading {
+    width: 100%;
+  }
+}
+
 .integrated-admin-order-payment-glance {
   margin: 0 0 8px;
   padding: 10px 12px;
   border: 1px solid rgba(0, 56, 168, 0.16);
-  border-radius: 6px;
+  border-radius: 0.375rem;
   background: #f7faff;
   display: grid;
   gap: 10px;
@@ -397,21 +1016,9 @@
 }
 
 .integrated-admin-order-detail-status-select {
+  width: 100%;
   min-width: 0;
-  max-width: none;
-}
-
-.integrated-admin-order-detail-status-title {
-  color: var(--deped-ink);
-  font-size: 13px;
-  font-weight: 700;
-  line-height: 1.2;
-  white-space: nowrap;
-}
-
-.integrated-admin-order-detail-status-select .floating-field__control input {
-  border-top-right-radius: 6px;
-  border-bottom-right-radius: 6px;
+  min-height: 42px;
 }
 
 .integrated-admin-order-detail-status-save {
@@ -529,15 +1136,28 @@
 }
 
 .integrated-admin-merch-group__summary {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
   list-style: none;
   cursor: pointer;
-  padding: 10px 12px;
+  padding: 8px 12px;
   border-bottom: 1px solid transparent;
   background: #f7faff;
+}
+
+.integrated-admin-merch-group__chevron {
+  color: var(--deped-blue);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+  transition: transform 0.18s ease;
+  align-self: center;
+}
+
+.integrated-admin-merch-group[open] .integrated-admin-merch-group__chevron {
+  transform: rotate(180deg);
 }
 
 .integrated-admin-merch-group__summary::-webkit-details-marker {
@@ -546,6 +1166,118 @@
 
 .integrated-admin-merch-group[open] .integrated-admin-merch-group__summary {
   border-bottom-color: var(--deped-line);
+}
+
+.integrated-admin-merch-learner-group__identity {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  justify-self: start;
+  text-align: left;
+}
+
+.integrated-admin-merch-learner-group__identity-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.integrated-admin-merch-learner-group__summary-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.integrated-admin-merch-learner-group__meta {
+  color: var(--deped-muted);
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.integrated-admin-merch-learner-group__summary-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-self: end;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.integrated-admin-merch-learner-group__summary-stats {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+  min-width: 0;
+}
+
+.integrated-admin-merch-learner-group__total {
+  color: var(--deped-blue);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.integrated-admin-merch-learner-group__summary-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.integrated-admin-merch-learner-group__outstanding {
+  color: #0c6b3d;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.integrated-admin-merch-learner-group__payment-btn {
+  min-height: 30px;
+  height: 30px;
+  padding: 0 12px;
+}
+
+.integrated-admin-merch-learner-group__print-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  min-width: 30px;
+  height: 30px;
+  min-height: 30px;
+  padding: 0;
+  border: 1px solid rgba(0, 56, 168, 0.22);
+  border-radius: 0.375rem;
+  background: #eef4ff;
+  color: var(--deped-blue);
+}
+
+.integrated-admin-merch-learner-group__print-btn:hover {
+  background: #e3edff;
+}
+
+.integrated-admin-merch-learner-group__print-btn .merch-receipt-action__content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  width: 100%;
+}
+
+.integrated-admin-merch-learner-group__print-btn .material-symbols-outlined {
+  display: block;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.integrated-admin-merch-learner-group__payment-btn:disabled,
+.integrated-admin-merch-group__table .integrated-admin-merch-group__payment-btn:disabled {
+  background: #e5e7eb;
+  border-color: #cbd5e1;
+  color: #64748b;
+  box-shadow: none;
+  cursor: not-allowed;
+  opacity: 1;
 }
 
 .integrated-admin-merch-group__title {
@@ -562,6 +1294,57 @@
 
 .integrated-admin-merch-group__table {
   border-top: 0;
+  border-radius: 0 !important;
+  overflow: hidden;
+}
+
+.integrated-admin-merch-group__table thead th {
+  padding-top: 9px;
+  padding-bottom: 9px;
+}
+
+.integrated-admin-merch-group__table tbody td {
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+.integrated-admin-merch-group__amount-stack {
+  display: grid;
+  gap: 2px;
+}
+
+.integrated-admin-merch-group__amount-stack strong {
+  color: var(--deped-blue);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.integrated-admin-merch-group__amount-stack small {
+  color: var(--deped-muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.integrated-admin-merch-group__table .integrated-admin-order-status-select {
+  min-height: 30px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+.integrated-admin-merch-group__table .integrated-admin-order-source-tag {
+  min-height: 22px;
+}
+
+.integrated-admin-merch-group__table .registry-icon-btn {
+  min-height: 30px;
+  width: 30px;
+  height: 30px;
+}
+
+.integrated-admin-merch-group__table .integrated-admin-merch-group__payment-btn {
+  min-height: 30px;
+  height: 30px;
+  padding: 0 12px;
 }
 
 .integrated-admin-merch-order-row {
@@ -574,5 +1357,58 @@
 
 .integrated-admin-merch-order-row:hover td:first-child {
   box-shadow: inset 3px 0 0 #1d4fa8;
+}
+
+.integrated-admin-merch-order-row--status-pending td {
+  background: #fffdf3;
+}
+
+.integrated-admin-merch-order-row--status-confirmed td {
+  background: #f3f8ff;
+}
+
+.integrated-admin-merch-order-row--status-released td {
+  background: #f2fbf5;
+}
+
+.integrated-admin-merch-order-row--status-refund td {
+  background: #fff5f5;
+}
+
+.integrated-admin-order-status-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.integrated-admin-order-status-tag--pending {
+  border: 1px solid #f0c766;
+  background: #fff6d9;
+  color: #946200;
+}
+
+.integrated-admin-order-status-tag--confirmed {
+  border: 1px solid #95b8ee;
+  background: #e9f2ff;
+  color: #18498f;
+}
+
+.integrated-admin-order-status-tag--released {
+  border: 1px solid #8fd9ab;
+  background: #e8faef;
+  color: #0c6b3d;
+}
+
+.integrated-admin-order-status-tag--refund {
+  border: 1px solid #f0b4b4;
+  background: #fff1f1;
+  color: #b42318;
 }
 

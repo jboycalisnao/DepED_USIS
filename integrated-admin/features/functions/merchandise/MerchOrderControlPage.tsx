@@ -1,10 +1,17 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { UsisAlertModal } from '../../../../common/components/UsisAlertModal';
 import { UsisGradeSectionList, type UsisGradeSectionListGrade } from '../../../../common/components/ui/UsisGradeSectionList';
 import UsisPageLoader from '../../../../common/components/UsisPageLoader';
 import { ManualOrderOverrideModal } from './order-control/components/ManualOrderOverrideModal';
+import { MerchOrderWorkbookReviewModal } from './order-control/components/MerchOrderWorkbookReviewModal';
 import { OrderControlSectionTable } from './order-control/components/OrderControlSectionTable';
 import { OrderDetailAuditModal } from './order-control/components/OrderDetailAuditModal';
+import {
+  downloadMerchOrdersWorkbook,
+  reviewMerchOrdersWorkbook,
+  type MerchOrderWorkbookReview,
+} from './order-control/utils/merchOrdersWorkbook';
+import { MERCH_ORDER_STATUS_OPTIONS, normalizeMerchOrderStatus } from './order-control/utils/orderStatus';
 import { loadCachedMerchOrdersPageSnapshot, saveCachedMerchOrdersPageSnapshot } from './utils/merchOrdersPageCache';
 import {
   createManualMerchOrder,
@@ -13,6 +20,7 @@ import {
   loadMerchOrderAuditTrail,
   loadMerchOrderControlRecords,
   loadPublishedMerchProducts,
+  hydrateMerchOrderLearnerNames,
   updateMerchOrderStatus,
   type MerchActiveLearnerOption,
   type MerchOrderAuditRecord,
@@ -20,13 +28,24 @@ import {
   type MerchProductOption,
 } from './services/merchOrderControlService';
 
-const STATUS_OPTIONS = ['Pending', 'Approved', 'Rejected', 'Fulfilled'];
 const parseGradeSortValue = (grade: string) => {
   const match = grade.match(/\d+/);
   return match ? Number(match[0]) : Number.POSITIVE_INFINITY;
 };
+const formatDateTime = (value: string) => {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  const parsed = new Date(raw);
+  return Number.isNaN(parsed.getTime()) ? raw : parsed.toLocaleString();
+};
+
+const normalizeOrderRecord = (record: MerchOrderControlRecord): MerchOrderControlRecord => ({
+  ...record,
+  orderStatus: normalizeMerchOrderStatus(record.orderStatus),
+});
 
 export function MerchOrderControlPage() {
+  const uploadInputRef = useRef<HTMLInputElement | null>(null);
   const [records, setRecords] = useState<MerchOrderControlRecord[]>([]);
   const [learners, setLearners] = useState<MerchActiveLearnerOption[]>([]);
   const [products, setProducts] = useState<MerchProductOption[]>([]);
@@ -45,24 +64,51 @@ export function MerchOrderControlPage() {
   const [isAuditLoading, setIsAuditLoading] = useState(false);
   const [detailStatusValue, setDetailStatusValue] = useState('');
   const [orderSearch, setOrderSearch] = useState('');
-  const [lastSyncedAt, setLastSyncedAt] = useState('');
+  const [lastLoadedFromDbAt, setLastLoadedFromDbAt] = useState('');
+  const [lastLoadedFromCacheAt, setLastLoadedFromCacheAt] = useState('');
+  const [bootedFromCache, setBootedFromCache] = useState(false);
+  const [isExportingWorkbook, setIsExportingWorkbook] = useState(false);
+  const [isImportingWorkbook, setIsImportingWorkbook] = useState(false);
+  const [pendingWorkbookReview, setPendingWorkbookReview] = useState<MerchOrderWorkbookReview | null>(null);
   const [alert, setAlert] = useState<{ title: string; message: string; tone: 'success' | 'danger' } | null>(null);
 
-  const hydrateFromCache = async () => {
+  const bootstrapFromCacheOrDatabase = async () => {
     setIsLoading(true);
     try {
       const cached = await loadCachedMerchOrdersPageSnapshot();
       if (cached) {
-        setRecords(cached.records || []);
-        setLearners(cached.learners || []);
+        const cacheLoadedAt = new Date().toISOString();
+        const cachedLearners = cached.learners || [];
+        setRecords(hydrateMerchOrderLearnerNames((cached.records || []).map(normalizeOrderRecord), cachedLearners));
+        setLearners(cachedLearners);
         setProducts(cached.products || []);
-        setLastSyncedAt(cached.updatedAt || '');
+        setLastLoadedFromDbAt(cached.lastLoadedFromDbAt || '');
+        setLastLoadedFromCacheAt(cacheLoadedAt);
+        setBootedFromCache(true);
         if (!selectedProductId && (cached.products || []).length > 0) {
           setSelectedProductId(cached.products[0].id);
         }
+        return;
       }
+
+      const [rows, activeLearners, merchProducts] = await Promise.all([
+        loadMerchOrderControlRecords(),
+        loadActiveSchoolYearLearners(),
+        loadPublishedMerchProducts(),
+      ]);
+      setRecords(hydrateMerchOrderLearnerNames(rows.map(normalizeOrderRecord), activeLearners));
+      setLearners(activeLearners);
+      setProducts(merchProducts);
+      if (!selectedProductId && merchProducts.length > 0) {
+        setSelectedProductId(merchProducts[0].id);
+      }
+      const syncedAt = new Date().toISOString();
+      setLastLoadedFromDbAt(syncedAt);
+      setLastLoadedFromCacheAt('');
+      setBootedFromCache(false);
+      await saveCachedMerchOrdersPageSnapshot(rows, activeLearners, merchProducts, syncedAt);
     } catch (error) {
-      console.error('MerchOrderControlPage cache hydrate failed:', error);
+      console.error('MerchOrderControlPage bootstrap failed:', error);
     } finally {
       setIsLoading(false);
     }
@@ -77,14 +123,16 @@ export function MerchOrderControlPage() {
         loadActiveSchoolYearLearners(),
         loadPublishedMerchProducts(),
       ]);
-      setRecords(rows);
       setLearners(activeLearners);
       setProducts(merchProducts);
+      setRecords(hydrateMerchOrderLearnerNames(rows.map(normalizeOrderRecord), activeLearners));
       if (!selectedProductId && merchProducts.length > 0) {
         setSelectedProductId(merchProducts[0].id);
       }
-      setLastSyncedAt(new Date().toISOString());
-      await saveCachedMerchOrdersPageSnapshot(rows, activeLearners, merchProducts);
+      const syncedAt = new Date().toISOString();
+      setLastLoadedFromDbAt(syncedAt);
+      await saveCachedMerchOrdersPageSnapshot(rows, activeLearners, merchProducts, syncedAt);
+      setBootedFromCache(false);
       if (!silent) {
         setAlert({ title: 'Refresh Complete', message: 'Merch orders were reloaded from the database and saved locally.', tone: 'success' });
       }
@@ -97,7 +145,7 @@ export function MerchOrderControlPage() {
   };
 
   useEffect(() => {
-    void hydrateFromCache();
+    void bootstrapFromCacheOrDatabase();
   }, []);
 
   useEffect(() => {
@@ -110,7 +158,14 @@ export function MerchOrderControlPage() {
     setIsSaving(true);
     try {
       await updateMerchOrderStatus(orderId, value);
-      await refresh({ silent: true });
+      const nextStatus = normalizeMerchOrderStatus(value);
+      const nextRecords = hydrateMerchOrderLearnerNames(
+        records.map((entry) => (entry.id === orderId ? { ...entry, orderStatus: nextStatus } : entry)),
+        learners,
+      );
+      setRecords(nextRecords);
+      await saveCachedMerchOrdersPageSnapshot(nextRecords, learners, products, lastLoadedFromDbAt);
+      setSelectedOrderDetail((current) => (current && current.id === orderId ? { ...current, orderStatus: nextStatus } : current));
       setAlert({ title: 'Saved', message: 'Order status updated.', tone: 'success' });
     } catch (error: any) {
       setAlert({ title: 'Save Failed', message: error?.message || 'Unable to update order status.', tone: 'danger' });
@@ -121,7 +176,7 @@ export function MerchOrderControlPage() {
 
   const handleDetailStatusSave = async () => {
     if (!selectedOrderDetail) return;
-    const nextStatus = detailStatusValue.trim();
+    const nextStatus = normalizeMerchOrderStatus(detailStatusValue);
     if (!nextStatus || nextStatus === selectedOrderDetail.orderStatus) return;
 
     setIsSaving(true);
@@ -129,10 +184,25 @@ export function MerchOrderControlPage() {
       await updateMerchOrderStatus(selectedOrderDetail.id, nextStatus, {
         auditNote: `Manual status change from Merch Order Details. Updated to ${nextStatus}.`,
       });
-      const logs = await loadMerchOrderAuditTrail(selectedOrderDetail.id);
-      setSelectedOrderAudit(logs);
+      const nextRecords = hydrateMerchOrderLearnerNames(
+        records.map((entry) => (entry.id === selectedOrderDetail.id ? { ...entry, orderStatus: nextStatus } : entry)),
+        learners,
+      );
+      setRecords(nextRecords);
+      await saveCachedMerchOrdersPageSnapshot(nextRecords, learners, products, lastLoadedFromDbAt);
+      setSelectedOrderAudit((current) => [
+        {
+          changedBy: 'Integrated Admin',
+          createdAt: new Date().toISOString(),
+          fromStatus: selectedOrderDetail.orderStatus,
+          notes: 'Manual status change from Merch Order Details.',
+          source: 'integrated_admin',
+          toStatus: nextStatus,
+        },
+        ...current,
+      ]);
       setSelectedOrderDetail((current) => (current ? { ...current, orderStatus: nextStatus } : current));
-      await refresh({ silent: true });
+      setDetailStatusValue(nextStatus);
       setAlert({ title: 'Saved', message: 'Order status updated.', tone: 'success' });
     } catch (error: any) {
       setAlert({ title: 'Save Failed', message: error?.message || 'Unable to update order status.', tone: 'danger' });
@@ -205,8 +275,9 @@ export function MerchOrderControlPage() {
               onDeleteOrder={(orderId) => void handleDeleteOrder(orderId)}
               onOpenOrderDetails={(row) => void openOrderDetails(row)}
               onStatusChange={(orderId, value) => void handleStatusChange(orderId, value)}
+              learners={learners}
               rows={sectionRows}
-              statusOptions={STATUS_OPTIONS}
+              statusOptions={MERCH_ORDER_STATUS_OPTIONS}
             />
           ),
           count: sectionRows.length,
@@ -224,7 +295,7 @@ export function MerchOrderControlPage() {
 
     setIsSaving(true);
     try {
-      await createManualMerchOrder({
+      const createdOrder = await createManualMerchOrder({
         learnerId: selectedLearner.id,
         learnerLrn: selectedLearner.lrn,
         learnerName: selectedLearner.name,
@@ -233,17 +304,131 @@ export function MerchOrderControlPage() {
         quantity: Math.max(1, Number(quantity || 1)),
         selectedSize,
       });
+      const now = createdOrder.createdAt || new Date().toISOString();
+      const quantityValue = Math.max(1, Number(quantity || 1));
+      const productPrice = Math.max(0, Number(selectedProduct.price || 0));
+      const nextRecord: MerchOrderControlRecord = {
+        createdAt: now,
+        gradeLevel: selectedLearner.gradeLevel || 'Unassigned',
+        id: createdOrder.orderId,
+        learnerId: selectedLearner.id,
+        learnerLrn: selectedLearner.lrn,
+        learnerName: selectedLearner.name,
+        notes: manualNotes.trim(),
+        orderStatus: 'pending',
+        orderAmount: productPrice * quantityValue,
+        orderPeriodLabel: createdOrder.orderPeriodLabel || '',
+        orderSource: 'integrated_admin',
+        productName: selectedProduct.name,
+        quantity: quantityValue,
+        referenceNo: createdOrder.referenceNo,
+        sectionName: selectedLearner.sectionName || 'Unassigned',
+        selectedSize: selectedSize.trim(),
+        unitPrice: productPrice,
+      };
+      const nextRecords = [nextRecord, ...records.filter((row) => row.id !== nextRecord.id)];
+      setRecords(nextRecords);
+      await saveCachedMerchOrdersPageSnapshot(nextRecords, learners, products, lastLoadedFromDbAt);
       setSelectedLearnerId('');
       setLearnerSearch('');
       setManualNotes('');
       setQuantity('1');
       setIsManualModalOpen(false);
-      await refresh({ silent: true });
       setAlert({ title: 'Saved', message: 'Manual merch order added.', tone: 'success' });
     } catch (error: any) {
       setAlert({ title: 'Save Failed', message: error?.message || 'Unable to add manual order.', tone: 'danger' });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleDownloadWorkbook = async () => {
+    if (records.length === 0) {
+      setAlert({ title: 'Export Failed', message: 'No merch orders are available for export.', tone: 'danger' });
+      return;
+    }
+    setIsExportingWorkbook(true);
+    try {
+      await downloadMerchOrdersWorkbook(records, 'Merch Orders');
+      setAlert({ title: 'Export Complete', message: 'Merch orders workbook has been downloaded.', tone: 'success' });
+    } catch (error: any) {
+      setAlert({ title: 'Export Failed', message: error?.message || 'Unable to export merch orders.', tone: 'danger' });
+    } finally {
+      setIsExportingWorkbook(false);
+    }
+  };
+
+  const handleUploadWorkbook = () => {
+    uploadInputRef.current?.click();
+  };
+
+  const handleWorkbookFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] || null;
+    event.target.value = '';
+    if (!file) return;
+
+    setIsImportingWorkbook(true);
+    try {
+      const review = await reviewMerchOrdersWorkbook(file, records);
+      setPendingWorkbookReview(review);
+    } catch (error: any) {
+      setAlert({ title: 'Import Failed', message: error?.message || 'Unable to sync statuses from workbook.', tone: 'danger' });
+    } finally {
+      setIsImportingWorkbook(false);
+    }
+  };
+
+  const handleConfirmWorkbookImport = async () => {
+    if (!pendingWorkbookReview) return;
+
+    if (pendingWorkbookReview.patches.length === 0) {
+      setAlert({
+        title: 'Import Review',
+        message: 'No valid status changes were found in the uploaded workbook.',
+        tone: 'danger',
+      });
+      setPendingWorkbookReview(null);
+      return;
+    }
+
+    setIsImportingWorkbook(true);
+    try {
+      const nextRecords = records.map((row) => ({ ...row }));
+      let changedCount = 0;
+
+      for (const patch of pendingWorkbookReview.patches) {
+        const normalizedStatus = normalizeMerchOrderStatus(patch.orderStatus);
+        const match = nextRecords.find((row) => row.id === patch.orderId || row.referenceNo === patch.referenceNo);
+        if (!match) continue;
+        if (normalizeMerchOrderStatus(match.orderStatus) === normalizedStatus) continue;
+        await updateMerchOrderStatus(match.id, normalizedStatus);
+        match.orderStatus = normalizedStatus;
+        changedCount += 1;
+      }
+
+      if (changedCount === 0) {
+        setAlert({
+          title: 'Import Complete',
+          message: 'The uploaded workbook did not change any order statuses.',
+          tone: 'success',
+        });
+        setPendingWorkbookReview(null);
+        return;
+      }
+
+      const syncedRecords = hydrateMerchOrderLearnerNames(nextRecords.map(normalizeOrderRecord), learners);
+      setRecords(syncedRecords);
+      await saveCachedMerchOrdersPageSnapshot(syncedRecords, learners, products, lastLoadedFromDbAt);
+      setPendingWorkbookReview(null);
+      setAlert({
+        title: 'Import Complete',
+        message: `${changedCount} order status${changedCount === 1 ? '' : 'es'} synced from the workbook.`,
+        tone: 'success',
+      });
+    } catch (error: any) {
+      setAlert({ title: 'Import Failed', message: error?.message || 'Unable to sync statuses from workbook.', tone: 'danger' });
+    } finally {
+      setIsImportingWorkbook(false);
     }
   };
 
@@ -262,7 +447,7 @@ export function MerchOrderControlPage() {
 
   const openOrderDetails = async (row: MerchOrderControlRecord) => {
     setSelectedOrderDetail(row);
-    setDetailStatusValue(row.orderStatus);
+    setDetailStatusValue(normalizeMerchOrderStatus(row.orderStatus));
     setSelectedOrderAudit([]);
     setIsAuditLoading(true);
     try {
@@ -282,7 +467,71 @@ export function MerchOrderControlPage() {
   return (
     <section className="section-shell integrated-admin-function">
       <div className="integrated-admin-function__header">
-        <h2>Orders</h2>
+        <div className="integrated-admin-merch-orders__header-row">
+          <div className="integrated-admin-merch-orders__header-copy">
+            <h2>Orders</h2>
+            <p>Merchandise orders received through the learner portal and manual Integrated Admin entries.</p>
+            <div className="integrated-admin-merch-orders__sync-stack">
+              <p className="integrated-admin-merch-orders__sync-line">
+                <span>Last loaded from database: {formatDateTime(lastLoadedFromDbAt) || 'Not yet loaded from database'}</span>
+                <span className="integrated-admin-merch-orders__sync-divider" aria-hidden="true">|</span>
+                <span>Last loaded from cache: {formatDateTime(lastLoadedFromCacheAt) || 'Not yet loaded from cache'}</span>
+              </p>
+              {bootedFromCache ? (
+                <p className="integrated-admin-merch-orders__sync-note">
+                  Use Refresh to fetch the latest records from the database.
+                </p>
+              ) : null}
+              {isLoading ? (
+                <p className="integrated-admin-merch-orders__sync-note">
+                  Loading orders in the background...
+                </p>
+              ) : null}
+            </div>
+          </div>
+          <div className="integrated-admin-merch-orders__header-actions">
+            <button
+              className="secondary-button"
+              onClick={() => void refresh()}
+              type="button"
+              disabled={isRefreshing || isLoading}
+            >
+              {isRefreshing ? 'Refreshing...' : 'Refresh'}
+            </button>
+            <button
+              className="primary-button"
+              onClick={() => setIsManualModalOpen(true)}
+              type="button"
+              disabled={isRefreshing}
+            >
+              Manual Learner Order Override
+            </button>
+            <button
+              className="secondary-button"
+              onClick={() => void handleDownloadWorkbook()}
+              type="button"
+              disabled={isExportingWorkbook || isImportingWorkbook}
+            >
+              {isExportingWorkbook ? 'Downloading...' : 'Download Excel'}
+            </button>
+            <button
+              className="secondary-button"
+              onClick={handleUploadWorkbook}
+              type="button"
+              disabled={isExportingWorkbook || isImportingWorkbook}
+            >
+              {isImportingWorkbook ? 'Uploading...' : 'Upload Excel'}
+            </button>
+          </div>
+        </div>
+        <input
+          ref={uploadInputRef}
+          accept=".xlsx,.xls"
+          aria-hidden="true"
+          onChange={(event) => void handleWorkbookFileChange(event)}
+          style={{ display: 'none' }}
+          type="file"
+        />
       </div>
       <article className="section-card integrated-admin-merch-control">
         <div className="section-card__bar" />
@@ -303,30 +552,7 @@ export function MerchOrderControlPage() {
                 </div>
               </div>
             </div>
-            <div className="integrated-admin-merch-order-manual-trigger">
-              <button
-                className="secondary-button"
-                onClick={() => void refresh()}
-                type="button"
-                disabled={isRefreshing || isLoading}
-              >
-                {isRefreshing ? 'Refreshing...' : 'Refresh'}
-              </button>
-              <button
-                className="primary-button"
-                onClick={() => setIsManualModalOpen(true)}
-                type="button"
-                disabled={isRefreshing}
-              >
-                Manual Learner Order Override
-              </button>
-            </div>
           </div>
-          {lastSyncedAt ? (
-            <p className="integrated-admin-merch-orders-cache-note">
-              Last synced: {new Date(lastSyncedAt).toLocaleString()}
-            </p>
-          ) : null}
           <UsisGradeSectionList
             className="integrated-admin-merch-groups"
             emptyMessage={records.length === 0
@@ -369,7 +595,14 @@ export function MerchOrderControlPage() {
         order={selectedOrderDetail}
         orderStatusValue={detailStatusValue}
         orderAudit={selectedOrderAudit}
-        statusOptions={STATUS_OPTIONS}
+        statusOptions={MERCH_ORDER_STATUS_OPTIONS}
+      />
+      <MerchOrderWorkbookReviewModal
+        isOpen={Boolean(pendingWorkbookReview)}
+        isProcessing={isImportingWorkbook}
+        onClose={() => setPendingWorkbookReview(null)}
+        onConfirm={() => void handleConfirmWorkbookImport()}
+        review={pendingWorkbookReview}
       />
       <UsisAlertModal
         open={Boolean(alert)}

@@ -1,5 +1,9 @@
 import { useMemo } from 'react';
-import type { LearnerMerchOrderRecord } from '../../../../services/learnerMerchService';
+import {
+  getLearnerMerchOrderStatusClass,
+  getLearnerMerchOrderStatusLabel,
+  type LearnerMerchOrderRecord,
+} from '../../../../services/learnerMerchService';
 import type { MerchControlSectionLearnerRecord } from '../../../../services/learnerMerchControlService';
 
 type Props = {
@@ -73,7 +77,11 @@ export function MerchControlOrderDetailsModal({ learner, orders, isLoadingDetail
                             <td>{order.referenceNo || '-'}</td>
                             <td>{order.productName}</td>
                             <td>{order.quantity} {order.selectedSize ? `- ${order.selectedSize}` : '- No size'}</td>
-                            <td>{order.orderStatus}</td>
+                            <td>
+                              <span className={`learner-merch-status-chip ${getLearnerMerchOrderStatusClass(order.orderStatus)}`}>
+                                {getLearnerMerchOrderStatusLabel(order.orderStatus)}
+                              </span>
+                            </td>
                             <td>
                               <span className={`learner-merch-order-source learner-merch-order-source--${order.orderSource}`}>
                                 {order.orderSource === 'integrated_admin' ? 'IA Override' : order.orderSource === 'learner_portal' ? 'School Portal' : 'Unknown'}

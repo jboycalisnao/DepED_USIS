@@ -1,9 +1,11 @@
 import { supabase } from '../../../../../packages/shared-supabase/src';
+import { normalizeMerchOrderStatus, toMerchOrderDbStatus } from '../order-control/utils/orderStatus';
 
 export type MerchOrderControlRecord = {
   createdAt: string;
   gradeLevel: string;
   id: string;
+  learnerId: string;
   learnerLrn: string;
   learnerName: string;
   notes: string;
@@ -27,9 +29,97 @@ type LearnerSectionInfo = {
 export type MerchActiveLearnerOption = {
   id: string;
   label: string;
+  gradeLevel: string;
   lrn: string;
   name: string;
+  sectionName: string;
 };
+
+export const resolveMerchLearnerDisplayName = (
+  record: Pick<MerchOrderControlRecord, 'learnerId' | 'learnerLrn' | 'learnerName'>,
+  learners: Pick<MerchActiveLearnerOption, 'id' | 'lrn' | 'name'>[] = [],
+) => {
+  const learnerId = String(record.learnerId || '').trim();
+  if (learnerId) {
+    const matchedById = learners.find((learner) => String(learner.id || '').trim() === learnerId);
+    if (matchedById?.name) return matchedById.name;
+  }
+
+  const learnerLrn = String(record.learnerLrn || '').trim();
+  if (learnerLrn) {
+    const matchedByLrn = learners.find((learner) => String(learner.lrn || '').trim() === learnerLrn);
+    if (matchedByLrn?.name) return matchedByLrn.name;
+  }
+
+  return String(record.learnerName || '').trim() || 'Unnamed Learner';
+};
+
+const normalizeLearnerMatchValue = (value: string) =>
+  String(value || '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLowerCase();
+
+export const resolveMerchLearnerProfile = (
+  record: Pick<MerchOrderControlRecord, 'learnerId' | 'learnerLrn' | 'learnerName' | 'gradeLevel' | 'sectionName'>,
+  learners: Pick<MerchActiveLearnerOption, 'id' | 'lrn' | 'name' | 'gradeLevel' | 'sectionName'>[] = [],
+) => {
+  const learnerId = String(record.learnerId || '').trim();
+  if (learnerId) {
+    const matchedById = learners.find((learner) => String(learner.id || '').trim() === learnerId);
+    if (matchedById) {
+      return {
+        gradeLevel: String(matchedById.gradeLevel || '').trim() || String(record.gradeLevel || '').trim() || 'Unassigned',
+        name: String(matchedById.name || '').trim() || String(record.learnerName || '').trim() || 'Unnamed Learner',
+        sectionName: String(matchedById.sectionName || '').trim() || String(record.sectionName || '').trim() || 'Unassigned',
+      };
+    }
+  }
+
+  const learnerLrn = String(record.learnerLrn || '').trim();
+  if (learnerLrn) {
+    const matchedByLrn = learners.find((learner) => String(learner.lrn || '').trim() === learnerLrn);
+    if (matchedByLrn) {
+      return {
+        gradeLevel: String(matchedByLrn.gradeLevel || '').trim() || String(record.gradeLevel || '').trim() || 'Unassigned',
+        name: String(matchedByLrn.name || '').trim() || String(record.learnerName || '').trim() || 'Unnamed Learner',
+        sectionName: String(matchedByLrn.sectionName || '').trim() || String(record.sectionName || '').trim() || 'Unassigned',
+      };
+    }
+  }
+
+  const learnerName = normalizeLearnerMatchValue(String(record.learnerName || ''));
+  if (learnerName) {
+    const matchedByName = learners.find((learner) => normalizeLearnerMatchValue(String(learner.name || '')) === learnerName);
+    if (matchedByName) {
+      return {
+        gradeLevel: String(matchedByName.gradeLevel || '').trim() || String(record.gradeLevel || '').trim() || 'Unassigned',
+        name: String(matchedByName.name || '').trim() || String(record.learnerName || '').trim() || 'Unnamed Learner',
+        sectionName: String(matchedByName.sectionName || '').trim() || String(record.sectionName || '').trim() || 'Unassigned',
+      };
+    }
+  }
+
+  return {
+    gradeLevel: String(record.gradeLevel || '').trim() || 'Unassigned',
+    name: String(record.learnerName || '').trim() || 'Unnamed Learner',
+    sectionName: String(record.sectionName || '').trim() || 'Unassigned',
+  };
+};
+
+export const hydrateMerchOrderLearnerNames = (
+  rows: MerchOrderControlRecord[],
+  learners: Pick<MerchActiveLearnerOption, 'id' | 'lrn' | 'name' | 'gradeLevel' | 'sectionName'>[] = [],
+) =>
+  rows.map((row) => {
+    const profile = resolveMerchLearnerProfile(row, learners);
+    return {
+      ...row,
+      gradeLevel: profile.gradeLevel,
+      learnerName: profile.name,
+      sectionName: profile.sectionName,
+    };
+  });
 
 export type MerchManualOrderPayload = {
   learnerId?: string;
@@ -39,6 +129,13 @@ export type MerchManualOrderPayload = {
   productId: string;
   quantity: number;
   selectedSize: string;
+};
+
+export type MerchManualOrderCreateResult = {
+  createdAt: string;
+  orderId: string;
+  orderPeriodLabel: string;
+  referenceNo: string;
 };
 
 export type MerchProductOption = {
@@ -135,7 +232,7 @@ const generatePaymentTransactionNo = async () => {
   throw new Error('Unable to generate unique payment transaction number.');
 };
 
-const getIntegratedAdminActorName = () => {
+export const getIntegratedAdminActorName = () => {
   if (typeof window === 'undefined') return 'Integrated Admin';
   try {
     const raw = window.sessionStorage.getItem('usis_integrated_admin_access');
@@ -181,8 +278,8 @@ const getOrderStatusSnapshot = async (orderId: string) => {
     .limit(1)
     .maybeSingle();
   if (error) throw new Error('Unable to read current order status.');
-  const status = String(data?.order_status || '').trim() || 'Pending';
-  return status;
+  const status = String(data?.order_status || '').trim() || 'pending';
+  return normalizeMerchOrderStatus(status);
 };
 
 export const loadMerchOrderControlRecords = async (): Promise<MerchOrderControlRecord[]> => {
@@ -340,10 +437,11 @@ export const loadMerchOrderControlRecords = async (): Promise<MerchOrderControlR
           createdAt: String(row.created_at || ''),
           gradeLevel: resolvedLearnerInfo.gradeLevel,
           id: String(row.id || ''),
+          learnerId: String(row.learner_id || ''),
           learnerLrn: String(row.learner_lrn || ''),
           learnerName: String(row.learner_name || ''),
           notes: String(row.notes || ''),
-          orderStatus: String(row.order_status || 'Pending'),
+          orderStatus: normalizeMerchOrderStatus(String(row.order_status || 'pending')),
           orderAmount: 0,
           orderPeriodLabel: '',
           orderSource: String(row.order_source || '') === 'integrated_admin'
@@ -367,10 +465,11 @@ export const loadMerchOrderControlRecords = async (): Promise<MerchOrderControlR
       createdAt: String(row.created_at || ''),
       gradeLevel: resolvedLearnerInfo.gradeLevel,
       id: String(row.id || ''),
+      learnerId: String(row.learner_id || ''),
       learnerLrn: String(row.learner_lrn || ''),
       learnerName: String(row.learner_name || ''),
       notes: String(row.notes || ''),
-      orderStatus: String(row.order_status || 'Pending'),
+      orderStatus: normalizeMerchOrderStatus(String(row.order_status || 'pending')),
       orderAmount: Math.max(0, quantity * unitPrice),
       orderPeriodLabel: String(item?.merch_products?.merch_order_periods?.label || ''),
       orderSource: String(row.order_source || '') === 'integrated_admin'
@@ -396,29 +495,32 @@ export const updateMerchOrderStatus = async (
 ) => {
   const currentStatusResult = await supabase
     .from('merch_orders')
-    .eq('order_kind', 'merch')
     .select('order_status')
+    .eq('order_kind', 'merch')
     .eq('id', orderId)
     .limit(1)
     .maybeSingle();
   if (currentStatusResult.error) throw new Error('Unable to read current order status.');
 
-  const fromStatus = String(currentStatusResult.data?.order_status || '').trim() || null;
-  if (options?.expectedFromStatus && fromStatus !== options.expectedFromStatus) {
+  const fromStatus = normalizeMerchOrderStatus(String(currentStatusResult.data?.order_status || ''));
+  const nextStatus = normalizeMerchOrderStatus(orderStatus);
+  const nextDbStatus = toMerchOrderDbStatus(nextStatus);
+  const normalizedExpectedFromStatus = options?.expectedFromStatus ? normalizeMerchOrderStatus(options.expectedFromStatus) : '';
+  if (normalizedExpectedFromStatus && fromStatus !== normalizedExpectedFromStatus) {
     throw new Error(`Order status was already updated by another user. Current status: ${fromStatus || 'Unknown'}.`);
   }
 
   let updateQuery = supabase
     .from('merch_orders')
+    .update({ order_status: nextDbStatus })
     .eq('order_kind', 'merch')
-    .update({ order_status: orderStatus })
     .eq('id', orderId);
-  if (options?.expectedFromStatus) {
-    updateQuery = updateQuery.eq('order_status', options.expectedFromStatus);
+  if (normalizedExpectedFromStatus) {
+    updateQuery = updateQuery.eq('order_status', normalizedExpectedFromStatus);
   }
   const { data: updatedRows, error } = await updateQuery.select('id');
   if (error) throw new Error('Unable to update order status.');
-  if (options?.expectedFromStatus && (!updatedRows || updatedRows.length === 0)) {
+  if (normalizedExpectedFromStatus && (!updatedRows || updatedRows.length === 0)) {
     throw new Error('Order status update conflict detected. Please refresh and retry.');
   }
 
@@ -428,7 +530,7 @@ export const updateMerchOrderStatus = async (
     notes: options?.auditNote || 'Status changed in Integrated Admin merch control.',
     orderId,
     source: 'integrated_admin',
-    toStatus: orderStatus,
+    toStatus: nextStatus,
   });
 };
 
@@ -476,6 +578,23 @@ export const loadActiveSchoolYearLearners = async (): Promise<MerchActiveLearner
   const sectionIds = (sectionsResult.data || []).map((row) => String(row.id || '')).filter(Boolean);
   if (sectionIds.length === 0) return [];
 
+  const sectionRowsResult = await supabase
+    .from('registrar_sections')
+    .select('id,name,grade_level')
+    .in('id', sectionIds);
+  if (sectionRowsResult.error) {
+    throw new Error('Unable to load active school year sections.');
+  }
+  const sectionLookup = new Map<string, LearnerSectionInfo>();
+  for (const row of sectionRowsResult.data || []) {
+    const sectionId = String((row as any).id || '').trim();
+    if (!sectionId) continue;
+    sectionLookup.set(sectionId, {
+      gradeLevel: String((row as any).grade_level || '').trim() || 'Unassigned',
+      sectionName: String((row as any).name || '').trim() || 'Unassigned',
+    });
+  }
+
   const learnersResult = await supabase
     .from('registrar_learners')
     .select('id,lrn,first_name,middle_name,last_name,section_id')
@@ -492,16 +611,22 @@ export const loadActiveSchoolYearLearners = async (): Promise<MerchActiveLearner
     const lastName = String(row.last_name || '').trim();
     const lrn = String(row.lrn || '').trim();
     const name = [lastName, firstName, middleName].filter(Boolean).join(', ').replace(', ,', ',');
+    const sectionInfo = sectionLookup.get(String(row.section_id || '').trim()) || {
+      gradeLevel: 'Unassigned',
+      sectionName: 'Unassigned',
+    };
     return {
       id: String(row.id || ''),
+      gradeLevel: sectionInfo.gradeLevel,
       label: `${name || 'Unnamed Learner'}${lrn ? ` (${lrn})` : ''}`,
       lrn,
       name: name || 'Unnamed Learner',
+      sectionName: sectionInfo.sectionName,
     } satisfies MerchActiveLearnerOption;
   });
 };
 
-export const createManualMerchOrder = async (payload: MerchManualOrderPayload) => {
+export const createManualMerchOrder = async (payload: MerchManualOrderPayload): Promise<MerchManualOrderCreateResult> => {
   const productOrderPeriod = await supabase
     .from('merch_products')
     .select('merch_order_periods(id,label)')
@@ -520,7 +645,7 @@ export const createManualMerchOrder = async (payload: MerchManualOrderPayload) =
     order_kind: 'merch',
     order_period_id: productOrderPeriod.data?.merch_order_periods?.id || null,
     notes: payload.notes.trim() || null,
-    order_status: 'Pending',
+    order_status: toMerchOrderDbStatus('pending'),
     order_source: 'integrated_admin',
   };
   if (UUID_REGEX.test(learnerIdValue)) {
@@ -528,14 +653,15 @@ export const createManualMerchOrder = async (payload: MerchManualOrderPayload) =
   }
 
   let orderResult: any = null;
+  let referenceNoUsed = '';
   for (let attempt = 0; attempt < MAX_REFERENCE_RETRY; attempt += 1) {
     const referenceNo = await generateOrderReferenceNo(orderPeriodLabel);
+    referenceNoUsed = referenceNo;
     const orderInsert = { ...orderInsertBase, reference_no: referenceNo };
     orderResult = await supabase
       .from('merch_orders')
       .insert([orderInsert])
       .select('id')
-      .eq('order_kind', 'merch')
       .single();
 
     if (!orderResult.error && orderResult.data?.id) break;
@@ -543,11 +669,11 @@ export const createManualMerchOrder = async (payload: MerchManualOrderPayload) =
     const details = String(orderResult.error?.details || '').toLowerCase();
     const missingReferenceColumn = message.includes('reference_no') || details.includes('reference_no');
     if (missingReferenceColumn) {
+      referenceNoUsed = '';
       orderResult = await supabase
         .from('merch_orders')
         .insert([orderInsertBase])
         .select('id')
-        .eq('order_kind', 'merch')
         .single();
       break;
     }
@@ -576,8 +702,15 @@ export const createManualMerchOrder = async (payload: MerchManualOrderPayload) =
     notes: 'Order created through manual IA override.',
     orderId: String(orderResult.data.id),
     source: 'integrated_admin',
-    toStatus: 'Pending',
+    toStatus: 'pending',
   });
+
+  return {
+    createdAt: new Date().toISOString(),
+    orderId: String(orderResult.data.id),
+    orderPeriodLabel,
+    referenceNo: referenceNoUsed,
+  };
 };
 
 export const deleteMerchOrderRecord = async (orderId: string) => {
@@ -649,14 +782,15 @@ export const createMerchOrderPayment = async (payload: {
   paymentMethod?: 'cash' | 'gcash' | 'bank_transfer' | 'other';
   paymentNotes?: string;
   receiptNo?: string;
-}) => {
+}): Promise<MerchOrderPaymentRecord> => {
   const fromStatus = await getOrderStatusSnapshot(payload.orderId);
   const transactionNo = await generatePaymentTransactionNo();
+  const paidAt = new Date().toISOString();
   const { error } = await supabase.from('merch_order_payments').insert([
     {
       order_id: payload.orderId,
       transaction_no: transactionNo,
-      paid_at: new Date().toISOString(),
+      paid_at: paidAt,
       payment_amount: Math.max(0, Number(payload.paymentAmount || 0)),
       payment_method: payload.paymentMethod || 'cash',
       payment_notes: payload.paymentNotes?.trim() || null,
@@ -675,6 +809,23 @@ export const createMerchOrderPayment = async (payload: {
     source: 'integrated_admin',
     toStatus: fromStatus,
   });
+
+  return {
+    createdAt: paidAt,
+    id: transactionNo,
+    orderId: payload.orderId,
+    paidAt,
+    paymentAmount: Math.max(0, Number(payload.paymentAmount || 0)),
+    paymentMethod: payload.paymentMethod || 'cash',
+    paymentNotes: payload.paymentNotes?.trim() || '',
+    paymentStatus: 'posted',
+    postedBy: getIntegratedAdminActorName(),
+    receiptNo: payload.receiptNo?.trim() || '',
+    transactionNo,
+    updatedAt: paidAt,
+    voidedAt: '',
+    voidedBy: '',
+  };
 };
 
 export const deleteLatestMerchOrderPayment = async (orderId: string) => {
@@ -706,6 +857,37 @@ export const deleteLatestMerchOrderPayment = async (orderId: string) => {
     source: 'integrated_admin',
     toStatus: fromStatus,
   });
+};
+
+export const deleteMerchOrderPayment = async (paymentId: string) => {
+  const target = await supabase
+    .from('merch_order_payments')
+    .select('id,order_id')
+    .eq('id', paymentId)
+    .limit(1)
+    .maybeSingle();
+  if (target.error || !target.data?.id || !target.data?.order_id) {
+    throw new Error('Unable to locate payment record for deletion.');
+  }
+
+  const orderId = String(target.data.order_id);
+  const fromStatus = await getOrderStatusSnapshot(orderId);
+  const { error } = await supabase
+    .from('merch_order_payments')
+    .delete()
+    .eq('id', paymentId);
+  if (error) throw new Error('Unable to delete payment record.');
+
+  await addMerchOrderAudit({
+    changedBy: getIntegratedAdminActorName(),
+    fromStatus,
+    notes: `Payment deleted (payment id: ${paymentId}).`,
+    orderId,
+    source: 'integrated_admin',
+    toStatus: fromStatus,
+  });
+
+  return orderId;
 };
 
 export const updateMerchOrderPayment = async (payload: {
@@ -806,7 +988,7 @@ export const loadMerchOrderCountsSummary = async (selectedOrderPeriod = ''): Pro
       return;
     }
 
-    const status = String(row.order_status || 'Pending').trim() || 'Pending';
+    const status = normalizeMerchOrderStatus(String(row.order_status || 'pending'));
     const sourceRaw = String(row.order_source || '').trim();
     const source = sourceRaw === 'integrated_admin'
       ? 'Integrated Admin'

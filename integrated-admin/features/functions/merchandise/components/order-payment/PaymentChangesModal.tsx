@@ -1,4 +1,22 @@
 import type { MerchOrderAuditRecord, MerchOrderControlRecord } from '../../services/merchOrderControlService';
+import { getMerchOrderStatusLabel } from '../../order-control/utils/orderStatus';
+
+const formatAuditStatusLabel = (value: string) => {
+  const label = getMerchOrderStatusLabel(value);
+  return label === 'Unknown' ? String(value || '-').trim() || 'Unknown' : label;
+};
+
+const formatAuditSourceLabel = (value: string) => {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (!normalized) return 'Unknown Source';
+  if (normalized === 'learner_portal') return 'Learner Portal';
+  if (normalized === 'integrated_admin') return 'IA Override';
+  return normalized
+    .split(/[_\s-]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+};
 
 type Props = {
   isLoading: boolean;
@@ -42,7 +60,7 @@ export function PaymentChangesModal({ isLoading, isOpen, onClose, order, rows }:
               </div>
               <div className="modal-record__field">
                 <span>Status</span>
-                <strong>{order.orderStatus || 'Pending'}</strong>
+                <strong>{getMerchOrderStatusLabel(order.orderStatus)}</strong>
               </div>
             </div>
           </section>
@@ -56,10 +74,22 @@ export function PaymentChangesModal({ isLoading, isOpen, onClose, order, rows }:
                 <p>No payment history found for this order.</p>
               ) : (
                 rows.map((log, index) => (
-                  <div key={`${log.createdAt}-${index}`} className="integrated-admin-merch-order-audit__item">
-                    <strong>{log.fromStatus ? `${log.fromStatus} -> ${log.toStatus}` : `Created as ${log.toStatus}`}</strong>
-                    <span>{log.createdAt ? new Date(log.createdAt).toLocaleString() : '-'} | {log.changedBy || log.source || 'Unknown Actor'}</span>
-                    {log.notes ? <small>{log.notes}</small> : null}
+                  <div key={`${log.createdAt}-${index}`} className="integrated-admin-merch-order-audit__item integrated-admin-merch-order-audit__item--formatted">
+                    <div className="integrated-admin-merch-order-audit__headline">
+                      <strong>
+                        {log.fromStatus
+                          ? `${formatAuditStatusLabel(log.fromStatus)} -> ${formatAuditStatusLabel(log.toStatus)}`
+                          : `Created as ${formatAuditStatusLabel(log.toStatus)}`}
+                      </strong>
+                      <span className="integrated-admin-merch-order-audit__source">
+                        {formatAuditSourceLabel(log.source)}
+                      </span>
+                    </div>
+                    <div className="integrated-admin-merch-order-audit__meta">
+                      <span>{log.createdAt ? new Date(log.createdAt).toLocaleString() : '-'}</span>
+                      <span>{log.changedBy || 'Unknown Actor'}</span>
+                    </div>
+                    {log.notes ? <small className="integrated-admin-merch-order-audit__notes">{log.notes}</small> : null}
                   </div>
                 ))
               )}

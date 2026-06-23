@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
 import {
   ConfigProvider,
   App as AntApp,
@@ -36,9 +35,6 @@ const LandingContent: React.FC = () => {
             <a className="kit-nav__link kit-nav__link--active" href="#registrar-login-title">
               Access
             </a>
-            <a className="kit-nav__link" href="/verify-document">
-              Document Verification
-            </a>
           </div>
         </nav>
       </RegistrarHeader>
@@ -59,11 +55,6 @@ const LandingContent: React.FC = () => {
               onPasswordChange={setPassword}
               onSubmit={onSubmit}
             />
-            <div style={{ marginTop: '18px' }}>
-              <Link className="secondary-button" to="/verify-document">
-                Open Public Verification Page
-              </Link>
-            </div>
           </section>
         </div>
       </main>

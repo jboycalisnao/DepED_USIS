@@ -1,5 +1,9 @@
 import { supabase } from '@deped-usis/shared-supabase';
-import { fetchLearnerMerchOrders, type LearnerMerchOrderRecord } from './learnerMerchService';
+import {
+  fetchLearnerMerchOrders,
+  normalizeLearnerMerchOrderStatus,
+  type LearnerMerchOrderRecord,
+} from './learnerMerchService';
 
 const MERCH_CONTROL_OPERATION_KEY = 'class_section_merch_control';
 const GRADE_SCOPE_PREFIX = 'grade_level::';
@@ -223,7 +227,7 @@ export const fetchMerchControlSectionSnapshot = async (params: {
       if (!current) {
         ordersMap.set(lrn, {
           latestOrderAt: toText(row.created_at) || null,
-          latestOrderStatus: toText(row.order_status) || null,
+          latestOrderStatus: normalizeLearnerMerchOrderStatus(row.order_status),
           totalOrders: 1,
         });
         return;

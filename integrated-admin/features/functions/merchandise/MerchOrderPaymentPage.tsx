@@ -2,25 +2,269 @@ import { useEffect, useMemo, useState } from 'react';
 import { UsisAlertModal } from '../../../../common/components/UsisAlertModal';
 import { UsisGradeSectionList, type UsisGradeSectionListGrade } from '../../../../common/components/ui/UsisGradeSectionList';
 import UsisPageLoader from '../../../../common/components/UsisPageLoader';
+import { loadCachedMerchOrdersPageSnapshot, saveCachedMerchOrdersPageSnapshot } from './utils/merchOrdersPageCache';
 import {
   createMerchOrderPayment,
-  deleteLatestMerchOrderPayment,
-  loadMerchOrderControlRecords,
+  deleteMerchOrderPayment,
   loadMerchOrderPayments,
   loadMerchOrderAuditTrail,
   updateMerchOrderPayment,
   type MerchOrderPaymentRecord,
   updateMerchOrderStatus,
+  type MerchActiveLearnerOption,
   type MerchOrderAuditRecord,
   type MerchOrderControlRecord,
+  hydrateMerchOrderLearnerNames,
+  getIntegratedAdminActorName,
+  resolveMerchLearnerDisplayName,
 } from './services/merchOrderControlService';
+import { getMerchOrderStatusClass, getMerchOrderStatusLabel, normalizeMerchOrderStatus } from './order-control/utils/orderStatus';
 import { AddPaymentModal } from './components/order-payment/AddPaymentModal';
 import { OrderPaymentDetailModal } from './components/order-payment/OrderPaymentDetailModal';
+import { MerchPaymentReceiptDownloadButton } from '../../../../common/components/merch/MerchPaymentReceiptDownloadButton';
 
 const parseGradeSortValue = (grade: string) => {
   const match = grade.match(/\d+/);
   return match ? Number(match[0]) : Number.POSITIVE_INFINITY;
 };
+
+type LearnerGroup = {
+  key: string;
+  label: string;
+  lrn: string;
+  rows: MerchOrderControlRecord[];
+};
+
+type LearnerPaymentSummary = {
+  label: string;
+  orderCount: number;
+  rows: MerchOrderControlRecord[];
+  totalAmount: number;
+  outstandingAmount: number;
+};
+
+type PaymentOrderMetrics = {
+  balanceAfter: number;
+  orderAmount: number;
+  outstanding: number;
+  paid: number;
+};
+
+const buildLearnerGroupKey = (row: MerchOrderControlRecord) => {
+  const learnerId = String(row.learnerId || '').trim().toLowerCase();
+  const lrn = String(row.learnerLrn || '').trim().toLowerCase();
+  const name = String(row.learnerName || '').trim().toLowerCase();
+  return `${learnerId || lrn || name || 'unknown'}|${lrn || 'unknown'}`;
+};
+
+const groupRowsByLearner = (rows: MerchOrderControlRecord[], learners: MerchActiveLearnerOption[]) =>
+  rows.reduce<Record<string, LearnerGroup>>((acc, row) => {
+    const key = buildLearnerGroupKey(row);
+    if (!acc[key]) {
+      acc[key] = {
+        key,
+        label: resolveMerchLearnerDisplayName(row, learners),
+        lrn: row.learnerLrn || '',
+        rows: [],
+      };
+    }
+    acc[key].rows.push(row);
+    return acc;
+  }, {});
+
+function PaymentLearnerGroupTable({
+  learners,
+  isBalanceLoading,
+  onAddPayment,
+  onAddLearnerPayment,
+  onOpenOrderDetails,
+  orderOutstandingBalanceById,
+  rows,
+}: {
+  learners: MerchActiveLearnerOption[]; 
+  isBalanceLoading: boolean;
+  onAddPayment: (row: MerchOrderControlRecord) => void;
+  onAddLearnerPayment: (group: LearnerPaymentSummary) => void;
+  onOpenOrderDetails: (row: MerchOrderControlRecord) => void;
+  orderOutstandingBalanceById: Record<string, number>;
+  rows: MerchOrderControlRecord[];
+}) {
+  const learnerGroups = Object.values(groupRowsByLearner(rows, learners)).sort((groupA, groupB) => {
+    const nameDiff = groupA.label.localeCompare(groupB.label);
+    if (nameDiff !== 0) return nameDiff;
+    return groupA.lrn.localeCompare(groupB.lrn);
+  });
+
+  return (
+    <div className="integrated-admin-merch-learner-groups">
+      {learnerGroups.map((group) => {
+        const totalAmount = group.rows.reduce((sum, row) => sum + row.orderAmount, 0);
+        const outstandingAmount = group.rows.reduce(
+          (sum, row) => sum + (orderOutstandingBalanceById[row.id] ?? row.orderAmount),
+          0,
+        );
+        const canPayLearner = outstandingAmount > 0;
+        const learnerReceiptPayload = {
+          gradeSection: [group.rows[0]?.gradeLevel, group.rows[0]?.sectionName].filter(Boolean).join(' - ') || 'Unassigned',
+          learnerLrn: group.lrn || '',
+          learnerName: group.label || '',
+          orderAmount: totalAmount,
+          outstandingBalance: outstandingAmount,
+          paymentAmount: outstandingAmount,
+          referenceNo: group.rows[0]?.referenceNo || group.key,
+          productName: `${group.rows.length} order(s)`,
+          postedBy: getIntegratedAdminActorName(),
+          sourceLabel: 'Integrated Admin',
+          transactionNo: group.rows[0]?.referenceNo || group.key,
+          variant: 'consolidated' as const,
+          orderLines: group.rows.map((row) => ({
+            amount: row.orderAmount,
+            label: row.orderPeriodLabel || row.sectionName || '',
+            outstandingBalance: orderOutstandingBalanceById[row.id] ?? row.orderAmount,
+            productName: row.productName,
+            referenceNo: row.referenceNo,
+          })),
+        };
+
+        return (
+          <details key={group.key} className="integrated-admin-merch-group integrated-admin-merch-learner-group" open>
+            <summary className="integrated-admin-merch-group__summary">
+              <div className="integrated-admin-merch-learner-group__summary-main">
+                <span className="material-symbols-outlined integrated-admin-merch-group__chevron" aria-hidden="true">
+                  expand_more
+                </span>
+                <div className="integrated-admin-merch-learner-group__identity">
+                  <div className="integrated-admin-merch-learner-group__identity-row">
+                    <span className="integrated-admin-merch-group__title">{group.label}</span>
+                    <MerchPaymentReceiptDownloadButton
+                      ariaLabel={`Print consolidated receipt for ${group.label}`}
+                      className="integrated-admin-merch-learner-group__print-btn"
+                      mode="print"
+                      showLabel={false}
+                      title="Print consolidated receipt"
+                      payload={learnerReceiptPayload}
+                    />
+                  </div>
+                  <span className="integrated-admin-merch-learner-group__meta">{group.lrn || 'No LRN provided'}</span>
+                </div>
+              </div>
+              <div className="integrated-admin-merch-learner-group__summary-meta">
+                <div className="integrated-admin-merch-learner-group__summary-stats">
+                  <span className="integrated-admin-merch-group__count">{group.rows.length} order(s)</span>
+                  <span className="integrated-admin-merch-learner-group__total">Total PHP {totalAmount.toFixed(2)}</span>
+                  <span className="integrated-admin-merch-learner-group__outstanding">
+                    Outstanding PHP {outstandingAmount.toFixed(2)}
+                  </span>
+                </div>
+                <div className="integrated-admin-merch-learner-group__summary-actions">
+                  <button
+                    type="button"
+                    className="primary-button integrated-admin-merch-learner-group__payment-btn"
+                    disabled={!canPayLearner}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      if (!canPayLearner) return;
+                      onAddLearnerPayment({
+                        label: group.label,
+                        orderCount: group.rows.length,
+                        rows: group.rows,
+                        totalAmount,
+                        outstandingAmount,
+                      });
+                    }}
+                  >
+                    {canPayLearner ? 'Payment' : 'No Balance'}
+                  </button>
+                </div>
+              </div>
+            </summary>
+          <table className="registry-table integrated-admin-merch-group__table">
+            <thead>
+              <tr>
+                <th>Ref No.</th>
+                <th>Date</th>
+                <th>Learner</th>
+                <th>LRN</th>
+                <th>Product</th>
+                <th>Period</th>
+                <th>Qty</th>
+                <th>Order Amount</th>
+                <th>Size</th>
+                <th>Status</th>
+                <th>Payment</th>
+              </tr>
+            </thead>
+            <tbody>
+              {group.rows.map((row, index) => (
+                <tr
+                  key={`${row.id}-${index}`}
+                  className={`integrated-admin-merch-order-row integrated-admin-merch-order-row--status-${row.orderStatus}`}
+                  onClick={() => void onOpenOrderDetails(row)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      void onOpenOrderDetails(row);
+                    }
+                  }}
+                >
+                  <td>{row.referenceNo || '-'}</td>
+                  <td>{row.createdAt ? new Date(row.createdAt).toLocaleString() : '-'}</td>
+                  <td>{row.learnerName || '-'}</td>
+                  <td>{row.learnerLrn || '-'}</td>
+                  <td>{row.productName || '-'}</td>
+                  <td>{row.orderPeriodLabel || '-'}</td>
+                  <td>{row.quantity}</td>
+                  <td>
+                    <div className="integrated-admin-merch-group__amount-stack">
+                      <strong>PHP {row.orderAmount.toFixed(2)}</strong>
+                      <small>
+                        Outstanding:{' '}
+                        {isBalanceLoading && !(row.id in orderOutstandingBalanceById)
+                          ? 'Loading...'
+                          : `PHP ${(orderOutstandingBalanceById[row.id] ?? row.orderAmount).toFixed(2)}`}
+                      </small>
+                    </div>
+                  </td>
+                  <td>{row.selectedSize || '-'}</td>
+                  <td>
+                    <span
+                      className={`integrated-admin-order-status-tag ${getMerchOrderStatusClass(row.orderStatus).replace('select', 'tag')}`}
+                    >
+                      {getMerchOrderStatusLabel(row.orderStatus)}
+                    </span>
+                  </td>
+                  <td>
+                    {(() => {
+                      const rowOutstanding = orderOutstandingBalanceById[row.id] ?? row.orderAmount;
+                      const canPayRow = rowOutstanding > 0;
+                      return (
+                        <button
+                          type="button"
+                          className="primary-button integrated-admin-merch-group__payment-btn"
+                          disabled={!canPayRow}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            if (!canPayRow) return;
+                            onAddPayment(row);
+                          }}
+                        >
+                          {canPayRow ? 'Payment' : 'No Balance'}
+                        </button>
+                      );
+                    })()}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          </details>
+        );
+      })}
+    </div>
+  );
+}
 
 export function MerchOrderPaymentPage() {
   const [records, setRecords] = useState<MerchOrderControlRecord[]>([]);
@@ -33,17 +277,22 @@ export function MerchOrderPaymentPage() {
   const [receiptNo, setReceiptNo] = useState('');
   const [paymentNotes, setPaymentNotes] = useState('');
   const [selectedOrderDetail, setSelectedOrderDetail] = useState<MerchOrderControlRecord | null>(null);
-  const [detailModalView, setDetailModalView] = useState<'payment' | 'record' | 'audit'>('record');
+  const [detailModalView, setDetailModalView] = useState<'payment' | 'audit'>('payment');
   const [selectedOrderAudit, setSelectedOrderAudit] = useState<MerchOrderAuditRecord[]>([]);
   const [selectedOrderPayments, setSelectedOrderPayments] = useState<MerchOrderPaymentRecord[]>([]);
   const [isPaymentsLoading, setIsPaymentsLoading] = useState(false);
   const [isAuditLoading, setIsAuditLoading] = useState(false);
-  const [detailPaymentAmount, setDetailPaymentAmount] = useState('');
-  const [detailReceiptNo, setDetailReceiptNo] = useState('');
-  const [detailPaymentNotes, setDetailPaymentNotes] = useState('');
-  const [editingPaymentId, setEditingPaymentId] = useState('');
+  const [orderOutstandingBalanceById, setOrderOutstandingBalanceById] = useState<Record<string, number>>({});
+  const [isBalanceLoading, setIsBalanceLoading] = useState(false);
   const [addPaymentAmountError, setAddPaymentAmountError] = useState('');
-  const [detailPaymentAmountError, setDetailPaymentAmountError] = useState('');
+  const [cacheReady, setCacheReady] = useState(false);
+  const [cachedLearners, setCachedLearners] = useState<any[]>([]);
+  const [cachedProducts, setCachedProducts] = useState<any[]>([]);
+  const [lastLoadedFromDbAt, setLastLoadedFromDbAt] = useState('');
+  const [selectedLearnerPaymentSummary, setSelectedLearnerPaymentSummary] = useState<LearnerPaymentSummary | null>(null);
+  const [editingHistoryPaymentId, setEditingHistoryPaymentId] = useState('');
+  const [selectedPaymentOrderMetrics, setSelectedPaymentOrderMetrics] = useState<PaymentOrderMetrics | null>(null);
+  const [isPaymentOrderLocked, setIsPaymentOrderLocked] = useState(false);
   const [alert, setAlert] = useState<{ message: string; title: string; tone: 'success' | 'danger' } | null>(null);
 
   const getAmountError = (amount: string, orderAmount: number | null) => {
@@ -60,8 +309,18 @@ export function MerchOrderPaymentPage() {
   const refresh = async () => {
     setIsLoading(true);
     try {
-      const rows = await loadMerchOrderControlRecords();
-      setRecords(rows);
+      const snapshot = await loadCachedMerchOrdersPageSnapshot();
+      if (!snapshot) {
+        setRecords([]);
+        setCacheReady(false);
+        throw new Error('No local merch cache found. Open the Orders page and refresh it first.');
+      }
+      const snapshotLearners = snapshot.learners || [];
+      setRecords(hydrateMerchOrderLearnerNames((snapshot.records || []).map((row) => ({ ...row })), snapshotLearners));
+      setCachedLearners(snapshotLearners);
+      setCachedProducts(snapshot.products || []);
+      setLastLoadedFromDbAt(snapshot.lastLoadedFromDbAt || '');
+      setCacheReady(true);
     } catch (error: any) {
       setAlert({ title: 'Load Failed', message: error?.message || 'Unable to load order payments.', tone: 'danger' });
     } finally {
@@ -73,9 +332,67 @@ export function MerchOrderPaymentPage() {
     void refresh();
   }, []);
 
+  const visibleRecords = useMemo(
+    () =>
+      records.filter((row) => {
+        const status = normalizeMerchOrderStatus(row.orderStatus);
+        return status === 'confirmed' || status === 'released';
+      }),
+    [records],
+  );
+
+  const refreshOutstandingBalances = async (targetRecords: MerchOrderControlRecord[] = records) => {
+    const balanceTargetRecords = targetRecords.filter((row) => {
+      const status = normalizeMerchOrderStatus(row.orderStatus);
+      return status === 'confirmed' || status === 'released';
+    });
+
+    if (!cacheReady || balanceTargetRecords.length === 0) {
+      setOrderOutstandingBalanceById({});
+      return;
+    }
+
+    setIsBalanceLoading(true);
+    try {
+      const balances = await Promise.all(
+        balanceTargetRecords.map(async (row) => {
+          const payments = await loadMerchOrderPayments(row.id);
+          const postedTotal = payments
+            .filter((entry) => entry.paymentStatus === 'posted')
+            .reduce((sum, entry) => sum + entry.paymentAmount, 0);
+          return [row.id, Math.max(0, row.orderAmount - postedTotal)] as const;
+        }),
+      );
+
+      setOrderOutstandingBalanceById(Object.fromEntries(balances));
+    } catch {
+      setOrderOutstandingBalanceById({});
+    } finally {
+      setIsBalanceLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!cacheReady) return;
+    void refreshOutstandingBalances(records);
+  }, [cacheReady]);
+
+  const syncOutstandingBalanceFromPayments = (
+    row: MerchOrderControlRecord,
+    payments: MerchOrderPaymentRecord[] = [],
+  ) => {
+    const postedTotal = payments
+      .filter((entry) => entry.paymentStatus === 'posted')
+      .reduce((sum, entry) => sum + entry.paymentAmount, 0);
+    setOrderOutstandingBalanceById((current) => ({
+      ...current,
+      [row.id]: Math.max(0, row.orderAmount - postedTotal),
+    }));
+  };
+
   const filteredRows = useMemo(() => {
     const normalized = search.trim().toLowerCase();
-    return records.filter((row) => {
+    return visibleRecords.filter((row) => {
       if (!normalized) return true;
       return [
         row.referenceNo,
@@ -92,27 +409,27 @@ export function MerchOrderPaymentPage() {
         .toLowerCase()
         .includes(normalized);
     });
-  }, [records, search]);
+  }, [search, visibleRecords]);
 
   const paymentOrderOptions = useMemo(
     () =>
-      records
-        .filter((row) => row.orderStatus === 'Pending')
+      visibleRecords
         .map((row) => ({
-        label: `${row.referenceNo || row.id} - ${row.learnerName || 'Unknown Learner'} - ${row.productName}`,
-        value: row.id,
-      })),
-    [records],
+          label: `${row.referenceNo || row.id} - ${row.learnerName || 'Unknown Learner'} - ${row.productName}`,
+          value: row.id,
+        })),
+    [visibleRecords],
   );
 
   const selectedPaymentOrder = useMemo(
-    () => records.find((row) => row.id === selectedPaymentOrderId) || null,
-    [records, selectedPaymentOrderId],
+    () => visibleRecords.find((row) => row.id === selectedPaymentOrderId) || null,
+    [selectedPaymentOrderId, visibleRecords],
+  );
+  const editingHistoryPaymentRecord = useMemo(
+    () => selectedOrderPayments.find((entry) => entry.id === editingHistoryPaymentId) || null,
+    [editingHistoryPaymentId, selectedOrderPayments],
   );
   const addPaymentAmountValue = Number(paymentAmount);
-  const addPaymentBalance = selectedPaymentOrder
-    ? Math.max(0, selectedPaymentOrder.orderAmount - (Number.isFinite(addPaymentAmountValue) ? Math.max(0, addPaymentAmountValue) : 0))
-    : 0;
   const paymentHistoryEntries = useMemo(
     () => selectedOrderPayments.filter((entry) => entry.paymentStatus === 'posted'),
     [selectedOrderPayments],
@@ -121,19 +438,113 @@ export function MerchOrderPaymentPage() {
     () => paymentHistoryEntries.reduce((sum, entry) => sum + entry.paymentAmount, 0),
     [paymentHistoryEntries],
   );
-  const editingPaymentRecord = useMemo(
-    () => paymentHistoryEntries.find((entry) => entry.id === editingPaymentId) || null,
-    [paymentHistoryEntries, editingPaymentId],
-  );
-  const totalPaidAmountExcludingEditing = totalPaidAmount - (editingPaymentRecord?.paymentAmount || 0);
-  const detailPaymentAmountValue = Number(detailPaymentAmount);
-  const detailRemainingBalance = selectedOrderDetail
-    ? Math.max(0, selectedOrderDetail.orderAmount - totalPaidAmountExcludingEditing)
-    : 0;
-  const detailPaymentBalance = Math.max(
-    0,
-    detailRemainingBalance - (Number.isFinite(detailPaymentAmountValue) ? Math.max(0, detailPaymentAmountValue) : 0),
-  );
+  const addPaymentEditLimit = editingHistoryPaymentRecord && selectedOrderDetail
+    ? Math.max(0, selectedOrderDetail.orderAmount - (totalPaidAmount - editingHistoryPaymentRecord.paymentAmount))
+    : null;
+  const selectedPaymentOrderOutstanding = selectedPaymentOrder
+    ? (selectedPaymentOrderMetrics?.outstanding ?? orderOutstandingBalanceById[selectedPaymentOrder.id] ?? selectedPaymentOrder.orderAmount)
+    : null;
+  const activePaymentLimit = editingHistoryPaymentId
+    ? addPaymentEditLimit
+    : selectedLearnerPaymentSummary
+      ? selectedLearnerPaymentSummary.outstandingAmount
+      : selectedPaymentOrderOutstanding;
+  const addPaymentLimit = editingHistoryPaymentId
+    ? addPaymentEditLimit
+    : selectedLearnerPaymentSummary
+      ? selectedLearnerPaymentSummary.outstandingAmount
+      : selectedPaymentOrderOutstanding;
+  const clampPaymentAmountToLimit = (value: string, limit: number | null) => {
+    const trimmed = String(value || '').trim();
+    if (!trimmed) return '';
+    const numeric = Number(trimmed);
+    if (!Number.isFinite(numeric) || numeric <= 0) return trimmed;
+    if (limit === null) return trimmed;
+    return String(Math.min(numeric, limit));
+  };
+  const applyLocalOutstandingDelta = (orderId: string, delta: number, fallbackOutstanding?: number) => {
+    const cleanDelta = Number.isFinite(delta) ? delta : 0;
+    if (!orderId || cleanDelta === 0) return;
+    setOrderOutstandingBalanceById((current) => {
+      const currentBalance = Number(current[orderId] ?? fallbackOutstanding ?? 0);
+      const nextBalance = Math.max(0, currentBalance + cleanDelta);
+      return { ...current, [orderId]: nextBalance };
+    });
+    setSelectedPaymentOrderMetrics((current) =>
+      current && selectedPaymentOrderId === orderId
+        ? {
+            ...current,
+            outstanding: Math.max(0, current.outstanding + cleanDelta),
+            balanceAfter: Math.max(0, current.balanceAfter + cleanDelta),
+          }
+        : current,
+    );
+    setSelectedOrderDetail((current) =>
+      current && current.id === orderId
+        ? {
+            ...current,
+            outstandingBalance: Math.max(0, Number(current.outstandingBalance || current.orderAmount || 0) + cleanDelta),
+          }
+        : current,
+    );
+  };
+  const openAddPaymentForOrder = (row: MerchOrderControlRecord) => {
+    setEditingHistoryPaymentId('');
+    setSelectedLearnerPaymentSummary(null);
+    setSelectedPaymentOrderId(row.id);
+    const currentOutstanding = Math.max(0, orderOutstandingBalanceById[row.id] ?? row.orderAmount);
+    setPaymentAmount(String(currentOutstanding.toFixed(2)));
+    setReceiptNo('');
+    setPaymentNotes('');
+    setAddPaymentAmountError('');
+    setIsPaymentOrderLocked(true);
+    setSelectedPaymentOrderMetrics({
+      orderAmount: row.orderAmount,
+      paid: 0,
+      outstanding: currentOutstanding,
+      balanceAfter: currentOutstanding,
+    });
+    void (async () => {
+      const payments = await loadMerchOrderPayments(row.id);
+      const paid = payments
+        .filter((entry) => entry.paymentStatus === 'posted')
+        .reduce((sum, entry) => sum + entry.paymentAmount, 0);
+      const outstanding = Math.max(0, row.orderAmount - paid);
+      setPaymentAmount(String(outstanding.toFixed(2)));
+      setSelectedPaymentOrderMetrics({
+        orderAmount: row.orderAmount,
+        paid,
+        outstanding,
+        balanceAfter: outstanding,
+      });
+    })();
+    setIsAddPaymentModalOpen(true);
+  };
+  const openAddPaymentForLearner = (summary: LearnerPaymentSummary) => {
+    setEditingHistoryPaymentId('');
+    setSelectedLearnerPaymentSummary(summary);
+    setSelectedPaymentOrderId(summary.rows[0]?.id || '');
+    setPaymentAmount(String(summary.outstandingAmount.toFixed(2)));
+    setReceiptNo('');
+    setPaymentNotes('');
+    setAddPaymentAmountError('');
+    setIsPaymentOrderLocked(false);
+    setSelectedPaymentOrderMetrics(null);
+    setIsAddPaymentModalOpen(true);
+  };
+  const openStandaloneAddPaymentModal = () => {
+    setEditingHistoryPaymentId('');
+    setSelectedLearnerPaymentSummary(null);
+    setSelectedPaymentOrderId('');
+    setPaymentAmount('');
+    setReceiptNo('');
+    setPaymentNotes('');
+    setAddPaymentAmountError('');
+    setEditingHistoryPaymentId('');
+    setIsPaymentOrderLocked(false);
+    setSelectedPaymentOrderMetrics(null);
+    setIsAddPaymentModalOpen(true);
+  };
   const groupedRows = useMemo(
     () =>
       filteredRows.reduce<Record<string, Record<string, MerchOrderControlRecord[]>>>((acc, row) => {
@@ -162,48 +573,15 @@ export function MerchOrderPaymentPage() {
             label: grade,
             sections: sectionEntries.map(([sectionName, sectionRows]) => ({
               content: (
-                <table className="registry-table integrated-admin-merch-group__table">
-                  <thead>
-                    <tr>
-                      <th>Ref No.</th>
-                      <th>Date</th>
-                      <th>Learner</th>
-                      <th>LRN</th>
-                      <th>Product</th>
-                      <th>Period</th>
-                      <th>Qty</th>
-                      <th>Size</th>
-                      <th>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sectionRows.map((row, index) => (
-                      <tr
-                        key={`${row.id}-${index}`}
-                        className="integrated-admin-merch-order-row"
-                        onClick={() => void openOrderDetails(row)}
-                        role="button"
-                        tabIndex={0}
-                        onKeyDown={(event) => {
-                          if (event.key === 'Enter' || event.key === ' ') {
-                            event.preventDefault();
-                            void openOrderDetails(row);
-                          }
-                        }}
-                      >
-                        <td>{row.referenceNo || '-'}</td>
-                        <td>{row.createdAt ? new Date(row.createdAt).toLocaleString() : '-'}</td>
-                        <td>{row.learnerName || '-'}</td>
-                        <td>{row.learnerLrn || '-'}</td>
-                        <td>{row.productName || '-'}</td>
-                        <td>{row.orderPeriodLabel || '-'}</td>
-                        <td>{row.quantity}</td>
-                        <td>{row.selectedSize || '-'}</td>
-                        <td><strong>{row.orderStatus || 'Pending'}</strong></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <PaymentLearnerGroupTable
+                  learners={cachedLearners}
+                  isBalanceLoading={isBalanceLoading}
+                  onAddPayment={(row) => void openAddPaymentForOrder(row)}
+                  onAddLearnerPayment={(summary) => void openAddPaymentForLearner(summary)}
+                  onOpenOrderDetails={(row) => void openOrderDetails(row)}
+                  orderOutstandingBalanceById={orderOutstandingBalanceById}
+                  rows={sectionRows}
+                />
               ),
               count: sectionRows.length,
               key: sectionName,
@@ -215,7 +593,7 @@ export function MerchOrderPaymentPage() {
   );
 
   const handleMarkPaid = async (row: MerchOrderControlRecord, options?: { amount?: string; notes?: string; receiptNo?: string; force?: boolean; closeDetailOnSuccess?: boolean }) => {
-    const amountValue = Number(options?.amount ?? detailPaymentAmount);
+    const amountValue = Number(options?.amount ?? paymentAmount);
     if (!Number.isFinite(amountValue) || amountValue <= 0) {
       setAlert({ title: 'Required Fields', message: 'Enter a valid payment amount.', tone: 'danger' });
       return;
@@ -230,32 +608,42 @@ export function MerchOrderPaymentPage() {
       });
       return;
     }
-    const cleanReceipt = String(options?.receiptNo ?? detailReceiptNo).trim();
-    const cleanNotes = String(options?.notes ?? detailPaymentNotes).trim();
+    const cleanReceipt = String(options?.receiptNo ?? receiptNo).trim();
+    const cleanNotes = String(options?.notes ?? paymentNotes).trim();
     setIsSaving(true);
     try {
-      await createMerchOrderPayment({
+      const createdPayment = await createMerchOrderPayment({
         orderId: row.id,
         paymentAmount: amountValue,
         paymentNotes: cleanNotes,
         receiptNo: cleanReceipt,
       });
-      await updateMerchOrderStatus(row.id, 'Approved', {
+      await updateMerchOrderStatus(row.id, 'confirmed', {
         auditNote: `Payment recorded in Integrated Admin order payment page. Amount: PHP ${amountValue.toFixed(2)}.${cleanReceipt ? ` Receipt No: ${cleanReceipt}.` : ''}${cleanNotes ? ` Notes: ${cleanNotes}` : ''}`,
-        expectedFromStatus: options?.force ? undefined : row.orderStatus === 'Pending' ? 'Pending' : undefined,
+        expectedFromStatus: options?.force ? undefined : row.orderStatus === 'pending' ? 'pending' : undefined,
       });
-      await refresh();
-      await loadPaymentHistory(row.id);
+      const nextRecords = records.map((entry) =>
+        entry.id === row.id ? { ...entry, orderStatus: 'confirmed' } : entry,
+      );
+      setRecords(nextRecords);
+      await saveCachedMerchOrdersPageSnapshot(nextRecords, cachedLearners, cachedProducts, lastLoadedFromDbAt);
+      applyLocalOutstandingDelta(row.id, -amountValue, row.orderAmount);
+      setSelectedOrderPayments((current) =>
+        current.some((entry) => entry.id === createdPayment.id) ? current : [...current, createdPayment],
+      );
+      if (selectedOrderDetail?.id === row.id) {
+        setSelectedOrderDetail({ ...row, orderStatus: 'confirmed' });
+      }
       if (options?.closeDetailOnSuccess) {
         setSelectedOrderDetail(null);
       }
-      setAlert({
-        title: 'Payment Posted',
-        message: `Order ${row.referenceNo || row.id} payment saved.`,
-        tone: 'success',
-      });
+        setAlert({
+          title: 'Payment Posted',
+          message: `Order ${row.referenceNo || row.id} payment saved.`,
+          tone: 'success',
+        });
       if (selectedOrderDetail?.id === row.id) {
-        setSelectedOrderDetail({ ...row, orderStatus: 'Approved' });
+        setSelectedOrderDetail({ ...row, orderStatus: 'confirmed' });
       }
     } catch (error: any) {
       setAlert({ title: 'Update Failed', message: error?.message || 'Unable to update payment status.', tone: 'danger' });
@@ -265,28 +653,147 @@ export function MerchOrderPaymentPage() {
   };
 
   const handleAddPayment = async () => {
-    if (!selectedPaymentOrder) {
-      setAlert({ title: 'Required Fields', message: 'Select a pending order first.', tone: 'danger' });
+    const editingMode = Boolean(editingHistoryPaymentId);
+    if (!selectedPaymentOrder && !selectedLearnerPaymentSummary && !editingMode) {
+      setAlert({ title: 'Required Fields', message: 'Select a confirmed or released order first.', tone: 'danger' });
       return;
     }
-    const liveError = getAmountError(paymentAmount, selectedPaymentOrder.orderAmount);
+    const editTargetLimit = editingMode && selectedOrderDetail && editingHistoryPaymentRecord
+      ? Math.max(0, selectedOrderDetail.orderAmount - (totalPaidAmount - editingHistoryPaymentRecord.paymentAmount))
+      : null;
+    const liveError = editingMode
+      ? getAmountError(paymentAmount, editTargetLimit)
+      : selectedLearnerPaymentSummary
+        ? getAmountError(paymentAmount, selectedLearnerPaymentSummary.outstandingAmount)
+        : getAmountError(paymentAmount, selectedPaymentOrder ? selectedPaymentOrder.orderAmount : null);
     if (liveError) {
       setAddPaymentAmountError(liveError);
       return;
     }
     try {
-      await handleMarkPaid(selectedPaymentOrder, {
-        amount: paymentAmount,
-        notes: paymentNotes,
-        receiptNo,
-      });
+      if (editingMode) {
+        if (!editingHistoryPaymentRecord) {
+          throw new Error('Unable to locate payment record for update.');
+        }
+        const amountValue = Number(paymentAmount);
+        const maxAllowed = editTargetLimit ?? 0;
+        if (!Number.isFinite(amountValue) || amountValue <= 0) {
+          setAddPaymentAmountError('Enter a valid payment amount.');
+          return;
+        }
+        if (amountValue > maxAllowed) {
+          setAddPaymentAmountError(`Payment amount cannot be greater than remaining balance (PHP ${maxAllowed.toFixed(2)}).`);
+          return;
+        }
+        setIsSaving(true);
+        await updateMerchOrderPayment({
+          paymentId: editingHistoryPaymentId,
+          paymentAmount: amountValue,
+          paymentNotes: paymentNotes.trim(),
+          receiptNo: receiptNo.trim(),
+        });
+        if (selectedOrderDetail) {
+          await loadPaymentHistory(selectedOrderDetail.id);
+        }
+        setEditingHistoryPaymentId('');
+        setIsAddPaymentModalOpen(false);
+        setSelectedPaymentOrderId('');
+        setPaymentAmount('');
+        setAddPaymentAmountError('');
+        setReceiptNo('');
+        setPaymentNotes('');
+        setSelectedLearnerPaymentSummary(null);
+        setIsPaymentOrderLocked(false);
+        setSelectedPaymentOrderMetrics(null);
+        setAlert({
+          title: 'Payment Updated',
+          message: 'Selected payment history record updated.',
+          tone: 'success',
+        });
+        return;
+      }
+      if (selectedLearnerPaymentSummary) {
+        const amountValue = Number(paymentAmount);
+        const rowPaymentBalances = await Promise.all(
+          selectedLearnerPaymentSummary.rows.map(async (row) => {
+            const payments = await loadMerchOrderPayments(row.id);
+            const postedTotal = payments
+              .filter((entry) => entry.paymentStatus === 'posted')
+              .reduce((sum, entry) => sum + entry.paymentAmount, 0);
+            return { row, remaining: Math.max(0, row.orderAmount - postedTotal) };
+          }),
+        );
+        const totalOutstanding = rowPaymentBalances.reduce((sum, item) => sum + item.remaining, 0);
+        if (amountValue > totalOutstanding) {
+          setAlert({
+            title: 'Invalid Payment Amount',
+            message: `Payment amount cannot be greater than learner outstanding total (PHP ${totalOutstanding.toFixed(2)}).`,
+            tone: 'danger',
+          });
+          return;
+        }
+        let remainingAmount = amountValue;
+        const createdPayments: MerchOrderPaymentRecord[] = [];
+        for (const item of rowPaymentBalances) {
+          if (remainingAmount <= 0) break;
+          const paymentForRow = Math.min(item.remaining, remainingAmount);
+          if (paymentForRow <= 0) continue;
+          const createdPayment = await createMerchOrderPayment({
+            orderId: item.row.id,
+            paymentAmount: paymentForRow,
+            paymentNotes: paymentNotes.trim(),
+            receiptNo: receiptNo.trim(),
+          });
+          createdPayments.push(createdPayment);
+          await updateMerchOrderStatus(item.row.id, 'confirmed', {
+            auditNote: `Learner total payment recorded in Integrated Admin order payment page. Amount: PHP ${paymentForRow.toFixed(2)}.${receiptNo.trim() ? ` Receipt No: ${receiptNo.trim()}.` : ''}${paymentNotes.trim() ? ` Notes: ${paymentNotes.trim()}` : ''}`,
+            expectedFromStatus: item.row.orderStatus === 'pending' ? 'pending' : undefined,
+          });
+          applyLocalOutstandingDelta(item.row.id, -paymentForRow, item.row.orderAmount);
+          if (selectedOrderDetail?.id === item.row.id) {
+            setSelectedOrderPayments((current) =>
+              current.some((entry) => entry.id === createdPayment.id) ? current : [...current, createdPayment],
+            );
+          }
+          remainingAmount -= paymentForRow;
+        }
+        const nextRecords = records.map((entry) =>
+          selectedLearnerPaymentSummary.rows.some((row) => row.id === entry.id) ? { ...entry, orderStatus: 'confirmed' } : entry,
+        );
+        setRecords(nextRecords);
+        await saveCachedMerchOrdersPageSnapshot(nextRecords, cachedLearners, cachedProducts, lastLoadedFromDbAt);
+        if (selectedOrderDetail && createdPayments.some((payment) => payment.orderId === selectedOrderDetail.id)) {
+          setSelectedOrderPayments((current) => {
+            const nextById = new Map(current.map((entry) => [entry.id, entry]));
+            createdPayments.forEach((payment) => nextById.set(payment.id, payment));
+            return Array.from(nextById.values()).sort((a, b) => a.paidAt.localeCompare(b.paidAt) || a.createdAt.localeCompare(b.createdAt));
+          });
+        }
+        setAlert({
+          title: 'Payment Posted',
+          message: `Learner payment saved for ${selectedLearnerPaymentSummary.label}.`,
+          tone: 'success',
+        });
+      } else {
+        await handleMarkPaid(selectedPaymentOrder, {
+          amount: paymentAmount,
+          notes: paymentNotes,
+          receiptNo,
+        });
+      }
       setIsAddPaymentModalOpen(false);
       setSelectedPaymentOrderId('');
       setPaymentAmount('');
       setAddPaymentAmountError('');
       setReceiptNo('');
       setPaymentNotes('');
+      setSelectedLearnerPaymentSummary(null);
+      setIsPaymentOrderLocked(false);
+      setSelectedPaymentOrderMetrics(null);
     } catch {}
+    finally {
+      setIsSaving(false);
+    }
   };
 
   const loadAuditTrail = async (orderId: string) => {
@@ -306,6 +813,10 @@ export function MerchOrderPaymentPage() {
     try {
       const rows = await loadMerchOrderPayments(orderId);
       setSelectedOrderPayments(rows);
+      const targetRow = records.find((row) => row.id === orderId);
+      if (targetRow) {
+        syncOutstandingBalanceFromPayments(targetRow, rows);
+      }
     } catch {
       setSelectedOrderPayments([]);
     } finally {
@@ -315,41 +826,32 @@ export function MerchOrderPaymentPage() {
 
   const openOrderDetails = async (row: MerchOrderControlRecord) => {
     setSelectedOrderDetail(row);
-    setDetailModalView('record');
-    setDetailPaymentAmount('0');
-    setDetailPaymentAmountError('');
-    setDetailReceiptNo('');
-    setDetailPaymentNotes('');
-    setEditingPaymentId('');
+    setDetailModalView('payment');
     setSelectedOrderAudit([]);
     setSelectedOrderPayments([]);
     const [, paymentRows] = await Promise.all([loadAuditTrail(row.id), loadMerchOrderPayments(row.id)]);
     setSelectedOrderPayments(paymentRows);
-    const totalPosted = paymentRows
-      .filter((entry) => entry.paymentStatus === 'posted')
-      .reduce((sum, entry) => sum + entry.paymentAmount, 0);
-    const remainingBalance = Math.max(0, row.orderAmount - totalPosted);
-    setDetailPaymentAmount(String(remainingBalance));
+    syncOutstandingBalanceFromPayments(row, paymentRows);
   };
 
-  const handleDeletePaymentRecord = async () => {
+  const handleDeletePaymentHistoryEntry = async (entry: MerchOrderPaymentRecord) => {
     if (!selectedOrderDetail) return;
     setIsSaving(true);
     try {
-      await deleteLatestMerchOrderPayment(selectedOrderDetail.id);
-      const latestPayments = await loadMerchOrderPayments(selectedOrderDetail.id);
-      const hasPostedPayment = latestPayments.some((payment) => payment.paymentStatus === 'posted');
-      if (!hasPostedPayment) {
-        await updateMerchOrderStatus(selectedOrderDetail.id, 'Pending', {
-          auditNote: 'Payment record deleted in Integrated Admin order payment page.',
-        });
-      }
-      await refresh();
-      setSelectedOrderPayments(latestPayments);
-      setSelectedOrderDetail({ ...selectedOrderDetail, orderStatus: hasPostedPayment ? 'Approved' : 'Pending' });
+      const orderId = await deleteMerchOrderPayment(entry.id);
+      const remainingPostedPayments = selectedOrderPayments.filter((payment) => payment.id !== entry.id);
+      const nextRecords = records.map((current) =>
+        current.id === orderId ? { ...current } : current,
+      );
+      setRecords(nextRecords);
+      await saveCachedMerchOrdersPageSnapshot(nextRecords, cachedLearners, cachedProducts, lastLoadedFromDbAt);
+      setSelectedOrderPayments(remainingPostedPayments);
+      setSelectedOrderDetail({ ...selectedOrderDetail });
+      syncOutstandingBalanceFromPayments(selectedOrderDetail, remainingPostedPayments);
+      void loadPaymentHistory(orderId);
       setAlert({
         title: 'Payment Deleted',
-        message: `Latest payment record for order ${selectedOrderDetail.referenceNo || selectedOrderDetail.id} deleted.`,
+        message: 'Selected payment history record deleted.',
         tone: 'success',
       });
     } catch (error: any) {
@@ -360,56 +862,49 @@ export function MerchOrderPaymentPage() {
   };
 
   const handleEditPaymentHistory = (entry: MerchOrderPaymentRecord) => {
-    setEditingPaymentId(entry.id);
-    setDetailPaymentAmount(String(entry.paymentAmount));
-    setDetailReceiptNo(entry.receiptNo || '');
-    setDetailPaymentNotes(entry.paymentNotes || '');
-    setDetailPaymentAmountError('');
-  };
-
-  const handleDetailPrimaryAction = async () => {
-    if (!selectedOrderDetail) return;
-    if (editingPaymentId) {
-      const amountValue = Number(detailPaymentAmount);
-      if (!Number.isFinite(amountValue) || amountValue <= 0) {
-        setDetailPaymentAmountError('Enter a valid payment amount.');
-        return;
-      }
-      if (amountValue > detailRemainingBalance) {
-        setDetailPaymentAmountError(`Payment amount cannot be greater than remaining balance (PHP ${detailRemainingBalance.toFixed(2)}).`);
-        return;
-      }
-      setIsSaving(true);
-      try {
-        await updateMerchOrderPayment({
-          paymentId: editingPaymentId,
-          paymentAmount: amountValue,
-          paymentNotes: detailPaymentNotes,
-          receiptNo: detailReceiptNo,
-        });
-        await loadPaymentHistory(selectedOrderDetail.id);
-        setEditingPaymentId('');
-        setSelectedOrderDetail(null);
-        setAlert({
-          title: 'Payment Updated',
-          message: `Payment history record updated for order ${selectedOrderDetail.referenceNo || selectedOrderDetail.id}.`,
-          tone: 'success',
-        });
-      } catch (error: any) {
-        setAlert({ title: 'Update Failed', message: error?.message || 'Unable to update payment record.', tone: 'danger' });
-      } finally {
-        setIsSaving(false);
-      }
-      return;
+    setEditingHistoryPaymentId(entry.id);
+    setSelectedLearnerPaymentSummary(null);
+    setSelectedPaymentOrderId(entry.orderId);
+    setPaymentAmount(String(entry.paymentAmount));
+    setReceiptNo(entry.receiptNo || '');
+    setPaymentNotes(entry.paymentNotes || '');
+    setAddPaymentAmountError('');
+    setIsPaymentOrderLocked(true);
+    if (selectedOrderDetail && selectedOrderDetail.id === entry.orderId) {
+      const paid = Math.max(0, totalPaidAmount - entry.paymentAmount);
+      const outstanding = Math.max(0, selectedOrderDetail.orderAmount - paid);
+      setSelectedPaymentOrderMetrics({
+        orderAmount: selectedOrderDetail.orderAmount,
+        paid,
+        outstanding,
+        balanceAfter: Math.max(0, outstanding - entry.paymentAmount),
+      });
+    } else {
+      setSelectedPaymentOrderMetrics(null);
     }
-    await handleMarkPaid(selectedOrderDetail, {
-      closeDetailOnSuccess: selectedOrderDetail.orderStatus === 'Approved',
-      force: true,
-    });
+    setIsAddPaymentModalOpen(true);
   };
 
   if (isLoading) {
     return <UsisPageLoader message="Loading order payments..." />;
+  }
+
+  if (!cacheReady) {
+    return (
+      <section className="section-shell integrated-admin-function">
+        <div className="integrated-admin-function__header">
+          <h2>Orders</h2>
+        </div>
+        <article className="section-card integrated-admin-merch-control">
+          <div className="section-card__bar" />
+          <div className="section-card__content">
+            <p className="learner-services-history__state">
+              No local merch cache is available yet. Open the Orders page and refresh it first.
+            </p>
+          </div>
+        </article>
+      </section>
+    );
   }
 
   return (
@@ -435,7 +930,7 @@ export function MerchOrderPaymentPage() {
             <button
               type="button"
               className="primary-button integrated-admin-order-payment-toolbar__add-btn"
-              onClick={() => setIsAddPaymentModalOpen(true)}
+              onClick={() => openStandaloneAddPaymentModal()}
             >
               Add Payment
             </button>
@@ -458,17 +953,44 @@ export function MerchOrderPaymentPage() {
       />
       <AddPaymentModal
         addPaymentAmountError={addPaymentAmountError}
+        editingPaymentId={editingHistoryPaymentId}
+        isOrderSelectorDisabled={isPaymentOrderLocked || Boolean(editingHistoryPaymentId)}
+        learnerPaymentSummary={selectedLearnerPaymentSummary}
+        paymentAmountLimit={activePaymentLimit}
+        paymentOrderMetrics={selectedPaymentOrderMetrics}
         isOpen={isAddPaymentModalOpen}
         isSaving={isSaving}
         onAmountChange={(value) => {
-          setPaymentAmount(value);
-          setAddPaymentAmountError(getAmountError(value, selectedPaymentOrder ? selectedPaymentOrder.orderAmount : null));
+          const nextValue = clampPaymentAmountToLimit(value, activePaymentLimit);
+          setPaymentAmount(nextValue);
+          setAddPaymentAmountError(getAmountError(nextValue, addPaymentLimit));
         }}
-        onClose={() => setIsAddPaymentModalOpen(false)}
+        onClose={() => {
+          setIsAddPaymentModalOpen(false);
+          setSelectedLearnerPaymentSummary(null);
+          setEditingHistoryPaymentId('');
+          setIsPaymentOrderLocked(false);
+          setSelectedPaymentOrderMetrics(null);
+          setSelectedPaymentOrderId('');
+          setPaymentAmount('');
+          setReceiptNo('');
+          setPaymentNotes('');
+          setAddPaymentAmountError('');
+        }}
         onNotesChange={setPaymentNotes}
         onReceiptNoChange={setReceiptNo}
         onSave={() => void handleAddPayment()}
-        onSelectOrder={setSelectedPaymentOrderId}
+        onSelectOrder={(value) => {
+          setSelectedPaymentOrderId(value);
+          const nextSelectedOrder = visibleRecords.find((row) => row.id === value) || null;
+          const nextOutstanding = nextSelectedOrder
+            ? Math.max(0, orderOutstandingBalanceById[nextSelectedOrder.id] ?? nextSelectedOrder.orderAmount)
+            : null;
+          if (!selectedLearnerPaymentSummary && !editingHistoryPaymentId && nextOutstanding !== null) {
+            setPaymentAmount(String(nextOutstanding.toFixed(2)));
+            setAddPaymentAmountError(getAmountError(String(nextOutstanding.toFixed(2)), nextOutstanding));
+          }
+        }}
         paymentAmount={paymentAmount}
         paymentNotes={paymentNotes}
         paymentOrderOptions={paymentOrderOptions}
@@ -478,35 +1000,19 @@ export function MerchOrderPaymentPage() {
       />
       <OrderPaymentDetailModal
         detailModalView={detailModalView}
-        detailPaymentAmount={detailPaymentAmount}
-        detailPaymentAmountError={detailPaymentAmountError}
-        detailPaymentBalance={detailPaymentBalance}
-        detailPaymentNotes={detailPaymentNotes}
-        detailReceiptNo={detailReceiptNo}
-        detailRemainingBalance={detailRemainingBalance}
-        editingPaymentId={editingPaymentId}
         isAuditLoading={isAuditLoading}
         isOpen={Boolean(selectedOrderDetail)}
         isPaymentsLoading={isPaymentsLoading}
         isSaving={isSaving}
-        onAmountChange={(value) => {
-          setDetailPaymentAmount(value);
-          setDetailPaymentAmountError(getAmountError(value, detailRemainingBalance));
-        }}
-        onDeletePayment={() => void handleDeletePaymentRecord()}
+        onDeleteHistory={(entry) => void handleDeletePaymentHistoryEntry(entry)}
         onEditHistory={(entry) => {
           handleEditPaymentHistory(entry);
-          setDetailModalView('record');
         }}
-        onNotesChange={setDetailPaymentNotes}
         onClose={() => setSelectedOrderDetail(null)}
-        onPrimaryAction={() => void handleDetailPrimaryAction()}
-        onReceiptNoChange={setDetailReceiptNo}
         onSetView={setDetailModalView}
         order={selectedOrderDetail}
         paymentHistoryEntries={paymentHistoryEntries}
         selectedOrderAudit={selectedOrderAudit}
-        totalPaidAmount={totalPaidAmount}
       />
     </section>
   );

@@ -1,4 +1,8 @@
 import type { MerchControlSectionLearnerRecord } from '../../../../services/learnerMerchControlService';
+import {
+  getLearnerMerchOrderStatusClass,
+  getLearnerMerchOrderStatusLabel,
+} from '../../../../services/learnerMerchService';
 
 type Props = {
   rows: MerchControlSectionLearnerRecord[];
@@ -37,7 +41,13 @@ export function MerchControlLearnerTable({ rows, ariaLabel, onOpenLearnerDetails
               <td>{row.learnerName}</td>
               <td>{row.learnerLrn || '-'}</td>
               <td>{row.totalOrders}</td>
-              <td>{row.latestOrderStatus || '-'}</td>
+              <td>
+                {row.latestOrderStatus ? (
+                  <span className={`learner-merch-status-chip ${getLearnerMerchOrderStatusClass(row.latestOrderStatus)}`}>
+                    {getLearnerMerchOrderStatusLabel(row.latestOrderStatus)}
+                  </span>
+                ) : '-'}
+              </td>
               <td>{row.latestOrderAt ? new Date(row.latestOrderAt).toLocaleString() : '-'}</td>
             </tr>
           ))}
@@ -46,4 +56,3 @@ export function MerchControlLearnerTable({ rows, ariaLabel, onOpenLearnerDetails
     </div>
   );
 }
-
