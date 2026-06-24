@@ -78,6 +78,52 @@ function chunkArray<T>(items: T[], size: number) {
 }
 
 const STATUS_REFRESH_BATCH_SIZE = 100;
+const PUBLIC_ENROLLMENT_UI_STATE_STORAGE_PREFIX = 'registrar_public_enrollment_submissions_ui_v1';
+
+function getPublicEnrollmentUiStateStorageKey(scopeKey: string, schoolYearLabel: string) {
+  const normalizedScopeKey = String(scopeKey || '').trim() || 'unscoped';
+  const normalizedSchoolYearLabel = String(schoolYearLabel || '').trim() || 'unscoped';
+  return `${PUBLIC_ENROLLMENT_UI_STATE_STORAGE_PREFIX}:${normalizedScopeKey}::${normalizedSchoolYearLabel}`;
+}
+
+function readPublicEnrollmentUiState(scopeKey: string, schoolYearLabel: string) {
+  if (typeof window === 'undefined') return null;
+
+  try {
+    const raw = window.sessionStorage.getItem(getPublicEnrollmentUiStateStorageKey(scopeKey, schoolYearLabel));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as {
+      query?: string;
+      collapsedGrades?: Record<string, boolean>;
+      selectedPrintGrade?: string;
+    };
+    return {
+      query: String(parsed?.query || ''),
+      collapsedGrades: parsed?.collapsedGrades && typeof parsed.collapsedGrades === 'object' ? parsed.collapsedGrades : {},
+      selectedPrintGrade: String(parsed?.selectedPrintGrade || ''),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writePublicEnrollmentUiState(
+  scopeKey: string,
+  schoolYearLabel: string,
+  state: {
+    query: string;
+    collapsedGrades: Record<string, boolean>;
+    selectedPrintGrade: string;
+  }
+) {
+  if (typeof window === 'undefined') return;
+
+  try {
+    window.sessionStorage.setItem(getPublicEnrollmentUiStateStorageKey(scopeKey, schoolYearLabel), JSON.stringify(state));
+  } catch {
+    // Best effort only.
+  }
+}
 
 function normalizeSchoolYear(value: string) {
   const raw = String(value || '').trim();
@@ -250,8 +296,11 @@ export default function PublicEnrollmentSubmissionsPage() {
     removeSubmissionById,
   } = usePublicEnrollmentSubmissions(submissionsScopeKey, effectiveSchoolYearLabel);
   const deferredSubmissions = useDeferredValue(submissions);
-  const [isBodyReady, setIsBodyReady] = useState(false);
-  const [query, setQuery] = useState('');
+  const restoredUiState = useMemo(
+    () => readPublicEnrollmentUiState(submissionsScopeKey, effectiveSchoolYearLabel),
+    [submissionsScopeKey, effectiveSchoolYearLabel]
+  );
+  const [query, setQuery] = useState(() => restoredUiState?.query || '');
   const [actionError, setActionError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [editingSubmission, setEditingSubmission] = useState<PublicEnrollmentSubmission | null>(null);
@@ -264,7 +313,7 @@ export default function PublicEnrollmentSubmissionsPage() {
   const [enrollError, setEnrollError] = useState<string | null>(null);
   const [topAlert, setTopAlert] = useState<{ title: string; message: string } | null>(null);
   const [existingLearnerLrns, setExistingLearnerLrns] = useState<Set<string>>(new Set());
-  const [collapsedGrades, setCollapsedGrades] = useState<Record<string, boolean>>({});
+  const [collapsedGrades, setCollapsedGrades] = useState<Record<string, boolean>>(() => restoredUiState?.collapsedGrades || {});
   const [pendingDeleteSubmissionId, setPendingDeleteSubmissionId] = useState<string | null>(null);
   const [isDeletingSubmission, setIsDeletingSubmission] = useState(false);
   const [draftEditor, setDraftEditor] = useState<EnrollmentDraft>(() => emptyDraft(schoolId));
@@ -276,7 +325,7 @@ export default function PublicEnrollmentSubmissionsPage() {
   const [isSectioningAccessModalOpen, setIsSectioningAccessModalOpen] = useState(false);
   const [isPrintEnrolleesModalOpen, setIsPrintEnrolleesModalOpen] = useState(false);
   const [isNameCheckModalOpen, setIsNameCheckModalOpen] = useState(false);
-  const [selectedPrintGrade, setSelectedPrintGrade] = useState('');
+  const [selectedPrintGrade, setSelectedPrintGrade] = useState(() => restoredUiState?.selectedPrintGrade || '');
   const [sectioningCodes, setSectioningCodes] = useState<SectioningAccessCodeRow[]>([]);
   const [sectioningGradeLevels, setSectioningGradeLevels] = useState<string[]>([]);
   const [isGeneratingCode, setIsGeneratingCode] = useState<string | null>(null);
@@ -286,26 +335,15 @@ export default function PublicEnrollmentSubmissionsPage() {
   const isEditorSeniorHighTargetGrade = SHS_GRADES.has(draftEditor.gradeToEnroll);
   const activeYearNormalized = normalizeSchoolYear(effectiveSchoolYearLabel);
 
-  useEffect(() => {
-    setIsBodyReady(false);
-    const frame = window.requestAnimationFrame(() => {
-      setIsBodyReady(true);
-    });
-    return () => {
-      window.cancelAnimationFrame(frame);
-    };
-  }, [effectiveSchoolYearLabel]);
-
   const activeSchoolYearSubmissions = useMemo(() => {
-    if (!isBodyReady || !activeYearNormalized) return [];
+    if (!activeYearNormalized) return [];
     return deferredSubmissions.filter((row) => {
       const rowSchoolYear = normalizeSchoolYear(String(row.school_year || row.payload?.schoolYear || '').trim());
       return rowSchoolYear === activeYearNormalized;
     });
-  }, [deferredSubmissions, activeYearNormalized, isBodyReady]);
+  }, [deferredSubmissions, activeYearNormalized]);
 
   const filtered = useMemo(() => {
-    if (!isBodyReady) return [];
     const normalized = query.trim().toLowerCase();
     if (!normalized) return activeSchoolYearSubmissions;
     return activeSchoolYearSubmissions.filter((row) => {
@@ -314,7 +352,7 @@ export default function PublicEnrollmentSubmissionsPage() {
       const grade = (row.grade_to_enroll || '').toLowerCase();
       return fullName.includes(normalized) || lrn.includes(normalized) || grade.includes(normalized);
     });
-  }, [query, activeSchoolYearSubmissions, isBodyReady]);
+  }, [query, activeSchoolYearSubmissions]);
 
   const syncLearnerStatusByLrn = useCallback(async (lrn: string) => {
     const trimmedLrn = String(lrn || '').trim();
@@ -611,7 +649,6 @@ export default function PublicEnrollmentSubmissionsPage() {
   }, [isEditorOpen, draftEditor]);
 
   const groupedByGrade = useMemo(() => {
-    if (!isBodyReady) return [];
     const groups = new Map<string, PublicEnrollmentSubmission[]>();
     filtered.forEach((row) => {
       const grade = (row.grade_to_enroll || 'Unspecified').trim() || 'Unspecified';
@@ -619,10 +656,9 @@ export default function PublicEnrollmentSubmissionsPage() {
       groups.get(grade)!.push(row);
     });
     return Array.from(groups.entries()).sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric: true }));
-  }, [filtered, isBodyReady]);
+  }, [filtered]);
 
   const gradeSubmissionCounts = useMemo(() => {
-    if (!isBodyReady) return new Map<string, { enrolled: number; pending: number }>();
     const counts = new Map<string, { enrolled: number; pending: number }>();
 
     filtered.forEach((row) => {
@@ -643,10 +679,9 @@ export default function PublicEnrollmentSubmissionsPage() {
     });
 
     return counts;
-  }, [existingLearnerLrns, filtered, isBodyReady]);
+  }, [existingLearnerLrns, filtered]);
 
   const gradeLatestSubmissionMap = useMemo(() => {
-    if (!isBodyReady) return new Map<string, string>();
     const latestByGrade = new Map<string, string>();
 
     filtered.forEach((row) => {
@@ -665,7 +700,7 @@ export default function PublicEnrollmentSubmissionsPage() {
     });
 
     return latestByGrade;
-  }, [filtered, isBodyReady]);
+  }, [filtered]);
 
   const printableGradeOptions = useMemo(
     () => groupedByGrade.map(([grade]) => grade),
@@ -673,7 +708,6 @@ export default function PublicEnrollmentSubmissionsPage() {
   );
 
   useEffect(() => {
-    if (!isBodyReady) return;
     setCollapsedGrades((current) => {
       const next = { ...current };
       groupedByGrade.forEach(([grade]) => {
@@ -681,7 +715,15 @@ export default function PublicEnrollmentSubmissionsPage() {
       });
       return next;
     });
-  }, [groupedByGrade, isBodyReady]);
+  }, [groupedByGrade]);
+
+  useEffect(() => {
+    writePublicEnrollmentUiState(submissionsScopeKey, effectiveSchoolYearLabel, {
+      query,
+      collapsedGrades,
+      selectedPrintGrade,
+    });
+  }, [collapsedGrades, effectiveSchoolYearLabel, query, selectedPrintGrade, submissionsScopeKey]);
 
   const priorYearLearnerOptions = useMemo(() => {
     return priorYearLearners.map((row) => ({
@@ -822,7 +864,7 @@ export default function PublicEnrollmentSubmissionsPage() {
   };
 
   const openEdit = (row: PublicEnrollmentSubmission) => {
-    navigate(`/enroll/${row.id}/edit`);
+    navigate(`/enroll/${row.id}/edit`, { state: { returnTo: '/enroll' } });
   };
 
   const openPriorLearnerEditor = async (learnerId: string) => {
@@ -1293,7 +1335,6 @@ export default function PublicEnrollmentSubmissionsPage() {
     const payload = enrollingSubmission.payload || ({} as EnrollmentDraft);
     const lrn = (enrollingSubmission.lrn || payload.lrn || '').trim();
     const gradeToEnroll = (enrollingSubmission.grade_to_enroll || payload.gradeToEnroll || '').trim();
-    const registeredSubmissionEmail = String(enrollingSubmission.payload?.email || enrollingSubmission.email || payload.email || '').trim();
     if (!lrn) {
       setEnrollError('LRN is required before enrolling this submission.');
       return;
@@ -1387,7 +1428,6 @@ export default function PublicEnrollmentSubmissionsPage() {
         payload: appendSubmissionAudit(
           {
             ...payload,
-            email: registeredSubmissionEmail,
             consent: true,
             assignedSectionId: selectedSectionId,
             assignedSectionName: String(sectionInfo.name || '').trim(),
@@ -1437,24 +1477,6 @@ export default function PublicEnrollmentSubmissionsPage() {
 
         upsertSubmissionLocally(updatedSubmission);
         await syncLearnerStatusByLrn(lrn);
-        const updatedSubmissionEmail = String(updatedSubmission.payload?.email || updatedSubmission.email || '').trim();
-        if (updatedSubmissionEmail) {
-          const updatedSubmissionReferenceId = String(updatedSubmission.submission_reference_id || enrollingSubmission.submission_reference_id || '').trim();
-          const updatedLearnerName = [updatedSubmission.last_name || payload.lastName, updatedSubmission.first_name || payload.firstName, updatedSubmission.middle_name || payload.middleName]
-            .map((value) => String(value || '').trim())
-            .filter(Boolean)
-            .join(', ');
-          const updatedSectionLabel = String((updatedSubmission.payload as any)?.assignedSectionName || sectionInfo?.name || '').trim() || 'Assigned Section';
-          const result = await sendSubmissionConfirmationEmail({
-            submissionId: updatedSubmission.id,
-            schoolId: String(updatedSubmission.school_id || payload.schoolId || schoolId).trim(),
-            email: updatedSubmissionEmail,
-            learnerName: updatedLearnerName,
-            submissionReferenceId: updatedSubmissionReferenceId,
-            sectionLabel: updatedSectionLabel,
-            lrn,
-          });
-        }
         closeEnrollModal();
       } catch (error: any) {
         setEnrollError(error?.message || 'Unable to enroll submission to learner records.');
@@ -1558,7 +1580,7 @@ export default function PublicEnrollmentSubmissionsPage() {
               <p className="registrar-public-enrollment-submissions__sync-note">
                 Last saved to cache: {formatDate(lastSavedToCacheAt) || 'Not yet saved to cache'}
               </p>
-              {isLoading || !isBodyReady ? (
+              {isLoading && !deferredSubmissions.length ? (
                 <p className="registrar-public-enrollment-submissions__sync-note">
                   Loading submissions in the background...
                 </p>
@@ -1573,7 +1595,7 @@ export default function PublicEnrollmentSubmissionsPage() {
             <button type="button" className="secondary-button" style={{ minHeight: 56 }} onClick={() => void openSectioningAccessModal()}>
               Sectioning Access
             </button>
-            <button type="button" className="secondary-button" style={{ minHeight: 56 }} onClick={openPrintEnrolleesModal} disabled={!isBodyReady || !groupedByGrade.length}>
+            <button type="button" className="secondary-button" style={{ minHeight: 56 }} onClick={openPrintEnrolleesModal} disabled={!groupedByGrade.length}>
               Print Enrollees List
             </button>
             <button
@@ -1581,7 +1603,7 @@ export default function PublicEnrollmentSubmissionsPage() {
               className="secondary-button"
               style={{ minHeight: 56 }}
               onClick={() => setIsNameCheckModalOpen(true)}
-              disabled={!isBodyReady}
+              disabled={!deferredSubmissions.length}
             >
               Check Section List
             </button>
@@ -1659,7 +1681,7 @@ export default function PublicEnrollmentSubmissionsPage() {
           </div>
         </div>
 
-        {isLoading || !isBodyReady ? (
+        {isLoading && !filtered.length ? (
           <div className="table-card"><table className="usis-table"><tbody><tr><td>Loading submissions...</td></tr></tbody></table></div>
         ) : groupedByGrade.length ? (
     groupedByGrade.map(([grade, rows]) => (

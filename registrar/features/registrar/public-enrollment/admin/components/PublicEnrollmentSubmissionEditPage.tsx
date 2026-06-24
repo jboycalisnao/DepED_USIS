@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useStore } from '../../../../../store';
 import UsisPageLoader from '../../../../../../common/components/UsisPageLoader';
 import type { EnrollmentDraft } from '../../types';
@@ -62,8 +62,10 @@ const emptyDraft = (schoolId: string): EnrollmentDraft => ({
 export default function PublicEnrollmentSubmissionEditPage() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { registrarAccess, availableStrands } = useStore();
   const schoolId = registrarAccess?.schoolId || '302522';
+  const returnTo = String((location.state as { returnTo?: string } | null)?.returnTo || '').trim() || '/enroll';
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -191,7 +193,7 @@ export default function PublicEnrollmentSubmissionEditPage() {
         guardian_contact: draft.guardianContact.trim() || null,
         payload: draft,
       });
-      navigate('/enroll');
+      navigate(returnTo, { replace: true });
     } catch (e: any) {
       setError(e?.message || 'Unable to save submission.');
     } finally {
@@ -200,13 +202,13 @@ export default function PublicEnrollmentSubmissionEditPage() {
   };
 
   if (isLoading) return <UsisPageLoader message="Loading submission editor..." />;
-  if (error && !draft.lrn && !draft.lastName && !draft.firstName) return <section className="portal-panel registrar-public-enrollment-submissions"><div className="portal-panel__body"><p>{error}</p><button type="button" className="secondary-button" onClick={() => navigate('/enroll')}>Back</button></div></section>;
+  if (error && !draft.lrn && !draft.lastName && !draft.firstName) return <section className="portal-panel registrar-public-enrollment-submissions"><div className="portal-panel__body"><p>{error}</p><button type="button" className="secondary-button" onClick={() => navigate(returnTo, { replace: true })}>Back</button></div></section>;
 
   return (
     <section className="portal-panel registrar-public-enrollment-submissions">
       <div className="portal-panel__header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
         <div><h2>Edit Submission</h2><p>Update learner enrollment details.</p></div>
-        <button type="button" className="secondary-button" onClick={() => navigate('/enroll')}>Back to Submissions</button>
+        <button type="button" className="secondary-button" onClick={() => navigate(returnTo, { replace: true })}>Back to Submissions</button>
       </div>
       <div className="portal-panel__body" style={{ display: 'grid', gap: 18 }}>
         {error ? <div className="notice-box" style={{ color: 'var(--deped-red)' }}>{error}</div> : null}
@@ -219,7 +221,7 @@ export default function PublicEnrollmentSubmissionEditPage() {
           schoolIdReadOnly
         />
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-          <button type="button" className="secondary-button" onClick={() => navigate('/enroll')} disabled={isSaving}>Cancel</button>
+          <button type="button" className="secondary-button" onClick={() => navigate(returnTo, { replace: true })} disabled={isSaving}>Cancel</button>
           <button type="button" className="primary-button" onClick={save} disabled={isSaving}>{isSaving ? 'Saving...' : 'Save Submission'}</button>
         </div>
       </div>
