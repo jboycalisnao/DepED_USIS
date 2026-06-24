@@ -3,9 +3,18 @@ import { getSupabaseAdmin, normalize, type RegistrarEnrollmentEmailSettings } fr
 
 type Json = Record<string, any>;
 
+const DEFAULT_SENDER_DISPLAY_NAME = 'Leon NHS - USIS';
+
 const json = (res: VercelResponse, statusCode: number, payload: Json) => {
   res.status(statusCode).setHeader('Content-Type', 'application/json');
   res.send(JSON.stringify(payload));
+};
+
+const resolveSenderDisplayName = (value: unknown) => {
+  const normalized = normalize(value);
+  if (!normalized) return DEFAULT_SENDER_DISPLAY_NAME;
+  if (/^deped\s+usis\s+registrar$/i.test(normalized)) return DEFAULT_SENDER_DISPLAY_NAME;
+  return normalized;
 };
 
 const readBody = (req: VercelRequest): Json => {
@@ -78,8 +87,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       htmlContent,
       html: htmlContent,
       textContent: normalize(body.textContent) || undefined,
-      senderName: normalize(body.senderName) || normalize(settings?.from_display_name) || 'DepED USIS Registrar',
-      fromDisplayName: normalize(body.fromDisplayName) || normalize(settings?.from_display_name) || 'DepED USIS Registrar',
+      senderName: resolveSenderDisplayName(body.senderName || settings?.from_display_name),
+      fromDisplayName: resolveSenderDisplayName(body.fromDisplayName || settings?.from_display_name),
       replyTo: normalize(body.replyTo) || normalize(settings?.reply_to_email) || null,
       statusLookupUrl: normalize(body.statusLookupUrl) || undefined,
       headerImageSrc: normalize(body.headerImageSrc) || undefined,

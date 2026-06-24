@@ -608,8 +608,8 @@ export default defineConfig(({ mode }) => {
           const lrn = escapeHtml(input.lrn || '--');
           const submissionReferenceId = escapeHtml(input.submissionReferenceId || '--');
           const statusLookupUrl = escapeHtml(input.statusLookupUrl || '#');
-          const fromDisplayName = escapeHtml(input.fromDisplayName || 'Leon NHS - USIS Registrar');
-          return `<!doctype html><html><body style="margin:0;padding:0;background:#f3f6fb;font-family:'Segoe UI',sans-serif;color:#10233d;"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f3f6fb;padding:20px 12px;"><tr><td align="center"><table role="presentation" width="640" cellspacing="0" cellpadding="0" style="max-width:640px;width:100%;background:#ffffff;border:1px solid #d5deea;border-radius:12px;overflow:hidden;"><tr><td style="background:#0f4c81;color:#ffffff;padding:16px 20px;"><div style="font-size:13px;font-weight:700;line-height:1.3;">Leon NHS - USIS</div><div style="font-size:22px;font-weight:700;line-height:1.2;margin-top:4px;">Enrollment Submission Confirmation</div></td></tr><tr><td style="padding:18px 20px;"><p style="margin:0 0 12px;font-size:14px;line-height:1.5;">Your online enrollment submission has been received.</p><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:1px solid #d9e2ef;border-radius:12px;background:#f8fbff;"><tr><td style="padding:14px 14px 4px;font-size:12px;color:#415a77;">Learner Name</td></tr><tr><td style="padding:0 14px 10px;font-size:16px;font-weight:700;">${learnerName}</td></tr><tr><td style="padding:0 14px 4px;font-size:12px;color:#415a77;">LRN</td></tr><tr><td style="padding:0 14px 10px;font-size:16px;font-weight:700;">${lrn}</td></tr><tr><td style="padding:0 14px 4px;font-size:12px;color:#415a77;">Submission Reference Number</td></tr><tr><td style="padding:0 14px 14px;font-size:16px;font-weight:700;">${submissionReferenceId}</td></tr></table><div style="margin-top:16px;"><a href="${statusLookupUrl}" style="display:inline-block;background:#0f4c81;color:#ffffff;text-decoration:none;border-radius:10px;padding:11px 14px;font-size:14px;font-weight:700;">Check Submission Status</a></div><p style="margin:12px 0 0;font-size:12px;color:#415a77;line-height:1.4;">If the button does not work, copy and open this link:<br /><a href="${statusLookupUrl}" style="color:#0f4c81;word-break:break-all;">${statusLookupUrl}</a></p></td></tr><tr><td style="border-top:1px solid #d5deea;padding:12px 20px;background:#f8fbff;font-size:12px;color:#415a77;">${fromDisplayName}<br />&copy; Leon NHS - USIS</td></tr></table></td></tr></table></body></html>`;
+          const fromDisplayName = escapeHtml(input.fromDisplayName || 'Leon NHS - USIS');
+          return `<!doctype html><html><body style="margin:0;padding:0;background:#f3f6fb;font-family:'Segoe UI',sans-serif;color:#10233d;"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f3f6fb;padding:20px 12px;"><tr><td align="center"><table role="presentation" width="640" cellspacing="0" cellpadding="0" style="max-width:640px;width:100%;background:#ffffff;border:1px solid #d5deea;border-radius:6px;overflow:hidden;"><tr><td style="background:#0038A8;color:#ffffff;padding:16px 20px;"><div style="font-size:13px;font-weight:700;line-height:1.3;">Leon NHS - USIS</div><div style="font-size:22px;font-weight:700;line-height:1.2;margin-top:4px;">Enrollment Submission Confirmation</div></td></tr><tr><td style="padding:18px 20px;"><p style="margin:0 0 12px;font-size:14px;line-height:1.5;">Your online enrollment submission has been received.</p><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:1px solid #d9e2ef;border-radius:6px;background:#f8fbff;"><tr><td style="padding:14px 14px 4px;font-size:12px;color:#415a77;">Learner Name</td></tr><tr><td style="padding:0 14px 10px;font-size:16px;font-weight:700;">${learnerName}</td></tr><tr><td style="padding:0 14px 4px;font-size:12px;color:#415a77;">LRN</td></tr><tr><td style="padding:0 14px 10px;font-size:16px;font-weight:700;">${lrn}</td></tr><tr><td style="padding:0 14px 4px;font-size:12px;color:#415a77;">Submission Reference Number</td></tr><tr><td style="padding:0 14px 14px;font-size:16px;font-weight:700;">${submissionReferenceId}</td></tr></table><div style="margin-top:16px;"><a href="${statusLookupUrl}" style="display:inline-block;background:#0038A8;color:#ffffff;text-decoration:none;border-radius:6px;padding:11px 14px;font-size:14px;font-weight:700;">Check Submission Status</a></div><p style="margin:12px 0 0;font-size:12px;color:#415a77;line-height:1.4;">If the button does not work, copy and open this link:<br /><a href="${statusLookupUrl}" style="color:#0038A8;word-break:break-all;">${statusLookupUrl}</a></p></td></tr><tr><td style="border-top:1px solid #d5deea;padding:12px 20px;background:#f8fbff;font-size:12px;color:#415a77;">${fromDisplayName}<br />&copy; Leon NHS - USIS</td></tr></table></td></tr></table></body></html>`;
         };
 
         const getSupabaseAdmin = () => {
@@ -708,7 +708,7 @@ export default defineConfig(({ mode }) => {
                 lrn,
                 submissionReferenceId,
                 statusLookupUrl,
-                fromDisplayName: normalize((settings as any).from_display_name) || 'Leon NHS - USIS Registrar',
+                fromDisplayName: normalize((settings as any).from_display_name) || 'Leon NHS - USIS',
               }),
               send_status: 'pending',
               attempts: 0,
@@ -740,8 +740,8 @@ export default defineConfig(({ mode }) => {
                     subject: `USIS Enrollment Submission Confirmation - ${submissionReferenceId}`,
                     htmlContent: queueRow.email_html,
                     html: queueRow.email_html,
-                    senderName: normalize((settings as any).from_display_name) || 'Leon NHS - USIS Registrar',
-                    fromDisplayName: normalize((settings as any).from_display_name) || 'Leon NHS - USIS Registrar',
+                    senderName: normalize((settings as any).from_display_name) || 'Leon NHS - USIS',
+                    fromDisplayName: normalize((settings as any).from_display_name) || 'Leon NHS - USIS',
                     replyTo: normalize((settings as any).reply_to_email) || undefined,
                   }),
                 });
@@ -854,8 +854,8 @@ export default defineConfig(({ mode }) => {
                     subject: String((row as any).email_subject || ''),
                     htmlContent: String((row as any).email_html || ''),
                     html: String((row as any).email_html || ''),
-                    senderName: String((settings as any).from_display_name || 'Leon NHS - USIS Registrar'),
-                    fromDisplayName: String((settings as any).from_display_name || 'Leon NHS - USIS Registrar'),
+                    senderName: String((settings as any).from_display_name || 'Leon NHS - USIS'),
+                    fromDisplayName: String((settings as any).from_display_name || 'Leon NHS - USIS'),
                     replyTo: normalize((settings as any).reply_to_email) || undefined,
                   }),
                 });
@@ -957,8 +957,8 @@ export default defineConfig(({ mode }) => {
               htmlContent: String(body?.htmlContent || ''),
               html: String(body?.htmlContent || ''),
               textContent: String(body?.textContent || ''),
-              senderName: String(body?.senderName || settings?.from_display_name || 'DepED USIS Registrar'),
-              fromDisplayName: String(body?.fromDisplayName || settings?.from_display_name || 'DepED USIS Registrar'),
+              senderName: String(body?.senderName || settings?.from_display_name || 'Leon NHS - USIS'),
+              fromDisplayName: String(body?.fromDisplayName || settings?.from_display_name || 'Leon NHS - USIS'),
               replyTo: normalize(body?.replyTo) || normalize((settings as any)?.reply_to_email) || undefined,
               statusLookupUrl: normalize(body?.statusLookupUrl) || undefined,
               headerImageSrc: normalize(body?.headerImageSrc) || undefined,

@@ -14,6 +14,12 @@ const json = (res: VercelResponse, statusCode: number, payload: unknown) => {
 
 const toEmail = (value: unknown) => normalize(value).toLowerCase();
 const isLikelyEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+const resolveSenderDisplayName = (value: unknown) => {
+  const normalized = normalize(value);
+  if (!normalized) return 'Leon NHS - USIS';
+  if (/^deped\s+usis\s+registrar$/i.test(normalized)) return 'Leon NHS - USIS';
+  return normalized;
+};
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
@@ -31,7 +37,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!submission) return json(res, 404, { error: 'Submission not found.' });
 
     const payload = submission.payload && typeof submission.payload === 'object' ? (submission.payload as Record<string, any>) : {};
-    const recipientEmail = toEmail(payload.email);
+    const submissionLrn = normalize(submission.lrn || payload.lrn || '');
+    let recipientEmail = toEmail(payload.email || (submission as any).email);
+    let learnerFallback: Record<string, any> | null = null;
+
+    if (!isLikelyEmail(recipientEmail) && submissionLrn) {
+      const { data: learnerRow, error: learnerError } = await supabase
+        .from('registrar_learners')
+        .select('email,microsoft_upn,first_name,last_name,middle_name')
+        .eq('lrn', submissionLrn)
+        .maybeSingle();
+      if (learnerError) throw learnerError;
+      learnerFallback = learnerRow as Record<string, any> | null;
+      recipientEmail = toEmail(learnerFallback?.email || learnerFallback?.microsoft_upn || '');
+    }
+
     if (!isLikelyEmail(recipientEmail)) return json(res, 200, { queued: false, reason: 'missing_or_invalid_email' });
 
     const schoolId = normalize(submission.school_id || payload.schoolId || '');
@@ -50,8 +70,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const submissionReferenceId = normalize((submission as any).submission_reference_id);
     if (!submissionReferenceId) return json(res, 200, { queued: false, reason: 'missing_submission_reference' });
 
-    const lrn = normalize(submission.lrn || payload.lrn || '');
-    const learnerName = [normalize(submission.last_name || payload.lastName), normalize(submission.first_name || payload.firstName), normalize(submission.middle_name || payload.middleName)]
+    const lrn = submissionLrn;
+    const learnerName = [normalize(submission.last_name || payload.lastName || learnerFallback?.last_name), normalize(submission.first_name || payload.firstName || learnerFallback?.first_name), normalize(submission.middle_name || payload.middleName || learnerFallback?.middle_name)]
       .filter(Boolean)
       .join(', ');
 
@@ -62,7 +82,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       lrn,
       submissionReferenceId,
       statusLookupUrl,
-      fromDisplayName: normalize((settings as RegistrarEnrollmentEmailSettings).from_display_name) || 'DepED USIS Registrar',
+      fromDisplayName: resolveSenderDisplayName((settings as RegistrarEnrollmentEmailSettings).from_display_name),
     });
 
     const queueRow = {
@@ -105,8 +125,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             subject,
             htmlContent: html,
             html,
-            senderName: normalize((settings as RegistrarEnrollmentEmailSettings).from_display_name) || 'DepED USIS Registrar',
-            fromDisplayName: normalize((settings as RegistrarEnrollmentEmailSettings).from_display_name) || 'DepED USIS Registrar',
+            senderName: resolveSenderDisplayName((settings as RegistrarEnrollmentEmailSettings).from_display_name),
+            fromDisplayName: resolveSenderDisplayName((settings as RegistrarEnrollmentEmailSettings).from_display_name),
             replyTo: normalize((settings as RegistrarEnrollmentEmailSettings).reply_to_email) || undefined,
           }),
         });

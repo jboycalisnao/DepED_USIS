@@ -9,11 +9,12 @@ import { CredentialsActions } from './credentials/CredentialsActions';
 import { CredentialsFilters } from './credentials/CredentialsFilters';
 import { CredentialsSectionTable } from './credentials/CredentialsSectionTable';
 import { buildMicrosoftUsername, createPolicyPassword, createUniquePolicyPassword } from './credentials/credentialsHelpers';
+import { sendLearnerCredentialsViaWebhook } from '../features/registrar/learners/services/sendLearnerCredentialsEmail';
 import { getActiveLearnersForYear } from '../services/dashboardService';
 
 const Credentials: React.FC = () => {
   const navigate = useNavigate();
-  const { learners, sections, activeSchoolYear, gradeLevels, updateLearnerCredentials, updateLearner, loading } = useStore();
+  const { learners, sections, activeSchoolYear, gradeLevels, registrarAccess, updateLearnerCredentials, updateLearner, loading } = useStore();
   const [selectedGrade, setSelectedGrade] = useState<GradeLevel>(gradeLevels[0] || GradeLevel.GRADE_7);
   const [selectedSectionId, setSelectedSectionId] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
@@ -257,6 +258,114 @@ const Credentials: React.FC = () => {
     else setFeedback(`Credentials reset for ${payload.length} learner(s).`);
   };
 
+  const classifyCredentialSendError = (error: unknown) => {
+    const rawMessage = String(error instanceof Error ? error.message : error || '').trim();
+    const message = rawMessage.toLowerCase();
+    if (!message) {
+      return { bucket: 'other' as const, label: 'Unknown error' };
+    }
+    if (message.includes('learner email is not set') || message.includes('email is missing')) {
+      return { bucket: 'missing_email' as const, label: 'Missing email' };
+    }
+    if (message.includes('learner credentials are incomplete') || message.includes('username and password are required')) {
+      return { bucket: 'incomplete_credentials' as const, label: 'Incomplete credentials' };
+    }
+    if (
+      message.includes('apps script web app url is not configured') ||
+      message.includes('enrollment email settings not found') ||
+      message.includes('disabled in registrar settings') ||
+      message.includes('unable to forward learner credentials email') ||
+      message.includes('apps script webhook returned an error') ||
+      message.includes('missing required fields')
+    ) {
+      return { bucket: 'delivery_or_config' as const, label: 'Delivery/config error' };
+    }
+    if (message.includes('fetch failed') || message.includes('networkerror') || message.includes('failed to fetch')) {
+      return { bucket: 'other' as const, label: 'Network/fetch error' };
+    }
+    return { bucket: 'other' as const, label: rawMessage || 'Other error' };
+  };
+
+  const massSendCredentials = async () => {
+    if (selectedLearners.length === 0) {
+      setFeedback('Select at least one learner first.');
+      return;
+    }
+
+    const schoolId = String(registrarAccess?.schoolId || '').trim();
+    if (!schoolId) {
+      setFeedback('School ID is missing. Unable to send credentials email.');
+      return;
+    }
+
+    setFeedback('Sending credentials emails...');
+    try {
+      const results = await Promise.allSettled(
+        selectedLearners.map(async (learner) => {
+          const section = sections.find((entry) => String(entry.id || '').trim() === String(learner.sectionId || '').trim());
+          return sendLearnerCredentialsViaWebhook({
+            learner,
+            schoolId,
+            schoolYearLabel: activeSchoolYear.label,
+            sectionLabel: section ? `${section.name}${section.strand ? ` [${section.strand}]` : ''}` : 'Unassigned',
+          });
+        }),
+      );
+
+      const sent = results.filter((result) => result.status === 'fulfilled').length;
+      const breakdown = results.reduce(
+        (acc, result) => {
+          if (result.status === 'fulfilled') {
+            acc.sent += 1;
+            return acc;
+          }
+
+          acc.failed += 1;
+          const classification = classifyCredentialSendError(result.reason);
+          if (classification.bucket === 'missing_email') acc.missingEmail += 1;
+          else if (classification.bucket === 'incomplete_credentials') acc.incompleteCredentials += 1;
+          else if (classification.bucket === 'delivery_or_config') acc.deliveryOrConfig += 1;
+          else acc.other += 1;
+          const reasonKey = classification.label || 'Other error';
+          acc.otherReasons[reasonKey] = (acc.otherReasons[reasonKey] || 0) + 1;
+          return acc;
+        },
+        {
+          sent: 0,
+          failed: 0,
+          missingEmail: 0,
+          incompleteCredentials: 0,
+          deliveryOrConfig: 0,
+          other: 0,
+          otherReasons: {} as Record<string, number>,
+        },
+      );
+
+      const failed = breakdown.failed;
+      if (failed > 0) {
+        const details = [
+          breakdown.missingEmail > 0 ? `${breakdown.missingEmail} missing email` : '',
+          breakdown.incompleteCredentials > 0 ? `${breakdown.incompleteCredentials} incomplete credentials` : '',
+          breakdown.deliveryOrConfig > 0 ? `${breakdown.deliveryOrConfig} delivery/config` : '',
+          breakdown.other > 0
+            ? Object.entries(breakdown.otherReasons)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 4)
+                .map(([reason, count]) => `${count} ${reason.toLowerCase()}`)
+                .join(', ')
+            : '',
+        ].filter(Boolean).join(', ');
+        setFeedback(
+          `Credentials emails sent for ${sent}/${results.length} learner(s). Failed: ${details || `${failed} total`}.`,
+        );
+      } else {
+        setFeedback(`Credentials emails sent for ${sent} learner(s).`);
+      }
+    } catch (error: any) {
+      setFeedback(error?.message || 'Unable to send credentials emails.');
+    }
+  };
+
   const openPrintPopup = () => {
     const printableLearners = selectedLearners.length > 0 ? selectedLearners : targetLearners;
     if (printableLearners.length === 0) return setFeedback('No learners available to print in the selected scope.');
@@ -339,6 +448,7 @@ const Credentials: React.FC = () => {
           loading={loading}
           selectedCount={selectedLearners.length}
           onGenerate={generateCredentials}
+          onMassSendCredentials={massSendCredentials}
           onPrint={openPrintPopup}
           onPrintMicrosoft={openMicrosoftPrintPopup}
           onRecheckMicrosoft={recheckMicrosoftStatus}

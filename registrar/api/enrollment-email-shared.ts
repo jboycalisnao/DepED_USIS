@@ -56,7 +56,7 @@ export const buildEnrollmentEmailHtml = (input: {
   const lrn = escapeHtml(input.lrn || '--');
   const submissionReferenceId = escapeHtml(input.submissionReferenceId || '--');
   const statusLookupUrl = escapeHtml(input.statusLookupUrl || '#');
-  const fromDisplayName = escapeHtml(input.fromDisplayName || 'Leon NHS - USIS Registrar');
+  const fromDisplayName = escapeHtml(input.fromDisplayName || 'Leon NHS - USIS');
   return `<!doctype html>
 <html>
   <head>
@@ -68,9 +68,9 @@ export const buildEnrollmentEmailHtml = (input: {
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f3f6fb;padding:20px 12px;">
       <tr>
         <td align="center">
-          <table role="presentation" width="640" cellspacing="0" cellpadding="0" style="max-width:640px;width:100%;background:#ffffff;border:1px solid #d5deea;border-radius:12px;overflow:hidden;">
+          <table role="presentation" width="640" cellspacing="0" cellpadding="0" style="max-width:640px;width:100%;background:#ffffff;border:1px solid #d5deea;border-radius:6px;overflow:hidden;">
             <tr>
-              <td style="background:#0f4c81;color:#ffffff;padding:16px 20px;">
+              <td style="background:#0038A8;color:#ffffff;padding:16px 20px;">
                 <div style="font-size:13px;font-weight:700;line-height:1.3;">Leon NHS - USIS</div>
                 <div style="font-size:22px;font-weight:700;line-height:1.2;margin-top:4px;">Enrollment Submission Confirmation</div>
               </td>
@@ -78,7 +78,7 @@ export const buildEnrollmentEmailHtml = (input: {
             <tr>
               <td style="padding:18px 20px;">
                 <p style="margin:0 0 12px;font-size:14px;line-height:1.5;">Your online enrollment submission has been received.</p>
-                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:1px solid #d9e2ef;border-radius:12px;background:#f8fbff;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:1px solid #d9e2ef;border-radius:6px;background:#f8fbff;">
                   <tr><td style="padding:14px 14px 4px;font-size:12px;color:#415a77;">Learner Name</td></tr>
                   <tr><td style="padding:0 14px 10px;font-size:16px;font-weight:700;">${learnerName}</td></tr>
                   <tr><td style="padding:0 14px 4px;font-size:12px;color:#415a77;">LRN</td></tr>
@@ -87,9 +87,9 @@ export const buildEnrollmentEmailHtml = (input: {
                   <tr><td style="padding:0 14px 14px;font-size:16px;font-weight:700;">${submissionReferenceId}</td></tr>
                 </table>
                 <div style="margin-top:16px;">
-                  <a href="${statusLookupUrl}" style="display:inline-block;background:#0f4c81;color:#ffffff;text-decoration:none;border-radius:10px;padding:11px 14px;font-size:14px;font-weight:700;">Check Submission Status</a>
+                  <a href="${statusLookupUrl}" style="display:inline-block;background:#0038A8;color:#ffffff;text-decoration:none;border-radius:6px;padding:11px 14px;font-size:14px;font-weight:700;">Check Submission Status</a>
                 </div>
-                <p style="margin:12px 0 0;font-size:12px;color:#415a77;line-height:1.4;">If the button does not work, copy and open this link:<br /><a href="${statusLookupUrl}" style="color:#0f4c81;word-break:break-all;">${statusLookupUrl}</a></p>
+                <p style="margin:12px 0 0;font-size:12px;color:#415a77;line-height:1.4;">If the button does not work, copy and open this link:<br /><a href="${statusLookupUrl}" style="color:#0038A8;word-break:break-all;">${statusLookupUrl}</a></p>
               </td>
             </tr>
             <tr>

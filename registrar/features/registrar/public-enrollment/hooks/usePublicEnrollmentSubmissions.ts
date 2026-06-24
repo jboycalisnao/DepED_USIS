@@ -107,10 +107,11 @@ export function usePublicEnrollmentSubmissions(scopeKey = 'default', schoolYearL
         scopeKey,
         schoolYearLabel,
       });
-      await loadFromNetwork({ toggleLoading: !options?.silent });
+      return await loadFromNetwork({ toggleLoading: !options?.silent });
     } catch (error: any) {
       setErrorMessage(error?.message || 'Unable to load submissions.');
       if (!options?.silent) setIsLoading(false);
+      return [];
     } finally {
       if (!options?.silent) setIsLoading(false);
     }

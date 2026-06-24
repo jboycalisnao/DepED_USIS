@@ -11,7 +11,6 @@ import PrintEnrollmentGradeModal from './PrintEnrollmentGradeModal';
 import EnrollmentSubmissionNameCheckModal from './EnrollmentSubmissionNameCheckModal';
 import type { EnrollmentDraft, PublicEnrollmentSubmission } from '../../types';
 import { openEnrollmentEnrolleesPrintWindow, type EnrollmentEnrolleePrintRow } from '../utils/printEnrollmentEnrolleesList';
-import { sendLearnerCredentialsViaWebhook } from '../../../learners/services/sendLearnerCredentialsEmail';
 import {
   createPublicEnrollmentSubmissionRecord,
   deletePublicEnrollmentSubmissionRecord,
@@ -25,6 +24,8 @@ import {
 import { publishEnrollmentKioskState, type EnrollmentKioskSelectedLearner } from '../../kiosk/enrollmentKioskSync';
 import { validatePublicEnrollmentDraft } from '../../utils/validation';
 import { logEnrollmentBandwidthEstimate } from '../../utils/enrollmentBandwidthLog';
+import { loadUsisEmailHeaderImagePayload } from '../../../../../../common/email/usisEmailHeaderImage';
+import { buildEnrollmentConfirmationEmailHtml } from '../../services/email-template/buildEnrollmentConfirmationEmailHtml';
 import {
   deviceOptions,
   gradeLevelOptions,
@@ -66,6 +67,17 @@ function formatDate(value: string) {
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleString();
 }
+
+function chunkArray<T>(items: T[], size: number) {
+  if (size <= 0) return [items];
+  const chunks: T[][] = [];
+  for (let index = 0; index < items.length; index += size) {
+    chunks.push(items.slice(index, index + size));
+  }
+  return chunks;
+}
+
+const STATUS_REFRESH_BATCH_SIZE = 100;
 
 function normalizeSchoolYear(value: string) {
   const raw = String(value || '').trim();
@@ -270,6 +282,7 @@ export default function PublicEnrollmentSubmissionsPage() {
   const [isGeneratingCode, setIsGeneratingCode] = useState<string | null>(null);
   const [sendingEmailSubmissionId, setSendingEmailSubmissionId] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isStatusRefreshing, setIsStatusRefreshing] = useState(false);
   const isEditorSeniorHighTargetGrade = SHS_GRADES.has(draftEditor.gradeToEnroll);
   const activeYearNormalized = normalizeSchoolYear(effectiveSchoolYearLabel);
 
@@ -341,6 +354,104 @@ export default function PublicEnrollmentSubmissionsPage() {
 
     return isExistingLearner;
   }, [activeSchoolYearId]);
+
+  const refreshAllSubmissionStatuses = useCallback(async () => {
+    setIsStatusRefreshing(true);
+    setActionError(null);
+    try {
+      const refreshedRows = await refresh({ silent: true });
+      const sourceRows = Array.isArray(refreshedRows) && refreshedRows.length ? refreshedRows : activeSchoolYearSubmissions;
+      const lrns = Array.from(
+        new Set(
+          sourceRows
+            .map((row) => String(row.lrn || row.payload?.lrn || '').trim())
+            .filter(Boolean)
+        )
+      );
+
+      if (!lrns.length) {
+        setTopAlert({
+          title: 'Status Refresh',
+          message: 'No learner LRNs were found in the current submissions list.',
+        });
+        return;
+      }
+
+      const learnerRowsByLrn = new Map<string, { lrn: string; section_id: string | null; status: string | null }>();
+      const sectionIds = new Set<string>();
+
+      for (const batch of chunkArray(lrns, STATUS_REFRESH_BATCH_SIZE)) {
+        const { data: learnerRows, error: learnerError } = await supabase
+          .from('registrar_learners')
+          .select('lrn,section_id,status')
+          .in('lrn', batch);
+
+        if (learnerError) throw learnerError;
+
+        for (const learnerRow of (learnerRows || []) as Array<{ lrn?: string; section_id?: string | null; status?: string | null }>) {
+          const learnerLrn = String(learnerRow?.lrn || '').trim();
+          if (!learnerLrn) continue;
+          learnerRowsByLrn.set(learnerLrn, {
+            lrn: learnerLrn,
+            section_id: String(learnerRow?.section_id || '').trim() || null,
+            status: String(learnerRow?.status || '').trim() || null,
+          });
+
+          const learnerSectionId = String(learnerRow?.section_id || '').trim();
+          if (learnerSectionId) {
+            sectionIds.add(learnerSectionId);
+          }
+        }
+      }
+
+      const sectionYearMap = new Map<string, string>();
+      if (sectionIds.size) {
+        const { data: sectionRows, error: sectionError } = await supabase
+          .from('registrar_sections')
+          .select('id,school_year_id')
+          .in('id', Array.from(sectionIds));
+
+        if (sectionError) throw sectionError;
+
+        for (const sectionRow of (sectionRows || []) as Array<{ id?: string; school_year_id?: string | null }>) {
+          const sectionId = String(sectionRow?.id || '').trim();
+          if (!sectionId) continue;
+          sectionYearMap.set(sectionId, String(sectionRow?.school_year_id || '').trim());
+        }
+      }
+
+      const nextExistingLearnerLrns = new Set<string>();
+      for (const lrn of lrns) {
+        const learnerRow = learnerRowsByLrn.get(lrn);
+        if (!learnerRow) continue;
+
+        const statusValue = String(learnerRow.status || '').trim().toLowerCase();
+        const learnerSectionId = String(learnerRow.section_id || '').trim();
+        let isExistingLearner = false;
+
+        if (learnerSectionId) {
+          const sectionSchoolYearId = sectionYearMap.get(learnerSectionId) || '';
+          isExistingLearner = Boolean(activeSchoolYearId && sectionSchoolYearId && sectionSchoolYearId === activeSchoolYearId);
+        } else if (statusValue === 'enrolled') {
+          isExistingLearner = true;
+        }
+
+        if (isExistingLearner) {
+          nextExistingLearnerLrns.add(lrn);
+        }
+      }
+
+      setExistingLearnerLrns(nextExistingLearnerLrns);
+      setTopAlert({
+        title: 'Status Refresh',
+        message: `Submission statuses were refreshed for ${lrns.length} learner${lrns.length === 1 ? '' : 's'}.`,
+      });
+    } catch (error: any) {
+      setActionError(error?.message || 'Unable to refresh submission statuses.');
+    } finally {
+      setIsStatusRefreshing(false);
+    }
+  }, [activeSchoolYearSubmissions, activeSchoolYearId, refresh]);
 
   useEffect(() => {
     if (!errorMessage) return;
@@ -1013,12 +1124,91 @@ export default function PublicEnrollmentSubmissionsPage() {
     await removeSubmission(id);
   };
 
+  const buildSubmissionStatusLookupUrl = (submissionReferenceId: string) => {
+    const baseUrl = 'https://enroll.leonnhs.edu.ph/submission-status';
+    try {
+      const url = new URL(baseUrl);
+      url.searchParams.set('q', submissionReferenceId);
+      return url.toString();
+    } catch {
+      const joiner = baseUrl.includes('?') ? '&' : '?';
+      return `${baseUrl}${joiner}q=${encodeURIComponent(submissionReferenceId)}`;
+    }
+  };
+
+  const sendSubmissionConfirmationEmail = async (input: {
+    submissionId: string;
+    schoolId: string;
+    email: string;
+    learnerName: string;
+    submissionReferenceId: string;
+    sectionLabel: string;
+    lrn: string;
+  }) => {
+    const headerImagePayload = await loadUsisEmailHeaderImagePayload();
+    const statusLookupUrl = buildSubmissionStatusLookupUrl(input.submissionReferenceId);
+      const htmlContent = buildEnrollmentConfirmationEmailHtml({
+        learnerName: input.learnerName,
+        lrn: input.lrn,
+        submissionReferenceId: input.submissionReferenceId,
+        sectionLabel: input.sectionLabel,
+        statusLookupUrl,
+        senderName: 'Leon NHS - USIS',
+        headerImageSrc: headerImagePayload.headerImageSrc,
+      });
+
+    const response = await fetch('/api/credentials-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        schoolId: input.schoolId,
+        email: input.email,
+        subject: `USIS Enrollment Confirmation - ${input.submissionReferenceId}`,
+        htmlContent,
+        textContent: [
+          'Enrollment Confirmation',
+          `Name: ${input.learnerName || '--'}`,
+          `LRN: ${input.lrn || '--'}`,
+          `Section: ${input.sectionLabel || '--'}`,
+          `Submission Reference Number: ${input.submissionReferenceId}`,
+          `Status Link: ${statusLookupUrl}`,
+        ].join('\n'),
+        senderName: 'Leon NHS - USIS',
+        fromDisplayName: 'Leon NHS - USIS',
+        replyTo: null,
+        statusLookupUrl,
+        headerImageSrc: headerImagePayload.headerImageSrc,
+        headerImageBase64: headerImagePayload.headerImageBase64,
+        headerImageMimeType: headerImagePayload.headerImageMimeType,
+        headerImageName: headerImagePayload.headerImageName,
+          payload: {
+            submissionId: input.submissionId,
+            submissionReferenceId: input.submissionReferenceId,
+            learnerName: input.learnerName,
+            recipientEmail: input.email,
+            sectionLabel: input.sectionLabel,
+            lrn: input.lrn,
+            statusLookupUrl,
+            fromDisplayName: 'Leon NHS - USIS',
+          },
+        type: 'ENROLLMENT_CONFIRMATION',
+      }),
+    });
+
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(String((result as any)?.error || 'Unable to send enrollment confirmation email.'));
+    }
+    return result;
+  };
+
   const sendConfirmationEmail = async (row: PublicEnrollmentSubmission) => {
-    const recipientEmail = String(row.payload?.email || '').trim();
-    if (!recipientEmail) {
-      setActionError('This submission has no email address. Add learner email first before sending confirmation.');
+    const submissionEmail = String(row.payload?.email || row.email || '').trim();
+    if (!submissionEmail) {
+      setActionError('This submission has no email address on record.');
       return;
     }
+    const submissionLrn = String(row.lrn || row.payload?.lrn || '').trim();
     const submissionReferenceId = String(row.submission_reference_id || '').trim();
     if (!submissionReferenceId) {
       setActionError('Submission reference ID is missing.');
@@ -1027,25 +1217,24 @@ export default function PublicEnrollmentSubmissionsPage() {
     setSendingEmailSubmissionId(row.id);
     setActionError(null);
     try {
-      const response = await fetch('/api/enrollment-email-queue', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ submissionId: row.id }),
+      const learnerName = [row.last_name || row.payload?.lastName, row.first_name || row.payload?.firstName, row.middle_name || row.payload?.middleName]
+        .map((value) => String(value || '').trim())
+        .filter(Boolean)
+        .join(', ');
+      const sectionLabel = String((row.payload as any)?.assignedSectionName || '').trim() || 'Assigned Section';
+      const result = await sendSubmissionConfirmationEmail({
+        submissionId: row.id,
+        schoolId: String(row.school_id || row.payload?.schoolId || schoolId).trim(),
+        email: submissionEmail,
+        learnerName,
+        submissionReferenceId,
+        sectionLabel,
+        lrn: submissionLrn,
       });
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(String((result as any)?.error || 'Unable to send enrollment confirmation email.'));
-      }
-      if (!(result as any)?.queued) {
-        const reason = String((result as any)?.reason || 'unknown');
-        throw new Error(`Confirmation email not queued (${reason}).`);
-      }
 
       setTopAlert({
         title: 'Confirmation Email',
-        message: (result as any)?.sent_immediately
-          ? 'Enrollment confirmation email was sent.'
-          : 'Enrollment confirmation email was queued for sending.',
+        message: String((result as any)?.message || 'Enrollment confirmation email was sent.'),
       });
     } catch (error: any) {
       setActionError(error?.message || 'Unable to send enrollment confirmation email.');
@@ -1104,6 +1293,7 @@ export default function PublicEnrollmentSubmissionsPage() {
     const payload = enrollingSubmission.payload || ({} as EnrollmentDraft);
     const lrn = (enrollingSubmission.lrn || payload.lrn || '').trim();
     const gradeToEnroll = (enrollingSubmission.grade_to_enroll || payload.gradeToEnroll || '').trim();
+    const registeredSubmissionEmail = String(enrollingSubmission.payload?.email || enrollingSubmission.email || payload.email || '').trim();
     if (!lrn) {
       setEnrollError('LRN is required before enrolling this submission.');
       return;
@@ -1197,6 +1387,7 @@ export default function PublicEnrollmentSubmissionsPage() {
         payload: appendSubmissionAudit(
           {
             ...payload,
+            email: registeredSubmissionEmail,
             consent: true,
             assignedSectionId: selectedSectionId,
             assignedSectionName: String(sectionInfo.name || '').trim(),
@@ -1242,50 +1433,27 @@ export default function PublicEnrollmentSubmissionsPage() {
           },
         },
         response: { submissionId: updatedSubmission.id, learnerId: resolvedLearnerId, section: String(sectionInfo.name || '') },
-      });
+        });
 
         upsertSubmissionLocally(updatedSubmission);
         await syncLearnerStatusByLrn(lrn);
-        const learnerEmail = String((resolvedLearner as any)?.email || (upsertPayload as any)?.email || '').trim();
-        if (learnerEmail) {
-          try {
-            const learnerPayload = {
-              id: String((resolvedLearner as any)?.id || resolvedLearnerId || crypto.randomUUID()),
-              lrn: String((resolvedLearner as any)?.lrn || lrn || ''),
-              firstName: String((resolvedLearner as any)?.first_name || enrollingSubmission.first_name || payload.firstName || ''),
-              lastName: String((resolvedLearner as any)?.last_name || enrollingSubmission.last_name || payload.lastName || ''),
-              middleName: String((resolvedLearner as any)?.middle_name || payload.middleName || ''),
-              email: learnerEmail,
-              loginUsername: String((resolvedLearner as any)?.login_username || upsertPayload.login_username || lrn || ''),
-              loginPassword: String((resolvedLearner as any)?.login_password_plain || upsertPayload.login_password_plain || ''),
-              microsoftUpn: String((resolvedLearner as any)?.microsoft_upn || upsertPayload.microsoft_upn || ''),
-              birthDate: String((resolvedLearner as any)?.birth_date || payload.birthDate || ''),
-              gender: String((resolvedLearner as any)?.gender || payload.gender || ''),
-              address: String((resolvedLearner as any)?.address || payload.currentAddress || payload.permanentAddress || ''),
-              contactNumber: String((resolvedLearner as any)?.contact_number || payload.learnerContact || ''),
-              guardian_name: String((resolvedLearner as any)?.guardian_name || payload.guardianName || ''),
-              father_name: String((resolvedLearner as any)?.father_name || payload.fatherName || ''),
-              mother_name: String((resolvedLearner as any)?.mother_name || payload.motherName || ''),
-              status: String((resolvedLearner as any)?.status || 'Enrolled'),
-              sectionId: String((resolvedLearner as any)?.section_id || selectedSectionId || ''),
-              schoolYear: enrolledSchoolYear,
-            } as any;
-            await sendLearnerCredentialsViaWebhook({
-              learner: learnerPayload,
-              schoolId: String(enrollingSubmission.school_id || payload.schoolId || schoolId).trim(),
-              schoolYearLabel: enrolledSchoolYear,
-              sectionLabel: String(sectionInfo.name || ''),
-            });
-            setTopAlert({
-              title: 'Credentials Email',
-              message: 'Learner credentials email was sent using the Registrar email settings.',
-            });
-          } catch (emailError: any) {
-            setTopAlert({
-              title: 'Credentials Email',
-              message: emailError?.message || 'Enrollment completed, but credentials email could not be sent.',
-            });
-          }
+        const updatedSubmissionEmail = String(updatedSubmission.payload?.email || updatedSubmission.email || '').trim();
+        if (updatedSubmissionEmail) {
+          const updatedSubmissionReferenceId = String(updatedSubmission.submission_reference_id || enrollingSubmission.submission_reference_id || '').trim();
+          const updatedLearnerName = [updatedSubmission.last_name || payload.lastName, updatedSubmission.first_name || payload.firstName, updatedSubmission.middle_name || payload.middleName]
+            .map((value) => String(value || '').trim())
+            .filter(Boolean)
+            .join(', ');
+          const updatedSectionLabel = String((updatedSubmission.payload as any)?.assignedSectionName || sectionInfo?.name || '').trim() || 'Assigned Section';
+          const result = await sendSubmissionConfirmationEmail({
+            submissionId: updatedSubmission.id,
+            schoolId: String(updatedSubmission.school_id || payload.schoolId || schoolId).trim(),
+            email: updatedSubmissionEmail,
+            learnerName: updatedLearnerName,
+            submissionReferenceId: updatedSubmissionReferenceId,
+            sectionLabel: updatedSectionLabel,
+            lrn,
+          });
         }
         closeEnrollModal();
       } catch (error: any) {
@@ -1438,6 +1606,22 @@ export default function PublicEnrollmentSubmissionsPage() {
                 </span>
               ) : (
                 'Refresh'
+              )}
+            </button>
+            <button
+              type="button"
+              className="secondary-button"
+              style={{ minHeight: 56 }}
+              onClick={() => void refreshAllSubmissionStatuses()}
+              disabled={isLoading || isRefreshing || isStatusRefreshing}
+            >
+              {isStatusRefreshing ? (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                  <span className="registrar-public-enrollment-submissions__refresh-spinner" aria-hidden="true" />
+                  Fetching Status...
+                </span>
+              ) : (
+                'Fetch Status Only'
               )}
             </button>
             <div className="status-badge status-badge--open" style={{ minHeight: 56, display: 'flex', alignItems: 'center' }} aria-label="Submission count">{filtered.length} shown</div>
@@ -1602,14 +1786,37 @@ export default function PublicEnrollmentSubmissionsPage() {
                                 event.stopPropagation();
                                 void sendConfirmationEmail(row);
                               }}
-                              disabled={sendingEmailSubmissionId === row.id || !String(row.payload?.email || '').trim()}
-                              title={!String(row.payload?.email || '').trim() ? 'No learner email in submission payload' : 'Send enrollment confirmation email'}
+                  disabled={sendingEmailSubmissionId === row.id || !String(row.payload?.email || row.email || '').trim()}
+                  title={
+                    !String(row.payload?.email || row.email || '').trim()
+                      ? 'No learner email in submission record'
+                      : 'Send enrollment confirmation email'
+                  }
                               aria-label="Send enrollment confirmation email"
                               style={{ minWidth: 40, width: 40, height: 40, padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
                             >
                               <span className="material-symbols-outlined" aria-hidden="true">
                                 {sendingEmailSubmissionId === row.id ? 'hourglass_top' : 'mail'}
                               </span>
+                            </button>
+                            <button
+                              type="button"
+                              className="secondary-button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                const rowLrn = String(row.lrn || row.payload?.lrn || '').trim();
+                                if (!rowLrn) {
+                                  setActionError('No LRN found for this submission.');
+                                  return;
+                                }
+                                void syncLearnerStatusByLrn(rowLrn);
+                              }}
+                              disabled={!String(row.lrn || row.payload?.lrn || '').trim()}
+                              title="Refresh status only"
+                              aria-label="Refresh status only"
+                              style={{ minWidth: 40, width: 40, height: 40, padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                            >
+                              <span className="material-symbols-outlined" aria-hidden="true">refresh</span>
                             </button>
                             <button
                               type="button"

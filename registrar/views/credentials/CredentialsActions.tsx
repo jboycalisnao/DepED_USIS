@@ -4,6 +4,7 @@ type Props = {
   loading: boolean;
   selectedCount: number;
   onGenerate: () => void;
+  onMassSendCredentials: () => void;
   onPrint: () => void;
   onPrintMicrosoft: () => void;
   onRecheckMicrosoft: () => void;
@@ -17,6 +18,7 @@ export function CredentialsActions({
   loading,
   selectedCount,
   onGenerate,
+  onMassSendCredentials,
   onPrint,
   onPrintMicrosoft,
   onRecheckMicrosoft,
@@ -30,6 +32,9 @@ export function CredentialsActions({
       </button>
       <button type="button" className="primary-button" onClick={onGenerate} disabled={loading || selectedCount === 0}>
         Generate Credentials
+      </button>
+      <button type="button" className="secondary-button" onClick={onMassSendCredentials} disabled={loading || selectedCount === 0}>
+        Send Credentials Email
       </button>
       <button type="button" className="secondary-button" onClick={onReset} disabled={loading || selectedCount === 0}>
         Reset Credentials

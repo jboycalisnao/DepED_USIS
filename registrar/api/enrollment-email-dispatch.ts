@@ -7,6 +7,14 @@ const json = (res: VercelResponse, statusCode: number, payload: unknown) => {
 };
 
 const MAX_ATTEMPTS = 5;
+const DEFAULT_SENDER_DISPLAY_NAME = 'Leon NHS - USIS';
+
+const resolveSenderDisplayName = (value: unknown) => {
+  const normalized = normalize(value);
+  if (!normalized) return DEFAULT_SENDER_DISPLAY_NAME;
+  if (/^deped\s+usis\s+registrar$/i.test(normalized)) return DEFAULT_SENDER_DISPLAY_NAME;
+  return normalized;
+};
 
 type QueueRow = {
   id: string;
@@ -71,8 +79,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             subject: row.email_subject,
             htmlContent: row.email_html,
             html: row.email_html,
-            senderName: normalize(cfg.from_display_name) || 'DepED USIS Registrar',
-            fromDisplayName: normalize(cfg.from_display_name) || 'DepED USIS Registrar',
+            senderName: resolveSenderDisplayName(cfg.from_display_name),
+            fromDisplayName: resolveSenderDisplayName(cfg.from_display_name),
             replyTo: normalize(cfg.reply_to_email) || undefined,
           }),
         });

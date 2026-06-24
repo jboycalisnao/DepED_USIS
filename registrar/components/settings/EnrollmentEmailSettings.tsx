@@ -14,6 +14,7 @@ type EnrollmentEmailSettingsState = {
 };
 
 const DEFAULT_STATUS_PAGE_URL = 'https://enroll.leonnhs.edu.ph/submission-status';
+const DEFAULT_SENDER_DISPLAY_NAME = 'Leon NHS - USIS';
 
 const emptyState = (schoolId: string): EnrollmentEmailSettingsState => ({
   school_id: schoolId,
@@ -21,7 +22,7 @@ const emptyState = (schoolId: string): EnrollmentEmailSettingsState => ({
   apps_script_web_app_url: '',
   apps_script_bearer_token: '',
   status_page_base_url: DEFAULT_STATUS_PAGE_URL,
-  from_display_name: 'DepED USIS Registrar',
+  from_display_name: DEFAULT_SENDER_DISPLAY_NAME,
   reply_to_email: '',
 });
 
@@ -69,7 +70,7 @@ const EnrollmentEmailSettings: React.FC = () => {
           apps_script_web_app_url: String(resolved.apps_script_web_app_url || ''),
           apps_script_bearer_token: String(resolved.apps_script_bearer_token || ''),
           status_page_base_url: String(resolved.status_page_base_url || DEFAULT_STATUS_PAGE_URL),
-          from_display_name: String(resolved.from_display_name || 'DepED USIS Registrar'),
+          from_display_name: String(resolved.from_display_name || DEFAULT_SENDER_DISPLAY_NAME),
           reply_to_email: String(resolved.reply_to_email || ''),
         });
       } catch {
@@ -96,7 +97,7 @@ const EnrollmentEmailSettings: React.FC = () => {
         apps_script_web_app_url: state.apps_script_web_app_url.trim() || null,
         apps_script_bearer_token: state.apps_script_bearer_token.trim() || null,
         status_page_base_url: state.status_page_base_url.trim() || DEFAULT_STATUS_PAGE_URL,
-        from_display_name: state.from_display_name.trim() || 'DepED USIS Registrar',
+        from_display_name: state.from_display_name.trim() || DEFAULT_SENDER_DISPLAY_NAME,
         reply_to_email: state.reply_to_email.trim() || null,
       };
       const { error } = await supabase

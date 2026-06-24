@@ -1,4 +1,5 @@
 import { supabase } from '../../../../lib/supabase';
+import { loadUsisEmailHeaderImagePayload } from '../../../../../common/email/usisEmailHeaderImage';
 import { buildEnrollmentConfirmationEmailHtml } from './email-template/buildEnrollmentConfirmationEmailHtml';
 
 type EnrollmentEmailSettings = {
@@ -12,6 +13,13 @@ type EnrollmentEmailSettings = {
 };
 
 const normalize = (value: unknown) => String(value ?? '').trim();
+
+const resolveSenderDisplayName = (value: unknown) => {
+  const normalized = normalize(value);
+  if (!normalized) return 'Leon NHS - USIS';
+  if (/^deped\s+usis\s+registrar$/i.test(normalized)) return 'Leon NHS - USIS';
+  return normalized;
+};
 
 const buildStatusLookupUrl = (baseUrl: string | null | undefined, submissionReferenceId: string) => {
   const resolvedBase = normalize(baseUrl) || 'https://enroll.leonnhs.edu.ph/submission-status';
@@ -51,14 +59,16 @@ export async function sendEnrollmentConfirmationViaWebhook(input: {
   const webhookUrl = normalize(settings.apps_script_web_app_url);
   if (!webhookUrl) throw new Error('Apps Script Web App URL is not configured.');
 
+  const headerImagePayload = await loadUsisEmailHeaderImagePayload();
   const statusLookupUrl = buildStatusLookupUrl(settings.status_page_base_url, input.submissionReferenceId);
-  const senderName = normalize(settings.from_display_name) || 'DepED USIS Registrar';
+  const senderName = resolveSenderDisplayName(settings.from_display_name);
   const htmlContent = buildEnrollmentConfirmationEmailHtml({
     learnerName: normalize(input.learnerName),
     lrn: normalize(input.lrn),
     submissionReferenceId: normalize(input.submissionReferenceId),
     statusLookupUrl,
     senderName,
+    headerImageSrc: headerImagePayload.headerImageSrc,
   });
 
   // Keep top-level fields to match existing working GAS relay implementation.
@@ -67,6 +77,10 @@ export async function sendEnrollmentConfirmationViaWebhook(input: {
     email: normalize(input.recipientEmail),
     subject: `USIS Enrollment Submission Confirmation - ${normalize(input.submissionReferenceId)}`,
     senderName,
+    headerImageSrc: headerImagePayload.headerImageSrc,
+    headerImageBase64: headerImagePayload.headerImageBase64,
+    headerImageMimeType: headerImagePayload.headerImageMimeType,
+    headerImageName: headerImagePayload.headerImageName,
     htmlContent,
     replyTo: normalize(settings.reply_to_email) || null,
     // Keep payload for compatibility/future metadata handling.
