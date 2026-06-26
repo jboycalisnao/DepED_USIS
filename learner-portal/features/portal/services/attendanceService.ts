@@ -1,4 +1,12 @@
 import { supabase } from '@deped-usis/shared-supabase';
+import { fetchLearnerProfile } from './learnerProfile';
+import {
+  DEFAULT_ATTENDANCE_SCHEDULE,
+  normalizeAttendanceSchedule,
+  resolveAttendanceDecision,
+  type AttendanceScheduleConfig,
+  type LearnerAttendanceTapType,
+} from './attendanceSchedule';
 import {
   getCachedLearnerData,
   getPersistentCachedLearnerData,
@@ -8,8 +16,9 @@ import {
 } from './learnerPortalCache';
 
 const ATTENDANCE_TAP_ORDER = ['AM_IN', 'AM_OUT', 'PM_IN', 'PM_OUT', 'UNSCHEDULED'] as const;
-
-export type LearnerAttendanceTapType = typeof ATTENDANCE_TAP_ORDER[number];
+const CACHE_SCOPE = 'attendance-history-records-v1';
+const MANILA_TIME_ZONE = 'Asia/Manila';
+const CACHE_MAX_AGE_MS = 10 * 60 * 1000;
 
 export type LearnerAttendanceTap = {
   type: LearnerAttendanceTapType;
@@ -44,21 +53,37 @@ export type LearnerAttendanceSnapshot = {
 type RawAttendanceRecordRow = {
   id: string;
   attendance_type: string;
-  is_late?: boolean | null;
   logged_at: string;
   source: string | null;
   station_no: number | string | null;
   scanned_uid: string | null;
 };
 
+type AttendanceSettingsRow = {
+  id: number;
+  updated_at: string | null;
+  schedule_config: Partial<AttendanceScheduleConfig> | null;
+};
+
+type AttendanceSettingsSnapshot = {
+  scheduleConfig: AttendanceScheduleConfig;
+  settingsUpdatedAt: string;
+};
+
+type LearnerAttendanceContext = {
+  gradeLevel: string;
+  scheduleConfig: AttendanceScheduleConfig;
+  settingsUpdatedAt: string;
+};
+
 type AttendanceCachePayload = {
   rows: RawAttendanceRecordRow[];
   snapshot: LearnerAttendanceSnapshot;
   latestLoggedAt: string;
+  gradeLevel: string;
+  settingsUpdatedAt: string;
+  cachedAt: number;
 };
-
-const CACHE_SCOPE = 'attendance-history-records-v1';
-const MANILA_TIME_ZONE = 'Asia/Manila';
 
 const toText = (value: unknown) => String(value || '').trim();
 
@@ -148,7 +173,12 @@ const mergeRows = (existingRows: RawAttendanceRecordRow[], incomingRows: RawAtte
   return Array.from(merged.values()).sort((left, right) => new Date(left.logged_at).getTime() - new Date(right.logged_at).getTime());
 };
 
-const buildSnapshot = (rows: RawAttendanceRecordRow[]): LearnerAttendanceSnapshot => {
+const isLateFromSchedule = (row: RawAttendanceRecordRow, context: LearnerAttendanceContext) => {
+  if (!context.gradeLevel) return false;
+  return resolveAttendanceDecision(context.gradeLevel, new Date(row.logged_at), context.scheduleConfig).isLate;
+};
+
+const buildSnapshot = (rows: RawAttendanceRecordRow[], context: LearnerAttendanceContext): LearnerAttendanceSnapshot => {
   const monthMap = new Map<string, Map<number, LearnerAttendanceTap[]>>();
 
   rows.forEach((row) => {
@@ -165,7 +195,7 @@ const buildSnapshot = (rows: RawAttendanceRecordRow[]): LearnerAttendanceSnapsho
       createTap(
         normalizeAttendanceType(row.attendance_type),
         row.logged_at,
-        Boolean(row.is_late),
+        isLateFromSchedule(row, context),
         row.source || 'rfid',
         row.station_no == null ? '' : String(row.station_no),
         row.scanned_uid || '',
@@ -214,6 +244,15 @@ const buildSnapshot = (rows: RawAttendanceRecordRow[]): LearnerAttendanceSnapsho
   };
 };
 
+const buildCachePayload = (rows: RawAttendanceRecordRow[], context: LearnerAttendanceContext): AttendanceCachePayload => ({
+  rows,
+  snapshot: buildSnapshot(rows, context),
+  latestLoggedAt: rows.length > 0 ? rows[rows.length - 1].logged_at : '',
+  gradeLevel: context.gradeLevel,
+  settingsUpdatedAt: context.settingsUpdatedAt,
+  cachedAt: Date.now(),
+});
+
 const fetchAllAttendanceRows = async (learnerId: string) => {
   const { data, error } = await supabase
     .from('attendance_records')
@@ -233,7 +272,7 @@ const fetchAttendanceRowsSince = async (learnerId: string, sinceLoggedAt: string
     .from('attendance_records')
     .select('id,attendance_type,logged_at,source,station_no,scanned_uid')
     .eq('learner_id', learnerId)
-    .gte('logged_at', sinceLoggedAt)
+    .gt('logged_at', sinceLoggedAt)
     .order('logged_at', { ascending: true });
 
   if (error) {
@@ -243,11 +282,38 @@ const fetchAttendanceRowsSince = async (learnerId: string, sinceLoggedAt: string
   return (data || []) as RawAttendanceRecordRow[];
 };
 
-const buildCachePayload = (rows: RawAttendanceRecordRow[]): AttendanceCachePayload => ({
-  rows,
-  snapshot: buildSnapshot(rows),
-  latestLoggedAt: rows.length > 0 ? rows[rows.length - 1].logged_at : '',
-});
+const fetchAttendanceSettings = async (): Promise<AttendanceSettingsSnapshot> => {
+  const { data, error } = await supabase
+    .from('attendance_settings')
+    .select('id,updated_at,schedule_config')
+    .eq('id', 1)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message || 'Unable to load attendance schedule configuration.');
+  }
+
+  const row = (data as AttendanceSettingsRow | null) || null;
+  return {
+    scheduleConfig: normalizeAttendanceSchedule((row?.schedule_config || DEFAULT_ATTENDANCE_SCHEDULE) as Partial<AttendanceScheduleConfig>),
+    settingsUpdatedAt: toText(row?.updated_at),
+  };
+};
+
+const fetchAttendanceContext = async (input: { learnerId?: string; lrn?: string }): Promise<LearnerAttendanceContext> => {
+  const learnerProfile = await fetchLearnerProfile(input);
+  const settings = await fetchAttendanceSettings();
+  return {
+    gradeLevel: toText(learnerProfile.gradeLevel),
+    scheduleConfig: settings.scheduleConfig,
+    settingsUpdatedAt: settings.settingsUpdatedAt,
+  };
+};
+
+const contextMatchesCache = (cached: AttendanceCachePayload | null, context: LearnerAttendanceContext) =>
+  !!cached &&
+  cached.gradeLevel === context.gradeLevel &&
+  cached.settingsUpdatedAt === context.settingsUpdatedAt;
 
 export async function fetchLearnerAttendanceSnapshot(
   input: { learnerId?: string; lrn?: string },
@@ -261,33 +327,30 @@ export async function fetchLearnerAttendanceSnapshot(
     throw new Error('Learner attendance lookup requires learner ID.');
   }
 
-  if (!options.forceRefresh) {
-    const persistentCached = await getPersistentCachedLearnerData<AttendanceCachePayload>(CACHE_SCOPE, cacheKey);
-    if (persistentCached?.snapshot) return persistentCached.snapshot;
+  const context = await fetchAttendanceContext({ learnerId, lrn });
 
-    const cached = getCachedLearnerData<AttendanceCachePayload>(CACHE_SCOPE, cacheKey);
-    if (cached?.snapshot) {
-      void setPersistentCachedLearnerData(CACHE_SCOPE, cacheKey, cached);
-      return cached.snapshot;
+  if (!options.forceRefresh) {
+    const cachedLocal = getCachedLearnerData<AttendanceCachePayload>(CACHE_SCOPE, cacheKey);
+    const cachedPersistent = cachedLocal || (await getPersistentCachedLearnerData<AttendanceCachePayload>(CACHE_SCOPE, cacheKey));
+    if (cachedPersistent && contextMatchesCache(cachedPersistent, context)) {
+      if (Date.now() - cachedPersistent.cachedAt < CACHE_MAX_AGE_MS) {
+        return cachedPersistent.snapshot;
+      }
     }
   }
 
   const persistentCached = await getPersistentCachedLearnerData<AttendanceCachePayload>(CACHE_SCOPE, cacheKey);
-  if (persistentCached?.rows?.length && persistentCached.latestLoggedAt) {
+  if (!options.forceRefresh && persistentCached?.rows?.length && persistentCached.latestLoggedAt) {
     const newRows = await fetchAttendanceRowsSince(learnerId, persistentCached.latestLoggedAt);
-    if (newRows.length === 0) {
-      return persistentCached.snapshot;
-    }
-
-    const mergedRows = mergeRows(persistentCached.rows, newRows);
-    const nextCache = buildCachePayload(mergedRows);
+    const mergedRows = newRows.length === 0 ? persistentCached.rows : mergeRows(persistentCached.rows, newRows);
+    const nextCache = buildCachePayload(mergedRows, context);
     await setPersistentCachedLearnerData(CACHE_SCOPE, cacheKey, nextCache);
     setCachedLearnerData(CACHE_SCOPE, cacheKey, nextCache);
     return nextCache.snapshot;
   }
 
   const rows = await fetchAllAttendanceRows(learnerId);
-  const nextCache = buildCachePayload(rows);
+  const nextCache = buildCachePayload(rows, context);
   await setPersistentCachedLearnerData(CACHE_SCOPE, cacheKey, nextCache);
   setCachedLearnerData(CACHE_SCOPE, cacheKey, nextCache);
   return nextCache.snapshot;

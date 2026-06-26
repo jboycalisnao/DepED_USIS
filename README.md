@@ -27,6 +27,7 @@ The repository currently contains these active modules:
 - `election/` - DepED school election system
 - `sp-portal/` - Special Program admissions portal for school-specific application bulletins
 - `registrar/` - Registrar and learner records system
+- `repository/` - school academic repository for posting and organizing school academic notices, schedules, and reference content
 - `support/` - learner support subsystem scaffold for guidance, clinic, and child protection services
 
 These modules are currently standalone Vite + React applications.

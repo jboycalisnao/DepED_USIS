@@ -16,6 +16,7 @@
     "sp-portal",
     "spta",
     "registrar",
+    "repository",
     "support",
     "packages/*"
   ],
@@ -36,6 +37,7 @@
     "dev:sp-portal": "npm run dev --workspace ./sp-portal",
     "dev:spta": "npm run dev --workspace ./spta -- --host 0.0.0.0 --port 5180",
     "dev:registrar": "npm run dev --workspace ./registrar",
+    "dev:repository": "npm run dev --workspace ./repository",
     "dev:support": "npm run dev --workspace ./support",
     "build:attendance": "npm run build --workspace ./attendance",
     "build:coordinator": "npm run build --workspace ./coordinator",
@@ -52,8 +54,9 @@
     "build:sp-portal": "npm run build --workspace ./sp-portal",
     "build:spta": "npm run build --workspace ./spta",
     "build:registrar": "npm run build --workspace ./registrar",
+    "build:repository": "npm run build --workspace ./repository",
     "build:support": "npm run build --workspace ./support",
-    "build": "npm run build:attendance && npm run build:coordinator && npm run build:deped-web-kit && npm run build:data-privacy && npm run build:enrollment && npm run build:learner-portal && npm run build:integrated-admin && npm run build:school-help-portal && npm run build:merch && npm run build:election && npm run build:sp-portal && npm run build:spta && npm run build:registrar && npm run build:support"
+    "build": "npm run build:attendance && npm run build:coordinator && npm run build:deped-web-kit && npm run build:data-privacy && npm run build:enrollment && npm run build:learner-portal && npm run build:integrated-admin && npm run build:school-help-portal && npm run build:merch && npm run build:election && npm run build:sp-portal && npm run build:spta && npm run build:registrar && npm run build:repository && npm run build:support"
   },
   "engines": {
     "node": ">=20"

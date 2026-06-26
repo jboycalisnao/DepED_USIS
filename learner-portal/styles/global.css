@@ -1942,14 +1942,14 @@ body {
   vertical-align: top;
   padding: 2px 1px !important;
   text-align: center;
-  height: 42px;
+  height: 54px;
   overflow: hidden;
   border: 1px solid #d0d5dd;
   background: #ffffff;
 }
 
 .learner-attendance-table__row {
-  height: 42px;
+  height: 54px;
 }
 
 .learner-attendance-table__row--alt {
@@ -2019,10 +2019,10 @@ body {
 .learner-attendance-table__tap-list {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 2px;
+  gap: 1px;
   justify-items: stretch;
   min-height: 0;
-  max-height: 30px;
+  max-height: 44px;
   overflow-y: auto;
   scrollbar-width: thin;
 }
@@ -2030,15 +2030,18 @@ body {
 .learner-attendance-table__tap-item,
 .learner-attendance-table__tap-unscheduled,
 .learner-attendance-table__tap-empty {
-  display: block;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   border: 0;
   background: transparent;
   color: #1f2937;
-  font-size: 7px;
+  font-size: 6px;
   font-weight: 700;
   line-height: 1.1;
   min-height: 0;
-  padding: 0;
+  padding: 1px 2px;
   text-align: center;
   word-break: break-word;
 }
@@ -2152,8 +2155,8 @@ body {
 }
 
 .learner-attendance-table-mobile__day-card--late {
-  border-color: #f79009;
-  background: #fffaf2;
+  border-color: #fda4af;
+  background: #fff1f2;
 }
 
 .learner-attendance-table-mobile__day-card--filled {
@@ -2273,7 +2276,11 @@ body {
 }
 
 .learner-attendance-table__tap-item--late {
-  color: #b54708;
+  color: #991b1b;
+  background: #ffe4e6;
+  border: 1px solid #fda4af;
+  border-radius: 6px;
+  padding: 1px 2px;
 }
 
 .learner-attendance-table__tap-item--am_in {
@@ -2296,13 +2303,13 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 2px;
   flex-wrap: wrap;
 }
 
 .learner-attendance-table__tap-type {
   color: #475467;
-  font-size: 6px;
+  font-size: 5px;
   font-weight: 700;
   text-transform: uppercase;
   line-height: 1.1;
@@ -2313,18 +2320,18 @@ body {
   align-items: center;
   justify-content: center;
   border-radius: 999px;
-  background: #f97316;
+  background: #dc2626;
   color: #ffffff;
-  font-size: 6px;
+  font-size: 5px;
   font-weight: 700;
   line-height: 1;
-  padding: 1px 4px;
+  padding: 1px 3px;
   text-transform: uppercase;
 }
 
 .learner-attendance-table__tap-time {
   color: #101828;
-  font-size: 8px;
+  font-size: 7px;
   font-variant-numeric: tabular-nums;
   line-height: 1.1;
 }
