@@ -558,6 +558,43 @@ export const useAttendance = () => {
     return { mode: 'raw', rawRecords, summaryRows: [] };
   }, [getLocalAttendanceRecordsInRange]);
 
+  const queryAttendanceRecordsByRange = useCallback(
+    async (fromDate: string, toDate: string, learnerIds: string[] = []): Promise<AttendanceRecord[]> => {
+      const startDate = String(fromDate || '').trim();
+      const endDate = String(toDate || '').trim();
+      if (!startDate || !endDate) return [];
+
+      const startTimestamp = new Date(`${startDate}T00:00:00+08:00`).toISOString();
+      const endTimestamp = new Date(`${endDate}T23:59:59.999+08:00`).toISOString();
+
+      let query = supabase
+        .from('attendance_records')
+        .select('id,learner_id,attendance_type,logged_at,source,station_no,scanned_uid')
+        .gte('logged_at', startTimestamp)
+        .lte('logged_at', endTimestamp)
+        .order('logged_at', { ascending: false });
+
+      const scopedLearnerIds = Array.from(new Set(learnerIds.map((id) => String(id || '').trim()).filter(Boolean)));
+      if (scopedLearnerIds.length > 0) {
+        query = query.in('learner_id', scopedLearnerIds);
+      }
+
+      const { data, error } = await query;
+      if (error) {
+        throw error;
+      }
+
+      return (data || []).map((row: any) => ({
+        id: String(row.id || ''),
+        learnerId: String(row.learner_id || ''),
+        type: row.attendance_type as AttendanceType,
+        timestamp: String(row.logged_at || ''),
+        synced: true,
+      }));
+    },
+    [],
+  );
+
   const queryMonthlySummariesByRange = useCallback(async (fromDate: string, toDate: string): Promise<AttendanceMonthlySummaryRow[]> => {
     const dailyRows = buildDailySummariesFromRecords(getLocalAttendanceRecordsInRange(fromDate, toDate));
 
@@ -713,6 +750,7 @@ export const useAttendance = () => {
     addManualAttendanceRecord,
     deleteRecord,
     queryRecordsByDateRange,
+    queryAttendanceRecordsByRange,
     queryMonthlySummariesByRange,
     queryDailySummariesByMonth,
     queryRawRecordsByDate,

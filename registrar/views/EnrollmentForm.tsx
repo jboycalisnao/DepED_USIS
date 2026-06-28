@@ -221,6 +221,7 @@ const EnrollmentForm: React.FC = () => {
                ))}
              </div>
           </div>
+
         </div>
 
         <div className="lg:col-span-2 space-y-8">
@@ -402,6 +403,7 @@ const EnrollmentForm: React.FC = () => {
         hideCancel={true}
         onConfirm={() => setValidationError(null)}
       />
+
     </div>
   );
 };

@@ -299,6 +299,10 @@
   padding: 24px var(--page-inset) 24px;
 }
 
+.registrar-content--adviser-learners {
+  padding-left: 0;
+}
+
 .registrar-layout {
   display: grid;
   grid-template-columns: 220px minmax(0, 1fr);

@@ -1,14 +1,16 @@
 import React, { useMemo, useState } from 'react';
 import { useStore } from '../../store';
-import { Student } from '../../types';
+import { Section, Student } from '../../types';
 import LearnerEditModal from '../learners/LearnerEditModal';
 import { getActiveLearnersForYear } from '../../services/dashboardService';
 import { groupLearnersByLinkedSection, resolveAdviserLinkedSections } from './utils/adviserLearnerAccess';
 import { downloadAdviserSectionWorkbook } from './utils/adviserLearnerWorkbook';
+import AdviserLearnerCreateModal from './AdviserLearnerCreateModal';
 
 const AdviserLearnersPage: React.FC = () => {
-  const { learners, sections, activeSchoolYear, availableStrands, registrarAccess, updateLearner, loading } = useStore();
+  const { learners, sections, activeSchoolYear, availableStrands, registrarAccess, updateLearner, addLearner, loading } = useStore();
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
 
   const linkedSections = useMemo(
@@ -32,7 +34,10 @@ const AdviserLearnersPage: React.FC = () => {
     [activeSchoolYear, learners, registrarAccess?.coordinatorName, registrarAccess?.coordinatorUsername, sections],
   );
 
-  const activeSectionGroup = sectionGroups[0] ? [sectionGroups[0]] : [];
+  const advisorySection = linkedSections[0] || null;
+  const activeSectionGroup = advisorySection
+    ? [sectionGroups.find((group) => group.section.id === advisorySection.id) || { section: advisorySection, learners: [] }]
+    : [];
 
   const totalLearners = useMemo(
     () => activeSectionGroup.reduce((count, group) => count + group.learners.length, 0),
@@ -41,21 +46,22 @@ const AdviserLearnersPage: React.FC = () => {
 
   const activeSection = activeSectionGroup[0] || null;
   const canAccessSectionLearners = Boolean(activeSection);
+  const activeAdvisorySection: Section | null = activeSection?.section || advisorySection;
 
   const handleExport = () => {
     if (!canAccessSectionLearners) {
-      setFeedback('No linked section found for this adviser account.');
+      setFeedback('No advisory class found for this adviser account.');
       return;
     }
     const ok = downloadAdviserSectionWorkbook(activeSectionGroup, activeSchoolYear.label, registrarAccess?.coordinatorName || 'Adviser');
     if (!ok) {
-      setFeedback('No learners are available to export for your linked section.');
+      setFeedback('No learners are available to export for your advisory class.');
     }
   };
 
   return (
     <div className="registrar-adviser-learners-page">
-      <section className="section-card">
+      <section className="section-card registrar-adviser-learners-page__summary-card">
         <div className="section-card__bar" />
         <div className="section-card__content">
           <div className="registrar-adviser-learners-page__head">
@@ -65,7 +71,7 @@ const AdviserLearnersPage: React.FC = () => {
               <p>
                 {canAccessSectionLearners
                   ? `Viewing learners for ${activeSection?.section.name || linkedSections[0]?.name} in SY ${activeSchoolYear.label}.`
-                  : 'No linked section was found for this adviser account.'}
+                  : 'No advisory class was found for this adviser account.'}
               </p>
             </div>
             <div className="registrar-adviser-learners-page__toolbar">
@@ -73,6 +79,15 @@ const AdviserLearnersPage: React.FC = () => {
                 <span className="material-symbols-outlined" aria-hidden="true">groups</span>
                 {totalLearners.toLocaleString()} Learners
               </div>
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => setIsCreateModalOpen(true)}
+                disabled={!canAccessSectionLearners || loading}
+              >
+                <span className="material-symbols-outlined" aria-hidden="true">person_add</span>
+                Add Learner
+              </button>
               <button type="button" className="secondary-button" onClick={handleExport} disabled={!canAccessSectionLearners || loading}>
                 <span className="material-symbols-outlined" aria-hidden="true">download</span>
                 Download Excel
@@ -92,7 +107,10 @@ const AdviserLearnersPage: React.FC = () => {
                       <div>
                         <p className="section-card__eyebrow">{group.section.gradeLevel}</p>
                         <h3>{group.section.name}</h3>
-                        <p>{group.learners.length} learner(s) in this linked section.</p>
+                        <p className="registrar-adviser-learners-page__section-adviser">
+                          Adviser: {registrarAccess?.coordinatorName || 'Current account'}
+                        </p>
+                        <p>{group.learners.length} learner(s) in this advisory class.</p>
                       </div>
                       <span className="status-badge status-badge--open">
                         <span className="material-symbols-outlined" aria-hidden="true">check_circle</span>
@@ -138,7 +156,7 @@ const AdviserLearnersPage: React.FC = () => {
                           {group.learners.length === 0 ? (
                             <tr>
                               <td colSpan={8} className="registrar-learners-page__empty-row">
-                                No learners linked to this section yet.
+                                No learners linked to this advisory class yet.
                               </td>
                             </tr>
                           ) : null}
@@ -151,7 +169,7 @@ const AdviserLearnersPage: React.FC = () => {
             ) : (
               <div className="registrar-adviser-learners-page__empty">
                 <span className="material-symbols-outlined" aria-hidden="true">lock</span>
-                <p>No linked section is assigned to this adviser account.</p>
+                <p>No advisory class is assigned to this adviser account.</p>
               </div>
             )}
           </div>
@@ -167,6 +185,17 @@ const AdviserLearnersPage: React.FC = () => {
         onError={(message) => setFeedback(message)}
         onSuccess={(message) => setFeedback(message)}
         onSubmit={updateLearner}
+      />
+
+      <AdviserLearnerCreateModal
+        open={isCreateModalOpen}
+        section={activeAdvisorySection}
+        schoolYearLabel={activeSchoolYear.label}
+        loading={loading}
+        onClose={() => setIsCreateModalOpen(false)}
+        onSubmit={addLearner}
+        onSuccess={(message) => setFeedback(message)}
+        onError={(message) => setFeedback(message)}
       />
     </div>
   );

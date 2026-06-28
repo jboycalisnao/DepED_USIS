@@ -188,7 +188,7 @@ const LearnerList: React.FC = () => {
     if (!isAdviserScopedAccess || exportGroups.length === 0) return;
     const ok = downloadAdviserSectionWorkbook(exportGroups, activeSchoolYear.label, registrarAccess?.coordinatorName || 'Adviser');
     if (!ok) {
-      setFeedback('No learners are available to export for your linked section.');
+      setFeedback('No learners are available to export for your advisory class.');
     }
   };
 
@@ -327,9 +327,12 @@ const LearnerList: React.FC = () => {
         {isAdviserScopedAccess ? (
           <>
             <div className="registrar-learners-page__meta-box registrar-learners-page__meta-box--wide">
-              <span className="registrar-learners-page__meta-label">Linked Section</span>
+              <span className="registrar-learners-page__meta-label">Advisory Class</span>
               <span className="registrar-learners-page__meta-value">
-                {adviserLinkedSections.map((section) => section.name).join(', ')}
+                {adviserLinkedSections.map((section) => `${section.gradeLevel} - ${section.name}`).join(', ')}
+              </span>
+              <span className="registrar-learners-page__meta-subvalue">
+                Adviser: {registrarAccess?.coordinatorName || 'Current account'}
               </span>
             </div>
             <button type="button" className="secondary-button" onClick={adviserExport} disabled={loading || adviserSectionGroups.length === 0}>

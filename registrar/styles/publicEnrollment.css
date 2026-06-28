@@ -121,6 +121,15 @@
   margin-top: 12px;
 }
 
+.registrar-public-enrollment-submissions__enroll-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+  border-color: rgba(18, 35, 61, 0.12);
+  background: #eef2f7;
+  color: #7c8798;
+  box-shadow: none;
+}
+
 .year-pair-field {
   grid-column: span 2;
   display: grid;
@@ -640,6 +649,19 @@
 
 .registrar-public-enrollment-submissions .floating-field-grid {
   overflow: visible;
+}
+
+.registrar-public-enrollment-submissions .usis-table tbody tr {
+  transition: background-color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+}
+
+.registrar-public-enrollment-submissions .usis-table tbody tr:hover {
+  background: #eef4ff;
+  box-shadow: inset 3px 0 0 var(--deped-blue);
+}
+
+.registrar-public-enrollment-submissions .usis-table tbody tr:hover td {
+  background: transparent;
 }
 
 @media (max-width: 720px) {

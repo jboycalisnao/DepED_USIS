@@ -52,12 +52,12 @@ export default function TeacherAttendanceLandingPage({ onAuthenticated }: Teache
           />
           <nav className="kit-nav" aria-label="Teacher attendance landing sections">
             <div className="kit-nav__grid">
-              <a className="kit-nav__link kit-nav__link--active" href="#teacher-attendance-login-title">
-                Access
-              </a>
               <Link className="kit-nav__link" to="/">
-                Coordinator Access
+                Access
               </Link>
+              <a className="kit-nav__link kit-nav__link--active" href="#teacher-attendance-login-title">
+                Teacher Access
+              </a>
             </div>
           </nav>
         </div>

@@ -35,6 +35,7 @@ import {
   semesterOptions,
   studentTypeOptions,
 } from '../../data/enrollmentOptions';
+import { resolveAdviserLinkedSections } from '../../../../../views/adviser-learners/utils/adviserLearnerAccess';
 import '../../../../../styles/publicEnrollment.css';
 
 const SAME_SCHOOL_LABEL = 'Same School';
@@ -280,11 +281,34 @@ const appendSubmissionAudit = (payload: EnrollmentDraft, entry: Omit<SubmissionA
 
 export default function PublicEnrollmentSubmissionsPage() {
   const navigate = useNavigate();
-  const { registrarAccess, refreshData, availableStrands, activeSchoolYear } = useStore();
+  const { registrarAccess, refreshData, availableStrands, activeSchoolYear, sections } = useStore();
   const schoolId = registrarAccess?.schoolId || '302522';
   const submissionsScopeKey = registrarAccess?.schoolUuid || schoolId;
   const activeSchoolYearId = String(activeSchoolYear?.id || '').trim();
   const effectiveSchoolYearLabel = String(activeSchoolYear?.label || '').trim();
+  const adviserLinkedSections = useMemo(
+    () => resolveAdviserLinkedSections(
+      sections,
+      registrarAccess?.coordinatorName || '',
+      registrarAccess?.coordinatorUsername || '',
+      activeSchoolYear,
+    ),
+    [activeSchoolYear, registrarAccess?.coordinatorName, registrarAccess?.coordinatorUsername, sections],
+  );
+  const isAdviserScopedAccess =
+    registrarAccess?.coordinatorRole === 'school_usis_coordinator' &&
+    adviserLinkedSections.length > 0;
+  const adviserGradeLevels = useMemo(
+    () => Array.from(
+      new Set(
+        adviserLinkedSections
+          .map((section) => String(section.gradeLevel || '').trim())
+          .filter(Boolean),
+      ),
+    ),
+    [adviserLinkedSections],
+  );
+  const adviserGradeSet = useMemo(() => new Set(adviserGradeLevels), [adviserGradeLevels]);
   const {
     submissions,
     isLoading,
@@ -337,11 +361,13 @@ export default function PublicEnrollmentSubmissionsPage() {
 
   const activeSchoolYearSubmissions = useMemo(() => {
     if (!activeYearNormalized) return [];
-    return deferredSubmissions.filter((row) => {
+    const scopedRows = deferredSubmissions.filter((row) => {
       const rowSchoolYear = normalizeSchoolYear(String(row.school_year || row.payload?.schoolYear || '').trim());
       return rowSchoolYear === activeYearNormalized;
     });
-  }, [deferredSubmissions, activeYearNormalized]);
+    if (!isAdviserScopedAccess || adviserGradeSet.size === 0) return scopedRows;
+    return scopedRows.filter((row) => adviserGradeSet.has(String(row.grade_to_enroll || row.payload?.gradeToEnroll || '').trim()));
+  }, [adviserGradeSet, activeYearNormalized, deferredSubmissions, isAdviserScopedAccess]);
 
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -811,6 +837,10 @@ export default function PublicEnrollmentSubmissionsPage() {
   };
 
   const openSectioningAccessModal = async () => {
+    if (isAdviserScopedAccess) {
+      setActionError('Sectioning access is not available in adviser view.');
+      return;
+    }
     setIsSectioningAccessModalOpen(true);
     setActionError(null);
     try {
@@ -1589,69 +1619,106 @@ export default function PublicEnrollmentSubmissionsPage() {
           </div>
 
           <div className="registrar-public-enrollment-submissions__header-actions">
-            <button type="button" className="secondary-button" style={{ minHeight: 56 }} onClick={openKioskWindow}>
-              Open Enrollment Kiosk
-            </button>
-            <button type="button" className="secondary-button" style={{ minHeight: 56 }} onClick={() => void openSectioningAccessModal()}>
-              Sectioning Access
-            </button>
+            {!isAdviserScopedAccess ? (
+              <>
+                <button type="button" className="secondary-button" style={{ minHeight: 56 }} onClick={openKioskWindow}>
+                  Open Enrollment Kiosk
+                </button>
+                <button type="button" className="secondary-button" style={{ minHeight: 56 }} onClick={() => void openSectioningAccessModal()}>
+                  Sectioning Access
+                </button>
+              </>
+            ) : null}
             <button type="button" className="secondary-button" style={{ minHeight: 56 }} onClick={openPrintEnrolleesModal} disabled={!groupedByGrade.length}>
               Print Enrollees List
             </button>
-            <button
-              type="button"
-              className="secondary-button"
-              style={{ minHeight: 56 }}
-              onClick={() => setIsNameCheckModalOpen(true)}
-              disabled={!deferredSubmissions.length}
-            >
-              Check Section List
-            </button>
-            <button
-              type="button"
-              className="secondary-button"
-              style={{ minHeight: 56 }}
-              onClick={async () => {
-                setIsRefreshing(true);
-                try {
-                  await refresh({ silent: true });
-                } finally {
-                  setIsRefreshing(false);
-                }
-              }}
-              disabled={isLoading || isRefreshing}
-            >
-              {isRefreshing ? (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                  <span className="registrar-public-enrollment-submissions__refresh-spinner" aria-hidden="true" />
-                  Refreshing...
-                </span>
-              ) : (
-                'Refresh'
-              )}
-            </button>
-            <button
-              type="button"
-              className="secondary-button"
-              style={{ minHeight: 56 }}
-              onClick={() => void refreshAllSubmissionStatuses()}
-              disabled={isLoading || isRefreshing || isStatusRefreshing}
-            >
-              {isStatusRefreshing ? (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                  <span className="registrar-public-enrollment-submissions__refresh-spinner" aria-hidden="true" />
-                  Fetching Status...
-                </span>
-              ) : (
-                'Fetch Status Only'
-              )}
-            </button>
+            {!isAdviserScopedAccess ? (
+              <>
+                <button
+                  type="button"
+                  className="secondary-button"
+                  style={{ minHeight: 56 }}
+                  onClick={() => setIsNameCheckModalOpen(true)}
+                  disabled={!deferredSubmissions.length}
+                >
+                  Check Section List
+                </button>
+                <button
+                  type="button"
+                  className="secondary-button"
+                  style={{ minHeight: 56 }}
+                  onClick={async () => {
+                    setIsRefreshing(true);
+                    try {
+                      await refresh({ silent: true });
+                    } finally {
+                      setIsRefreshing(false);
+                    }
+                  }}
+                  disabled={isLoading || isRefreshing}
+                >
+                  {isRefreshing ? (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                      <span className="registrar-public-enrollment-submissions__refresh-spinner" aria-hidden="true" />
+                      Refreshing...
+                    </span>
+                  ) : (
+                    'Refresh'
+                  )}
+                </button>
+                <button
+                  type="button"
+                  className="secondary-button"
+                  style={{ minHeight: 56 }}
+                  onClick={() => void refreshAllSubmissionStatuses()}
+                  disabled={isLoading || isRefreshing || isStatusRefreshing}
+                >
+                  {isStatusRefreshing ? (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                      <span className="registrar-public-enrollment-submissions__refresh-spinner" aria-hidden="true" />
+                      Fetching Status...
+                    </span>
+                  ) : (
+                    'Fetch Status Only'
+                  )}
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                className="secondary-button"
+                style={{ minHeight: 56 }}
+                onClick={async () => {
+                  setIsRefreshing(true);
+                  try {
+                    await refresh({ silent: true });
+                  } finally {
+                    setIsRefreshing(false);
+                  }
+                }}
+                disabled={isLoading || isRefreshing}
+              >
+                {isRefreshing ? (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                    <span className="registrar-public-enrollment-submissions__refresh-spinner" aria-hidden="true" />
+                    Refreshing...
+                  </span>
+                ) : (
+                  'Refresh'
+                )}
+              </button>
+            )}
             <div className="status-badge status-badge--open" style={{ minHeight: 56, display: 'flex', alignItems: 'center' }} aria-label="Submission count">{filtered.length} shown</div>
           </div>
         </div>
       </header>
 
       <div className="portal-panel__body" style={{ display: 'grid', gap: 16 }}>
+        {isAdviserScopedAccess ? (
+          <div className="notice-box">
+            Showing enrollment submissions for {adviserGradeLevels.join(', ') || 'your linked grade level'} only.
+          </div>
+        ) : null}
         <div className="form-grid" style={{ gridTemplateColumns: 'minmax(240px, 1fr) auto auto auto auto auto', alignItems: 'stretch' }}>
           <label className="floating-field">
             <div className="floating-field__control">
@@ -1773,7 +1840,7 @@ export default function PublicEnrollmentSubmissionsPage() {
                             </button>
                             <button
                               type="button"
-                              className="secondary-button"
+                              className="secondary-button registrar-public-enrollment-submissions__enroll-button"
                               onClick={(event) => {
                                 event.stopPropagation();
                                 if (hasAssignedSection) return;
@@ -1794,7 +1861,15 @@ export default function PublicEnrollmentSubmissionsPage() {
                                     ? 'Re-enroll learner'
                                     : 'Enroll to school'
                               }
-                              style={{ minHeight: 40, padding: '0 10px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                              style={{
+                                minHeight: 40,
+                                padding: '0 10px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: 6,
+                                cursor: hasAssignedSection ? 'not-allowed' : 'pointer',
+                              }}
                             >
                               <span className="material-symbols-outlined" aria-hidden="true">
                                 {hasAssignedSection ? 'check_circle' : 'school'}

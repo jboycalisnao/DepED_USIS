@@ -104,7 +104,7 @@ function App() {
     addManualAttendanceRecord,
     deleteRecord,
     querySummaryByDateRange,
-    queryDailySummariesByMonth,
+    queryAttendanceRecordsByRange,
     refreshAttendanceStatusByRange,
   } = useAttendance();
 
@@ -534,14 +534,13 @@ function App() {
         <TeacherSectionAttendancePage
           access={teacherAccess}
           learners={learners}
-          logs={attendanceLogs}
+          scheduleConfig={scheduleConfig}
           onLogout={() => {
             clearStoredTeacherAttendanceAccess();
             setTeacherAccess(null);
             navigate('/teacher', { replace: true });
           }}
-          refreshAttendanceStatusByRange={refreshAttendanceStatusByRange}
-          queryDailySummariesByMonth={queryDailySummariesByMonth}
+          queryAttendanceRecordsByRange={queryAttendanceRecordsByRange}
         />
       </div>
     );

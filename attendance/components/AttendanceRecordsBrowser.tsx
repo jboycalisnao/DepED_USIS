@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   AttendanceDailySummaryRow,
   AttendanceMonthlySummaryRow,
@@ -19,6 +19,7 @@ type Props = {
   scheduleConfig: AttendanceScheduleConfig;
   onDelete?: (record: AttendanceRecord) => Promise<void> | void;
   refreshAttendanceStatusByRange: (fromDate: string, toDate: string) => Promise<Set<string>>;
+  loadRecordsByRange?: (fromDate: string, toDate: string) => Promise<AttendanceRecord[]>;
 };
 
 type MonthGroup = {
@@ -265,6 +266,7 @@ const AttendanceRecordsBrowser: React.FC<Props> = ({
   scheduleConfig,
   onDelete,
   refreshAttendanceStatusByRange,
+  loadRecordsByRange,
 }) => {
   const [searchValue, setSearchValue] = useState('');
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -272,11 +274,42 @@ const AttendanceRecordsBrowser: React.FC<Props> = ({
   const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set());
   const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set());
   const [deleteTarget, setDeleteTarget] = useState<AttendanceRecord | null>(null);
+  const [loadedRecords, setLoadedRecords] = useState<AttendanceRecord[] | null>(null);
   const canDelete = typeof onDelete === 'function';
+  const effectiveLogs = loadRecordsByRange ? (loadedRecords || logs) : logs;
+
+  const loadRecords = async (fromDate: string, toDate: string) => {
+    if (!loadRecordsByRange) {
+      await refreshAttendanceStatusByRange(fromDate, toDate);
+      return;
+    }
+
+    const records = await loadRecordsByRange(fromDate, toDate);
+    setLoadedRecords(records);
+  };
+
+  useEffect(() => {
+    if (!loadRecordsByRange) return;
+    const scope = parseSearchScope('');
+    if (!scope) return;
+    setIsLoadingOverview(true);
+    void (async () => {
+      try {
+        const records = await loadRecordsByRange(scope.fromDate, scope.toDate);
+        setLoadedRecords(records);
+        setExpandedMonths(new Set([scope.monthKey]));
+        setStatusMessage(`Loaded attendance records for ${scope.label}.`);
+      } catch (error: any) {
+        setStatusMessage(error?.message || 'Unable to load attendance records.');
+      } finally {
+        setIsLoadingOverview(false);
+      }
+    })();
+  }, [loadRecordsByRange]);
 
   const rawRowsByDate = useMemo(() => {
     const map = new Map<string, AttendanceRecord[]>();
-    logs.forEach((record) => {
+    effectiveLogs.forEach((record) => {
       const dateKey = new Intl.DateTimeFormat('en-CA', {
         timeZone: 'Asia/Manila',
         year: 'numeric',
@@ -293,10 +326,10 @@ const AttendanceRecordsBrowser: React.FC<Props> = ({
       output[key] = value.slice().sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
     });
     return output;
-  }, [logs]);
+  }, [effectiveLogs]);
 
   const dailyRowsByMonth = useMemo(() => {
-    const dailyRows = buildDailyRowsFromLogs(logs);
+    const dailyRows = buildDailyRowsFromLogs(effectiveLogs);
     const map = new Map<string, AttendanceDailySummaryRow[]>();
 
     dailyRows.forEach((row) => {
@@ -311,9 +344,9 @@ const AttendanceRecordsBrowser: React.FC<Props> = ({
       output[key] = value;
     });
     return output;
-  }, [logs]);
+  }, [effectiveLogs]);
 
-  const monthlyRows = useMemo(() => buildMonthlyRowsFromDailyRows(buildDailyRowsFromLogs(logs), learners), [logs, learners]);
+  const monthlyRows = useMemo(() => buildMonthlyRowsFromDailyRows(buildDailyRowsFromLogs(effectiveLogs), learners), [effectiveLogs, learners]);
 
   const monthGroups = useMemo<MonthGroup[]>(() => {
     const groupMap = new Map<string, AttendanceMonthlySummaryRow[]>();
@@ -374,7 +407,7 @@ const AttendanceRecordsBrowser: React.FC<Props> = ({
       if (scope.kind === 'day') {
         setExpandedDays(new Set([scope.dayKey]));
       }
-      await refreshAttendanceStatusByRange(scope.fromDate, scope.toDate);
+      await loadRecords(scope.fromDate, scope.toDate);
       setStatusMessage(`Loaded attendance records for ${scope.label}.`);
     } catch (error: any) {
       setStatusMessage(error?.message || 'Unable to load attendance records.');
@@ -388,7 +421,7 @@ const AttendanceRecordsBrowser: React.FC<Props> = ({
     setStatusMessage(null);
     try {
       setExpandedMonths((prev) => new Set(prev).add(monthKey));
-      await refreshAttendanceStatusByRange(`${monthKey}-01`, endOfMonth(monthKey));
+      await loadRecords(`${monthKey}-01`, endOfMonth(monthKey));
       setStatusMessage(`Refreshed status for ${formatMonthLabel(monthKey)}.`);
     } catch (error: any) {
       setStatusMessage(error?.message || `Unable to load days for ${formatMonthLabel(monthKey)}.`);
@@ -414,7 +447,7 @@ const AttendanceRecordsBrowser: React.FC<Props> = ({
     setStatusMessage(null);
     try {
       setExpandedDays((prev) => new Set(prev).add(`${monthKey}:${dayKey}`));
-      await refreshAttendanceStatusByRange(dayKey, dayKey);
+      await loadRecords(dayKey, dayKey);
       setStatusMessage(`Refreshed status for ${formatDayLabel(dayKey)}.`);
     } catch (error: any) {
       setStatusMessage(error?.message || `Unable to load taps for ${formatDayLabel(dayKey)}.`);
@@ -471,9 +504,9 @@ const AttendanceRecordsBrowser: React.FC<Props> = ({
               />
               <span>Search month: 2026-06 | day: 2026-06-08</span>
             </label>
-            <button type="button" className="primary-button" onClick={() => void loadOverview()} disabled={isLoadingOverview}>
-              {isLoadingOverview ? 'Loading...' : 'Load Month/Day'}
-            </button>
+          <button type="button" className="primary-button" onClick={() => void loadOverview()} disabled={isLoadingOverview}>
+            {isLoadingOverview ? 'Loading...' : 'Load Month/Day'}
+          </button>
           </div>
         </div>
 
