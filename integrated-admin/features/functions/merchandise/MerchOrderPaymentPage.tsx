@@ -8,9 +8,11 @@ import {
   deleteMerchOrderPayment,
   loadMerchOrderPayments,
   loadMerchOrderAuditTrail,
+  loadPublishedMerchProducts,
   updateMerchOrderPayment,
   type MerchOrderPaymentRecord,
   updateMerchOrderStatus,
+  type MerchProductOption,
   type MerchActiveLearnerOption,
   type MerchOrderAuditRecord,
   type MerchOrderControlRecord,
@@ -18,15 +20,18 @@ import {
   getIntegratedAdminActorName,
   resolveMerchLearnerDisplayName,
 } from './services/merchOrderControlService';
-import { getMerchOrderStatusClass, getMerchOrderStatusLabel, normalizeMerchOrderStatus } from './order-control/utils/orderStatus';
+import { getMerchOrderRowStatusClass, getMerchOrderStatusClass, getMerchOrderStatusLabel, normalizeMerchOrderStatus } from './order-control/utils/orderStatus';
 import { AddPaymentModal } from './components/order-payment/AddPaymentModal';
 import { OrderPaymentDetailModal } from './components/order-payment/OrderPaymentDetailModal';
 import { MerchPaymentReceiptDownloadButton } from '../../../../common/components/merch/MerchPaymentReceiptDownloadButton';
+import { loadIdOrderRecords, updateIdOrderStatus, type IdOrderRecord } from './id-orders/services/idOrdersService';
 
 const parseGradeSortValue = (grade: string) => {
   const match = grade.match(/\d+/);
   return match ? Number(match[0]) : Number.POSITIVE_INFINITY;
 };
+
+const ID_SERVICE_SKU = 'ID-001';
 
 type LearnerGroup = {
   key: string;
@@ -48,6 +53,39 @@ type PaymentOrderMetrics = {
   orderAmount: number;
   outstanding: number;
   paid: number;
+};
+
+const normalizeMerchControlRecord = (record: MerchOrderControlRecord): MerchOrderControlRecord => ({
+  ...record,
+  orderKind: 'merch',
+  orderStatus: normalizeMerchOrderStatus(record.orderStatus),
+});
+
+const getProductBySku = (products: MerchProductOption[], sku: string) =>
+  products.find((product) => String(product.sku || '').trim().toUpperCase() === String(sku || '').trim().toUpperCase()) || null;
+
+const mapIdOrderToControlRecord = (record: IdOrderRecord, idProduct: MerchProductOption | null): MerchOrderControlRecord => {
+  const orderAmount = Number(idProduct?.price || 0);
+  return {
+    createdAt: record.createdAt,
+    gradeLevel: record.gradeLevel,
+    id: record.id,
+    learnerId: '',
+    learnerLrn: record.learnerLrn,
+    learnerName: record.learnerName,
+    notes: record.address ? `Address: ${record.address}` : '',
+    orderAmount,
+    orderKind: 'id',
+    orderPeriodLabel: record.orderPeriodLabel || 'ID Order',
+    orderSource: 'learner_portal',
+    orderStatus: normalizeMerchOrderStatus(record.orderStatus, 'id'),
+    productName: idProduct?.name || 'ID Order',
+    quantity: 1,
+    referenceNo: record.referenceNo,
+    sectionName: record.sectionName,
+    selectedSize: '',
+    unitPrice: orderAmount,
+  };
 };
 
 const buildLearnerGroupKey = (row: MerchOrderControlRecord) => {
@@ -198,7 +236,7 @@ function PaymentLearnerGroupTable({
               {group.rows.map((row, index) => (
                 <tr
                   key={`${row.id}-${index}`}
-                  className={`integrated-admin-merch-order-row integrated-admin-merch-order-row--status-${row.orderStatus}`}
+                  className={`integrated-admin-merch-order-row ${getMerchOrderRowStatusClass(row.orderStatus, row.orderKind)}`}
                   onClick={() => void onOpenOrderDetails(row)}
                   role="button"
                   tabIndex={0}
@@ -217,7 +255,7 @@ function PaymentLearnerGroupTable({
                   <td>{row.orderPeriodLabel || '-'}</td>
                   <td>{row.quantity}</td>
                   <td>
-                    <div className="integrated-admin-merch-group__amount-stack">
+                    <div className={`integrated-admin-merch-group__amount-stack ${row.orderKind === 'id' ? 'integrated-admin-merch-group__amount-stack--id' : ''}`}>
                       <strong>PHP {row.orderAmount.toFixed(2)}</strong>
                       <small>
                         Outstanding:{' '}
@@ -230,9 +268,9 @@ function PaymentLearnerGroupTable({
                   <td>{row.selectedSize || '-'}</td>
                   <td>
                     <span
-                      className={`integrated-admin-order-status-tag ${getMerchOrderStatusClass(row.orderStatus).replace('select', 'tag')}`}
+                      className={`integrated-admin-order-status-tag ${getMerchOrderStatusClass(row.orderStatus, row.orderKind).replace('select', 'tag')}`}
                     >
-                      {getMerchOrderStatusLabel(row.orderStatus)}
+                      {getMerchOrderStatusLabel(row.orderStatus, row.orderKind)}
                     </span>
                   </td>
                   <td>
@@ -316,11 +354,31 @@ export function MerchOrderPaymentPage() {
         throw new Error('No local merch cache found. Open the Orders page and refresh it first.');
       }
       const snapshotLearners = snapshot.learners || [];
-      setRecords(hydrateMerchOrderLearnerNames((snapshot.records || []).map((row) => ({ ...row })), snapshotLearners));
+      const merchRecords = hydrateMerchOrderLearnerNames(
+        (snapshot.records || [])
+          .filter((row) => String(row.orderKind || 'merch').toLowerCase() !== 'id')
+          .map((row) => normalizeMerchControlRecord({ ...row, orderKind: 'merch' })),
+        snapshotLearners,
+      );
+      let resolvedProducts = snapshot.products || [];
+      if (!getProductBySku(resolvedProducts, ID_SERVICE_SKU)) {
+        const liveProducts = await loadPublishedMerchProducts();
+        if (liveProducts.length > 0) {
+          resolvedProducts = liveProducts;
+        }
+      }
+      const idProduct = getProductBySku(resolvedProducts, ID_SERVICE_SKU);
+      const idRecords = await loadIdOrderRecords();
+      const mergedRecords = [
+        ...merchRecords,
+        ...idRecords.map((row) => mapIdOrderToControlRecord(row, idProduct)),
+      ].sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+      setRecords(mergedRecords);
       setCachedLearners(snapshotLearners);
-      setCachedProducts(snapshot.products || []);
+      setCachedProducts(resolvedProducts);
       setLastLoadedFromDbAt(snapshot.lastLoadedFromDbAt || '');
       setCacheReady(true);
+      await refreshOutstandingBalances(mergedRecords, true);
     } catch (error: any) {
       setAlert({ title: 'Load Failed', message: error?.message || 'Unable to load order payments.', tone: 'danger' });
     } finally {
@@ -335,19 +393,21 @@ export function MerchOrderPaymentPage() {
   const visibleRecords = useMemo(
     () =>
       records.filter((row) => {
-        const status = normalizeMerchOrderStatus(row.orderStatus);
+        const status = normalizeMerchOrderStatus(row.orderStatus, row.orderKind);
+        if (row.orderKind === 'id') return true;
         return status === 'confirmed' || status === 'released';
       }),
     [records],
   );
 
-  const refreshOutstandingBalances = async (targetRecords: MerchOrderControlRecord[] = records) => {
+  const refreshOutstandingBalances = async (targetRecords: MerchOrderControlRecord[] = records, allowWithoutCacheReady = false) => {
     const balanceTargetRecords = targetRecords.filter((row) => {
-      const status = normalizeMerchOrderStatus(row.orderStatus);
+      const status = normalizeMerchOrderStatus(row.orderStatus, row.orderKind);
+      if (row.orderKind === 'id') return true;
       return status === 'confirmed' || status === 'released';
     });
 
-    if (!cacheReady || balanceTargetRecords.length === 0) {
+    if ((!cacheReady && !allowWithoutCacheReady) || balanceTargetRecords.length === 0) {
       setOrderOutstandingBalanceById({});
       return;
     }
@@ -375,7 +435,7 @@ export function MerchOrderPaymentPage() {
   useEffect(() => {
     if (!cacheReady) return;
     void refreshOutstandingBalances(records);
-  }, [cacheReady]);
+  }, [cacheReady, records]);
 
     const syncOutstandingBalanceFromPayments = (
       row: MerchOrderControlRecord,
@@ -621,32 +681,42 @@ export function MerchOrderPaymentPage() {
         paymentNotes: cleanNotes,
         receiptNo: cleanReceipt,
       });
-      await updateMerchOrderStatus(row.id, 'confirmed', {
-        auditNote: `Payment recorded in Integrated Admin order payment page. Amount: PHP ${amountValue.toFixed(2)}.${cleanReceipt ? ` Receipt No: ${cleanReceipt}.` : ''}${cleanNotes ? ` Notes: ${cleanNotes}` : ''}`,
-        expectedFromStatus: options?.force ? undefined : row.orderStatus === 'pending' ? 'pending' : undefined,
-      });
+      const nextStatus = row.orderKind === 'id' ? 'done' : 'confirmed';
+      if (row.orderKind === 'id') {
+        await updateIdOrderStatus(row.id, nextStatus);
+      } else {
+        await updateMerchOrderStatus(row.id, nextStatus, {
+          auditNote: `Payment recorded in Integrated Admin order payment page. Amount: PHP ${amountValue.toFixed(2)}.${cleanReceipt ? ` Receipt No: ${cleanReceipt}.` : ''}${cleanNotes ? ` Notes: ${cleanNotes}` : ''}`,
+          expectedFromStatus: options?.force ? undefined : row.orderStatus === 'pending' ? 'pending' : undefined,
+        });
+      }
       const nextRecords = records.map((entry) =>
-        entry.id === row.id ? { ...entry, orderStatus: 'confirmed' } : entry,
+        entry.id === row.id ? { ...entry, orderStatus: nextStatus } : entry,
       );
       setRecords(nextRecords);
-      await saveCachedMerchOrdersPageSnapshot(nextRecords, cachedLearners, cachedProducts, lastLoadedFromDbAt);
+      await saveCachedMerchOrdersPageSnapshot(
+        nextRecords.filter((entry) => entry.orderKind !== 'id'),
+        cachedLearners,
+        cachedProducts,
+        lastLoadedFromDbAt,
+      );
       applyLocalOutstandingDelta(row.id, -amountValue, row.orderAmount);
       setSelectedOrderPayments((current) =>
         current.some((entry) => entry.id === createdPayment.id) ? current : [...current, createdPayment],
       );
       if (selectedOrderDetail?.id === row.id) {
-        setSelectedOrderDetail({ ...row, orderStatus: 'confirmed' });
+        setSelectedOrderDetail({ ...row, orderStatus: nextStatus });
       }
       if (options?.closeDetailOnSuccess) {
         setSelectedOrderDetail(null);
       }
-        setAlert({
-          title: 'Payment Posted',
-          message: `Order ${row.referenceNo || row.id} payment saved.`,
-          tone: 'success',
-        });
+      setAlert({
+        title: 'Payment Posted',
+        message: `${row.orderKind === 'id' ? 'ID order' : 'Order'} ${row.referenceNo || row.id} payment saved.`,
+        tone: 'success',
+      });
       if (selectedOrderDetail?.id === row.id) {
-        setSelectedOrderDetail({ ...row, orderStatus: 'confirmed' });
+        setSelectedOrderDetail({ ...row, orderStatus: nextStatus });
       }
     } catch (error: any) {
       setAlert({ title: 'Update Failed', message: error?.message || 'Unable to update payment status.', tone: 'danger' });
@@ -658,7 +728,7 @@ export function MerchOrderPaymentPage() {
   const handleAddPayment = async () => {
     const editingMode = Boolean(editingHistoryPaymentId);
     if (!selectedPaymentOrder && !selectedLearnerPaymentSummary && !editingMode) {
-      setAlert({ title: 'Required Fields', message: 'Select a confirmed or released order first.', tone: 'danger' });
+      setAlert({ title: 'Required Fields', message: 'Select an order first.', tone: 'danger' });
       return;
     }
     const editTargetLimit = editingMode && selectedOrderDetail && editingHistoryPaymentRecord
@@ -725,22 +795,23 @@ export function MerchOrderPaymentPage() {
           tone: 'success',
         });
         return;
-        }
-        if (selectedLearnerPaymentSummary) {
-          const amountValue = Number(paymentAmount);
-          const rowPaymentBalances = selectedLearnerPaymentSummary.rows.map((row) => ({
-            row,
-            remaining: Math.max(0, orderOutstandingBalanceById[row.id] ?? row.orderAmount),
-          }));
-          const totalOutstanding = rowPaymentBalances.reduce((sum, item) => sum + item.remaining, 0);
-          if (amountValue > totalOutstanding) {
-            setAlert({
-              title: 'Invalid Payment Amount',
-              message: `Payment amount cannot be greater than learner outstanding total (PHP ${totalOutstanding.toFixed(2)}).`,
+      }
+      if (selectedLearnerPaymentSummary) {
+        const amountValue = Number(paymentAmount);
+        const rowPaymentBalances = selectedLearnerPaymentSummary.rows.map((row) => ({
+          row,
+          remaining: Math.max(0, orderOutstandingBalanceById[row.id] ?? row.orderAmount),
+        }));
+        const totalOutstanding = rowPaymentBalances.reduce((sum, item) => sum + item.remaining, 0);
+        if (amountValue > totalOutstanding) {
+          setAlert({
+            title: 'Invalid Payment Amount',
+            message: `Payment amount cannot be greater than learner outstanding total (PHP ${totalOutstanding.toFixed(2)}).`,
             tone: 'danger',
           });
           return;
         }
+
         let remainingAmount = amountValue;
         const createdPayments: MerchOrderPaymentRecord[] = [];
         for (const item of rowPaymentBalances) {
@@ -754,10 +825,14 @@ export function MerchOrderPaymentPage() {
             receiptNo: receiptNo.trim(),
           });
           createdPayments.push(createdPayment);
-          await updateMerchOrderStatus(item.row.id, 'confirmed', {
-            auditNote: `Learner total payment recorded in Integrated Admin order payment page. Amount: PHP ${paymentForRow.toFixed(2)}.${receiptNo.trim() ? ` Receipt No: ${receiptNo.trim()}.` : ''}${paymentNotes.trim() ? ` Notes: ${paymentNotes.trim()}` : ''}`,
-            expectedFromStatus: item.row.orderStatus === 'pending' ? 'pending' : undefined,
-          });
+          if (item.row.orderKind === 'id') {
+            await updateIdOrderStatus(item.row.id, 'done');
+          } else {
+            await updateMerchOrderStatus(item.row.id, 'confirmed', {
+              auditNote: `Learner total payment recorded in Integrated Admin order payment page. Amount: PHP ${paymentForRow.toFixed(2)}.${receiptNo.trim() ? ` Receipt No: ${receiptNo.trim()}.` : ''}${paymentNotes.trim() ? ` Notes: ${paymentNotes.trim()}` : ''}`,
+              expectedFromStatus: item.row.orderStatus === 'pending' ? 'pending' : undefined,
+            });
+          }
           applyLocalOutstandingDelta(item.row.id, -paymentForRow, item.row.orderAmount);
           if (selectedOrderDetail?.id === item.row.id) {
             setSelectedOrderPayments((current) =>
@@ -766,11 +841,22 @@ export function MerchOrderPaymentPage() {
           }
           remainingAmount -= paymentForRow;
         }
+
         const nextRecords = records.map((entry) =>
-          selectedLearnerPaymentSummary.rows.some((row) => row.id === entry.id) ? { ...entry, orderStatus: 'confirmed' } : entry,
+          selectedLearnerPaymentSummary.rows.some((row) => row.id === entry.id)
+            ? {
+                ...entry,
+                orderStatus: entry.orderKind === 'id' ? 'done' : 'confirmed',
+              }
+            : entry,
         );
         setRecords(nextRecords);
-        await saveCachedMerchOrdersPageSnapshot(nextRecords, cachedLearners, cachedProducts, lastLoadedFromDbAt);
+        await saveCachedMerchOrdersPageSnapshot(
+          nextRecords.filter((entry) => entry.orderKind !== 'id'),
+          cachedLearners,
+          cachedProducts,
+          lastLoadedFromDbAt,
+        );
         if (selectedOrderDetail && createdPayments.some((payment) => payment.orderId === selectedOrderDetail.id)) {
           setSelectedOrderPayments((current) => {
             const nextById = new Map(current.map((entry) => [entry.id, entry]));
@@ -847,13 +933,18 @@ export function MerchOrderPaymentPage() {
     if (!selectedOrderDetail) return;
     setIsSaving(true);
     try {
-      const orderId = await deleteMerchOrderPayment(entry.id);
-      const remainingPostedPayments = selectedOrderPayments.filter((payment) => payment.id !== entry.id);
+        const orderId = await deleteMerchOrderPayment(entry.id);
+        const remainingPostedPayments = selectedOrderPayments.filter((payment) => payment.id !== entry.id);
         const nextRecords = records.map((current) =>
           current.id === orderId ? { ...current } : current,
         );
         setRecords(nextRecords);
-        await saveCachedMerchOrdersPageSnapshot(nextRecords, cachedLearners, cachedProducts, lastLoadedFromDbAt);
+        await saveCachedMerchOrdersPageSnapshot(
+          nextRecords.filter((current) => current.orderKind !== 'id'),
+          cachedLearners,
+          cachedProducts,
+          lastLoadedFromDbAt,
+        );
         setSelectedOrderPayments(remainingPostedPayments);
         setSelectedOrderDetail({ ...selectedOrderDetail });
         syncOutstandingBalanceFromPayments(selectedOrderDetail, remainingPostedPayments);

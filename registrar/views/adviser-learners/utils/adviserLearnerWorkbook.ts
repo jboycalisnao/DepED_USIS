@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx';
 import type { AdviserSectionGroup } from './adviserLearnerAccess';
+import { formatLearnerTags } from '../../../utils/learnerTags';
 
 const sanitizeFilePart = (value: string) =>
   String(value || '')
@@ -39,13 +40,8 @@ const buildLearnerRows = (group: AdviserSectionGroup, schoolYearLabel: string) =
     'Microsoft UPN': String(learner.microsoftUpn || ''),
     'Microsoft Status': String(learner.microsoftAccountStatus || ''),
     Status: String(learner.status || ''),
-    SSLG: learner.isSSLG ? 'Yes' : '',
-    'Club Officer': learner.isClubOfficer ? 'Yes' : '',
-    Athlete: learner.isAthlete ? 'Yes' : '',
-    Artist: learner.isArtist ? 'Yes' : '',
     '4Ps': learner.is4Ps ? 'Yes' : '',
-    Indigent: learner.isIndigent ? 'Yes' : '',
-    'Org Affiliations': Array.isArray(learner.orgAffiliations) ? learner.orgAffiliations.join(', ') : '',
+    Tags: formatLearnerTags(learner.tags),
   }));
 
 export const downloadAdviserSectionWorkbook = (

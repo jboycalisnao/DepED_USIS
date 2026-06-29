@@ -8,6 +8,7 @@ import BulkImport from './views/BulkImport';
 import SectionManagement from './views/SectionManagement';
 import Settings from './views/Settings';
 import Credentials from './views/Credentials';
+import Tagging from './views/tagging/TaggingPage';
 import CredentialDetailPage from './views/credentials/CredentialDetailPage';
 import AdviserLearnersPage from './views/adviser-learners/AdviserLearnersPage';
 import Landing from './views/Landing';
@@ -72,6 +73,7 @@ const AuthenticatedRouter: React.FC = () => {
         <Route path="/" element={<Dashboard />} />
         <Route path="/learners" element={<LearnerList />} />
         <Route path="/my-section-learners" element={<AdviserLearnersPage />} />
+        <Route path="/tagging" element={<Tagging />} />
         <Route path="/public-enrollment" element={<PublicEnrollmentPage />} />
         <Route path="/verify-document" element={<DocumentVerificationPage />} />
         <Route path="/enroll" element={<PublicEnrollmentSubmissionsPage />} />
@@ -112,10 +114,11 @@ const App: React.FC = () => {
         <UsisPortalGate moduleKey="registrar" />
         <Routes>
           <Route path="/" element={<Landing />} />
-          <Route path="/public-enrollment" element={<PublicEnrollmentPage />} />
-          <Route path="/enroll/sectioning" element={<PublicEnrollmentSectioningPage />} />
-          <Route path="/verify-document" element={<DocumentVerificationPage />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="/public-enrollment" element={<PublicEnrollmentPage />} />
+        <Route path="/enroll/sectioning" element={<PublicEnrollmentSectioningPage />} />
+        <Route path="/verify-document" element={<DocumentVerificationPage />} />
+        <Route path="/tagging" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
     );

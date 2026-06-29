@@ -1098,8 +1098,104 @@
   min-height: 90px;
 }
 
-.id-orders-export-modal__grade-select {
+.id-orders-bulk-import-modal__grade-select {
   margin-top: 12px;
+}
+
+.id-orders-bulk-import-modal__file-box {
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--deped-line);
+  border-radius: 8px;
+  background: #fbfcff;
+  padding: 14px;
+  margin-top: 12px;
+}
+
+.id-orders-bulk-import-modal__section-title {
+  margin: 0;
+  color: var(--deped-ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.id-orders-bulk-import-modal__file-copy {
+  margin: 4px 0 0;
+  color: var(--deped-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.id-orders-bulk-import-modal__file-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.id-orders-bulk-import-modal__file-input {
+  display: none;
+}
+
+.id-orders-bulk-import-modal__error {
+  margin: 0;
+  color: var(--deped-red);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.id-orders-bulk-import-modal__review {
+  display: grid;
+  gap: 14px;
+}
+
+.id-orders-bulk-import-modal__summary {
+  margin-top: 2px;
+}
+
+.id-orders-bulk-import-modal__summary-copy {
+  display: grid;
+  gap: 10px;
+}
+
+.id-orders-bulk-import-modal__changes {
+  display: grid;
+  gap: 10px;
+  max-height: 180px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.id-orders-bulk-import-modal__change-item {
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--deped-line);
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 10px 12px;
+}
+
+.id-orders-bulk-import-modal__change-item strong {
+  color: var(--deped-ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.id-orders-bulk-import-modal__change-item span {
+  color: var(--deped-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.id-orders-bulk-import-modal__issues {
+  margin-top: 0;
+}
+
+.id-orders-bulk-import-modal__blocking-note {
+  margin: 8px 0 0;
+  color: var(--deped-red);
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .integrated-admin-merch-order-manual__modal-actions {
@@ -1317,6 +1413,11 @@
   color: var(--deped-blue);
   font-size: 13px;
   font-weight: 700;
+}
+
+.integrated-admin-merch-group__amount-stack--id strong {
+  font-size: 16px;
+  line-height: 1.1;
 }
 
 .integrated-admin-merch-group__amount-stack small {

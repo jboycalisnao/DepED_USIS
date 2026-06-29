@@ -26,6 +26,7 @@ interface UsisSearchableSelectProps {
   value: string;
   forceInlineMenu?: boolean;
   forcePortalMenu?: boolean;
+  menuGap?: number;
   required?: boolean;
 }
 
@@ -49,6 +50,7 @@ export function UsisSearchableSelect({
   value,
   forceInlineMenu = false,
   forcePortalMenu = false,
+  menuGap = 4,
   required = false,
 }: UsisSearchableSelectProps) {
   const rootRef = useRef<HTMLDivElement>(null);
@@ -107,7 +109,7 @@ export function UsisSearchableSelect({
         if (!fieldRect) return;
         setMenuPosition({
           left: fieldRect.left,
-          top: fieldRect.bottom + 8,
+          top: fieldRect.bottom + menuGap,
           width: fieldRect.width,
         });
       };
@@ -128,7 +130,7 @@ export function UsisSearchableSelect({
       if (!fieldRect) return;
       setMenuPosition({
         left: fieldRect.left,
-        top: fieldRect.bottom + 8,
+        top: fieldRect.bottom + menuGap,
         width: fieldRect.width,
       });
     };
@@ -139,7 +141,7 @@ export function UsisSearchableSelect({
       window.removeEventListener('resize', updatePosition);
       window.removeEventListener('scroll', updatePosition, true);
     };
-  }, [forceInlineMenu, isOpen]);
+  }, [forceInlineMenu, forcePortalMenu, isOpen, menuGap]);
 
   const selectValue = (nextValue: string) => {
     onChange(nextValue);

@@ -1,6 +1,12 @@
 import type { MerchActiveLearnerOption, MerchOrderControlRecord } from '../../services/merchOrderControlService';
 import { resolveMerchLearnerDisplayName } from '../../services/merchOrderControlService';
-import { getMerchOrderRowStatusClass, getMerchOrderStatusClass, getMerchOrderStatusLabel } from '../utils/orderStatus';
+import {
+  getMerchOrderRowStatusClass,
+  getMerchOrderStatusClass,
+  getMerchOrderStatusLabel,
+  ID_ORDER_STATUS_OPTIONS,
+  MERCH_ORDER_STATUS_OPTIONS,
+} from '../utils/orderStatus';
 
 type Props = {
   isSaving: boolean;
@@ -9,7 +15,6 @@ type Props = {
   onStatusChange: (orderId: string, value: string) => void;
   learners: MerchActiveLearnerOption[];
   rows: MerchOrderControlRecord[];
-  statusOptions: string[];
 };
 
 type LearnerGroup = {
@@ -48,7 +53,6 @@ export function OrderControlSectionTable({
   onStatusChange,
   learners,
   rows,
-  statusOptions,
 }: Props) {
   const learnerGroups = Object.values(groupRowsByLearner(rows, learners)).sort((groupA, groupB) => {
     const nameDiff = groupA.label.localeCompare(groupB.label);
@@ -79,20 +83,21 @@ export function OrderControlSectionTable({
                 <th>Date</th>
                 <th>Learner</th>
                 <th>LRN</th>
-                <th>Product</th>
-                <th>Period</th>
-                <th>Qty</th>
-                <th>Size</th>
-                <th>Status</th>
-                <th>Placed Via</th>
-                <th>Action</th>
+            <th>Product</th>
+            <th>Period</th>
+            <th>Qty</th>
+            <th>Amount</th>
+            <th>Size</th>
+            <th>Status</th>
+            <th>Placed Via</th>
+            <th>Action</th>
               </tr>
             </thead>
             <tbody>
               {group.rows.map((row, index) => (
                 <tr
                   key={`${row.id}-${index}`}
-                  className={`integrated-admin-merch-order-row ${getMerchOrderRowStatusClass(row.orderStatus)}`}
+                  className={`integrated-admin-merch-order-row ${getMerchOrderRowStatusClass(row.orderStatus, row.orderKind)}`}
                   onClick={(event) => {
                     const target = event.target as HTMLElement;
                     if (target.closest('.integrated-admin-order-status-cell') || target.closest('.integrated-admin-order-action-cell')) {
@@ -116,10 +121,11 @@ export function OrderControlSectionTable({
                   <td>{row.productName}</td>
                   <td>{row.orderPeriodLabel || '-'}</td>
                   <td>{row.quantity}</td>
+                  <td>PHP {Number(row.orderAmount || 0).toFixed(2)}</td>
                   <td>{row.selectedSize || '-'}</td>
                   <td className="integrated-admin-order-status-cell">
                     <select
-                      className={`integrated-admin-order-status-select ${getMerchOrderStatusClass(row.orderStatus)}`}
+                      className={`integrated-admin-order-status-select ${getMerchOrderStatusClass(row.orderStatus, row.orderKind)}`}
                       disabled={isSaving}
                       value={row.orderStatus}
                       onChange={(event) => onStatusChange(row.id, event.target.value)}
@@ -127,9 +133,9 @@ export function OrderControlSectionTable({
                       onMouseDown={(event) => event.stopPropagation()}
                       aria-label="Order status"
                     >
-                      {statusOptions.map((option) => (
-                        <option key={option} value={option} className={getMerchOrderStatusClass(option)}>
-                          {getMerchOrderStatusLabel(option)}
+                      {(row.orderKind === 'id' ? ID_ORDER_STATUS_OPTIONS : MERCH_ORDER_STATUS_OPTIONS).map((option) => (
+                        <option key={option} value={option} className={getMerchOrderStatusClass(option, row.orderKind)}>
+                          {getMerchOrderStatusLabel(option, row.orderKind)}
                         </option>
                       ))}
                     </select>

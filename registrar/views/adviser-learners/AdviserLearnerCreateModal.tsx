@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type { Section, Student } from '../../types';
 import { EnrollmentStatus, GradeLevel } from '../../types';
+import { parseLearnerTagsInput } from '../../utils/learnerTags';
 
 type AdviserLearnerDraft = {
   lrn: string;
@@ -15,6 +16,7 @@ type AdviserLearnerDraft = {
   guardianName: string;
   fatherName: string;
   motherName: string;
+  tagsText: string;
 };
 
 interface AdviserLearnerCreateModalProps {
@@ -41,6 +43,7 @@ const createBlankDraft = (): AdviserLearnerDraft => ({
   guardianName: '',
   fatherName: '',
   motherName: '',
+  tagsText: '',
 });
 
 const todayIso = () => new Date().toISOString().split('T')[0];
@@ -105,6 +108,7 @@ const AdviserLearnerCreateModal: React.FC<AdviserLearnerCreateModalProps> = ({
       status: EnrollmentStatus.ENROLLED,
       sectionId: section.id,
       schoolYear: schoolYearLabel,
+      tags: parseLearnerTagsInput(draft.tagsText),
       enrollments: [
         {
           id: typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
@@ -117,13 +121,7 @@ const AdviserLearnerCreateModal: React.FC<AdviserLearnerCreateModalProps> = ({
           status: EnrollmentStatus.ENROLLED,
         },
       ],
-      orgAffiliations: [],
-      isSSLG: false,
-      isClubOfficer: false,
-      isAthlete: false,
-      isArtist: false,
       is4Ps: false,
-      isIndigent: false,
     };
 
     setIsSaving(true);
@@ -180,6 +178,7 @@ const AdviserLearnerCreateModal: React.FC<AdviserLearnerCreateModalProps> = ({
               <Field label="Guardian Name" value={draft.guardianName} onChange={(value) => update('guardianName', value)} />
               <Field label="Father's Full Name" value={draft.fatherName} onChange={(value) => update('fatherName', value)} />
               <Field label="Mother's Full Name" value={draft.motherName} onChange={(value) => update('motherName', value)} />
+              <Field label="Learner Tags" value={draft.tagsText} onChange={(value) => update('tagsText', value)} />
             </div>
           </div>
 

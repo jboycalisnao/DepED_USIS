@@ -3,8 +3,8 @@ import { UsisAlertModal } from '../../../../../../common/components/UsisAlertMod
 import UsisPageLoader from '../../../../../../common/components/UsisPageLoader';
 import { UsisSearchableSelect } from '../../../../../../common/components/ui/UsisSearchableSelect';
 import { UsisGradeSectionList, type UsisGradeSectionListGrade } from '../../../../../../common/components/ui/UsisGradeSectionList';
-import { IdOrdersExportModal } from '../components/IdOrdersExportModal';
-import { downloadIdOrdersWorkbook } from '../utils/idOrdersWorkbook';
+import { IdOrdersBulkImportModal } from '../components/IdOrdersBulkImportModal';
+import { downloadIdOrdersWorkbook, reviewIdOrdersWorkbook, type IdOrderWorkbookReview } from '../utils/idOrdersWorkbook';
 import {
   deleteIdOrderRecord,
   loadActiveIdOrdersSchoolYearLabel,
@@ -51,10 +51,13 @@ const getStatusToneClass = (value: string) => {
 export function IdOrdersPage() {
   const [records, setRecords] = useState<IdOrderRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isExporting, setIsExporting] = useState(false);
-  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
-  const [exportScope, setExportScope] = useState<'all' | 'grade'>('all');
-  const [exportGradeLevel, setExportGradeLevel] = useState('');
+  const [isDownloadingTemplate, setIsDownloadingTemplate] = useState(false);
+  const [isImportingWorkbook, setIsImportingWorkbook] = useState(false);
+  const [isReviewingWorkbook, setIsReviewingWorkbook] = useState(false);
+  const [isBulkImportModalOpen, setIsBulkImportModalOpen] = useState(false);
+  const [importScope, setImportScope] = useState<'all' | 'grade'>('all');
+  const [importGradeLevel, setImportGradeLevel] = useState('');
+  const [pendingWorkbookReview, setPendingWorkbookReview] = useState<IdOrderWorkbookReview | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isSavingStatus, setIsSavingStatus] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -82,15 +85,20 @@ export function IdOrdersPage() {
     }
   };
 
+  const loadLatestFromDatabase = async () => {
+    console.log('[ID Orders] refresh start');
+    const [rows, activeSchoolYearLabel] = await Promise.all([
+      loadIdOrderRecords(),
+      loadActiveIdOrdersSchoolYearLabel(),
+    ]);
+    console.log('[ID Orders] refresh complete', { count: rows.length });
+    return { rows, activeSchoolYearLabel };
+  };
+
   const refreshFromDatabase = async () => {
     setIsRefreshing(true);
     try {
-      console.log('[ID Orders] refresh start');
-      const [rows, activeSchoolYearLabel] = await Promise.all([
-        loadIdOrderRecords(),
-        loadActiveIdOrdersSchoolYearLabel(),
-      ]);
-      console.log('[ID Orders] refresh complete', { count: rows.length });
+      const { rows, activeSchoolYearLabel } = await loadLatestFromDatabase();
       setRecords(rows);
       setSchoolYearLabel(activeSchoolYearLabel);
       setLastSyncedAt(new Date().toISOString());
@@ -116,10 +124,7 @@ export function IdOrdersPage() {
       }
 
       console.log('[ID Orders] cache empty, loading from database');
-      const [rows, activeSchoolYearLabel] = await Promise.all([
-        loadIdOrderRecords(),
-        loadActiveIdOrdersSchoolYearLabel(),
-      ]);
+      const { rows, activeSchoolYearLabel } = await loadLatestFromDatabase();
       setRecords(rows);
       setSchoolYearLabel(activeSchoolYearLabel);
       setLastSyncedAt(new Date().toISOString());
@@ -156,7 +161,7 @@ export function IdOrdersPage() {
       const periodLabel = String(row.orderPeriodLabel || '').trim();
       if (!periodId) return;
       if (!periodMap.has(periodId)) {
-        periodMap.set(periodId, periodLabel || 'ID Request');
+        periodMap.set(periodId, periodLabel || 'ID Order');
       }
     });
     return [
@@ -175,7 +180,7 @@ export function IdOrdersPage() {
     setIsSavingStatus(true);
 
     const previousRecords = records;
-      const nextRecords = records.map((row) => (
+    const nextRecords = records.map((row) => (
       row.id === orderId
         ? { ...row, orderStatus: nextStatus, lastUpdatedAt: new Date().toISOString() }
         : row
@@ -266,10 +271,10 @@ export function IdOrdersPage() {
   }, [groupedRecords]);
 
   useEffect(() => {
-    if (exportScope !== 'grade') return;
-    if (exportGradeLevel && exportGradeOptions.includes(exportGradeLevel)) return;
-    setExportGradeLevel(exportGradeOptions[0] || '');
-  }, [exportGradeLevel, exportGradeOptions, exportScope]);
+    if (importScope !== 'grade') return;
+    if (importGradeLevel && exportGradeOptions.includes(importGradeLevel)) return;
+    setImportGradeLevel(exportGradeOptions[0] || '');
+  }, [exportGradeOptions, importGradeLevel, importScope]);
 
   const gradeListData: UsisGradeSectionListGrade[] = Object.entries(groupedRecords)
     .sort(([gradeA], [gradeB]) => {
@@ -357,35 +362,124 @@ export function IdOrdersPage() {
 
   const totalRequests = filteredRecords.length;
   const totalSections = Object.values(groupedRecords).reduce((sum, sectionMap) => sum + Object.keys(sectionMap).length, 0);
+  const downloadOrderPeriodLabel = useMemo(() => {
+    const labels = Array.from(new Set(
+      filteredRecords
+        .map((row) => String(row.orderPeriodLabel || '').trim())
+        .filter(Boolean),
+    ));
 
-  const handleExport = async () => {
-    setIsExporting(true);
+    if (labels.length === 1) return labels[0];
+    if (labels.length > 1) return labels.join(' / ');
+
+    if (selectedOrderPeriodId) {
+      const selectedOption = orderPeriodOptions.find((option) => option.value === selectedOrderPeriodId);
+      if (selectedOption?.label) return selectedOption.label;
+    }
+
+    return 'Order Period';
+  }, [filteredRecords, orderPeriodOptions, selectedOrderPeriodId]);
+
+  const handleDownloadTemplate = async () => {
+    setIsDownloadingTemplate(true);
     try {
-      const exportRecords = exportScope === 'grade'
-        ? filteredRecords.filter((row) => row.gradeLevel === exportGradeLevel)
+      const templateRecords = importScope === 'grade'
+        ? filteredRecords.filter((row) => row.gradeLevel === importGradeLevel)
         : filteredRecords;
 
-      if (exportRecords.length === 0) {
+      if (templateRecords.length === 0) {
         setAlert({
-          title: 'Export Failed',
-          message: exportScope === 'grade'
+          title: 'Download Failed',
+          message: importScope === 'grade'
             ? 'No records found for the selected grade level.'
-            : 'No ID orders are available for export.',
+            : 'No ID orders are available for download.',
           tone: 'danger',
         });
         return;
       }
 
-      await downloadIdOrdersWorkbook(exportRecords, schoolYearLabel, {
-        fileNameSuffix: exportScope === 'grade' ? exportGradeLevel : 'All_Orders',
-        isWholeOrders: exportScope === 'all',
+      await downloadIdOrdersWorkbook(templateRecords, downloadOrderPeriodLabel, {
+        fileNameSuffix: importScope === 'grade' ? importGradeLevel : 'All_Orders',
+        isWholeOrders: importScope === 'all',
       });
-      setIsExportModalOpen(false);
-      setAlert({ title: 'Export Complete', message: 'ID orders workbook has been downloaded.', tone: 'success' });
-    } catch (exportError: any) {
-      setAlert({ title: 'Export Failed', message: exportError?.message || 'Unable to export ID orders.', tone: 'danger' });
+      setAlert({ title: 'Download Complete', message: 'ID orders workbook has been downloaded.', tone: 'success' });
+    } catch (downloadError: any) {
+      setAlert({ title: 'Download Failed', message: downloadError?.message || 'Unable to download ID orders workbook.', tone: 'danger' });
     } finally {
-      setIsExporting(false);
+      setIsDownloadingTemplate(false);
+    }
+  };
+
+  const handleReviewWorkbook = async (file: File) => {
+    setIsReviewingWorkbook(true);
+    try {
+      const review = await reviewIdOrdersWorkbook(file, records);
+      setPendingWorkbookReview(review);
+    } catch (reviewError: any) {
+      setAlert({ title: 'Review Failed', message: reviewError?.message || 'Unable to review the uploaded workbook.', tone: 'danger' });
+    } finally {
+      setIsReviewingWorkbook(false);
+    }
+  };
+
+  const handleConfirmWorkbookImport = async () => {
+    if (!pendingWorkbookReview) return;
+
+    const blockingIssues = pendingWorkbookReview.issues.filter((issue) => issue.severity === 'error');
+    if (blockingIssues.length > 0) {
+      const firstIssue = blockingIssues[0];
+      setAlert({
+        title: 'Import Blocked',
+        message: `${firstIssue.message} (${firstIssue.sheetName} row ${firstIssue.rowNumber})`,
+        tone: 'danger',
+      });
+      return;
+    }
+
+    if (pendingWorkbookReview.patches.length === 0) {
+      setAlert({
+        title: 'Import Blocked',
+        message: 'No valid order rows were found in the workbook.',
+        tone: 'danger',
+      });
+      return;
+    }
+
+    setIsImportingWorkbook(true);
+    try {
+      const results = await Promise.allSettled(
+        pendingWorkbookReview.patches.map((patch) => updateIdOrderStatus(patch.orderId, patch.orderStatus)),
+      );
+      const failedCount = results.filter((result) => result.status === 'rejected').length;
+      const succeededCount = results.length - failedCount;
+
+      const { rows, activeSchoolYearLabel } = await loadLatestFromDatabase();
+      setRecords(rows);
+      setSchoolYearLabel(activeSchoolYearLabel);
+      setLastSyncedAt(new Date().toISOString());
+      await saveCachedIdOrdersSnapshot(rows, activeSchoolYearLabel);
+
+      setPendingWorkbookReview(null);
+
+      if (failedCount > 0) {
+        setAlert({
+          title: 'Import Partially Completed',
+          message: `${succeededCount} ID order status${succeededCount === 1 ? '' : 'es'} imported. ${failedCount} row${failedCount === 1 ? '' : 's'} failed to save.`,
+          tone: 'danger',
+        });
+        return;
+      }
+
+      setIsBulkImportModalOpen(false);
+      setAlert({
+        title: 'Import Complete',
+        message: `${succeededCount} ID order status${succeededCount === 1 ? '' : 'es'} imported successfully.`,
+        tone: 'success',
+      });
+    } catch (importError: any) {
+      setAlert({ title: 'Import Failed', message: importError?.message || 'Unable to import ID orders workbook.', tone: 'danger' });
+    } finally {
+      setIsImportingWorkbook(false);
     }
   };
 
@@ -411,7 +505,7 @@ export function IdOrdersPage() {
                       placeholder=" "
                       value={search}
                     />
-                    <span>Search ID requests (Learner, LRN, Grade, Section, Guardian, Address)</span>
+                    <span>Search ID orders (Learner, LRN, Grade, Section, Guardian, Address)</span>
                   </div>
                 </div>
               </div>
@@ -439,10 +533,10 @@ export function IdOrdersPage() {
               <button
                 type="button"
                 className="primary-button"
-                onClick={() => setIsExportModalOpen(true)}
-                disabled={isExporting || filteredRecords.length === 0 || isRefreshing || isSavingStatus}
+                onClick={() => setIsBulkImportModalOpen(true)}
+                disabled={isDownloadingTemplate || isImportingWorkbook || filteredRecords.length === 0 || isRefreshing || isSavingStatus}
               >
-                {isExporting ? 'Exporting...' : 'Download Excel'}
+                Bulk Import
               </button>
             </div>
           </div>
@@ -483,15 +577,25 @@ export function IdOrdersPage() {
         onClose={() => setAlert(null)}
       />
 
-      <IdOrdersExportModal
+      <IdOrdersBulkImportModal
         gradeOptions={exportGradeOptions}
-        isOpen={isExportModalOpen}
-        onClose={() => setIsExportModalOpen(false)}
-        onConfirm={() => void handleExport()}
-        onGradeChange={setExportGradeLevel}
-        onScopeChange={setExportScope}
-        selectedGrade={exportGradeLevel}
-        selectedScope={exportScope}
+        isBusy={isDownloadingTemplate || isImportingWorkbook || isReviewingWorkbook}
+        isImporting={isImportingWorkbook}
+        isReviewing={isReviewingWorkbook}
+        isOpen={isBulkImportModalOpen}
+        onClose={() => {
+          setPendingWorkbookReview(null);
+          setIsBulkImportModalOpen(false);
+        }}
+        onDownload={() => handleDownloadTemplate()}
+        onReview={handleReviewWorkbook}
+        onConfirmImport={handleConfirmWorkbookImport}
+        onGradeChange={setImportGradeLevel}
+        onResetReview={() => setPendingWorkbookReview(null)}
+        onScopeChange={setImportScope}
+        review={pendingWorkbookReview}
+        selectedGrade={importGradeLevel}
+        selectedScope={importScope}
       />
     </section>
   );

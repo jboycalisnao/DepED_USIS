@@ -7,6 +7,7 @@ export type RegistrarNavItem = {
 export const registrarNavItems: RegistrarNavItem[] = [
   { label: 'Dashboard', path: '/', icon: 'home' },
   { label: 'Learners', path: '/learners', icon: 'school' },
+  { label: 'Tagging', path: '/tagging', icon: 'local_offer' },
   { label: 'My Section Learners', path: '/my-section-learners', icon: 'groups' },
   { label: 'Enrollment', path: '/enroll', icon: 'widgets' },
   { label: 'Announcements', path: '/announcements', icon: 'campaign' },

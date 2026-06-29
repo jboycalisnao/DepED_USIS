@@ -1,5 +1,6 @@
 import { supabase } from '../../../../lib/supabase';
 import type { Student, Section } from '../../../../types';
+import { normalizeLearnerTags } from '../../../../utils/learnerTags';
 
 export type DocumentVerificationRecord = {
   learner: Student;
@@ -35,13 +36,8 @@ const mapLearner = (row: any): Student => ({
   status: toText(row.status || 'Enrolled') as Student['status'],
   sectionId: toText(row.section_id || ''),
   schoolYear: toText(row.school_year || ''),
-  isSSLG: Boolean(row.is_sslg),
-  isClubOfficer: Boolean(row.is_club_officer),
-  isAthlete: Boolean(row.is_athlete),
-  isArtist: Boolean(row.is_artist),
   is4Ps: Boolean(row.is_4ps),
-  isIndigent: Boolean(row.is_indigent),
-  orgAffiliations: Array.isArray(row.org_affiliations) ? row.org_affiliations : [],
+  tags: normalizeLearnerTags([row.tags ?? row.org_affiliations, row]),
   enrollments: [],
 });
 

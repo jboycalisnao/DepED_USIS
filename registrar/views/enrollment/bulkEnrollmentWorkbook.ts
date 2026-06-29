@@ -1,6 +1,7 @@
 import * as XLSX from 'xlsx';
 import type { GradeLevel, Section, Student } from '../../types';
 import { EnrollmentStatus } from '../../types';
+import { parseLearnerTagsInput } from '../../utils/learnerTags';
 
 export const BULK_ENROLLMENT_COLUMNS = [
   'LRN',
@@ -17,12 +18,8 @@ export const BULK_ENROLLMENT_COLUMNS = [
   'Guardian Name',
   'Grade Level',
   'Section',
-  'SSLG Member',
-  'Club Officer',
-  'Student Athlete',
-  'School Artist',
   '4Ps Beneficiary',
-  'Indigent Status',
+  'Tags',
 ] as const;
 
 type EnrollmentSheetRow = Record<(typeof BULK_ENROLLMENT_COLUMNS)[number], string>;
@@ -43,12 +40,8 @@ export const downloadBulkEnrollmentTemplate = (schoolYearLabel: string, selected
   sampleRow['Grade Level'] = String(selectedGrade || '').trim();
   sampleRow['Section'] = String(selectedSectionName || '').trim();
   sampleRow['Gender'] = 'Male';
-  sampleRow['SSLG Member'] = 'No';
-  sampleRow['Club Officer'] = 'No';
-  sampleRow['Student Athlete'] = 'No';
-  sampleRow['School Artist'] = 'No';
   sampleRow['4Ps Beneficiary'] = 'No';
-  sampleRow['Indigent Status'] = 'No';
+  sampleRow['Tags'] = '';
 
   const worksheet = XLSX.utils.aoa_to_sheet([
     headerRow,
@@ -106,6 +99,14 @@ export const parseBulkEnrollmentWorkbook = async (
       return;
     }
 
+    const legacyTags = [
+      toBoolean(row['SSLG Member']) ? 'SSLG Member' : '',
+      toBoolean(row['Club Officer']) ? 'Club Officer' : '',
+      toBoolean(row['Student Athlete']) ? 'Athlete' : '',
+      toBoolean(row['School Artist']) ? 'Artist' : '',
+      toBoolean(row['Indigent Status']) ? 'Indigent' : '',
+    ].filter(Boolean).join(', ');
+
     students.push({
       id: crypto.randomUUID(),
       lrn,
@@ -123,13 +124,8 @@ export const parseBulkEnrollmentWorkbook = async (
       status: EnrollmentStatus.ENROLLED,
       sectionId: targetSection.id,
       schoolYear: options.schoolYearLabel,
-      isSSLG: toBoolean(row['SSLG Member']),
-      isClubOfficer: toBoolean(row['Club Officer']),
-      isAthlete: toBoolean(row['Student Athlete']),
-      isArtist: toBoolean(row['School Artist']),
       is4Ps: toBoolean(row['4Ps Beneficiary']),
-      isIndigent: toBoolean(row['Indigent Status']),
-      orgAffiliations: [],
+      tags: parseLearnerTagsInput(String([row['Tags'] || row['tags'] || '', legacyTags].filter(Boolean).join(', '))),
       enrollments: [
         {
           id: crypto.randomUUID(),

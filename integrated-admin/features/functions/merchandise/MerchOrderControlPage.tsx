@@ -11,7 +11,10 @@ import {
   reviewMerchOrdersWorkbook,
   type MerchOrderWorkbookReview,
 } from './order-control/utils/merchOrdersWorkbook';
-import { MERCH_ORDER_STATUS_OPTIONS, normalizeMerchOrderStatus } from './order-control/utils/orderStatus';
+import {
+  MERCH_ORDER_STATUS_OPTIONS,
+  normalizeMerchOrderStatus,
+} from './order-control/utils/orderStatus';
 import { loadCachedMerchOrdersPageSnapshot, saveCachedMerchOrdersPageSnapshot } from './utils/merchOrdersPageCache';
 import {
   createManualMerchOrder,
@@ -41,6 +44,7 @@ const formatDateTime = (value: string) => {
 
 const normalizeOrderRecord = (record: MerchOrderControlRecord): MerchOrderControlRecord => ({
   ...record,
+  orderKind: 'merch',
   orderStatus: normalizeMerchOrderStatus(record.orderStatus),
 });
 
@@ -79,7 +83,8 @@ export function MerchOrderControlPage() {
       if (cached) {
         const cacheLoadedAt = new Date().toISOString();
         const cachedLearners = cached.learners || [];
-        setRecords(hydrateMerchOrderLearnerNames((cached.records || []).map(normalizeOrderRecord), cachedLearners));
+        const cachedRecords = hydrateMerchOrderLearnerNames((cached.records || []).map(normalizeOrderRecord), cachedLearners);
+        setRecords(cachedRecords);
         setLearners(cachedLearners);
         setProducts(cached.products || []);
         setLastLoadedFromDbAt(cached.lastLoadedFromDbAt || '');
@@ -88,15 +93,19 @@ export function MerchOrderControlPage() {
         if (!selectedProductId && (cached.products || []).length > 0) {
           setSelectedProductId(cached.products[0].id);
         }
+        if (cachedRecords.some((record) => Number(record.orderAmount || 0) <= 0)) {
+          void refresh({ silent: true });
+        }
         return;
       }
 
-      const [rows, activeLearners, merchProducts] = await Promise.all([
+      const [merchRows, activeLearners, merchProducts] = await Promise.all([
         loadMerchOrderControlRecords(),
         loadActiveSchoolYearLearners(),
         loadPublishedMerchProducts(),
       ]);
-      setRecords(hydrateMerchOrderLearnerNames(rows.map(normalizeOrderRecord), activeLearners));
+      const nextRecords = hydrateMerchOrderLearnerNames(merchRows.map(normalizeOrderRecord), activeLearners);
+      setRecords(nextRecords);
       setLearners(activeLearners);
       setProducts(merchProducts);
       if (!selectedProductId && merchProducts.length > 0) {
@@ -106,7 +115,7 @@ export function MerchOrderControlPage() {
       setLastLoadedFromDbAt(syncedAt);
       setLastLoadedFromCacheAt('');
       setBootedFromCache(false);
-      await saveCachedMerchOrdersPageSnapshot(rows, activeLearners, merchProducts, syncedAt);
+      await saveCachedMerchOrdersPageSnapshot(nextRecords, activeLearners, merchProducts, syncedAt);
     } catch (error) {
       console.error('MerchOrderControlPage bootstrap failed:', error);
     } finally {
@@ -118,20 +127,21 @@ export function MerchOrderControlPage() {
     const silent = Boolean(options?.silent);
     if (!silent) setIsRefreshing(true);
     try {
-      const [rows, activeLearners, merchProducts] = await Promise.all([
+      const [merchRows, activeLearners, merchProducts] = await Promise.all([
         loadMerchOrderControlRecords(),
         loadActiveSchoolYearLearners(),
         loadPublishedMerchProducts(),
       ]);
+      const nextRecords = hydrateMerchOrderLearnerNames(merchRows.map(normalizeOrderRecord), activeLearners);
       setLearners(activeLearners);
       setProducts(merchProducts);
-      setRecords(hydrateMerchOrderLearnerNames(rows.map(normalizeOrderRecord), activeLearners));
+      setRecords(nextRecords);
       if (!selectedProductId && merchProducts.length > 0) {
         setSelectedProductId(merchProducts[0].id);
       }
       const syncedAt = new Date().toISOString();
       setLastLoadedFromDbAt(syncedAt);
-      await saveCachedMerchOrdersPageSnapshot(rows, activeLearners, merchProducts, syncedAt);
+      await saveCachedMerchOrdersPageSnapshot(nextRecords, activeLearners, merchProducts, syncedAt);
       setBootedFromCache(false);
       if (!silent) {
         setAlert({ title: 'Refresh Complete', message: 'Merch orders were reloaded from the database and saved locally.', tone: 'success' });
@@ -155,10 +165,13 @@ export function MerchOrderControlPage() {
   }, [products, selectedProductId]);
 
   const handleStatusChange = async (orderId: string, value: string) => {
+    const currentRecord = records.find((row) => row.id === orderId);
+    if (!currentRecord) return;
+
     setIsSaving(true);
     try {
-      await updateMerchOrderStatus(orderId, value);
       const nextStatus = normalizeMerchOrderStatus(value);
+      await updateMerchOrderStatus(orderId, nextStatus);
       const nextRecords = hydrateMerchOrderLearnerNames(
         records.map((entry) => (entry.id === orderId ? { ...entry, orderStatus: nextStatus } : entry)),
         learners,
@@ -277,7 +290,6 @@ export function MerchOrderControlPage() {
               onStatusChange={(orderId, value) => void handleStatusChange(orderId, value)}
               learners={learners}
               rows={sectionRows}
-              statusOptions={MERCH_ORDER_STATUS_OPTIONS}
             />
           ),
           count: sectionRows.length,
@@ -317,6 +329,7 @@ export function MerchOrderControlPage() {
         notes: manualNotes.trim(),
         orderStatus: 'pending',
         orderAmount: productPrice * quantityValue,
+        orderKind: 'merch',
         orderPeriodLabel: createdOrder.orderPeriodLabel || '',
         orderSource: 'integrated_admin',
         productName: selectedProduct.name,
@@ -343,13 +356,14 @@ export function MerchOrderControlPage() {
   };
 
   const handleDownloadWorkbook = async () => {
-    if (records.length === 0) {
+    const merchOnlyRecords = records.filter((row) => row.orderKind === 'merch');
+    if (merchOnlyRecords.length === 0) {
       setAlert({ title: 'Export Failed', message: 'No merch orders are available for export.', tone: 'danger' });
       return;
     }
     setIsExportingWorkbook(true);
     try {
-      await downloadMerchOrdersWorkbook(records, 'Merch Orders');
+      await downloadMerchOrdersWorkbook(merchOnlyRecords, 'Merch Orders');
       setAlert({ title: 'Export Complete', message: 'Merch orders workbook has been downloaded.', tone: 'success' });
     } catch (error: any) {
       setAlert({ title: 'Export Failed', message: error?.message || 'Unable to export merch orders.', tone: 'danger' });
@@ -369,7 +383,7 @@ export function MerchOrderControlPage() {
 
     setIsImportingWorkbook(true);
     try {
-      const review = await reviewMerchOrdersWorkbook(file, records);
+      const review = await reviewMerchOrdersWorkbook(file, records.filter((row) => row.orderKind === 'merch'));
       setPendingWorkbookReview(review);
     } catch (error: any) {
       setAlert({ title: 'Import Failed', message: error?.message || 'Unable to sync statuses from workbook.', tone: 'danger' });
@@ -397,9 +411,9 @@ export function MerchOrderControlPage() {
       let changedCount = 0;
 
       for (const patch of pendingWorkbookReview.patches) {
-        const normalizedStatus = normalizeMerchOrderStatus(patch.orderStatus);
         const match = nextRecords.find((row) => row.id === patch.orderId || row.referenceNo === patch.referenceNo);
-        if (!match) continue;
+        if (!match || match.orderKind !== 'merch') continue;
+        const normalizedStatus = normalizeMerchOrderStatus(patch.orderStatus);
         if (normalizeMerchOrderStatus(match.orderStatus) === normalizedStatus) continue;
         await updateMerchOrderStatus(match.id, normalizedStatus);
         match.orderStatus = normalizedStatus;

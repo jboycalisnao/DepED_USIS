@@ -2,6 +2,7 @@ import { Section, Student } from '../../../../types';
 import { supabase } from '../../../../lib/supabase';
 import { buildLNHSPrintSheetHeader } from '../../shared/printSheetHeader';
 import { fetchLearnerEnrollmentSnapshot } from './enrollmentHistorySnapshot';
+import { normalizeLearnerTags } from '../../../../utils/learnerTags';
 
 type PrintLearnerInformationPayload = {
   learners: Student[];
@@ -212,6 +213,10 @@ const buildPrintHtml = async ({ learners, schoolYearLabel, sections }: PrintLear
       const preferredModality = firstNonEmpty([pickLearnerField(learner, ['preferredModality', 'preferred_modality']), latestSubmissionPayload && firstNonEmpty([latestSubmissionPayload.preferredModality, latestSubmissionPayload.preferred_modality])]);
       const deviceAccess = firstNonEmpty([pickLearnerField(learner, ['deviceAccess', 'device_access']), latestSubmissionPayload && firstNonEmpty([latestSubmissionPayload.deviceAccess, latestSubmissionPayload.device_access])]);
       const hasInternet = firstNonEmpty([pickLearnerField(learner, ['hasInternet', 'has_internet']), latestSubmissionPayload && firstNonEmpty([latestSubmissionPayload.hasInternet, latestSubmissionPayload.has_internet])]);
+      const learnerTags = normalizeLearnerTags([
+        pickLearnerField(learner, ['tags']),
+        latestSubmissionPayload && firstNonEmpty([latestSubmissionPayload.tags]),
+      ]);
       const verificationCard = await buildVerificationCard(learner);
 
       const enrollmentHistoryRows = enrollmentSnapshot.history
@@ -311,11 +316,7 @@ const buildPrintHtml = async ({ learners, schoolYearLabel, sections }: PrintLear
             <h3>5. Learner Category and Modality</h3>
             <div class="grid three">
               <p><strong>4Ps Beneficiary:</strong> ${yesNo(learner.is4Ps)}</p>
-              <p><strong>SSLG Member:</strong> ${yesNo(learner.isSSLG)}</p>
-              <p><strong>Club Officer:</strong> ${yesNo(learner.isClubOfficer)}</p>
-              <p><strong>Athlete:</strong> ${yesNo(learner.isAthlete)}</p>
-              <p><strong>Artist:</strong> ${yesNo(learner.isArtist)}</p>
-              <p><strong>Indigent:</strong> ${yesNo(learner.isIndigent)}</p>
+              <p><strong>Tags:</strong> ${escapeHtml(toOptionalText(learnerTags.length > 0 ? learnerTags.join(', ') : 'N/A'))}</p>
               <p><strong>SPED Need:</strong> ${yesNoText(hasSpedNeed)}</p>
               <p><strong>Preferred Modality:</strong> ${escapeHtml(toOptionalText(preferredModality))}</p>
               <p><strong>Preferred Device:</strong> ${escapeHtml(toOptionalText(deviceAccess))}</p>

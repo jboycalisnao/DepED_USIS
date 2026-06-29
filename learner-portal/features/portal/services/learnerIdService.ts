@@ -91,11 +91,11 @@ const generateOrderReferenceNo = async (orderKind: 'id', orderPeriodLabel: strin
       .eq('reference_no', candidate)
       .limit(1)
       .maybeSingle();
-    if (existing.error) throw new Error('Unable to verify generated ID request reference number.');
+    if (existing.error) throw new Error('Unable to verify generated ID order reference number.');
     if (!existing.data?.id) return candidate;
   }
 
-  throw new Error('Unable to generate unique ID request reference number.');
+  throw new Error('Unable to generate unique ID order reference number.');
 };
 
 export const loadActiveIdOrderPeriod = async (): Promise<LearnerIdOrderPeriodRecord | null> => {
@@ -125,7 +125,7 @@ export const loadActiveIdOrderPeriod = async (): Promise<LearnerIdOrderPeriodRec
     .select('id,label,start_date,end_date,is_active')
     .order('start_date', { ascending: false });
 
-  if (fallback.error) throw new Error('Unable to load active ID request period.');
+  if (fallback.error) throw new Error('Unable to load active ID order period.');
 
   const fallbackPeriods = (fallback.data || [])
     .map(mapOrderPeriodRow)
@@ -161,7 +161,7 @@ export const fetchLearnerIdRequests = async (params: {
       notes: normalizeText(row.notes),
       orderPeriodEndDate: row?.merch_order_periods?.end_date ? normalizeText(row.merch_order_periods.end_date) : null,
       orderPeriodId: normalizeText(row.order_period_id),
-      orderPeriodLabel: normalizeText(row?.merch_order_periods?.label) || 'ID Request',
+      orderPeriodLabel: normalizeText(row?.merch_order_periods?.label) || 'ID Order',
       orderStatus: normalizeStatus(row.order_status),
       referenceNo: normalizeText(row.reference_no),
     }));
@@ -182,7 +182,7 @@ export const fetchLearnerIdRequests = async (params: {
     .select('id,created_at,reference_no,learner_id,learner_lrn,order_status,notes,order_period_id,merch_order_periods(label,end_date)')
     .order('created_at', { ascending: false });
 
-  if (fallback.error) throw new Error('Unable to load ID requests.');
+  if (fallback.error) throw new Error('Unable to load ID orders.');
 
   return mapRows((fallback.data || []).filter((row: any) => {
     const matchesLearnerId = learnerId ? normalizeText(row.learner_id) === learnerId : false;
@@ -200,7 +200,7 @@ export const placeLearnerIdRequest = async (payload: {
 }) => {
   const activePeriod = await loadActiveIdOrderPeriod();
   if (!activePeriod?.id) {
-    throw new Error('No valid order period is available for ID requests.');
+    throw new Error('No valid order period is available for ID orders.');
   }
 
   const learnerId = normalizeText(payload.learnerId);
@@ -216,7 +216,7 @@ export const placeLearnerIdRequest = async (payload: {
       .eq('id', learnerIdForDb)
       .limit(1)
       .maybeSingle();
-    if (byId.error) throw new Error('Unable to load learner contact number for ID request.');
+    if (byId.error) throw new Error('Unable to load learner contact number for ID order.');
     learnerProfile = byId.data || null;
   } else if (learnerLrn) {
     const byLrn = await supabase
@@ -225,7 +225,7 @@ export const placeLearnerIdRequest = async (payload: {
       .eq('lrn', learnerLrn)
       .limit(1)
       .maybeSingle();
-    if (byLrn.error) throw new Error('Unable to load learner contact number for ID request.');
+    if (byLrn.error) throw new Error('Unable to load learner contact number for ID order.');
     learnerProfile = byLrn.data || null;
   }
 
@@ -237,7 +237,7 @@ export const placeLearnerIdRequest = async (payload: {
     .limit(200);
 
   const existingRequestResult = await existingRequestQuery;
-  if (existingRequestResult.error) throw new Error('Unable to validate existing ID request.');
+  if (existingRequestResult.error) throw new Error('Unable to validate existing ID order.');
 
   const existingRequest = (existingRequestResult.data || []).find((row: any) => {
     const rowKind = normalizeText(row.order_kind);
@@ -249,7 +249,7 @@ export const placeLearnerIdRequest = async (payload: {
   });
 
   if (existingRequest?.id) {
-    throw new Error(`You already have an ID request for ${activePeriod.label}.`);
+    throw new Error(`You already have an ID order for ${activePeriod.label}.`);
   }
 
   const referenceNo = await generateOrderReferenceNo('id', activePeriod.label);
@@ -268,5 +268,5 @@ export const placeLearnerIdRequest = async (payload: {
     },
   ]);
 
-  if (error) throw new Error(error.message || 'Unable to submit ID request.');
+  if (error) throw new Error(error.message || 'Unable to submit ID order.');
 };

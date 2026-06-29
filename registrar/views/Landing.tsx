@@ -32,7 +32,7 @@ const LandingContent: React.FC = () => {
       <RegistrarHeader showSearch>
         <nav className="kit-nav" aria-label="Registrar landing sections">
           <div className="kit-nav__grid">
-            <a className="kit-nav__link kit-nav__link--active" href="#registrar-login-title">
+            <a className="kit-nav__link kit-nav__link--active" href="#registrar-login-title" style={{ fontWeight: 700 }}>
               Access
             </a>
           </div>

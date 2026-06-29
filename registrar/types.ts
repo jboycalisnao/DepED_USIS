@@ -31,6 +31,16 @@ export interface AcademicProgram {
   fullName: string;
 }
 
+export interface ReusableTag {
+  id: string;
+  label: string;
+  category?: string;
+  description?: string;
+  color?: string;
+  isActive?: boolean;
+  createdAt?: string;
+}
+
 export interface Section {
   id: string;
   name: string;
@@ -68,13 +78,8 @@ export interface Student {
   status: EnrollmentStatus;
   sectionId?: string;
   schoolYear?: string;
-  isSSLG?: boolean;
-  isClubOfficer?: boolean;
-  isAthlete?: boolean;
-  isArtist?: boolean;
   is4Ps?: boolean;
-  isIndigent?: boolean;
-  orgAffiliations?: string[];
+  tags?: string[];
   enrollments?: EnrollmentRecord[];
 }
 

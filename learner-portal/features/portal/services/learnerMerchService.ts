@@ -132,6 +132,17 @@ const makeOrderPeriodPrefix = (label: string) => {
 };
 const MAX_REFERENCE_RETRY = 5;
 const ID_SERVICE_SKU = 'ID-001';
+
+type IdOrderProductPricing = {
+  id: string;
+  name: string;
+  price: number;
+  availableSizes: string[];
+  preOrderCutoffDate: string | null;
+  orderPeriodLabel: string;
+  orderPeriodEndDate: string | null;
+};
+
 const isUniqueViolation = (error: any, columnHint: string) => {
   const code = String(error?.code || '').toLowerCase();
   const message = String(error?.message || '').toLowerCase();
@@ -155,6 +166,32 @@ const generateOrderReferenceNo = async (orderPeriodLabel: string) => {
     if (!existing.data?.id) return candidate;
   }
   throw new Error('Unable to generate unique order reference number.');
+};
+
+const loadIdOrderProductPricing = async (): Promise<IdOrderProductPricing | null> => {
+  const { data, error } = await supabase
+    .from('merch_products')
+    .select('id, name, price, available_sizes, pre_order_cutoff_date, merch_order_periods(label, end_date)')
+    .eq('sku', ID_SERVICE_SKU)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.warn('Unable to load ID order product pricing:', error);
+    return null;
+  }
+
+  if (!data?.id) return null;
+
+  return {
+    id: String(data.id || ''),
+    name: String(data.name || 'ID Order'),
+    price: Number(data.price || 0),
+    availableSizes: Array.isArray(data.available_sizes) ? data.available_sizes.map((value: unknown) => String(value)) : [],
+    preOrderCutoffDate: data.pre_order_cutoff_date ? String(data.pre_order_cutoff_date) : null,
+    orderPeriodLabel: String(data?.merch_order_periods?.label || 'ID Order'),
+    orderPeriodEndDate: data?.merch_order_periods?.end_date ? String(data.merch_order_periods.end_date) : null,
+  };
 };
 
 const addMerchOrderAudit = async (params: {
@@ -233,18 +270,23 @@ export const fetchLearnerMerchOrders = async (params: {
           created_at,
           reference_no,
           order_status,
+          order_kind,
           order_source,
           notes,
+          order_period_id,
+          merch_order_periods(label, end_date),
           merch_order_items(quantity, selected_size, merch_products(id, name, price, available_sizes, is_preorder, pre_order_cutoff_date, merch_order_periods(label, end_date))),
           merch_order_payments(payment_amount, payment_status)
         `,
       )
-      .eq('order_kind', 'merch')
       .order('created_at', { ascending: false }),
   );
 
   let data: any[] | null = null;
-  const withSourceResult = await queryWithSource;
+  const [withSourceResult, idOrderPricing] = await Promise.all([
+    queryWithSource,
+    loadIdOrderProductPricing(),
+  ]);
   if (withSourceResult.error) {
     const message = String(withSourceResult.error.message || '').toLowerCase();
     const details = String(withSourceResult.error.details || '').toLowerCase();
@@ -261,13 +303,17 @@ export const fetchLearnerMerchOrders = async (params: {
           `
             id,
             created_at,
+            reference_no,
             order_status,
+            order_kind,
+            order_source,
             notes,
+            order_period_id,
+            merch_order_periods(label, end_date),
             merch_order_items(quantity, selected_size, merch_products(id, name, price, available_sizes, is_preorder, pre_order_cutoff_date, merch_order_periods(label, end_date))),
             merch_order_payments(payment_amount, payment_status)
           `,
         )
-        .eq('order_kind', 'merch')
         .order('created_at', { ascending: false }),
     );
     if (fallbackResult.error) throw new Error('Unable to load your merch orders.');
@@ -282,16 +328,27 @@ export const fetchLearnerMerchOrders = async (params: {
     const source = String(row.order_source || '').trim();
     const normalizedSource: LearnerMerchOrderRecord['orderSource'] =
       source === 'integrated_admin' || source === 'learner_portal' ? source : 'unknown';
+    const orderKind = String(row.order_kind || '').trim().toLowerCase();
+    const isIdOrder = orderKind === 'id';
 
     const paymentTotalAmount = payments.reduce((sum: number, payment: any) => {
       if (String(payment?.payment_status || '').trim().toLowerCase() === 'voided') return sum;
       return sum + Number(payment?.payment_amount || 0);
     }, 0);
 
-    if (items.length === 0) {
-          return [
+    if (items.length === 0 || isIdOrder) {
+      const idProduct = isIdOrder ? idOrderPricing : null;
+      const productPrice = Number(idProduct?.price || 0);
+      const orderPeriodLabel = String(row?.merch_order_periods?.label || '').trim() || idProduct?.orderPeriodLabel || (isIdOrder ? 'ID Order' : '');
+      const orderPeriodEndDate = row?.merch_order_periods?.end_date
+        ? String(row.merch_order_periods.end_date)
+        : idProduct?.orderPeriodEndDate || null;
+      const productName = idProduct?.name || (isIdOrder ? 'ID Order' : 'Unknown Product');
+      const quantity = isIdOrder ? 1 : 0;
+
+      return [
         {
-          availableSizes: [],
+          availableSizes: idProduct?.availableSizes || [],
           createdAt: String(row.created_at || ''),
           gradeLevel: '',
           learnerId: '',
@@ -299,21 +356,21 @@ export const fetchLearnerMerchOrders = async (params: {
           learnerName: '',
           notes: String(row.notes || ''),
           orderId: String(row.id || ''),
-          orderPeriodLabel: '',
-          orderPeriodEndDate: null,
+          orderPeriodLabel,
+          orderPeriodEndDate,
           orderSource: normalizedSource,
           orderStatus: normalizeLearnerMerchOrderStatus(row.order_status),
-          preOrderCutoffDate: null,
+          preOrderCutoffDate: idProduct?.preOrderCutoffDate || null,
           sectionName: '',
-          productId: '',
-          productName: 'Unknown Product',
+          productId: idProduct?.id || '',
+          productName,
           paymentTotalAmount,
-          productPrice: 0,
-          quantity: 0,
+          productPrice,
+          quantity,
           referenceNo: String(row.reference_no || ''),
           selectedSize: '',
-          outstandingBalance: 0,
-          totalAmount: 0,
+          outstandingBalance: Math.max(productPrice * quantity - paymentTotalAmount, 0),
+          totalAmount: productPrice * quantity,
         } satisfies LearnerMerchOrderRecord,
       ];
     }
@@ -329,8 +386,12 @@ export const fetchLearnerMerchOrders = async (params: {
       learnerName: '',
       notes: String(row.notes || ''),
       orderId: String(row.id || ''),
-      orderPeriodLabel: String(item?.merch_products?.merch_order_periods?.label || ''),
-      orderPeriodEndDate: item?.merch_products?.merch_order_periods?.end_date ? String(item.merch_products.merch_order_periods.end_date) : null,
+      orderPeriodLabel: String(item?.merch_products?.merch_order_periods?.label || row?.merch_order_periods?.label || ''),
+      orderPeriodEndDate: item?.merch_products?.merch_order_periods?.end_date
+        ? String(item.merch_products.merch_order_periods.end_date)
+        : row?.merch_order_periods?.end_date
+          ? String(row.merch_order_periods.end_date)
+          : null,
       orderSource: normalizedSource,
       orderStatus: normalizeLearnerMerchOrderStatus(row.order_status),
       preOrderCutoffDate: item?.merch_products?.pre_order_cutoff_date ? String(item.merch_products.pre_order_cutoff_date) : null,

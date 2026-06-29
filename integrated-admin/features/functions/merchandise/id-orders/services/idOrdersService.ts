@@ -148,7 +148,7 @@ export const loadIdOrderRecords = async (): Promise<IdOrderRecord[]> => {
       learnerName: learnerMeta.learnerName,
       lastUpdatedAt: normalizeText(row.updated_at) || normalizeText(row.created_at),
       orderPeriodId: normalizeText(row.order_period_id),
-      orderPeriodLabel: normalizeText(row?.merch_order_periods?.label) || 'ID Request',
+      orderPeriodLabel: normalizeText(row?.merch_order_periods?.label) || 'ID Order',
       orderStatus: normalizeStatus(row.order_status),
       referenceNo: normalizeText(row.reference_no),
       sectionName: learnerInfo.sectionName,
@@ -203,7 +203,7 @@ export const deleteIdOrderRecord = async (orderId: string) => {
 export const deriveIdOrdersExportMetadata = (records: IdOrderRecord[]): IdOrdersExportMetadata => {
   const orderPeriodLabels = Array.from(new Set(records.map((row) => normalizeText(row.orderPeriodLabel)).filter(Boolean)));
   return {
-    orderPeriodLabel: orderPeriodLabels.length === 1 ? orderPeriodLabels[0] : orderPeriodLabels.join(' / ') || 'ID Request',
+    orderPeriodLabel: orderPeriodLabels.length === 1 ? orderPeriodLabels[0] : orderPeriodLabels.join(' / ') || 'ID Order',
     schoolYearLabel: 'Active School Year',
   };
 };

@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { EnrollmentRecord, Student } from '../types';
+import { normalizeLearnerTags } from '../utils/learnerTags';
 
 interface LearnerDetailsModalProps {
   student: Student | null;
@@ -7,19 +8,10 @@ interface LearnerDetailsModalProps {
   onClose: () => void;
 }
 
-const profileFlagOptions = [
-  { label: 'SSLG Member', key: 'isSSLG', icon: 'military_tech' },
-  { label: 'Club Officer', key: 'isClubOfficer', icon: 'workspace_premium' },
-  { label: 'Athlete', key: 'isAthlete', icon: 'sports_basketball' },
-  { label: 'Artist', key: 'isArtist', icon: 'palette' },
-  { label: '4Ps', key: 'is4Ps', icon: 'family_restroom' },
-  { label: 'Indigent', key: 'isIndigent', icon: 'volunteer_activism' },
-] as const;
-
 const LearnerDetailsModal: React.FC<LearnerDetailsModalProps> = ({ student, history, onClose }) => {
-  const profileFlags = useMemo(() => {
+  const learnerTags = useMemo(() => {
     if (!student) return [];
-    return profileFlagOptions.filter((flag) => Boolean(student[flag.key]));
+    return normalizeLearnerTags(student.tags);
   }, [student]);
 
   if (!student) return null;
@@ -68,14 +60,17 @@ const LearnerDetailsModal: React.FC<LearnerDetailsModalProps> = ({ student, hist
               </section>
             </div>
 
-            {profileFlags.length > 0 && (
+            {(student.is4Ps || learnerTags.length > 0) && (
               <section className="modal-record__section">
                 <h4>Institutional Profile</h4>
+                <div className="modal-record__fields">
+                  <RecordField label="4Ps Beneficiary" value={student.is4Ps ? 'Yes' : 'No'} />
+                </div>
                 <div className="modal-record__chips">
-                  {profileFlags.map((flag) => (
-                    <span className="modal-record__chip" key={flag.key}>
-                      <span className="material-symbols-outlined">{flag.icon}</span>
-                      {flag.label}
+                  {learnerTags.map((tag) => (
+                    <span className="modal-record__chip" key={tag}>
+                      <span className="material-symbols-outlined">sell</span>
+                      {tag}
                     </span>
                   ))}
                 </div>

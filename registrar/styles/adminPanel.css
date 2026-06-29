@@ -456,6 +456,231 @@
   font-size: 48px;
 }
 
+.registrar-tagging-page__toolbar {
+  align-items: stretch;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.registrar-tagging-page__toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: stretch;
+  justify-content: flex-end;
+}
+
+.registrar-tagging-page__filter-select {
+  min-width: 220px;
+}
+
+.registrar-tagging-page__filter-toggle,
+.registrar-tagging-page__filter-clear {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 56px;
+  min-height: 56px;
+  padding: 0 16px;
+  border: 1px solid var(--deped-line);
+  border-radius: var(--usis-radius-control);
+  background: var(--deped-white);
+  color: var(--deped-blue);
+  font-size: var(--usis-helper-size);
+  font-weight: 700;
+  box-sizing: border-box;
+  white-space: nowrap;
+  align-self: stretch;
+}
+
+.registrar-tagging-page__toolbar-actions > .secondary-button {
+  height: 56px;
+  min-height: 56px;
+  align-self: stretch;
+}
+
+.registrar-tagging-page__filter-toggle:hover,
+.registrar-tagging-page__filter-clear:hover {
+  border-color: rgba(0, 56, 168, 0.28);
+  background: #f4f8ff;
+}
+
+.registrar-tagging-page__filter-toggle--active {
+  border-color: rgba(0, 56, 168, 0.36);
+  background: #eaf1ff;
+}
+
+.registrar-tagging-page__filter-clear:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.registrar-tagging-page__filter-toggle .material-symbols-outlined {
+  font-size: 18px;
+}
+
+.registrar-tagging-page__reusable-panel,
+.registrar-tagging-page__used-panel {
+  border: 1px solid var(--deped-line);
+  border-radius: var(--usis-radius-surface);
+  background: var(--deped-white);
+  margin-top: 2px;
+}
+
+.registrar-tagging-page__reusable-panel .section-card__content,
+.registrar-tagging-page__used-panel .section-card__content {
+  display: grid;
+  gap: 18px;
+  padding: 18px 20px;
+}
+
+.registrar-tagging-page__stats .info-card {
+  border: 1px solid var(--deped-line);
+  border-radius: var(--usis-radius-surface);
+  background: var(--deped-white);
+  box-shadow: none;
+}
+
+.registrar-tagging-page__stats .info-card__content {
+  height: 100%;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 4px;
+  text-align: center;
+}
+
+.registrar-tagging-page__stats .info-card__content h3 {
+  margin: 0;
+}
+
+.registrar-tagging-page__stats .info-card__content p {
+  margin: 0;
+}
+
+.registrar-tagging-page__groups {
+  padding-bottom: 20px;
+}
+
+.registrar-tagging-page__learner-list {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  background: var(--deped-canvas);
+}
+
+.registrar-tagging-page__learner {
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--deped-line);
+  border-radius: var(--usis-radius-control);
+  background: var(--deped-white);
+  overflow: hidden;
+}
+
+.registrar-tagging-page__learner-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  border: 0;
+  background: #f7f9fc;
+  padding: 14px 16px;
+  text-align: left;
+}
+
+.registrar-tagging-page__learner-toggle:hover {
+  background: #eef4fb;
+}
+
+.registrar-tagging-page__learner-toggle h4 {
+  margin: 0;
+  color: var(--deped-blue);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.registrar-tagging-page__learner-toggle p {
+  margin: 4px 0 0;
+  color: var(--deped-muted);
+  font-size: var(--usis-helper-size);
+}
+
+.registrar-tagging-page__learner-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--deped-blue);
+}
+
+.registrar-tagging-page__learner-panel {
+  display: grid;
+  gap: 14px;
+  padding: 0 16px 16px;
+}
+
+.registrar-tagging-page__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 7px 10px;
+  border: 1px solid rgba(18, 35, 61, 0.12);
+  border-radius: var(--usis-radius-control);
+  background: #f8fbff;
+  color: var(--deped-blue);
+  font-size: var(--usis-helper-size);
+  font-weight: 700;
+}
+
+.registrar-tagging-page__chip--assigned,
+.registrar-tagging-page__chip--reusable {
+  cursor: pointer;
+}
+
+.registrar-tagging-page__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.registrar-tagging-page__empty-state--compact {
+  min-height: 72px;
+  padding: 12px 14px;
+}
+
+.registrar-tagging-page__empty-state--compact p {
+  margin: 0;
+}
+
+.registrar-tagging-page__text-button {
+  border: 0;
+  background: transparent;
+  color: var(--deped-blue);
+  font-size: var(--usis-helper-size);
+  font-weight: 700;
+}
+
+.registrar-tagging-page__modal-form {
+  display: grid;
+  gap: 14px;
+}
+
+.registrar-tagging-page__search--color {
+  min-height: 42px;
+  padding: 8px 10px;
+}
+
+.registrar-tagging-page__color-input {
+  min-height: 42px;
+  padding: 6px 10px;
+}
+
+.registrar-tagging-page__category-select {
+  width: 100%;
+}
+
 .registrar-sections-page__layout,
 .registrar-import-page__layout {
   display: grid;

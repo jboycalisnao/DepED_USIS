@@ -450,7 +450,7 @@ export function MerchServicePage({ session }: MerchServicePageProps) {
         <section className="learner-services-history learner-merch-orders">
           <header className="learner-services-history__header">
             <h3>Current Orders</h3>
-            <p>Your latest merchandise order requests and overrides.</p>
+            <p>Your latest merchandise orders, ID requests, and overrides.</p>
           </header>
           {orders.length === 0 ? (
             <p className="learner-services-history__state">No current merch orders found.</p>

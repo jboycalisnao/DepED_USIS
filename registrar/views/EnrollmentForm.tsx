@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { GradeLevel, EnrollmentStatus, Student } from '../types';
 import { useStore } from '../store';
 import ConfirmationModal from '../components/ConfirmationModal';
+import { parseLearnerTagsInput } from '../utils/learnerTags';
 
 const EnrollmentForm: React.FC = () => {
   const navigate = useNavigate();
@@ -11,7 +12,7 @@ const EnrollmentForm: React.FC = () => {
   
   const isLocked = activeSchoolYear.isLocked;
 
-  const [formData, setFormData] = useState<Partial<Student>>({
+  const [formData, setFormData] = useState<Partial<Student> & { tagsText: string }>({
     lrn: '',
     firstName: '',
     lastName: '',
@@ -26,13 +27,8 @@ const EnrollmentForm: React.FC = () => {
     mother_name: '',
     status: EnrollmentStatus.ENROLLED,
     sectionId: '',
-    isSSLG: false,
-    isClubOfficer: false,
-    isAthlete: false,
-    isArtist: false,
     is4Ps: false,
-    isIndigent: false,
-    orgAffiliations: [],
+    tagsText: '',
     enrollments: []
   });
 
@@ -115,11 +111,13 @@ const EnrollmentForm: React.FC = () => {
 
       res = await updateLearner(studentToSync.id, {
         ...formData,
+        tags: parseLearnerTagsInput(formData.tagsText),
         enrollments: updatedHistory
       });
     } else {
       const newStudent: Student = {
         ...formData as Student,
+        tags: parseLearnerTagsInput(formData.tagsText),
         id: Math.random().toString(36).substr(2, 9),
         enrollments: [newEnrollment] 
       };
@@ -134,15 +132,6 @@ const EnrollmentForm: React.FC = () => {
       navigate('/learners');
     }
   };
-
-  const flags = [
-    { name: 'isSSLG', label: 'SSLG Member' },
-    { name: 'isClubOfficer', label: 'Club Officer' },
-    { name: 'isAthlete', label: 'Student Athlete' },
-    { name: 'isArtist', label: 'School Artist' },
-    { name: 'is4Ps', label: '4Ps Beneficiary' },
-    { name: 'isIndigent', label: 'Indigent Status' },
-  ];
 
   return (
     <div className="max-w-6xl mx-auto space-y-8 animate-in slide-in-from-bottom-8 duration-700 pb-20">
@@ -206,19 +195,30 @@ const EnrollmentForm: React.FC = () => {
 
           <div className="bg-white p-8 rounded-[40px] border border-surfaceVariant shadow-m3-1">
              <h4 className="font-black text-primary uppercase tracking-widest text-[10px] mb-6 border-b pb-2">Institutional Profiling</h4>
-             <div className="grid grid-cols-2 gap-4">
-               {flags.map(flag => (
-                 <label key={flag.name} className="flex items-center gap-3 p-3 rounded-2xl bg-surface border border-surfaceVariant hover:border-primary/30 cursor-pointer transition-all">
-                   <input 
-                     type="checkbox"
-                     name={flag.name}
-                     checked={!!(formData as any)[flag.name]}
-                     onChange={handleChange}
-                     className="w-5 h-5 rounded-lg accent-primary"
-                   />
-                   <span className="text-xs font-bold text-onSurface">{flag.label}</span>
-                 </label>
-               ))}
+             <div className="grid gap-4">
+               <label className="flex items-center gap-3 p-3 rounded-2xl bg-surface border border-surfaceVariant hover:border-primary/30 cursor-pointer transition-all">
+                 <input
+                   type="checkbox"
+                   name="is4Ps"
+                   checked={!!formData.is4Ps}
+                   onChange={handleChange}
+                   className="w-5 h-5 rounded-lg accent-primary"
+                 />
+                 <span className="text-xs font-bold text-onSurface">4Ps Beneficiary</span>
+               </label>
+
+               <div className="space-y-1">
+                 <label className="text-[10px] font-black text-outline uppercase ml-3">Learner Tags</label>
+                 <input
+                   type="text"
+                   name="tagsText"
+                   value={formData.tagsText}
+                   onChange={handleChange}
+                   placeholder="SSLG, Athlete, Chess Club"
+                   className="w-full px-6 py-4 rounded-2xl bg-surface border border-surfaceVariant focus:ring-4 focus:ring-primary/10 font-bold text-sm"
+                 />
+                 <p className="text-[10px] font-medium text-outline ml-3">Use commas to separate learner affiliations and club tags.</p>
+               </div>
              </div>
           </div>
 

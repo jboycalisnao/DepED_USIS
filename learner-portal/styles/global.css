@@ -2299,6 +2299,829 @@ body {
   color: #6b21a8;
 }
 
+.learner-attendance-service {
+  display: grid;
+  gap: 16px;
+}
+
+.learner-attendance-service__back-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.learner-attendance-service__back-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 14px 0 10px;
+  border: 1px solid #d0d5dd;
+  border-radius: var(--learner-radius-md);
+  background: #ffffff;
+  color: #18345b;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  text-decoration: none;
+  transition: background-color 0.16s ease, border-color 0.16s ease, transform 0.16s ease;
+}
+
+.learner-attendance-service__back-button:hover {
+  background: #f8fafc;
+  border-color: #b9c5d6;
+}
+
+.learner-attendance-service__back-button .material-symbols-outlined {
+  font-size: 18px;
+}
+
+.learner-attendance-records {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid #d0d5dd;
+  border-radius: var(--learner-radius-md);
+  background: #ffffff;
+}
+
+.learner-attendance-records__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.learner-attendance-records__title-block {
+  display: grid;
+  gap: 4px;
+}
+
+.learner-attendance-records__title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  margin: 0;
+  font-size: 24px;
+  line-height: 1.05;
+  letter-spacing: 0;
+}
+
+.learner-attendance-records__title-primary {
+  color: #18345b;
+  font-weight: 700;
+}
+
+.learner-attendance-records__title-accent {
+  color: #e11d2e;
+  font-weight: 700;
+}
+
+.learner-attendance-records__subtitle {
+  margin: 0;
+  color: #1f2937;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.learner-attendance-records__description {
+  margin: 0;
+  color: #667085;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.learner-attendance-records__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.learner-attendance-records__export-button,
+.learner-attendance-records__icon-button,
+.learner-attendance-records__nav-button,
+.learner-attendance-records__mobile-tools-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid #d0d5dd;
+  border-radius: var(--learner-radius-md);
+  background: #ffffff;
+  color: #18345b;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 0.16s ease, border-color 0.16s ease, transform 0.16s ease, opacity 0.16s ease;
+}
+
+.learner-attendance-records__export-button:hover,
+.learner-attendance-records__icon-button:hover,
+.learner-attendance-records__nav-button:hover,
+.learner-attendance-records__mobile-tools-button:hover {
+  background: #f8fafc;
+  border-color: #b9c5d6;
+}
+
+.learner-attendance-records__export-button:disabled,
+.learner-attendance-records__nav-button:disabled,
+.learner-attendance-records__mobile-tools-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.learner-attendance-records__export-button {
+  padding: 12px 18px;
+  min-height: 48px;
+}
+
+.learner-attendance-records__icon-button {
+  width: 48px;
+  height: 48px;
+  padding: 0;
+}
+
+.learner-attendance-records__icon-button--mobile {
+  display: none;
+}
+
+.learner-attendance-records__nav-button {
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  color: #18345b;
+}
+
+.learner-attendance-records__mobile-tools {
+  display: none;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  align-items: center;
+  padding: 12px 14px;
+  border: 1px solid #d0d5dd;
+  border-radius: var(--learner-radius-md);
+  background: #f8fafc;
+}
+
+.learner-attendance-records__mobile-tools-label {
+  color: #18345b;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.learner-attendance-records__mobile-tools-button {
+  justify-self: end;
+  padding: 10px 14px;
+}
+
+.learner-attendance-records__controls {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) 48px;
+  align-items: center;
+  gap: 10px;
+}
+
+.learner-attendance-records__month-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 0 16px;
+  border: 1px solid #d0d5dd;
+  border-radius: var(--learner-radius-md);
+  background: #ffffff;
+  color: #18345b;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.learner-attendance-records__month-icon {
+  font-size: 18px;
+}
+
+.learner-attendance-records__calendar-wrap {
+  display: grid;
+  gap: 0;
+  border: 1px solid #d0d5dd;
+  border-radius: var(--learner-radius-md);
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.learner-attendance-records__calendar-head,
+.learner-attendance-records__calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.learner-attendance-records__calendar-head {
+  background: #143b8f;
+}
+
+.learner-attendance-records__calendar-grid {
+  gap: 1px;
+  padding: 1px;
+  background: #dfe3ea;
+}
+
+.learner-attendance-records__calendar-head-cell {
+  padding: 10px 8px;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.learner-attendance-records__calendar-head-cell--weekend {
+  color: #ff2b2b;
+}
+
+.learner-attendance-records__calendar-cell {
+  appearance: none;
+  display: block;
+  position: relative;
+  min-height: 118px;
+  padding: 10px 10px 8px;
+  background: #ffffff;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  border: 0;
+  border-radius: 0;
+  transition:
+    transform 0.16s ease,
+    box-shadow 0.16s ease,
+    background-color 0.16s ease;
+}
+
+.learner-attendance-records__calendar-cell-button {
+  cursor: pointer;
+}
+
+.learner-attendance-records__calendar-cell-button:hover {
+  z-index: 1;
+  transform: translateY(-1px);
+  box-shadow: inset 0 0 0 1px rgba(20, 59, 143, 0.24), 0 4px 12px rgba(16, 24, 40, 0.08);
+}
+
+.learner-attendance-records__calendar-cell-button:hover.learner-attendance-records__calendar-cell--present {
+  background: #e4eeff;
+}
+
+.learner-attendance-records__calendar-cell-button:hover.learner-attendance-records__calendar-cell--late {
+  background: #fff0d9;
+}
+
+.learner-attendance-records__calendar-cell-button:hover.learner-attendance-records__calendar-cell--absent {
+  background: #ffe7ea;
+}
+
+.learner-attendance-records__calendar-cell-button:hover.learner-attendance-records__calendar-cell--incomplete {
+  background: #fff4cf;
+}
+
+.learner-attendance-records__calendar-cell-button:hover.learner-attendance-records__calendar-cell--no-class {
+  background: #eef2f7;
+}
+
+.learner-attendance-records__calendar-cell-button:focus-visible {
+  outline: 2px solid #143b8f;
+  outline-offset: -2px;
+  z-index: 1;
+}
+
+.learner-attendance-records__calendar-cell--empty {
+  background: #ffffff;
+}
+
+.learner-attendance-records__calendar-cell--present {
+  background: #eef4ff;
+}
+
+.learner-attendance-records__calendar-cell--late {
+  background: #fff7ed;
+}
+
+.learner-attendance-records__calendar-cell--absent {
+  background: #fff1f2;
+}
+
+.learner-attendance-records__calendar-cell--incomplete {
+  background: #fffbeb;
+}
+
+.learner-attendance-records__calendar-cell--no-class {
+  background: #f8fafc;
+}
+
+.learner-attendance-records__calendar-cell--selected {
+  box-shadow: inset 0 0 0 2px #143b8f;
+}
+
+.learner-attendance-records__day-number {
+  display: block;
+  color: #101828;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.learner-attendance-records__day-number--weekend {
+  color: #e11d2e;
+}
+
+.learner-attendance-records__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 20px;
+  color: #18345b;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.learner-attendance-records__status--present {
+  color: #143b8f;
+}
+
+.learner-attendance-records__status--late {
+  color: #d97706;
+}
+
+.learner-attendance-records__status--absent {
+  color: #dc2626;
+}
+
+.learner-attendance-records__status--incomplete {
+  color: #b45309;
+}
+
+.learner-attendance-records__status--no_class {
+  color: #9ca3af;
+}
+
+.learner-attendance-records__status-icon {
+  font-size: 18px;
+}
+
+.learner-attendance-records__tap-list {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.learner-attendance-records__tap-chip {
+  display: grid;
+  gap: 2px;
+  padding: 6px 8px;
+  border-radius: var(--learner-radius-md);
+  background: #ffffff;
+  color: #18345b;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.15;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.08);
+}
+
+.learner-attendance-records__tap-chip--late {
+  border: 1px solid #f9c0c8;
+}
+
+.learner-attendance-records__tap-chip--am_in {
+  color: #143b8f;
+}
+
+.learner-attendance-records__tap-chip--am_out {
+  color: #1d4fa8;
+}
+
+.learner-attendance-records__tap-chip--pm_in {
+  color: #b42318;
+}
+
+.learner-attendance-records__tap-chip--pm_out {
+  color: #18345b;
+}
+
+.learner-attendance-records__tap-time {
+  color: #667085;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.learner-attendance-records__tap-more {
+  color: #667085;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.learner-attendance-records__legend {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid #d0d5dd;
+  border-radius: var(--learner-radius-md);
+  background: #ffffff;
+}
+
+.learner-attendance-records__legend-title {
+  color: #18345b;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.learner-attendance-records__legend-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 20px;
+}
+
+.learner-attendance-records__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.learner-attendance-records__legend-swatch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--learner-radius-md);
+  background: #f3f4f6;
+  color: #9ca3af;
+}
+
+.learner-attendance-records__legend-swatch--present {
+  background: #eaf1ff;
+  color: #143b8f;
+}
+
+.learner-attendance-records__legend-swatch--late {
+  background: #fff1dc;
+  color: #d97706;
+}
+
+.learner-attendance-records__legend-swatch--absent {
+  background: #ffe4e6;
+  color: #dc2626;
+}
+
+.learner-attendance-records__legend-swatch--incomplete {
+  background: #fffbeb;
+  color: #b45309;
+}
+
+.learner-attendance-records__legend-swatch--no_class {
+  background: #f3f4f6;
+  color: #9ca3af;
+}
+
+.learner-attendance-records__legend-swatch .material-symbols-outlined {
+  font-size: 16px;
+}
+
+.learner-attendance-records__legend-label {
+  color: #344054;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.learner-attendance-records__summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px;
+}
+
+.learner-attendance-records__summary-card {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  padding: 14px;
+  border: 1px solid #d0d5dd;
+  border-radius: var(--learner-radius-md);
+  background: #ffffff;
+}
+
+.learner-attendance-records__summary-card-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: var(--learner-radius-md);
+  background: #143b8f;
+  color: #ffffff;
+}
+
+.learner-attendance-records__summary-card-icon .material-symbols-outlined {
+  font-size: 26px;
+}
+
+.learner-attendance-records__summary-card--present .learner-attendance-records__summary-card-icon {
+  background: #eaf1ff;
+  color: #143b8f;
+}
+
+.learner-attendance-records__summary-card--late .learner-attendance-records__summary-card-icon {
+  background: #fff1dc;
+  color: #d97706;
+}
+
+.learner-attendance-records__summary-card--absent .learner-attendance-records__summary-card-icon {
+  background: #ffe4e6;
+  color: #b42318;
+}
+
+.learner-attendance-records__summary-card--incomplete .learner-attendance-records__summary-card-icon {
+  background: #fffbeb;
+  color: #b45309;
+}
+
+.learner-attendance-records__summary-label {
+  color: #18345b;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.learner-attendance-records__summary-value {
+  display: block;
+  margin-top: 3px;
+  color: #101828;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.learner-attendance-records__summary-rate {
+  margin-top: 6px;
+  color: #667085;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.learner-attendance-day-modal {
+  border-radius: var(--learner-radius-md);
+}
+
+.learner-attendance-day-modal .modal-dialog__body {
+  display: grid;
+  gap: 12px;
+}
+
+.learner-attendance-day-modal__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid #d0d5dd;
+  border-radius: var(--learner-radius-md);
+  background: #f8fafc;
+}
+
+.learner-attendance-day-modal__summary-label {
+  color: #667085;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.learner-attendance-day-modal__summary strong {
+  color: #143b8f;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.learner-attendance-day-modal__summary--late strong,
+.learner-attendance-day-modal__summary--incomplete strong {
+  color: #b45309;
+}
+
+.learner-attendance-day-modal__summary--absent strong {
+  color: #b42318;
+}
+
+.learner-attendance-day-modal__summary--present {
+  background: #eef4ff;
+}
+
+.learner-attendance-day-modal__summary--late {
+  background: #fff7ed;
+}
+
+.learner-attendance-day-modal__summary--absent {
+  background: #fff1f2;
+}
+
+.learner-attendance-day-modal__summary--incomplete {
+  background: #fffbeb;
+}
+
+.learner-attendance-day-modal__summary--no_class {
+  background: #f8fafc;
+}
+
+.learner-attendance-day-modal__list {
+  display: grid;
+  gap: 10px;
+}
+
+.learner-attendance-day-modal__item {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid #d0d5dd;
+  border-radius: var(--learner-radius-md);
+  background: #ffffff;
+}
+
+.learner-attendance-day-modal__item-label {
+  color: #143b8f;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.learner-attendance-day-modal__item-time {
+  color: #101828;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.learner-attendance-day-modal__empty {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid #d0d5dd;
+  border-radius: var(--learner-radius-md);
+  background: #f8fafc;
+  color: #475467;
+  font-size: 13px;
+}
+
+.learner-attendance-records__empty {
+  margin: 0;
+  padding: 16px 14px;
+  border: 1px solid #d0d5dd;
+  border-radius: var(--learner-radius-md);
+  background: #ffffff;
+  color: #667085;
+  font-size: 13px;
+}
+
+@media (max-width: 1024px) {
+  .learner-attendance-records__summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .learner-attendance-records {
+    padding: 14px;
+  }
+
+  .learner-attendance-records__header {
+    display: grid;
+    gap: 10px;
+  }
+
+  .learner-attendance-records__title {
+    font-size: 22px;
+  }
+
+  .learner-attendance-records__subtitle {
+    font-size: 14px;
+  }
+
+  .learner-attendance-records__actions {
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .learner-attendance-records__export-button {
+    display: none;
+  }
+
+  .learner-attendance-records__icon-button--mobile {
+    display: inline-flex;
+  }
+
+  .learner-attendance-records__mobile-tools {
+    display: grid;
+  }
+
+  .learner-attendance-records__controls {
+    grid-template-columns: 48px minmax(0, 1fr) 48px;
+  }
+
+  .learner-attendance-records__month-pill {
+    min-height: 48px;
+    padding: 0 12px;
+    font-size: 14px;
+  }
+
+  .learner-attendance-records__calendar-cell {
+    min-height: 84px;
+    padding: 8px 8px 6px;
+  }
+
+  .learner-attendance-records__day-number {
+    font-size: 16px;
+  }
+
+  .learner-attendance-day-modal__meta {
+    grid-template-columns: 1fr;
+  }
+
+  .learner-attendance-records__status {
+    margin-top: 10px;
+    font-size: 12px;
+  }
+
+  .learner-attendance-records__tap-list {
+    display: none;
+  }
+
+  .learner-attendance-records__legend {
+    padding: 12px;
+  }
+
+  .learner-attendance-records__legend-items {
+    gap: 10px 14px;
+  }
+
+  .learner-attendance-records__summary-card {
+    grid-template-columns: 46px minmax(0, 1fr);
+    padding: 12px;
+  }
+
+  .learner-attendance-records__summary-card-icon {
+    width: 46px;
+    height: 46px;
+  }
+
+  .learner-attendance-records__summary-card-icon .material-symbols-outlined {
+    font-size: 22px;
+  }
+
+  .learner-attendance-records__summary-value {
+    font-size: 22px;
+  }
+}
+
+@media (max-width: 520px) {
+  .learner-attendance-records__controls {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .learner-attendance-records__nav-button {
+    display: none;
+  }
+
+  .learner-attendance-records__month-pill {
+    min-height: 46px;
+  }
+
+  .learner-attendance-records__calendar-head-cell {
+    padding: 8px 4px;
+    font-size: 11px;
+  }
+
+  .learner-attendance-records__calendar-cell {
+    min-height: 72px;
+    padding: 7px 6px 6px;
+  }
+
+  .learner-attendance-records__day-number {
+    font-size: 14px;
+  }
+
+  .learner-attendance-records__status {
+    margin-top: 8px;
+    gap: 4px;
+    font-size: 11px;
+  }
+
+  .learner-attendance-records__status-icon {
+    font-size: 16px;
+  }
+
+  .learner-attendance-records__summary-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .learner-attendance-table__tap-meta {
   display: inline-flex;
   align-items: center;

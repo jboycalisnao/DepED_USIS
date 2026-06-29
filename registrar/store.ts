@@ -1,8 +1,9 @@
 
 import { useState, useEffect } from 'react';
-import { Student, SchoolYear, EnrollmentStatus, GradeLevel, Section, AcademicProgram } from './types';
+import { Student, SchoolYear, EnrollmentStatus, GradeLevel, Section, AcademicProgram, ReusableTag } from './types';
 import { SCHOOL_YEARS } from './constants';
 import { supabase } from './lib/supabase';
+import { normalizeLearnerTags } from './utils/learnerTags';
 import {
   clearStoredRegistrarAccess,
   getStoredRegistrarAccess,
@@ -36,6 +37,7 @@ const REGISTRAR_TABLES = {
   sections: 'registrar_sections',
   strands: 'registrar_strands',
   specialPrograms: 'registrar_special_programs',
+  reusableTags: 'registrar_tags',
   schoolYears: 'registrar_school_years',
   gradeLevels: 'registrar_grade_levels',
 } as const;
@@ -48,6 +50,7 @@ let users: SystemUser[] = [];
 
 let availableStrands: AcademicProgram[] = JSON.parse(localStorage.getItem(STORAGE_KEY_STRANDS) || '[]');
 let availableSpecialPrograms: AcademicProgram[] = JSON.parse(localStorage.getItem(STORAGE_KEY_PROGRAMS) || '[]');
+let reusableTags: ReusableTag[] = [];
 let activeSchoolYear: SchoolYear = schoolYears[0];
 let activeGradeLevels: GradeLevel[] = JSON.parse(localStorage.getItem(STORAGE_KEY_GL) || '[]');
 
@@ -66,6 +69,7 @@ let syListListeners: Array<(s: SchoolYear[]) => void> = [];
 let usersListeners: Array<(u: SystemUser[]) => void> = [];
 let strandsListeners: Array<(s: AcademicProgram[]) => void> = [];
 let programsListeners: Array<(p: AcademicProgram[]) => void> = [];
+let reusableTagsListeners: Array<(tags: ReusableTag[]) => void> = [];
 let syListeners: Array<(sy: SchoolYear) => void> = [];
 let glListeners: Array<(gl: GradeLevel[]) => void> = [];
 let connectionListeners: Array<(err: boolean) => void> = [];
@@ -140,6 +144,10 @@ const mergeLearnerForBulkImport = (incoming: Student) => {
   const existing = learners.find((entry) => normalizeLrnKey(entry.lrn) === incomingLrn);
   if (!existing) return incoming;
 
+  const incomingTagsSource = (incoming as Partial<Student> & { tags?: unknown; orgAffiliations?: unknown }).tags
+    ?? (incoming as Partial<Student> & { tags?: unknown; orgAffiliations?: unknown }).orgAffiliations;
+  const incomingTags = normalizeLearnerTags(incomingTagsSource);
+
   return {
     ...existing,
     ...incoming,
@@ -155,7 +163,7 @@ const mergeLearnerForBulkImport = (incoming: Student) => {
     microsoftLicenseSkuId: normalizeLrnKey(incoming.microsoftLicenseSkuId) ? incoming.microsoftLicenseSkuId : existing.microsoftLicenseSkuId,
     microsoftCreatedAt: normalizeLrnKey(incoming.microsoftCreatedAt) ? incoming.microsoftCreatedAt : existing.microsoftCreatedAt,
     microsoftLastSyncedAt: normalizeLrnKey(incoming.microsoftLastSyncedAt) ? incoming.microsoftLastSyncedAt : existing.microsoftLastSyncedAt,
-    orgAffiliations: Array.isArray(incoming.orgAffiliations) && incoming.orgAffiliations.length > 0 ? incoming.orgAffiliations : existing.orgAffiliations,
+    tags: incomingTags.length > 0 ? incomingTags : existing.tags,
     enrollments: Array.isArray(incoming.enrollments) && incoming.enrollments.length > 0 ? incoming.enrollments : existing.enrollments,
   };
 };
@@ -205,6 +213,20 @@ const commitSections = (nextSections: Section[]) => {
   sectionsListeners.forEach((listener) => listener([...sections]));
 };
 
+const commitReusableTags = (nextTags: ReusableTag[]) => {
+  reusableTags = nextTags;
+  writeCachedRows(REGISTRAR_TABLES.reusableTags, nextTags.map((tag) => ({
+    id: tag.id,
+    label: tag.label,
+    category: tag.category || null,
+    description: tag.description || null,
+    color: tag.color || null,
+    is_active: tag.isActive !== false,
+    created_at: tag.createdAt || new Date().toISOString(),
+  })));
+  reusableTagsListeners.forEach((listener) => listener([...reusableTags]));
+};
+
 const mapLearnerToDb = (data: Partial<Student>) => {
   const sId = data.sectionId ? String(data.sectionId).trim() : null;
   return {
@@ -224,12 +246,7 @@ const mapLearnerToDb = (data: Partial<Student>) => {
     status: data.status || EnrollmentStatus.ENROLLED,
     section_id: sId,
     school_year: data.schoolYear ? String(data.schoolYear).trim() : null,
-    is_sslg: !!data.isSSLG,
-    is_club_officer: !!data.isClubOfficer,
-    is_athlete: !!data.isAthlete,
-    is_artist: !!data.isArtist,
     is_4ps: !!data.is4Ps,
-    is_indigent: !!data.isIndigent,
     login_username: data.loginUsername || null,
     login_password_plain: data.loginPassword || null,
     login_status: data.loginStatus || null,
@@ -241,7 +258,7 @@ const mapLearnerToDb = (data: Partial<Student>) => {
     microsoft_license_sku_id: data.microsoftLicenseSkuId || null,
     microsoft_created_at: data.microsoftCreatedAt || null,
     microsoft_last_synced_at: data.microsoftLastSyncedAt || null,
-    org_affiliations: Array.isArray(data.orgAffiliations) ? data.orgAffiliations : [],
+    tags: normalizeLearnerTags((data as Partial<Student> & { tags?: unknown; orgAffiliations?: unknown }).tags ?? (data as Partial<Student> & { tags?: unknown; orgAffiliations?: unknown }).orgAffiliations),
     enrollment_history: Array.isArray(data.enrollments) ? data.enrollments : []
   };
 };
@@ -274,13 +291,8 @@ const mapDbToLearner = (l: any): Student => ({
   status: l.status,
   sectionId: String(l.section_id || l.sectionId || '').trim(),
   schoolYear: String(l.school_year || l.schoolYear || '').trim(),
-  isSSLG: !!(l.is_sslg ?? l.isSSLG),
-  isClubOfficer: !!(l.is_club_officer ?? l.isClubOfficer),
-  isAthlete: !!(l.is_athlete ?? l.isAthlete),
-  isArtist: !!(l.is_artist ?? l.isArtist),
   is4Ps: !!(l.is_4ps ?? l.is4Ps),
-  isIndigent: !!(l.is_indigent ?? l.isIndigent),
-  orgAffiliations: l.org_affiliations || l.orgAffiliations || [],
+  tags: normalizeLearnerTags([l.tags ?? l.org_affiliations ?? l.orgAffiliations, l]),
   enrollments: Array.isArray(l.enrollment_history)
     ? l.enrollment_history.map(normalizeEnrollmentRecord)
     : Array.isArray(l.enrollments)
@@ -312,6 +324,16 @@ const mapDbToProgram = (p: any): AcademicProgram => ({
   id: String(p.id).trim(),
   acronym: p.acronym || p.name || 'UNK',
   fullName: p.full_name || p.fullName || p.description || 'Unknown'
+});
+
+const mapDbToReusableTag = (row: any): ReusableTag => ({
+  id: String(row.id || '').trim(),
+  label: String(row.label || row.name || '').trim(),
+  category: String(row.category || '').trim() || undefined,
+  description: String(row.description || '').trim() || undefined,
+  color: String(row.color || '').trim() || undefined,
+  isActive: !!(row.is_active ?? row.isActive ?? true),
+  createdAt: String(row.created_at || row.createdAt || '').trim() || undefined,
 });
 
 const hydrateCachedBootstrapState = () => {
@@ -371,6 +393,12 @@ const hydrateCachedBootstrapState = () => {
   if (cachedPrograms?.rows?.length) {
     availableSpecialPrograms = cachedPrograms.rows.map(mapDbToProgram).sort((a, b) => a.acronym.localeCompare(b.acronym));
     latestCacheTimestamp = Math.max(latestCacheTimestamp, new Date(cachedPrograms.updatedAt).getTime() || 0);
+  }
+
+  const cachedReusableTags = readCachedRows<any>(REGISTRAR_TABLES.reusableTags);
+  if (cachedReusableTags?.rows?.length) {
+    reusableTags = cachedReusableTags.rows.map(mapDbToReusableTag).filter((tag) => Boolean(tag.id) && Boolean(tag.label));
+    latestCacheTimestamp = Math.max(latestCacheTimestamp, new Date(cachedReusableTags.updatedAt).getTime() || 0);
   }
 
   if (latestCacheTimestamp > 0) {
@@ -472,7 +500,7 @@ const fetchLearners = (forceRefresh = false) => fetchAllFromTable(REGISTRAR_TABL
   commitLearners(data.map(mapDbToLearner));
 }, {
   forceRefresh,
-  selectColumns: 'id,lrn,first_name,last_name,middle_name,birth_date,gender,address,contact_number,guardian_name,father_name,mother_name,email,status,section_id,school_year,is_sslg,is_club_officer,is_athlete,is_artist,is_4ps,is_indigent,org_affiliations,login_username,login_password_plain,login_status,last_login_at,microsoft_user_id,microsoft_upn,microsoft_mail_nickname,microsoft_account_status,microsoft_license_sku_id,microsoft_created_at,microsoft_last_synced_at,created_at',
+  selectColumns: 'id,lrn,first_name,last_name,middle_name,birth_date,gender,address,contact_number,guardian_name,father_name,mother_name,email,status,section_id,school_year,is_4ps,tags,login_username,login_password_plain,login_status,last_login_at,microsoft_user_id,microsoft_upn,microsoft_mail_nickname,microsoft_account_status,microsoft_license_sku_id,microsoft_created_at,microsoft_last_synced_at,created_at',
 });
 
 const fetchSections = (forceRefresh = false) => fetchAllFromTable(REGISTRAR_TABLES.sections, (data) => {
@@ -534,6 +562,35 @@ const fetchPrograms = (forceRefresh = false) => fetchAllFromTable(REGISTRAR_TABL
   selectColumns: 'id,acronym,full_name',
 });
 
+const fetchReusableTags = async (forceRefresh = false) => {
+  try {
+    if (hasConnectionError && !forceRefresh) return;
+
+    const { data, error } = await supabase
+      .from(REGISTRAR_TABLES.reusableTags)
+      .select('id,label,category,description,color,is_active,created_at');
+
+    if (error) {
+      if (error.code === '42P01' || String(error.message || '').toLowerCase().includes('does not exist')) {
+        reusableTags = [];
+        reusableTagsListeners.forEach((listener) => listener([...reusableTags]));
+        return;
+      }
+      updateConnectionStatus(true);
+      return;
+    }
+
+    updateConnectionStatus(false);
+    commitReusableTags((data || [])
+      .map(mapDbToReusableTag)
+      .filter((tag) => Boolean(tag.id) && Boolean(tag.label))
+      .sort((a, b) => a.label.localeCompare(b.label)));
+    writeCachedRows(REGISTRAR_TABLES.reusableTags, data || []);
+  } catch {
+    // Keep the page usable even if the reusable-tag catalog is unavailable.
+  }
+};
+
 // Parallel Hydration on startup
 const initializeStore = async () => {
   setGlobalLoading(true);
@@ -548,7 +605,8 @@ const initializeStore = async () => {
       fetchSections(),
       fetchStrands(),
       fetchPrograms(),
-      fetchGradeLevels()
+      fetchGradeLevels(),
+      fetchReusableTags()
     ]);
     lastSyncTime = Date.now();
   } finally {
@@ -565,6 +623,7 @@ export const useStore = () => {
   const [currentUsers, setCurrentUsers] = useState<SystemUser[]>(users);
   const [currentStrands, setCurrentStrands] = useState<AcademicProgram[]>(availableStrands);
   const [currentPrograms, setCurrentPrograms] = useState<AcademicProgram[]>(availableSpecialPrograms);
+  const [currentReusableTags, setCurrentReusableTags] = useState<ReusableTag[]>(reusableTags);
   const [currentSY, setCurrentSY] = useState<SchoolYear>(activeSchoolYear);
   const [currentGLs, setCurrentGLs] = useState<GradeLevel[]>(activeGradeLevels);
   const [connectionError, setConnectionError] = useState<boolean>(hasConnectionError);
@@ -580,6 +639,7 @@ export const useStore = () => {
     const uListener = (newUsers: SystemUser[]) => setCurrentUsers([...newUsers]);
     const strandListener = (newStrands: AcademicProgram[]) => setCurrentStrands([...newStrands]);
     const progListener = (newProgs: AcademicProgram[]) => setCurrentPrograms([...newProgs]);
+    const reusableTagsListener = (nextTags: ReusableTag[]) => setCurrentReusableTags([...nextTags]);
     const syListener = (newSY: SchoolYear) => setCurrentSY(newSY);
     const glListener = (newGLs: GradeLevel[]) => setCurrentGLs([...newGLs]);
     const cListener = (err: boolean) => setConnectionError(err);
@@ -594,6 +654,7 @@ export const useStore = () => {
     usersListeners.push(uListener);
     strandsListeners.push(strandListener);
     programsListeners.push(progListener);
+    reusableTagsListeners.push(reusableTagsListener);
     syListeners.push(syListener);
     glListeners.push(glListener);
     connectionListeners.push(cListener);
@@ -609,6 +670,7 @@ export const useStore = () => {
       usersListeners = usersListeners.filter(l => l !== uListener);
       strandsListeners = strandsListeners.filter(l => l !== strandListener);
       programsListeners = programsListeners.filter(l => l !== progListener);
+      reusableTagsListeners = reusableTagsListeners.filter(l => l !== reusableTagsListener);
       syListeners = syListeners.filter(l => l !== syListener);
       glListeners = glListeners.filter(l => l !== glListener);
       connectionListeners = connectionListeners.filter(l => l !== cListener);
@@ -632,10 +694,11 @@ export const useStore = () => {
       await Promise.allSettled([
         fetchUsers(force), 
         fetchLearners(force), 
-        fetchSections(force), 
-        fetchStrands(force), 
-        fetchPrograms(force), 
-        fetchGradeLevels(force)
+      fetchSections(force), 
+      fetchStrands(force), 
+      fetchPrograms(force), 
+      fetchGradeLevels(force),
+      fetchReusableTags(force)
       ]);
       lastSyncTime = Date.now();
     } finally {
@@ -650,6 +713,7 @@ export const useStore = () => {
     users: currentUsers,
     availableStrands: currentStrands,
     availableSpecialPrograms: currentPrograms,
+    reusableTags: currentReusableTags,
     activeSchoolYear: currentSY, 
     gradeLevels: currentGLs,
     connectionError,
@@ -1026,6 +1090,40 @@ export const useStore = () => {
       try {
         await supabase.from(REGISTRAR_TABLES.specialPrograms).delete().eq('id', id);
         await fetchPrograms(true);
+      } finally {
+        setGlobalLoading(false);
+      }
+    },
+    addReusableTag: async (tag: Partial<ReusableTag> & { label: string }) => {
+      if (!registrarAccess?.schoolUuid) return { error: 'Not Authorized' };
+      const label = String(tag.label || '').trim();
+      if (!label) return { error: 'Label is required.' };
+      setGlobalLoading(true);
+      try {
+        const nextTag: ReusableTag = {
+          id: createId(),
+          label,
+          category: String(tag.category || '').trim() || undefined,
+          description: String(tag.description || '').trim() || undefined,
+          color: String(tag.color || '').trim() || undefined,
+          isActive: true,
+          createdAt: new Date().toISOString(),
+        };
+        const payload = {
+          id: nextTag.id,
+          school_id: registrarAccess.schoolUuid,
+          label: nextTag.label,
+          category: nextTag.category || null,
+          description: nextTag.description || null,
+          color: nextTag.color || null,
+          is_active: true,
+        };
+        const { error } = await supabase.from(REGISTRAR_TABLES.reusableTags).insert([payload]);
+        if (!error) {
+          commitReusableTags([...reusableTags, nextTag].sort((a, b) => a.label.localeCompare(b.label)));
+          await fetchReusableTags(true);
+        }
+        return { error: error?.message };
       } finally {
         setGlobalLoading(false);
       }

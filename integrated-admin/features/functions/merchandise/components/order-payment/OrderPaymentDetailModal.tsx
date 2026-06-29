@@ -2,8 +2,8 @@ import type { MerchOrderAuditRecord, MerchOrderControlRecord, MerchOrderPaymentR
 import { getMerchOrderStatusLabel } from '../../order-control/utils/orderStatus';
 import { MerchPaymentReceiptDownloadButton } from '../../../../../../common/components/merch/MerchPaymentReceiptDownloadButton';
 
-const formatAuditStatusLabel = (value: string) => {
-  const label = getMerchOrderStatusLabel(value);
+const formatAuditStatusLabel = (value: string, orderKind: 'merch' | 'id') => {
+  const label = getMerchOrderStatusLabel(value, orderKind);
   return label === 'Unknown' ? String(value || '-').trim() || 'Unknown' : label;
 };
 
@@ -43,6 +43,7 @@ export function OrderPaymentDetailModal(props: Props) {
   if (!isOpen || !order) return null;
 
   const resolvedGradeSection = [order.gradeLevel, order.sectionName].filter(Boolean).join(' - ') || 'Unassigned';
+  const modalLabel = order.orderKind === 'id' ? 'ID Order Payment' : 'Order Payment';
   const paymentAuditEntries = selectedOrderAudit.filter((log) => String(log.notes || '').trim().toLowerCase().startsWith('payment posted'));
   const paymentAuditEntriesAscending = [...paymentAuditEntries].reverse();
   const fallbackPostedBy =
@@ -53,10 +54,10 @@ export function OrderPaymentDetailModal(props: Props) {
   return (
     <div className="modal-overlay modal-overlay--high" role="presentation">
       <div className="modal-backdrop" onClick={onClose} />
-      <div className="modal-dialog modal-dialog--wide integrated-admin-merch-order-detail-modal" role="dialog" aria-modal="true" aria-label="Order payment details">
+      <div className="modal-dialog modal-dialog--wide integrated-admin-merch-order-detail-modal" role="dialog" aria-modal="true" aria-label={modalLabel}>
         <div className="modal-dialog__header">
           <div className="modal-dialog__title-group">
-            <p className="modal-dialog__eyebrow">Order Payment</p>
+            <p className="modal-dialog__eyebrow">{modalLabel}</p>
             <h3>{order.productName}</h3>
           </div>
           <div className="integrated-admin-order-payment-view-switch" role="tablist" aria-label="Order payment views">
@@ -177,8 +178,8 @@ export function OrderPaymentDetailModal(props: Props) {
                       <div className="integrated-admin-merch-order-audit__headline">
                         <strong>
                           {log.fromStatus
-                            ? `${formatAuditStatusLabel(log.fromStatus)} -> ${formatAuditStatusLabel(log.toStatus)}`
-                            : `Created as ${formatAuditStatusLabel(log.toStatus)}`}
+                            ? `${formatAuditStatusLabel(log.fromStatus, order.orderKind)} -> ${formatAuditStatusLabel(log.toStatus, order.orderKind)}`
+                            : `Created as ${formatAuditStatusLabel(log.toStatus, order.orderKind)}`}
                         </strong>
                         <span className="integrated-admin-merch-order-audit__source">
                           {formatAuditSourceLabel(log.source)}

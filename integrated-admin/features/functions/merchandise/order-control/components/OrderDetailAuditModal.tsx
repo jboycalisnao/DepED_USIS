@@ -32,7 +32,7 @@ export function OrderDetailAuditModal({
       <div className="modal-dialog modal-dialog--wide integrated-admin-merch-order-detail-modal" role="dialog" aria-modal="true" aria-label="Order details">
         <div className="modal-dialog__header">
           <div className="modal-dialog__title-group">
-            <p className="modal-dialog__eyebrow">Merch Order Details</p>
+            <p className="modal-dialog__eyebrow">{order.orderKind === 'id' ? 'ID Order Details' : 'Merch Order Details'}</p>
             <h3>{order.productName}</h3>
           </div>
           <button type="button" className="modal-dialog__close" onClick={onClose}>
@@ -45,13 +45,13 @@ export function OrderDetailAuditModal({
             <div className="integrated-admin-order-detail-status-row">
               <select
                 aria-label="Order status"
-                className={`integrated-admin-order-status-select integrated-admin-order-detail-status-select ${getMerchOrderStatusClass(orderStatusValue)}`}
+                className={`integrated-admin-order-status-select integrated-admin-order-detail-status-select ${getMerchOrderStatusClass(orderStatusValue, order.orderKind)}`}
                 onChange={(event) => onStatusChange(event.target.value)}
                 value={orderStatusValue}
               >
                 {statusOptions.map((option) => (
-                  <option key={option} value={option} className={getMerchOrderStatusClass(option)}>
-                    {getMerchOrderStatusLabel(option)}
+                  <option key={option} value={option} className={getMerchOrderStatusClass(option, order.orderKind)}>
+                    {getMerchOrderStatusLabel(option, order.orderKind)}
                   </option>
                 ))}
               </select>
@@ -90,6 +90,10 @@ export function OrderDetailAuditModal({
                 <strong>{order.quantity}</strong>
               </div>
               <div className="modal-record__field">
+                <span>Order Amount</span>
+                <strong>PHP {Number(order.orderAmount || 0).toFixed(2)}</strong>
+              </div>
+              <div className="modal-record__field">
                 <span>Order Period</span>
                 <strong>{order.orderPeriodLabel || '-'}</strong>
               </div>
@@ -99,7 +103,7 @@ export function OrderDetailAuditModal({
               </div>
               <div className="modal-record__field">
                 <span>Status</span>
-                <strong>{getMerchOrderStatusLabel(order.orderStatus)}</strong>
+                <strong>{getMerchOrderStatusLabel(order.orderStatus, order.orderKind)}</strong>
               </div>
               <div className="modal-record__field">
                 <span>Date</span>
@@ -128,8 +132,8 @@ export function OrderDetailAuditModal({
                   <div key={`${log.createdAt}-${index}`} className="integrated-admin-merch-order-audit__item">
                     <strong>
                       {log.fromStatus
-                        ? `${getMerchOrderStatusLabel(log.fromStatus)} -> ${getMerchOrderStatusLabel(log.toStatus)}`
-                        : `Created as ${getMerchOrderStatusLabel(log.toStatus)}`}
+                        ? `${getMerchOrderStatusLabel(log.fromStatus, order.orderKind)} -> ${getMerchOrderStatusLabel(log.toStatus, order.orderKind)}`
+                        : `Created as ${getMerchOrderStatusLabel(log.toStatus, order.orderKind)}`}
                     </strong>
                     <span>{log.createdAt ? new Date(log.createdAt).toLocaleString() : '-'} | {log.changedBy || log.source || 'Unknown Actor'}</span>
                     {log.notes ? <small>{log.notes}</small> : null}

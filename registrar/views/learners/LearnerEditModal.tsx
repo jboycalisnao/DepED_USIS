@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { SearchableSelect } from '../../components/ui/SearchableSelect';
 import type { Student } from '../../types';
 import { supabase } from '../../lib/supabase';
+import { formatLearnerTags, normalizeLearnerTags, parseLearnerTagsInput } from '../../utils/learnerTags';
 import {
   deviceOptions,
   gradeLevelOptions,
@@ -41,6 +42,7 @@ type LearnerModalDraft = {
   motherTongue: string;
   religion: string;
   is4Ps: string;
+  tagsText: string;
   fourPsHouseholdId: string;
   currentAddress: string;
   permanentAddress: string;
@@ -131,6 +133,11 @@ const buildDraft = (student: Student, activeSchoolYearLabel: string, latestSubmi
     motherTongue: firstNonEmpty(submissionPayload.motherTongue, payload.motherTongue),
     religion: firstNonEmpty(submissionPayload.religion, payload.religion, religionOptions[0]),
     is4Ps: student.is4Ps ? 'Yes' : firstNonEmpty(submissionPayload.is4Ps, payload.is4Ps, 'No'),
+    tagsText: firstNonEmpty(
+      submissionPayload.tags,
+      payload.tags,
+      formatLearnerTags(student.tags),
+    ),
     fourPsHouseholdId: firstNonEmpty(submissionPayload.fourPsHouseholdId, payload.fourPsHouseholdId),
     currentAddress: firstNonEmpty(submissionPayload.currentAddress, payload.currentAddress, student.address),
     permanentAddress: firstNonEmpty(submissionPayload.permanentAddress, payload.permanentAddress, student.address),
@@ -217,6 +224,7 @@ export default function LearnerEditModal({ student, activeSchoolYearLabel, stran
           enrollments: Array.isArray((data as any).enrollment_history) ? (data as any).enrollment_history : [],
           status: student.status,
           is4Ps: !!(data as any).is_4ps,
+          tags: normalizeLearnerTags([(data as any).tags ?? (data as any).org_affiliations, data]),
         };
         const latestSubmissionPayload = submissionRows?.[0]?.payload && typeof submissionRows[0].payload === 'object'
           ? (submissionRows[0].payload as Record<string, any>)
@@ -386,6 +394,7 @@ export default function LearnerEditModal({ student, activeSchoolYearLabel, stran
                 <SelectField label="Religion" value={draft.religion} onChange={(value) => applyDraftChange((current) => ({ ...current, religion: value }))} options={religionOptions as unknown as string[]} />
                 <SelectField label="4Ps Beneficiary" value={draft.is4Ps} onChange={(value) => applyDraftChange((current) => ({ ...current, is4Ps: value }))} options={['Yes', 'No']} />
                 <InputField label="4Ps Household ID" value={draft.fourPsHouseholdId} onChange={(value) => applyDraftChange((current) => ({ ...current, fourPsHouseholdId: value }))} />
+                <InputField label="Learner Tags" value={draft.tagsText} onChange={(value) => applyDraftChange((current) => ({ ...current, tagsText: value }))} />
               </div>
             </section>
             <section className="registrar-public-enrollment__section">
@@ -432,6 +441,7 @@ export default function LearnerEditModal({ student, activeSchoolYearLabel, stran
               const submissionPayload = {
                 ...latestDraft,
                 consent: true,
+                tags: parseLearnerTagsInput(latestDraft.tagsText),
               };
               let matched = false;
               const nextHistory = currentHistory.length > 0
@@ -474,6 +484,7 @@ export default function LearnerEditModal({ student, activeSchoolYearLabel, stran
                 father_name: latestDraft.fatherName.trim(),
                 mother_name: latestDraft.motherName.trim(),
                 is4Ps: latestDraft.is4Ps === 'Yes',
+                tags: parseLearnerTagsInput(latestDraft.tagsText),
                 schoolYear: scopedSchoolYear,
                 sectionId: selectedSectionIdValue || undefined,
                 enrollments: nextHistory as any,

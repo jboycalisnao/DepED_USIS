@@ -11,6 +11,7 @@ export type MerchOrderControlRecord = {
   notes: string;
   orderStatus: string;
   orderAmount: number;
+  orderKind: 'merch' | 'id';
   orderPeriodLabel: string;
   orderSource: 'integrated_admin' | 'learner_portal' | 'unknown';
   productName: string;
@@ -143,6 +144,7 @@ export type MerchProductOption = {
   id: string;
   name: string;
   price: number;
+  sku: string;
 };
 
 export type MerchOrderAuditRecord = {
@@ -443,6 +445,7 @@ export const loadMerchOrderControlRecords = async (): Promise<MerchOrderControlR
           notes: String(row.notes || ''),
           orderStatus: normalizeMerchOrderStatus(String(row.order_status || 'pending')),
           orderAmount: 0,
+          orderKind: 'merch',
           orderPeriodLabel: '',
           orderSource: String(row.order_source || '') === 'integrated_admin'
             ? 'integrated_admin'
@@ -471,6 +474,7 @@ export const loadMerchOrderControlRecords = async (): Promise<MerchOrderControlR
       notes: String(row.notes || ''),
       orderStatus: normalizeMerchOrderStatus(String(row.order_status || 'pending')),
       orderAmount: Math.max(0, quantity * unitPrice),
+      orderKind: 'merch',
       orderPeriodLabel: String(item?.merch_products?.merch_order_periods?.label || ''),
       orderSource: String(row.order_source || '') === 'integrated_admin'
         ? 'integrated_admin'
@@ -543,7 +547,7 @@ export const loadPublishedMerchProducts = async (): Promise<MerchProductOption[]
 
   const { data, error } = await supabase
     .from('merch_published_products')
-    .select('id,name,available_sizes,price')
+    .select('id,sku,name,available_sizes,price')
     .order('name', { ascending: true });
 
   if (error) throw new Error('Unable to load merch products.');
@@ -553,6 +557,7 @@ export const loadPublishedMerchProducts = async (): Promise<MerchProductOption[]
     id: String(row.id || ''),
     name: String(row.name || ''),
     price: parsePrice(row.price),
+    sku: String(row.sku || ''),
   }));
 };
 

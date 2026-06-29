@@ -57,7 +57,7 @@ export function IdServicePage({ session }: IdServicePageProps) {
       setIsIdPublished(Boolean(availability.isPublished));
     } catch (loadError: any) {
       console.error('Learner portal ID service load failed:', loadError);
-      setError(loadError?.message || 'Unable to load ID requests.');
+      setError(loadError?.message || 'Unable to load ID orders.');
       setIsIdPublished(false);
     } finally {
       setIsLoading(false);
@@ -82,7 +82,7 @@ export function IdServicePage({ session }: IdServicePageProps) {
       return;
     }
     if (!activePeriod) {
-      setAlert({ title: 'No Valid Period', message: 'There is no valid ID request period right now.', tone: 'danger' });
+      setAlert({ title: 'No Valid Period', message: 'There is no valid ID order period right now.', tone: 'danger' });
       return;
     }
 
@@ -96,22 +96,22 @@ export function IdServicePage({ session }: IdServicePageProps) {
       });
       setNotes('');
       await refresh();
-      setAlert({ title: 'Request Sent', message: 'Your ID creation request has been submitted.', tone: 'success' });
+      setAlert({ title: 'Order Sent', message: 'Your ID order has been submitted.', tone: 'success' });
     } catch (submitError: any) {
-      setAlert({ title: 'Request Failed', message: submitError?.message || 'Unable to submit your ID request.', tone: 'danger' });
+      setAlert({ title: 'Order Failed', message: submitError?.message || 'Unable to submit your ID order.', tone: 'danger' });
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  if (isLoading) return <UsisPageLoader message="Loading ID request service..." />;
+  if (isLoading) return <UsisPageLoader message="Loading ID order service..." />;
 
   return (
     <section className="section-shell">
       <div className="portal-panel learner-tab-panel">
         <header className="portal-panel__header learner-tab-header">
           <h2>ID</h2>
-          <p>Request a learner ID creation during a valid order period.</p>
+          <p>Place a learner ID order during a valid order period.</p>
         </header>
       </div>
 
@@ -123,7 +123,7 @@ export function IdServicePage({ session }: IdServicePageProps) {
       {!error ? (
         <section className="learner-services-history">
           <header className="learner-services-history__header">
-            <h3>Request Form</h3>
+            <h3>Order Form</h3>
             <p>
               {!isIdPublished
                 ? 'This service is currently unavailable.'
@@ -135,7 +135,7 @@ export function IdServicePage({ session }: IdServicePageProps) {
 
           {currentRequest ? (
             <p className="learner-services-history__state">
-              You already have an ID request for {activePeriod?.label || 'the active period'} with status{' '}
+              You already have an ID order for {activePeriod?.label || 'the active period'} with status{' '}
               <span className={getStatusClassName(currentRequest.orderStatus)}>
                 {formatStatusLabel(currentRequest.orderStatus)}
               </span>
@@ -151,7 +151,7 @@ export function IdServicePage({ session }: IdServicePageProps) {
                   value={notes}
                   onChange={(event) => setNotes(event.target.value)}
                   disabled={!canRequest || isSubmitting}
-                  aria-label="ID request notes"
+                  aria-label="ID order notes"
                 />
                 <span>Notes or special instructions (optional)</span>
               </div>
@@ -159,7 +159,7 @@ export function IdServicePage({ session }: IdServicePageProps) {
 
             <div className="modal-dialog__actions" style={{ justifyContent: 'flex-start', padding: 0 }}>
               <button type="submit" className="primary-button" disabled={!canRequest || isSubmitting}>
-                {isSubmitting ? 'Submitting...' : 'Request ID Creation'}
+                {isSubmitting ? 'Submitting...' : 'Place ID Order'}
               </button>
             </div>
           </form>
@@ -169,14 +169,14 @@ export function IdServicePage({ session }: IdServicePageProps) {
       {!error ? (
         <section className="learner-services-history">
           <header className="learner-services-history__header">
-            <h3>Request History</h3>
-            <p>Your ID creation requests and their current processing status.</p>
+            <h3>Order History</h3>
+            <p>Your ID orders and their current processing status.</p>
           </header>
           {requests.length === 0 ? (
-            <p className="learner-services-history__state">No ID requests found yet.</p>
+            <p className="learner-services-history__state">No ID orders found yet.</p>
           ) : (
             <div className="learner-merch-orders-table-wrap">
-              <table className="learner-merch-orders-table" aria-label="ID request history">
+              <table className="learner-merch-orders-table" aria-label="ID order history">
                 <thead>
                   <tr>
                     <th>Reference No.</th>
