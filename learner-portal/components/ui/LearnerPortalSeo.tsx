@@ -67,7 +67,7 @@ export function LearnerPortalSeo({ isAuthenticated }: LearnerPortalSeoProps) {
     const baseTitle = 'DepED USIS Learner Portal | School Information System';
     const sharedDescription =
       'Access grades, attendance, services, and school records in the DepED USIS learner portal.';
-    const imageUrl = getAbsoluteUrl('/common/assets/USIS_Meta_Pic.png');
+    const imageUrl = getAbsoluteUrl('/USIS_Meta_Pic.png');
     const canonicalUrl = `${window.location.origin}${normalizePortalPathname(location.pathname)}`;
 
     let title = baseTitle;
@@ -120,8 +120,8 @@ export function LearnerPortalSeo({ isAuthenticated }: LearnerPortalSeoProps) {
     upsertMeta('property', 'og:image', imageUrl);
     upsertMeta('property', 'og:image:secure_url', imageUrl);
     upsertMeta('property', 'og:image:type', 'image/png');
-    upsertMeta('property', 'og:image:width', '1200');
-    upsertMeta('property', 'og:image:height', '630');
+    upsertMeta('property', 'og:image:width', '906');
+    upsertMeta('property', 'og:image:height', '907');
     upsertMeta('property', 'og:image:alt', title);
     upsertMeta('name', 'twitter:card', 'summary_large_image');
     upsertMeta('name', 'twitter:title', title);
