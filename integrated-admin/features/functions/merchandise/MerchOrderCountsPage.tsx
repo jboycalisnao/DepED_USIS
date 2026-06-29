@@ -3,27 +3,19 @@ import { UsisAlertModal } from '../../../../common/components/UsisAlertModal';
 import { UsisSearchableSelect } from '../../../../common/components/ui/UsisSearchableSelect';
 import UsisPageLoader from '../../../../common/components/UsisPageLoader';
 import { loadCachedMerchOrdersPageSnapshot } from './utils/merchOrdersPageCache';
-import { getMerchOrderStatusLabel, normalizeMerchOrderStatus } from './order-control/utils/orderStatus';
 import type { MerchOrderControlRecord } from './services/merchOrderControlService';
 
 type MerchOrderCountsSummary = {
-  countsBySource: Array<{ count: number; source: string }>;
-  countsByStatus: Array<{ count: number; status: string }>;
+  countsByProduct: Array<{ amount: number; count: number; productName: string; quantity: number }>;
   orderPeriodOptions: string[];
   totalOrders: number;
 };
 
 const buildSummary = (records: MerchOrderControlRecord[], selectedOrderPeriod: string): MerchOrderCountsSummary => {
   const periodSet = new Set<string>();
-  const statusMap = new Map<string, number>();
-  const sourceMap = new Map<string, number>();
+  const productMap = new Map<string, { amount: number; count: number; productName: string; quantity: number }>();
 
   records.forEach((row) => {
-    const status = normalizeMerchOrderStatus(row.orderStatus);
-    if (!['confirmed', 'released'].includes(status)) {
-      return;
-    }
-
     const items = [row.orderPeriodLabel || ''].filter(Boolean);
     items.forEach((label) => periodSet.add(label));
 
@@ -31,29 +23,26 @@ const buildSummary = (records: MerchOrderControlRecord[], selectedOrderPeriod: s
       return;
     }
 
-    const sourceRaw = String(row.orderSource || '').trim();
-    const source = sourceRaw === 'integrated_admin'
-      ? 'Integrated Admin'
-      : sourceRaw === 'learner_portal'
-        ? 'Learner Portal'
-        : 'Unknown';
-
-    statusMap.set(status, (statusMap.get(status) || 0) + 1);
-    sourceMap.set(source, (sourceMap.get(source) || 0) + 1);
+    const productName = String(row.productName || '').trim() || 'Unspecified Product';
+    const current = productMap.get(productName) || {
+      amount: 0,
+      count: 0,
+      productName,
+      quantity: 0,
+    };
+    current.count += 1;
+    current.quantity += Math.max(1, Number(row.quantity || 1));
+    current.amount += Number(row.orderAmount || 0);
+    productMap.set(productName, current);
   });
 
-  const countsByStatus = Array.from(statusMap.entries())
-    .map(([status, count]) => ({ status, count }))
-    .sort((a, b) => b.count - a.count || a.status.localeCompare(b.status));
-  const countsBySource = Array.from(sourceMap.entries())
-    .map(([source, count]) => ({ source, count }))
-    .sort((a, b) => b.count - a.count || a.source.localeCompare(b.source));
+  const countsByProduct = Array.from(productMap.values())
+    .sort((a, b) => b.count - a.count || a.productName.localeCompare(b.productName));
 
   return {
-    countsBySource,
-    countsByStatus,
+    countsByProduct,
     orderPeriodOptions: Array.from(periodSet).sort((a, b) => a.localeCompare(b)),
-    totalOrders: countsByStatus.reduce((sum, entry) => sum + entry.count, 0),
+    totalOrders: countsByProduct.reduce((sum, entry) => sum + entry.count, 0),
   };
 };
 
@@ -143,54 +132,37 @@ export function MerchOrderCountsPage() {
             </div>
           </div>
 
-          <div className="integrated-admin-order-counts-grid">
-            <article className="integrated-admin-order-counts-card">
-              <h3>By Status</h3>
-              {summary.countsByStatus.length === 0 ? (
-                <p>No orders found for this scope.</p>
-              ) : (
-                <table className="registry-table">
-                  <thead>
-                    <tr>
-                      <th>Status</th>
-                      <th>Count</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {summary.countsByStatus.map((row) => (
-                      <tr key={row.status}>
-                        <td>{getMerchOrderStatusLabel(row.status)}</td>
-                        <td>{row.count}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </article>
+          <div className="integrated-admin-order-counts-section">
+            <div className="integrated-admin-order-counts-section__header">
+              <h3>By Product</h3>
+              <p>Orders are grouped from the locally cached IA orders snapshot.</p>
+            </div>
 
-            <article className="integrated-admin-order-counts-card">
-              <h3>By Source</h3>
-              {summary.countsBySource.length === 0 ? (
+            {summary.countsByProduct.length === 0 ? (
+              <article className="integrated-admin-order-counts-empty">
                 <p>No orders found for this scope.</p>
-              ) : (
-                <table className="registry-table">
-                  <thead>
-                    <tr>
-                      <th>Source</th>
-                      <th>Count</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {summary.countsBySource.map((row) => (
-                      <tr key={row.source}>
-                        <td>{row.source}</td>
-                        <td>{row.count}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </article>
+              </article>
+            ) : (
+              <div className="integrated-admin-order-counts-grid">
+                {summary.countsByProduct.map((row) => (
+                  <article key={row.productName} className="integrated-admin-order-counts-card">
+                    <h4>{row.productName}</h4>
+                    <div className="integrated-admin-order-counts-card__metric">
+                      <small>Orders</small>
+                      <strong>{row.count}</strong>
+                    </div>
+                    <div className="integrated-admin-order-counts-card__metric">
+                      <small>Total Qty</small>
+                      <strong>{row.quantity}</strong>
+                    </div>
+                    <div className="integrated-admin-order-counts-card__metric">
+                      <small>Total Amount</small>
+                      <strong>PHP {row.amount.toFixed(2)}</strong>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </article>

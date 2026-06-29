@@ -64,10 +64,10 @@ export function LearnerPortalSeo({ isAuthenticated }: LearnerPortalSeoProps) {
       return;
     }
 
-    const baseTitle = 'USIS School Portal';
+    const baseTitle = 'DepED USIS Learner Portal | School Information System';
     const sharedDescription =
-      'Learner self-service access portal for grades, attendance, services, and school records.';
-    const imageUrl = getAbsoluteUrl('/common/assets/Web-Kit_Header_Logo.png');
+      'Access grades, attendance, services, and school records in the DepED USIS learner portal.';
+    const imageUrl = getAbsoluteUrl('/og-image.svg');
     const canonicalUrl = `${window.location.origin}${normalizePortalPathname(location.pathname)}`;
 
     let title = baseTitle;
@@ -76,30 +76,30 @@ export function LearnerPortalSeo({ isAuthenticated }: LearnerPortalSeoProps) {
 
     if (!isAuthenticated) {
       if (location.pathname.startsWith('/get-credential')) {
-        title = 'Get Learner Portal Credential | USIS School Portal';
-        description = 'Retrieve or prepare learner access credentials for the school portal.';
+        title = 'Get Credential | DepED USIS Learner Portal';
+        description = 'Retrieve or prepare learner access credentials for the learner portal.';
       } else {
-        title = 'Learner Login | USIS School Portal';
+        title = 'Learner Login | DepED USIS Learner Portal';
         description = 'Sign in to the learner portal to view records, services, and school updates.';
       }
     } else {
       if (location.pathname === '/grades') {
-        title = 'Grades | USIS School Portal';
+        title = 'Grades | DepED USIS Learner Portal';
         description = 'View learner grades and academic records in the school portal.';
       } else if (location.pathname === '/services') {
-        title = 'Services | USIS School Portal';
+        title = 'Services | DepED USIS Learner Portal';
         description = 'Open learner services such as attendance, documents, enrollment history, and support.';
       } else if (location.pathname === '/services/id') {
-        title = 'ID Request | USIS School Portal';
+        title = 'ID Request | DepED USIS Learner Portal';
         description = 'Request a learner ID creation during the active school order period.';
       } else if (location.pathname === '/services/help-ticket') {
-        title = 'Help Ticket | USIS School Portal';
+        title = 'Help Ticket | DepED USIS Learner Portal';
         description = 'Submit a learner help ticket using registrar profile details and school support categories.';
       } else if (location.pathname === '/profile') {
-        title = 'Profile | USIS School Portal';
+        title = 'Profile | DepED USIS Learner Portal';
         description = 'Review learner profile details in the school portal.';
       } else {
-        title = 'Dashboard | USIS School Portal';
+        title = 'Dashboard | DepED USIS Learner Portal';
         description = sharedDescription;
       }
     }
@@ -119,9 +119,9 @@ export function LearnerPortalSeo({ isAuthenticated }: LearnerPortalSeoProps) {
     upsertMeta('property', 'og:url', canonicalUrl);
     upsertMeta('property', 'og:image', imageUrl);
     upsertMeta('property', 'og:image:secure_url', imageUrl);
-    upsertMeta('property', 'og:image:type', 'image/png');
-    upsertMeta('property', 'og:image:width', '1826');
-    upsertMeta('property', 'og:image:height', '335');
+    upsertMeta('property', 'og:image:type', 'image/svg+xml');
+    upsertMeta('property', 'og:image:width', '1200');
+    upsertMeta('property', 'og:image:height', '630');
     upsertMeta('property', 'og:image:alt', title);
     upsertMeta('name', 'twitter:card', 'summary_large_image');
     upsertMeta('name', 'twitter:title', title);
