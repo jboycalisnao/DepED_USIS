@@ -2,6 +2,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { AttendanceRecord, AttendanceScheduleConfig, Learner } from '../../../types';
 import { isAttendanceRecordLate, normalizeGradeBand } from '../../../utils/attendanceSchedule';
 import { UsisSearchableSelect } from '../../../../common/components/ui/UsisSearchableSelect';
+import { UsisDateTimePicker } from '../../../../common/components/ui/UsisDateTimePicker';
+import {
+  buildDailyAttendanceReportHtml,
+  buildDailyAttendanceRows,
+  buildMonthlyAttendanceReportHtml,
+} from './reporting/teacherAttendanceReports';
 
 type Props = {
   accessLabel: string;
@@ -75,6 +81,14 @@ const monthLabelFromKey = (monthKey: string) => {
   const parsed = new Date(`${monthKey}-01T00:00:00`);
   if (Number.isNaN(parsed.getTime())) return monthKey;
   return formatMonthLabel(monthKey);
+};
+
+const todayIso = () => {
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = `${now.getMonth() + 1}`.padStart(2, '0');
+  const dd = `${now.getDate()}`.padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
 };
 
 const buildMonthMatrix = (monthKey: string, records: AttendanceRecord[]): LearnerMatrixMonth => {
@@ -187,191 +201,6 @@ const groupLearnersByGender = (learners: Learner[]) => {
   ].filter((group) => group.learners.length > 0);
 };
 
-const formatPrintDate = () =>
-  new Intl.DateTimeFormat('en-PH', {
-    month: 'long',
-    day: '2-digit',
-    year: 'numeric',
-  }).format(new Date());
-
-const buildPrintableReportHtml = (sectionName: string, monthLabel: string, rows: LearnerReportRow[]) => {
-  const totalLearners = rows.length;
-  const totalPresent = rows.reduce((sum, row) => sum + row.stats.presentDays, 0);
-  const totalLate = rows.reduce((sum, row) => sum + row.stats.lateDays, 0);
-  const totalAbsent = rows.reduce((sum, row) => sum + row.stats.absentDays, 0);
-
-  const rowsHtml = rows
-    .map(
-      ({ learner, name, stats, monthRecords }) => `
-        <tr>
-          <td>${name || 'Unnamed learner'}</td>
-          <td>${learner.lrn || 'No LRN'}</td>
-          <td>${normalizeGenderLabel(learner.gender)}</td>
-          <td class="is-center">${stats.presentDays}</td>
-          <td class="is-center">${stats.lateDays}</td>
-          <td class="is-center">${stats.absentDays}</td>
-          <td class="is-center">${monthRecords.length}</td>
-        </tr>
-      `,
-    )
-    .join('');
-
-  return `
-    <!doctype html>
-    <html>
-      <head>
-        <meta charset="utf-8" />
-        <title>${sectionName} Attendance Report - ${monthLabel}</title>
-        <style>
-          @page { size: landscape; margin: 14mm; }
-          :root {
-            --ink: #102a43;
-            --blue: #123f9c;
-            --line: #d6deeb;
-            --muted: #5f6b7a;
-          }
-          body {
-            margin: 0;
-            font-family: Segoe UI, sans-serif;
-            color: var(--ink);
-            background: #fff;
-          }
-          .report {
-            padding: 0;
-          }
-          .report__header {
-            display: grid;
-            gap: 4px;
-            margin-bottom: 16px;
-            padding-bottom: 12px;
-            border-bottom: 2px solid var(--line);
-          }
-          .report__eyebrow {
-            margin: 0;
-            color: var(--muted);
-            font-size: 11px;
-            text-transform: uppercase;
-            letter-spacing: 0.04em;
-          }
-          .report__title {
-            margin: 0;
-            color: var(--blue);
-            font-size: 22px;
-            font-weight: 700;
-          }
-          .report__meta {
-            margin: 0;
-            color: var(--muted);
-            font-size: 12px;
-          }
-          .report__summary {
-            display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
-            gap: 8px;
-            margin: 0 0 16px;
-          }
-          .report__stat {
-            border: 1px solid var(--line);
-            border-radius: 8px;
-            padding: 10px 12px;
-          }
-          .report__stat-label {
-            margin: 0 0 4px;
-            color: var(--muted);
-            font-size: 11px;
-            text-transform: uppercase;
-          }
-          .report__stat-value {
-            margin: 0;
-            color: var(--ink);
-            font-size: 18px;
-            font-weight: 700;
-          }
-          table {
-            width: 100%;
-            border-collapse: collapse;
-          }
-          thead th {
-            padding: 10px 8px;
-            border: 1px solid var(--line);
-            background: #f7f9fc;
-            color: var(--blue);
-            font-size: 11px;
-            text-transform: uppercase;
-            text-align: left;
-          }
-          tbody td {
-            padding: 9px 8px;
-            border: 1px solid var(--line);
-            font-size: 12px;
-            vertical-align: top;
-          }
-          tbody tr:nth-child(even) td {
-            background: #fbfcfe;
-          }
-          .is-center {
-            text-align: center;
-          }
-          .report__footer {
-            margin-top: 12px;
-            color: var(--muted);
-            font-size: 11px;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="report">
-          <div class="report__header">
-            <p class="report__eyebrow">Attendance Monthly Report</p>
-            <h1 class="report__title">${sectionName}</h1>
-            <p class="report__meta">Month: ${monthLabel} | Printed: ${formatPrintDate()}</p>
-          </div>
-
-          <div class="report__summary">
-            <div class="report__stat">
-              <p class="report__stat-label">Learners</p>
-              <p class="report__stat-value">${totalLearners}</p>
-            </div>
-            <div class="report__stat">
-              <p class="report__stat-label">Present Days</p>
-              <p class="report__stat-value">${totalPresent}</p>
-            </div>
-            <div class="report__stat">
-              <p class="report__stat-label">Late Days</p>
-              <p class="report__stat-value">${totalLate}</p>
-            </div>
-            <div class="report__stat">
-              <p class="report__stat-label">Absent Days</p>
-              <p class="report__stat-value">${totalAbsent}</p>
-            </div>
-          </div>
-
-          <table>
-            <thead>
-              <tr>
-                <th>Learner</th>
-                <th>LRN</th>
-                <th>Gender</th>
-                <th class="is-center">Present</th>
-                <th class="is-center">Late</th>
-                <th class="is-center">Absent</th>
-                <th class="is-center">Taps</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${rowsHtml || '<tr><td colspan="7">No learners to report.</td></tr>'}
-            </tbody>
-          </table>
-
-          <div class="report__footer">
-            Generated by the Attendance module for ${sectionName}.
-          </div>
-        </div>
-      </body>
-    </html>
-  `;
-};
-
 export default function TeacherLearnerAttendanceMatrix({
   accessLabel,
   learners,
@@ -381,9 +210,11 @@ export default function TeacherLearnerAttendanceMatrix({
 }: Props) {
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthKey());
+  const [selectedDailyDate, setSelectedDailyDate] = useState(() => todayIso());
   const [searchValue, setSearchValue] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isPrintingDailyReport, setIsPrintingDailyReport] = useState(false);
 
   const sectionLearners = useMemo(
     () =>
@@ -484,15 +315,9 @@ export default function TeacherLearnerAttendanceMatrix({
     [learnerCards, scheduleConfig, sectionLearners, selectedMonth, selectedMonthMatrix.days],
   );
 
-  const handleCreateMonthlyReport = () => {
-    const html = buildPrintableReportHtml(
-      sectionLearners[0]?.section_name || accessLabel,
-      selectedMonthMatrix.monthLabel,
-      reportRows,
-    );
-
+  const triggerPrint = (html: string, title: string) => {
     const iframe = document.createElement('iframe');
-    iframe.title = `${selectedMonthMatrix.monthLabel} attendance report`;
+    iframe.title = title;
     iframe.setAttribute('aria-hidden', 'true');
     iframe.style.position = 'fixed';
     iframe.style.right = '0';
@@ -524,6 +349,37 @@ export default function TeacherLearnerAttendanceMatrix({
     };
 
     document.body.appendChild(iframe);
+  };
+
+  const handleCreateMonthlyReport = () => {
+    const html = buildMonthlyAttendanceReportHtml(
+      sectionLearners[0]?.section_name || accessLabel,
+      selectedMonthMatrix.monthLabel,
+      reportRows,
+    );
+    triggerPrint(html, `${selectedMonthMatrix.monthLabel} attendance report`);
+  };
+
+  const handleCreateDailyReport = async () => {
+    if (!selectedDailyDate) return;
+    setIsPrintingDailyReport(true);
+    try {
+      const dailyRecords = await queryAttendanceRecordsByRange(
+        selectedDailyDate,
+        selectedDailyDate,
+        sectionLearners.map((learner) => String(learner.id)),
+      );
+      const dailyRows = buildDailyAttendanceRows(sectionLearners, dailyRecords, selectedDailyDate, scheduleConfig);
+      const html = buildDailyAttendanceReportHtml(
+        sectionLearners[0]?.section_name || accessLabel,
+        selectedDailyDate,
+        dailyRows,
+        scheduleConfig,
+      );
+      triggerPrint(html, `${selectedDailyDate} attendance report`);
+    } finally {
+      setIsPrintingDailyReport(false);
+    }
   };
 
   const renderTapChip = (tap: AttendanceRecord, dayKey: string, tapIndex: number) => {
@@ -558,6 +414,23 @@ export default function TeacherLearnerAttendanceMatrix({
             <div className="attendance-teacher-matrix__title-actions">
               <button type="button" className="secondary-button rounded-md attendance-teacher-matrix__report-btn" onClick={handleCreateMonthlyReport}>
                 Print Monthly Report
+              </button>
+              <UsisDateTimePicker
+                ariaLabel="Report Date"
+                className="attendance-teacher-matrix__date-control"
+                label="Report Date"
+                mode="date"
+                onChange={setSelectedDailyDate}
+                showLabel={false}
+                value={selectedDailyDate}
+              />
+              <button
+                type="button"
+                className="secondary-button rounded-md attendance-teacher-matrix__report-btn"
+                onClick={() => void handleCreateDailyReport()}
+                disabled={isPrintingDailyReport || !selectedDailyDate}
+              >
+                {isPrintingDailyReport ? 'Preparing Daily Report...' : 'Print Daily Report'}
               </button>
               <button type="button" className="secondary-button rounded-md attendance-teacher-matrix__logout" onClick={onLogout}>
                 Sign Out

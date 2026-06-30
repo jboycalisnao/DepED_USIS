@@ -1738,6 +1738,7 @@ body {
   gap: 10px;
   flex: 0 0 auto;
   margin-left: auto;
+  flex-wrap: wrap;
 }
 
 .attendance-teacher-matrix__eyebrow {
@@ -1781,6 +1782,10 @@ body {
 .attendance-teacher-matrix__report-btn {
   flex: 0 0 auto;
   white-space: nowrap;
+}
+
+.attendance-teacher-matrix__date-control {
+  min-width: 190px;
 }
 
 .attendance-teacher-matrix__search-field,
