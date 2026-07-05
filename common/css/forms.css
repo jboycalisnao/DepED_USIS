@@ -891,6 +891,16 @@
   left: 0;
   right: auto;
   z-index: 2147483647;
+  max-height: calc(100vh - 16px);
+  overflow: auto;
+}
+
+.usis-calendar-popover--portal[data-placement='top'] {
+  transform-origin: bottom left;
+}
+
+.usis-calendar-popover--portal[data-placement='bottom'] {
+  transform-origin: top left;
 }
 
 .usis-calendar-popover button {

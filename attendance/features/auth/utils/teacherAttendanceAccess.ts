@@ -1,5 +1,8 @@
 import { supabase } from '@deped-usis/shared-supabase';
-import { hasCoordinatorModuleAccessInSupabase } from '../../../../common/auth/moduleAccess';
+import {
+  hasCoordinatorModuleAccessInSupabase,
+  saveCoordinatorAccountModuleAccessToSupabase,
+} from '../../../../common/auth/moduleAccess';
 
 export interface TeacherAttendanceAccessRecord {
   accountSource: 'usis_core_coordinators';
@@ -27,6 +30,72 @@ const normalizeSectionAdviser = (value: string) =>
 const matchesPassword = (record: any, password: string) => {
   const normalized = password.trim();
   return normalized === record?.password_plain || normalized === record?.password_hash;
+};
+
+const resolveTeacherSectionAssignment = async (accountId: string, displayName: string, username: string) => {
+  const displayNameKey = normalizeSectionAdviser(displayName);
+  const usernameKey = normalizeIdentity(username);
+
+  const { data: assignment, error: assignmentError } = await supabase
+    .from('attendance_teacher_sections')
+    .select(`
+      section_id,
+      registrar_sections!inner (
+        id,
+        name,
+        grade_level
+      )
+    `)
+    .eq('teacher_account_id', accountId)
+    .eq('is_active', true)
+    .limit(1)
+    .maybeSingle();
+
+  if (assignmentError) {
+    return {
+      error: assignmentError.message || 'Unable to resolve the teacher section assignment.',
+      sectionId: '',
+      section: null,
+    };
+  }
+
+  let sectionId = String(assignment?.section_id || '').trim();
+  let section: any = Array.isArray((assignment as any)?.registrar_sections)
+    ? (assignment as any).registrar_sections[0]
+    : (assignment as any)?.registrar_sections;
+
+  if (!sectionId) {
+    const sectionLookup = await supabase
+      .from('registrar_sections')
+      .select('id,name,grade_level,adviser_name');
+
+    if (sectionLookup.error) {
+      return {
+        error: sectionLookup.error.message || 'Unable to resolve the teacher section from registrar records.',
+        sectionId: '',
+        section: null,
+      };
+    }
+
+    const matchedSection = (sectionLookup.data || []).find((row: any) => {
+      const adviserKey = normalizeSectionAdviser(String(row?.adviser_name || row?.adviserName || ''));
+      if (!adviserKey) return false;
+      return (
+        adviserKey === displayNameKey ||
+        adviserKey.includes(displayNameKey) ||
+        displayNameKey.includes(adviserKey) ||
+        adviserKey.includes(usernameKey) ||
+        usernameKey.includes(adviserKey)
+      );
+    });
+
+    if (matchedSection?.id) {
+      sectionId = String(matchedSection.id);
+      section = matchedSection;
+    }
+  }
+
+  return { error: null as string | null, sectionId, section };
 };
 
 export const getStoredTeacherAttendanceAccess = (): TeacherAttendanceAccessRecord | null => {
@@ -97,77 +166,22 @@ export const resolveTeacherAttendanceAccess = async (
     };
   }
 
-  const hasAttendanceAccess = await hasCoordinatorModuleAccessInSupabase(String(response.data.id || ''), 'attendance');
-  if (!hasAttendanceAccess) {
-    return {
-      error: 'This account is not granted Attendance module access in Coordinator Portal.',
-      record: null,
-    };
-  }
-
   const displayName =
     [response.data.first_name, response.data.middle_name, response.data.last_name]
       .filter(Boolean)
       .join(' ')
       .trim() || normalizedUsername;
-  const displayNameKey = normalizeSectionAdviser(displayName);
-  const usernameKey = normalizeIdentity(normalizedUsername);
+  const { error: sectionError, sectionId, section } = await resolveTeacherSectionAssignment(
+    String(response.data.id || ''),
+    displayName,
+    normalizedUsername,
+  );
 
-  const { data: assignment, error: assignmentError } = await supabase
-    .from('attendance_teacher_sections')
-    .select(`
-      section_id,
-      registrar_sections!inner (
-        id,
-        name,
-        grade_level
-      )
-    `)
-    .eq('teacher_account_id', response.data.id)
-    .eq('is_active', true)
-    .limit(1)
-    .maybeSingle();
-
-  if (assignmentError) {
+  if (sectionError) {
     return {
-      error: assignmentError.message || 'Unable to resolve the teacher section assignment.',
+      error: sectionError,
       record: null,
     };
-  }
-
-  let sectionId = String(assignment?.section_id || '').trim();
-  let section: any = Array.isArray((assignment as any)?.registrar_sections)
-    ? (assignment as any).registrar_sections[0]
-    : (assignment as any)?.registrar_sections;
-
-  if (!sectionId) {
-    const sectionLookup = await supabase
-      .from('registrar_sections')
-      .select('id,name,grade_level,adviser_name');
-
-    if (sectionLookup.error) {
-      return {
-        error: sectionLookup.error.message || 'Unable to resolve the teacher section from registrar records.',
-        record: null,
-      };
-    }
-
-    const matchedSection = (sectionLookup.data || []).find((row: any) => {
-      const adviserKey = normalizeSectionAdviser(String(row?.adviser_name || row?.adviserName || ''));
-      if (!adviserKey) return false;
-      return (
-        adviserKey === displayNameKey ||
-        adviserKey.includes(displayNameKey) ||
-        displayNameKey.includes(adviserKey) ||
-        adviserKey.includes(usernameKey) ||
-        usernameKey.includes(adviserKey)
-      );
-    });
-
-    if (matchedSection?.id) {
-      sectionId = String(matchedSection.id);
-      section = matchedSection;
-    }
   }
 
   if (!sectionId) {
@@ -175,6 +189,36 @@ export const resolveTeacherAttendanceAccess = async (
       error: 'This account does not have a designated section assigned for attendance viewing. Set the section adviser in Registrar or assign the teacher section in Attendance.',
       record: null,
     };
+  }
+
+  const hasAttendanceAccess = await hasCoordinatorModuleAccessInSupabase(String(response.data.id || ''), 'attendance');
+  if (!hasAttendanceAccess) {
+    try {
+      const { data: moduleAccessRow, error: moduleAccessError } = await supabase
+        .from('coordinator_module_access')
+        .select('modules')
+        .eq('account_id', response.data.id)
+        .limit(1)
+        .maybeSingle();
+
+      if (moduleAccessError) {
+        return {
+          error: 'This account is linked to a section but the Attendance access could not be granted automatically.',
+          record: null,
+        };
+      }
+
+      const existingModules = Array.isArray((moduleAccessRow as any)?.modules)
+        ? ((moduleAccessRow as any).modules.filter((entry: unknown) => typeof entry === 'string') as string[])
+        : [];
+      const nextModules = Array.from(new Set([...existingModules, 'attendance']));
+      await saveCoordinatorAccountModuleAccessToSupabase(String(response.data.id || ''), nextModules as any);
+    } catch {
+      return {
+        error: 'This account is linked to a section but the Attendance access could not be granted automatically.',
+        record: null,
+      };
+    }
   }
 
   const school = Array.isArray(response.data.usis_schools)

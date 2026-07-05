@@ -4,10 +4,21 @@ import { LearnerAttendanceMonthRow, formatAttendanceTapType } from '../../../../
 import { normalizeGradeBand, type LearnerAttendanceTapType } from '../../../../services/attendanceSchedule';
 
 const DAY_HEADERS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'] as const;
+const DAY_INDEX_TO_KEY = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const;
 
 type MonthlyAttendanceTableProps = {
   months: LearnerAttendanceMonthRow[];
   gradeLevel: string;
+  classDayConfig: {
+    sunday: boolean;
+    monday: boolean;
+    tuesday: boolean;
+    wednesday: boolean;
+    thursday: boolean;
+    friday: boolean;
+    saturday: boolean;
+  };
+  noClassDates: string[];
 };
 
 type LearnerAttendanceTap = LearnerAttendanceMonthRow['days'][number]['taps'][number];
@@ -20,7 +31,7 @@ type CalendarCell = {
   dateKey: string;
   taps: LearnerAttendanceTap[];
   status: MonthStatus;
-  isWeekend: boolean;
+  isClassDay: boolean;
   isCurrentMonth: boolean;
 };
 
@@ -53,8 +64,29 @@ const REQUIRED_TAPS_BY_GRADE_BAND: Record<'grade7To10' | 'grade11' | 'grade12', 
 
 const getRequiredTapTypes = (gradeLevel: string) => REQUIRED_TAPS_BY_GRADE_BAND[normalizeGradeBand(gradeLevel)];
 
-const getCellStatus = (taps: LearnerAttendanceTap[], isWeekend: boolean, gradeLevel: string): MonthStatus => {
-  if (isWeekend) return 'no_class';
+const getManilaDateKey = (value = new Date()) =>
+  new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Manila',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(value);
+
+const isFutureDateKey = (dateKey: string, referenceDateKey: string) => dateKey > referenceDateKey;
+
+const isHeaderClassDay = (
+  day: typeof DAY_HEADERS[number],
+  classDayConfig: MonthlyAttendanceTableProps['classDayConfig'],
+) => {
+  const dayKey = DAY_INDEX_TO_KEY[DAY_HEADERS.indexOf(day)];
+  if (dayKey === 'sunday' || dayKey === 'saturday') return false;
+  return classDayConfig[dayKey];
+};
+
+const isNoClassDateKey = (dateKey: string, noClassDates: string[]) => noClassDates.includes(dateKey);
+
+const getCellStatus = (taps: LearnerAttendanceTap[], isClassDay: boolean, isFuture: boolean, gradeLevel: string): MonthStatus => {
+  if (!isClassDay || isFuture) return 'no_class';
   if (taps.length === 0) return 'absent';
 
   const requiredTapTypes = getRequiredTapTypes(gradeLevel);
@@ -118,11 +150,12 @@ const getStatusIcon = (status: MonthStatus) => {
   }
 };
 
-export function MonthlyAttendanceTable({ months, gradeLevel }: MonthlyAttendanceTableProps) {
+export function MonthlyAttendanceTable({ months, gradeLevel, classDayConfig, noClassDates }: MonthlyAttendanceTableProps) {
   const [selectedMonthIndex, setSelectedMonthIndex] = useState(0);
   const [selectedDayKey, setSelectedDayKey] = useState('');
   const [isDayModalOpen, setIsDayModalOpen] = useState(false);
   const [mobileToolsOpen, setMobileToolsOpen] = useState(false);
+  const todayKey = getManilaDateKey();
 
   useEffect(() => {
     if (months.length === 0) {
@@ -180,7 +213,7 @@ export function MonthlyAttendanceTable({ months, gradeLevel }: MonthlyAttendance
         dateKey: '',
         taps: [],
         status: 'no_class',
-        isWeekend: index === 0 || index === 6,
+        isClassDay: false,
         isCurrentMonth: false,
       });
     }
@@ -189,14 +222,23 @@ export function MonthlyAttendanceTable({ months, gradeLevel }: MonthlyAttendance
       const dateKey = `${selectedMonth.monthKey}-${String(day).padStart(2, '0')}`;
       const taps = dayMap.get(day) || [];
       const weekday = new Date(`${dateKey}T00:00:00`).getDay();
-      const isWeekend = weekday === 0 || weekday === 6;
+      const isClassDay = [
+        classDayConfig.sunday,
+        classDayConfig.monday,
+        classDayConfig.tuesday,
+        classDayConfig.wednesday,
+        classDayConfig.thursday,
+        classDayConfig.friday,
+        classDayConfig.saturday,
+      ][weekday] && !isNoClassDateKey(dateKey, noClassDates);
+      const isFuture = isFutureDateKey(dateKey, todayKey);
       cells.push({
         key: `${selectedMonth.monthKey}-${day}`,
         dayNumber: day,
         dateKey,
         taps,
-        status: getCellStatus(taps, isWeekend, gradeLevel),
-        isWeekend,
+        status: getCellStatus(taps, isClassDay, isFuture, gradeLevel),
+        isClassDay,
         isCurrentMonth: true,
       });
     }
@@ -209,13 +251,13 @@ export function MonthlyAttendanceTable({ months, gradeLevel }: MonthlyAttendance
         dateKey: '',
         taps: [],
         status: 'no_class',
-        isWeekend: false,
+        isClassDay: false,
         isCurrentMonth: false,
       });
     }
 
     return cells;
-  }, [selectedMonth, gradeLevel]);
+  }, [selectedMonth, gradeLevel, todayKey, classDayConfig, noClassDates]);
 
   const selectedDay = useMemo(
     () => selectedMonthCalendar.find((cell) => cell.dateKey === selectedDayKey && cell.isCurrentMonth) || null,
@@ -290,7 +332,7 @@ export function MonthlyAttendanceTable({ months, gradeLevel }: MonthlyAttendance
   };
 
   const selectedDayStatus = selectedDay ? getStatusLabel(selectedDay.status) : '';
-  const selectedDayHasRecords = Boolean(selectedDay && selectedDay.taps.length > 0);
+  const selectedDayHasRecords = Boolean(selectedDay && selectedDay.status !== 'no_class' && selectedDay.taps.length > 0);
 
   const renderTapChip = (tap: LearnerAttendanceTap, dayKey: string, tapIndex: number) => (
     <span
@@ -387,7 +429,7 @@ export function MonthlyAttendanceTable({ months, gradeLevel }: MonthlyAttendance
           <div className="learner-attendance-records__calendar-wrap">
             <div className="learner-attendance-records__calendar-head" role="row">
               {DAY_HEADERS.map((day) => (
-                <div key={day} className={`learner-attendance-records__calendar-head-cell ${day === 'SUN' || day === 'SAT' ? 'learner-attendance-records__calendar-head-cell--weekend' : ''}`}>
+                <div key={day} className={`learner-attendance-records__calendar-head-cell ${isHeaderClassDay(day, classDayConfig) ? '' : 'learner-attendance-records__calendar-head-cell--weekend'}`}>
                   {day}
                 </div>
               ))}
@@ -395,7 +437,7 @@ export function MonthlyAttendanceTable({ months, gradeLevel }: MonthlyAttendance
 
             <div className="learner-attendance-records__calendar-grid" role="grid" aria-label={`${selectedMonth.monthLabel} attendance calendar`}>
               {selectedMonthCalendar.map((cell) => {
-                const hasRecords = cell.taps.length > 0;
+                const hasRecords = cell.status !== 'no_class' && cell.taps.length > 0;
                 const isSelected = selectedDayKey === cell.dateKey && cell.isCurrentMonth;
                 return (
                   <button
@@ -424,11 +466,11 @@ export function MonthlyAttendanceTable({ months, gradeLevel }: MonthlyAttendance
                   >
                     {cell.isCurrentMonth && cell.dayNumber ? (
                       <>
-                        <span className={`learner-attendance-records__day-number ${cell.isWeekend ? 'learner-attendance-records__day-number--weekend' : ''}`}>
+                        <span className={`learner-attendance-records__day-number ${cell.isClassDay ? '' : 'learner-attendance-records__day-number--weekend'}`}>
                           {cell.dayNumber}
                         </span>
 
-                        {cell.status !== 'no_class' ? (
+                        {cell.status ? (
                           <div className={`learner-attendance-records__status learner-attendance-records__status--${cell.status}`}>
                             <span className="material-symbols-outlined learner-attendance-records__status-icon" aria-hidden="true">
                               {getStatusIcon(cell.status)}

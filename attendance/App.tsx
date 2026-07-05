@@ -71,6 +71,10 @@ function App() {
   const {
     settings: scheduleConfig,
     updateSettings,
+    classDayConfig,
+    setClassDayConfig,
+    noClassDates,
+    setNoClassDates,
     activeSchoolYear,
     isSettingsLoading,
     isSchoolYearsLoading,
@@ -90,7 +94,9 @@ function App() {
     clearLearnerRfid,
     registerLearner,
     loadLearners,
+    syncRosterIfNeeded,
     hasCachedRoster,
+    hasHydratedRosterCache,
     lastSyncedAt,
   } = useLearners(selectedSchoolYearId);
   const {
@@ -148,6 +154,11 @@ function App() {
     if (learners.some((learner) => learner.id === selectedLearnerId)) return;
     setSelectedLearnerId(null);
   }, [learners, selectedLearnerId]);
+
+  useEffect(() => {
+    if (!isTeacherRoute || !teacherAccess || !hasHydratedRosterCache) return;
+    void syncRosterIfNeeded();
+  }, [hasHydratedRosterCache, isTeacherRoute, syncRosterIfNeeded, teacherAccess]);
 
   const clearIdleTimer = (index: number) => {
     if (idleTimers.current[index]) {
@@ -533,8 +544,11 @@ function App() {
         <UsisPortalGate moduleKey="attendance" />
         <TeacherSectionAttendancePage
           access={teacherAccess}
+          schoolYearLabel={activeSchoolYear?.label || ''}
           learners={learners}
           scheduleConfig={scheduleConfig}
+          classDayConfig={classDayConfig}
+          noClassDates={noClassDates}
           onLogout={() => {
             clearStoredTeacherAttendanceAccess();
             setTeacherAccess(null);
@@ -800,9 +814,13 @@ function App() {
                       isSettingsLoading={isSettingsLoading}
                       isSchoolYearsLoading={isSchoolYearsLoading}
                       isSettingsSaving={isSettingsSaving}
-                      onScheduleConfigChange={updateSettings}
-                      onSchoolYearChange={setSelectedSchoolYearId}
-                      schoolYears={schoolYears}
+          classDayConfig={classDayConfig}
+          noClassDates={noClassDates}
+          onScheduleConfigChange={updateSettings}
+          onClassDayConfigChange={setClassDayConfig}
+          onNoClassDatesChange={setNoClassDates}
+          onSchoolYearChange={setSelectedSchoolYearId}
+          schoolYears={schoolYears}
                       selectedSchoolYearId={selectedSchoolYearId}
                       scheduleConfig={scheduleConfig}
                       settingsError={settingsError}

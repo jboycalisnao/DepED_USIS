@@ -1,11 +1,20 @@
 import React from 'react';
 import { UsisDateTimePicker } from '../../common/components/ui/UsisDateTimePicker';
 import { UsisSearchableSelect } from '../../common/components/ui/UsisSearchableSelect';
-import type { AttendanceScheduleConfig, SchoolYearOption } from '../types';
+import type {
+  AttendanceClassDayConfig,
+  AttendanceNoClassDateConfig,
+  AttendanceScheduleConfig,
+  SchoolYearOption,
+} from '../types';
 
 interface SettingsProps {
   scheduleConfig: AttendanceScheduleConfig;
   onScheduleConfigChange: (nextConfig: AttendanceScheduleConfig) => void;
+  classDayConfig: AttendanceClassDayConfig;
+  onClassDayConfigChange: (nextConfig: AttendanceClassDayConfig) => void;
+  noClassDates: AttendanceNoClassDateConfig;
+  onNoClassDatesChange: (nextConfig: AttendanceNoClassDateConfig) => void;
   activeSchoolYearLabel: string;
   isSettingsLoading: boolean;
   isSchoolYearsLoading: boolean;
@@ -72,6 +81,10 @@ const TimeField = ({
 const Settings: React.FC<SettingsProps> = ({
   scheduleConfig,
   onScheduleConfigChange,
+  classDayConfig,
+  onClassDayConfigChange,
+  noClassDates,
+  onNoClassDatesChange,
   activeSchoolYearLabel,
   isSettingsLoading,
   isSchoolYearsLoading,
@@ -81,6 +94,42 @@ const Settings: React.FC<SettingsProps> = ({
   selectedSchoolYearId,
   onSchoolYearChange,
 }) => {
+  const classDayRows = [
+    { key: 'sunday', label: 'Sunday' },
+    { key: 'monday', label: 'Monday' },
+    { key: 'tuesday', label: 'Tuesday' },
+    { key: 'wednesday', label: 'Wednesday' },
+    { key: 'thursday', label: 'Thursday' },
+    { key: 'friday', label: 'Friday' },
+    { key: 'saturday', label: 'Saturday' },
+  ] as const;
+
+  const toggleClassDay = (key: keyof AttendanceClassDayConfig) => {
+    onClassDayConfigChange({
+      ...classDayConfig,
+      [key]: !classDayConfig[key],
+    });
+  };
+
+  const [noClassDateValue, setNoClassDateValue] = React.useState('');
+
+  const noClassDateItems = [...noClassDates].sort((left, right) => left.localeCompare(right));
+
+  const addNoClassDate = () => {
+    const value = noClassDateValue.trim();
+    if (!value) return;
+    if (noClassDates.includes(value)) {
+      setNoClassDateValue('');
+      return;
+    }
+    onNoClassDatesChange([...noClassDateItems, value]);
+    setNoClassDateValue('');
+  };
+
+  const removeNoClassDate = (value: string) => {
+    onNoClassDatesChange(noClassDateItems.filter((date) => date !== value));
+  };
+
   return (
     <div className="w-full space-y-8 pb-20">
       <section className="section-card">
@@ -136,6 +185,89 @@ const Settings: React.FC<SettingsProps> = ({
         {settingsError ? (
           <p className="mt-4 text-[12px] font-medium text-red-600">{settingsError}</p>
         ) : null}
+        </div>
+      </section>
+
+      <section className="section-card">
+        <div className="section-card__bar" />
+        <div className="section-card__content">
+          <div className="flex flex-col gap-2">
+            <p className="text-[11px] font-semibold uppercase tracking-normal text-gray-500">Class Day Calendar</p>
+            <h3 className="text-[12px] font-semibold text-gray-700">Mark which days have classes.</h3>
+            <p className="text-[12px] text-gray-500">
+              These days drive the teacher calendar, learner attendance service, and absent counts.
+            </p>
+          </div>
+
+          <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-7">
+            {classDayRows.map((day) => {
+              const isActive = classDayConfig[day.key];
+              return (
+                <button
+                  key={day.key}
+                  type="button"
+                  className={`attendance-class-day-toggle ${isActive ? 'attendance-class-day-toggle--active' : ''}`}
+                  onClick={() => toggleClassDay(day.key)}
+                  disabled={isSettingsLoading || isSettingsSaving}
+                  aria-pressed={isActive}
+                >
+                  <span className="attendance-class-day-toggle__label">{day.label}</span>
+                  <span className="attendance-class-day-toggle__state">{isActive ? 'Class day' : 'No class'}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="mt-6 rounded-md border border-gray-200 bg-gray-50 p-4">
+            <div className="flex flex-col gap-2">
+              <p className="text-[11px] font-semibold uppercase tracking-normal text-gray-500">Specific No-Class Dates</p>
+              <h3 className="text-[12px] font-semibold text-gray-700">Pick exact dates inside a month that have no classes.</h3>
+              <p className="text-[12px] text-gray-500">
+                These override the weekday class-day settings and stay blank in the teacher matrix, learner portal, and SF2.
+              </p>
+            </div>
+
+            <div className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+              <UsisDateTimePicker
+                ariaLabel="No-class date"
+                label="No-Class Date"
+                mode="date"
+                onChange={setNoClassDateValue}
+                showLabel={false}
+                value={noClassDateValue}
+              />
+              <button
+                type="button"
+                className="attendance-class-day-toggle attendance-class-day-toggle--active h-full min-h-[56px] px-4"
+                onClick={addNoClassDate}
+                disabled={isSettingsLoading || isSettingsSaving || !noClassDateValue.trim()}
+              >
+                <span className="attendance-class-day-toggle__label">Add Date</span>
+                <span className="attendance-class-day-toggle__state">Mark no class</span>
+              </button>
+            </div>
+
+            <div className="mt-4 flex flex-wrap gap-2">
+              {noClassDateItems.length > 0 ? (
+                noClassDateItems.map((date) => (
+                  <button
+                    key={date}
+                    type="button"
+                    className="inline-flex items-center gap-2 rounded-full border border-red-200 bg-white px-3 py-1.5 text-[12px] font-semibold text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    onClick={() => removeNoClassDate(date)}
+                    disabled={isSettingsLoading || isSettingsSaving}
+                    aria-label={`Remove no-class date ${date}`}
+                    title="Remove date"
+                  >
+                    <span>{date}</span>
+                    <span className="material-symbols-outlined text-[16px] leading-none">close</span>
+                  </button>
+                ))
+              ) : (
+                <p className="text-[12px] text-gray-500">No specific dates added yet.</p>
+              )}
+            </div>
+          </div>
         </div>
       </section>
 
@@ -290,7 +422,7 @@ const Settings: React.FC<SettingsProps> = ({
       <section className="notice-box">
         <strong>Save behavior</strong>
         <span>
-          Changes are saved to the <code>attendance_settings</code> table automatically after you edit the times or school year.
+          Changes are saved to the <code>attendance_settings</code> table automatically after you edit the times, school year, or class days.
         </span>
       </section>
     </div>

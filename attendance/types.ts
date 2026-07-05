@@ -171,6 +171,18 @@ export interface AttendanceScheduleConfig {
   };
 }
 
+export interface AttendanceClassDayConfig {
+  sunday: boolean;
+  monday: boolean;
+  tuesday: boolean;
+  wednesday: boolean;
+  thursday: boolean;
+  friday: boolean;
+  saturday: boolean;
+}
+
+export type AttendanceNoClassDateConfig = string[];
+
 export interface AttendanceDecision {
   type: AttendanceType;
   isLate: boolean;

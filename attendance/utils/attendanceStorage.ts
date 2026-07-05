@@ -8,6 +8,7 @@ const STORE_NAME = 'kv';
 const UID_MAPPINGS_KEY = 'rfid_mappings';
 const ADMIN_UIDS_KEY = 'admin_uids';
 const ATTENDANCE_LOGS_KEY = 'attendance_logs';
+const TEACHER_RANGE_CACHE_PREFIX = 'teacher_attendance_range_cache:';
 
 const openDb = (): Promise<IDBDatabase> =>
   new Promise((resolve, reject) => {
@@ -76,3 +77,22 @@ export const saveAdminUids = async (value: string[]): Promise<void> =>
 
 export const saveAttendanceLogs = async (value: AttendanceRecord[]): Promise<void> =>
   setValue(ATTENDANCE_LOGS_KEY, value);
+
+export type TeacherAttendanceRangeCache = {
+  rows: AttendanceRecord[];
+  cachedAt: number;
+  fromDate: string;
+  toDate: string;
+  learnerIds: string[];
+};
+
+export const buildTeacherAttendanceRangeCacheKey = (fromDate: string, toDate: string, learnerIds: string[]) => {
+  const scope = Array.from(new Set(learnerIds.map((value) => String(value || '').trim()).filter(Boolean))).sort().join(',');
+  return `${TEACHER_RANGE_CACHE_PREFIX}${String(fromDate || '').trim()}:${String(toDate || '').trim()}:${scope}`;
+};
+
+export const loadTeacherAttendanceRangeCache = async (cacheKey: string): Promise<TeacherAttendanceRangeCache | null> =>
+  getValue<TeacherAttendanceRangeCache>(cacheKey);
+
+export const saveTeacherAttendanceRangeCache = async (cacheKey: string, value: TeacherAttendanceRangeCache): Promise<void> =>
+  setValue(cacheKey, value);

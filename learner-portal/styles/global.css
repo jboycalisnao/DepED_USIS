@@ -2304,10 +2304,79 @@ body {
   gap: 16px;
 }
 
+.learner-attendance-service__topbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .learner-attendance-service__back-row {
   display: flex;
   align-items: center;
   justify-content: flex-start;
+}
+
+.learner-attendance-service__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.learner-attendance-service__timestamp {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid #d0d5dd;
+  border-radius: var(--learner-radius-md);
+  background: #ffffff;
+  min-width: 220px;
+}
+
+.learner-attendance-service__timestamp-label {
+  color: #667085;
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.learner-attendance-service__timestamp strong {
+  color: #18345b;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.learner-attendance-service__refresh-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid #bfd0ef;
+  border-radius: var(--learner-radius-md);
+  background: #f5f9ff;
+  color: #0f4fb8;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 0.16s ease, border-color 0.16s ease, transform 0.16s ease, opacity 0.16s ease;
+}
+
+.learner-attendance-service__refresh-button:hover:not(:disabled) {
+  background: #eaf2ff;
+  border-color: #8cb3ff;
+}
+
+.learner-attendance-service__refresh-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.68;
+}
+
+.learner-attendance-service__refresh-button .material-symbols-outlined {
+  font-size: 18px;
 }
 
 .learner-attendance-service__back-button {

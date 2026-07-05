@@ -20,6 +20,18 @@ const CACHE_SCOPE = 'attendance-history-records-v1';
 const MANILA_TIME_ZONE = 'Asia/Manila';
 const CACHE_MAX_AGE_MS = 10 * 60 * 1000;
 
+type AttendanceClassDayConfig = {
+  sunday: boolean;
+  monday: boolean;
+  tuesday: boolean;
+  wednesday: boolean;
+  thursday: boolean;
+  friday: boolean;
+  saturday: boolean;
+};
+
+type AttendanceNoClassDateConfig = string[];
+
 export type LearnerAttendanceTap = {
   type: LearnerAttendanceTapType;
   loggedAt: string;
@@ -35,6 +47,7 @@ export type LearnerAttendanceDayCell = {
   dateKey: string;
   taps: LearnerAttendanceTap[];
   unscheduledCount: number;
+  isClassDay: boolean;
 };
 
 export type LearnerAttendanceMonthRow = {
@@ -48,6 +61,8 @@ export type LearnerAttendanceSnapshot = {
   totalMonths: number;
   totalDays: number;
   totalTaps: number;
+  classDayConfig: AttendanceClassDayConfig;
+  noClassDates: AttendanceNoClassDateConfig;
 };
 
 type RawAttendanceRecordRow = {
@@ -62,17 +77,23 @@ type RawAttendanceRecordRow = {
 type AttendanceSettingsRow = {
   id: number;
   updated_at: string | null;
+  class_day_config: Partial<AttendanceClassDayConfig> | null;
+  no_class_dates: AttendanceNoClassDateConfig | null;
   schedule_config: Partial<AttendanceScheduleConfig> | null;
 };
 
 type AttendanceSettingsSnapshot = {
   scheduleConfig: AttendanceScheduleConfig;
+  classDayConfig: AttendanceClassDayConfig;
+  noClassDates: AttendanceNoClassDateConfig;
   settingsUpdatedAt: string;
 };
 
 type LearnerAttendanceContext = {
   gradeLevel: string;
   scheduleConfig: AttendanceScheduleConfig;
+  classDayConfig: AttendanceClassDayConfig;
+  noClassDates: AttendanceNoClassDateConfig;
   settingsUpdatedAt: string;
 };
 
@@ -81,11 +102,60 @@ type AttendanceCachePayload = {
   snapshot: LearnerAttendanceSnapshot;
   latestLoggedAt: string;
   gradeLevel: string;
+  classDayConfig: AttendanceClassDayConfig;
+  noClassDates: AttendanceNoClassDateConfig;
   settingsUpdatedAt: string;
   cachedAt: number;
 };
 
 const toText = (value: unknown) => String(value || '').trim();
+
+const DEFAULT_ATTENDANCE_CLASS_DAYS: AttendanceClassDayConfig = {
+  sunday: false,
+  monday: true,
+  tuesday: true,
+  wednesday: true,
+  thursday: true,
+  friday: true,
+  saturday: true,
+};
+
+const DEFAULT_ATTENDANCE_NO_CLASS_DATES: AttendanceNoClassDateConfig = [];
+
+const normalizeAttendanceClassDays = (classDays: Partial<AttendanceClassDayConfig> | null | undefined): AttendanceClassDayConfig => ({
+  sunday: classDays?.sunday ?? DEFAULT_ATTENDANCE_CLASS_DAYS.sunday,
+  monday: classDays?.monday ?? DEFAULT_ATTENDANCE_CLASS_DAYS.monday,
+  tuesday: classDays?.tuesday ?? DEFAULT_ATTENDANCE_CLASS_DAYS.tuesday,
+  wednesday: classDays?.wednesday ?? DEFAULT_ATTENDANCE_CLASS_DAYS.wednesday,
+  thursday: classDays?.thursday ?? DEFAULT_ATTENDANCE_CLASS_DAYS.thursday,
+  friday: classDays?.friday ?? DEFAULT_ATTENDANCE_CLASS_DAYS.friday,
+  saturday: classDays?.saturday ?? DEFAULT_ATTENDANCE_CLASS_DAYS.saturday,
+});
+
+const normalizeAttendanceNoClassDates = (noClassDates: unknown): AttendanceNoClassDateConfig => {
+  const values = Array.isArray(noClassDates)
+    ? noClassDates
+        .map((entry) => {
+          if (typeof entry === 'string') return entry.trim();
+          if (entry && typeof entry === 'object' && 'date' in entry && typeof (entry as { date?: unknown }).date === 'string') {
+            return (entry as { date: string }).date.trim();
+          }
+          return '';
+        })
+    : [];
+
+  return Array.from(new Set(values.filter((value) => /^\d{4}-\d{2}-\d{2}$/.test(value)).sort((left, right) => left.localeCompare(right))));
+};
+
+const isAttendanceClassDay = (dateKey: string, classDays: AttendanceClassDayConfig) => {
+  const parsed = new Date(`${dateKey}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return false;
+  const dayKey = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][parsed.getDay()] as keyof AttendanceClassDayConfig;
+  return classDays[dayKey];
+};
+
+const isAttendanceNoClassDate = (dateKey: string, noClassDates: AttendanceNoClassDateConfig) =>
+  noClassDates.includes(dateKey);
 
 const formatTimeInManila = (value: string) => {
   if (!value) return '';
@@ -216,6 +286,7 @@ const buildSnapshot = (rows: RawAttendanceRecordRow[], context: LearnerAttendanc
           dateKey,
           taps,
           unscheduledCount: taps.filter((tap) => tap.type === 'UNSCHEDULED').length,
+          isClassDay: isAttendanceClassDay(dateKey, context.classDayConfig) && !isAttendanceNoClassDate(dateKey, context.noClassDates),
         };
       });
 
@@ -241,6 +312,8 @@ const buildSnapshot = (rows: RawAttendanceRecordRow[], context: LearnerAttendanc
     totalMonths: months.length,
     totalDays,
     totalTaps,
+    classDayConfig: context.classDayConfig,
+    noClassDates: context.noClassDates,
   };
 };
 
@@ -249,6 +322,8 @@ const buildCachePayload = (rows: RawAttendanceRecordRow[], context: LearnerAtten
   snapshot: buildSnapshot(rows, context),
   latestLoggedAt: rows.length > 0 ? rows[rows.length - 1].logged_at : '',
   gradeLevel: context.gradeLevel,
+  classDayConfig: context.classDayConfig,
+  noClassDates: context.noClassDates,
   settingsUpdatedAt: context.settingsUpdatedAt,
   cachedAt: Date.now(),
 });
@@ -285,7 +360,7 @@ const fetchAttendanceRowsSince = async (learnerId: string, sinceLoggedAt: string
 const fetchAttendanceSettings = async (): Promise<AttendanceSettingsSnapshot> => {
   const { data, error } = await supabase
     .from('attendance_settings')
-    .select('id,updated_at,schedule_config')
+    .select('id,updated_at,class_day_config,no_class_dates,schedule_config')
     .eq('id', 1)
     .maybeSingle();
 
@@ -296,6 +371,8 @@ const fetchAttendanceSettings = async (): Promise<AttendanceSettingsSnapshot> =>
   const row = (data as AttendanceSettingsRow | null) || null;
   return {
     scheduleConfig: normalizeAttendanceSchedule((row?.schedule_config || DEFAULT_ATTENDANCE_SCHEDULE) as Partial<AttendanceScheduleConfig>),
+    classDayConfig: normalizeAttendanceClassDays(row?.class_day_config),
+    noClassDates: normalizeAttendanceNoClassDates(row?.no_class_dates),
     settingsUpdatedAt: toText(row?.updated_at),
   };
 };
@@ -306,6 +383,8 @@ const fetchAttendanceContext = async (input: { learnerId?: string; lrn?: string 
   return {
     gradeLevel: toText(learnerProfile.gradeLevel),
     scheduleConfig: settings.scheduleConfig,
+    classDayConfig: settings.classDayConfig,
+    noClassDates: settings.noClassDates,
     settingsUpdatedAt: settings.settingsUpdatedAt,
   };
 };
@@ -313,6 +392,8 @@ const fetchAttendanceContext = async (input: { learnerId?: string; lrn?: string 
 const contextMatchesCache = (cached: AttendanceCachePayload | null, context: LearnerAttendanceContext) =>
   !!cached &&
   cached.gradeLevel === context.gradeLevel &&
+  JSON.stringify(cached.classDayConfig) === JSON.stringify(context.classDayConfig) &&
+  JSON.stringify(cached.noClassDates) === JSON.stringify(context.noClassDates) &&
   cached.settingsUpdatedAt === context.settingsUpdatedAt;
 
 export async function fetchLearnerAttendanceSnapshot(

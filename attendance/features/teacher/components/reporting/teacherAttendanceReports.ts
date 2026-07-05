@@ -31,6 +31,25 @@ const formatPrintDate = () =>
     year: 'numeric',
   }).format(new Date());
 
+const getManilaDateKey = (value = new Date()) =>
+  new Intl.DateTimeFormat('en-CA', {
+    timeZone: MANILA_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(value);
+
+const isWeekendDateKey = (dateKey: string) => {
+  const parsed = new Date(`${dateKey}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return false;
+  const day = parsed.getDay();
+  return day === 0 || day === 6;
+};
+
+const isFutureDateKey = (dateKey: string, referenceDateKey: string) => dateKey > referenceDateKey;
+
+const isNoClassDateKey = (dateKey: string, noClassDates: string[]) => noClassDates.includes(dateKey);
+
 const normalizeGenderLabel = (gender: string | null | undefined) => {
   const normalized = String(gender || '').trim().toLowerCase();
   if (!normalized) return 'Other / Unspecified';
@@ -187,6 +206,16 @@ const buildShell = (title: string, body: string) => `
           color: var(--muted);
           font-size: 11px;
         }
+        .report__notice {
+          margin: 0 0 14px;
+          padding: 10px 12px;
+          border: 1px solid #f59e0b;
+          border-radius: 8px;
+          background: #fffbeb;
+          color: #92400e;
+          font-size: 12px;
+          font-weight: 600;
+        }
         .report__muted {
           color: var(--muted);
         }
@@ -253,6 +282,12 @@ const buildDailyRows = (rows: DailyReportRow[], scheduleConfig: AttendanceSchedu
     )
     .join('');
 
+const buildReportNotice = (message: string) => `
+  <div class="report__notice">
+    ${message}
+  </div>
+`;
+
 export const buildMonthlyAttendanceReportHtml = (sectionName: string, monthLabel: string, rows: MonthlyReportRow[]) => {
   const totalLearners = rows.length;
   const totalPresent = rows.reduce((sum, row) => sum + row.stats.presentDays, 0);
@@ -298,11 +333,13 @@ export const buildDailyAttendanceReportHtml = (
   attendanceDate: string,
   rows: DailyReportRow[],
   scheduleConfig: AttendanceScheduleConfig,
+  options?: { noClassDay?: boolean },
 ) => {
   const totalLearners = rows.length;
   const totalTaps = rows.reduce((sum, row) => sum + row.records.length, 0);
   const totalLate = rows.reduce((sum, row) => sum + row.lateCount, 0);
   const totalUnscheduled = rows.reduce((sum, row) => sum + row.unscheduledCount, 0);
+  const noClassDay = Boolean(options?.noClassDay);
 
   return buildShell(
     `${sectionName} Daily Attendance Report - ${attendanceDate}`,
@@ -313,6 +350,8 @@ export const buildDailyAttendanceReportHtml = (
         { label: 'Late Taps', value: totalLate },
         { label: 'Unscheduled', value: totalUnscheduled },
       ])}
+
+      ${noClassDay ? buildReportNotice('No class was scheduled on this day. Attendance records are shown only if they were recorded manually.') : ''}
 
       <table>
         <thead>
@@ -347,6 +386,7 @@ export const buildMonthlyAttendanceRows = (
   selectedMonth: string,
   monthDays: string[],
   scheduleConfig: AttendanceScheduleConfig,
+  noClassDates: string[] = [],
 ) =>
   sectionLearners.map((learner) => {
     const learnerRecords = learnerCards.get(String(learner.id)) || [];
@@ -367,7 +407,12 @@ export const buildMonthlyAttendanceRows = (
     let presentDays = 0;
     let lateDays = 0;
     let absentDays = 0;
+    const currentDateKey = getManilaDateKey();
     monthDays.forEach((dayKey) => {
+      if (isWeekendDateKey(dayKey) || isNoClassDateKey(dayKey, noClassDates) || isFutureDateKey(dayKey, currentDateKey)) {
+        return;
+      }
+
       const dayRecords = byDay.get(dayKey) || [];
       const hasAnyRecords = dayRecords.length > 0;
       const hasCompleteInOut = requiredSlotTypes.every((slotType) => dayRecords.some((record) => record.type === slotType));
@@ -395,21 +440,24 @@ export const buildDailyAttendanceRows = (
   records: AttendanceRecord[],
   selectedDate: string,
   scheduleConfig: AttendanceScheduleConfig,
+  noClassDates: string[] = [],
 ) =>
-  sectionLearners
-    .map((learner) => {
-      const learnerRecords = records.filter((record) => String(record.learnerId) === String(learner.id));
-      const dayRecords = learnerRecords.filter((record) => formatAttendanceDate(record.timestamp) === selectedDate);
-      const name = `${learner.last_name || ''}, ${learner.first_name || ''}`.replace(/^,\s*/, '').trim();
-      const lateCount = dayRecords.filter((record) => isAttendanceRecordLate(record, learner, scheduleConfig)).length;
-      const unscheduledCount = dayRecords.filter((record) => record.type === 'UNSCHEDULED').length;
+  isNoClassDateKey(selectedDate, noClassDates)
+    ? []
+    : sectionLearners
+        .map((learner) => {
+          const learnerRecords = records.filter((record) => String(record.learnerId) === String(learner.id));
+          const dayRecords = learnerRecords.filter((record) => formatAttendanceDate(record.timestamp) === selectedDate);
+          const name = `${learner.last_name || ''}, ${learner.first_name || ''}`.replace(/^,\s*/, '').trim();
+          const lateCount = dayRecords.filter((record) => isAttendanceRecordLate(record, learner, scheduleConfig)).length;
+          const unscheduledCount = dayRecords.filter((record) => record.type === 'UNSCHEDULED').length;
 
-      return {
-        learner,
-        name,
-        records: dayRecords,
-        lateCount,
-        unscheduledCount,
-      } satisfies DailyReportRow;
-    })
-    .filter((row) => row.records.length > 0);
+          return {
+            learner,
+            name,
+            records: dayRecords,
+            lateCount,
+            unscheduledCount,
+          } satisfies DailyReportRow;
+        })
+        .filter((row) => row.records.length > 0);

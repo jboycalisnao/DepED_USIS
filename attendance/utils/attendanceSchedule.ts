@@ -1,4 +1,12 @@
-import type { AttendanceDecision, AttendanceRecord, AttendanceScheduleConfig, AttendanceType, Learner } from '../types';
+import type {
+  AttendanceClassDayConfig,
+  AttendanceDecision,
+  AttendanceRecord,
+  AttendanceScheduleConfig,
+  AttendanceType,
+  AttendanceNoClassDateConfig,
+  Learner,
+} from '../types';
 
 const timeToMinutes = (value: string) => {
   const [hours, minutes] = String(value || '')
@@ -44,6 +52,86 @@ const bandLabel = (band: AttendanceDecision['gradeBand']) => {
 };
 
 const defaultRange = 'Database policy active';
+
+export const DEFAULT_ATTENDANCE_CLASS_DAYS: AttendanceClassDayConfig = {
+  sunday: false,
+  monday: true,
+  tuesday: true,
+  wednesday: true,
+  thursday: true,
+  friday: true,
+  saturday: true,
+};
+
+const classDayKeys = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const;
+const MANILA_TIME_ZONE = 'Asia/Manila';
+
+const toManilaDateKey = (value: Date | string) => {
+  const candidate = typeof value === 'string' ? new Date(`${value}T00:00:00`) : new Date(value);
+  if (Number.isNaN(candidate.getTime())) return '';
+
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: MANILA_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(candidate);
+};
+
+export const normalizeAttendanceClassDays = (
+  classDays: Partial<AttendanceClassDayConfig> | null | undefined,
+): AttendanceClassDayConfig => ({
+  sunday: classDays?.sunday ?? DEFAULT_ATTENDANCE_CLASS_DAYS.sunday,
+  monday: classDays?.monday ?? DEFAULT_ATTENDANCE_CLASS_DAYS.monday,
+  tuesday: classDays?.tuesday ?? DEFAULT_ATTENDANCE_CLASS_DAYS.tuesday,
+  wednesday: classDays?.wednesday ?? DEFAULT_ATTENDANCE_CLASS_DAYS.wednesday,
+  thursday: classDays?.thursday ?? DEFAULT_ATTENDANCE_CLASS_DAYS.thursday,
+  friday: classDays?.friday ?? DEFAULT_ATTENDANCE_CLASS_DAYS.friday,
+  saturday: classDays?.saturday ?? DEFAULT_ATTENDANCE_CLASS_DAYS.saturday,
+});
+
+export const DEFAULT_ATTENDANCE_NO_CLASS_DATES: AttendanceNoClassDateConfig = [];
+
+export const normalizeAttendanceNoClassDates = (
+  noClassDates: unknown,
+): AttendanceNoClassDateConfig => {
+  const rawDates =
+    Array.isArray(noClassDates)
+      ? noClassDates
+          .map((entry) => {
+            if (typeof entry === 'string') return entry.trim();
+            if (entry && typeof entry === 'object' && 'date' in entry && typeof (entry as { date?: unknown }).date === 'string') {
+              return (entry as { date: string }).date.trim();
+            }
+            return '';
+          })
+      : [];
+
+  return Array.from(
+    new Set(
+      rawDates
+        .map((value) => toManilaDateKey(value))
+        .filter((value) => /^\d{4}-\d{2}-\d{2}$/.test(value)),
+    ),
+  ).sort((left, right) => left.localeCompare(right));
+};
+
+export const isAttendanceClassDay = (date: Date | string, classDays: AttendanceClassDayConfig = DEFAULT_ATTENDANCE_CLASS_DAYS) => {
+  const candidate = typeof date === 'string' ? new Date(`${date}T00:00:00`) : new Date(date);
+  if (Number.isNaN(candidate.getTime())) return false;
+  const dayKey = classDayKeys[candidate.getDay()];
+  if (dayKey === 'sunday' || dayKey === 'saturday') return false;
+  return classDays[dayKey];
+};
+
+export const isAttendanceNoClassDate = (
+  date: Date | string,
+  noClassDates: AttendanceNoClassDateConfig = DEFAULT_ATTENDANCE_NO_CLASS_DATES,
+) => {
+  const dateKey = toManilaDateKey(date);
+  if (!dateKey) return false;
+  return noClassDates.includes(dateKey);
+};
 
 export const DEFAULT_ATTENDANCE_SCHEDULE: AttendanceScheduleConfig = {
   grade7To10: {

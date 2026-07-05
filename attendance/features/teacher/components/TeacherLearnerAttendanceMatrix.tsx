@@ -1,18 +1,27 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AttendanceRecord, AttendanceScheduleConfig, Learner } from '../../../types';
-import { isAttendanceRecordLate, normalizeGradeBand } from '../../../utils/attendanceSchedule';
+import { AttendanceClassDayConfig, AttendanceRecord, AttendanceScheduleConfig, Learner } from '../../../types';
+import {
+  isAttendanceClassDay,
+  isAttendanceRecordLate,
+  isAttendanceNoClassDate,
+  normalizeGradeBand,
+} from '../../../utils/attendanceSchedule';
 import { UsisSearchableSelect } from '../../../../common/components/ui/UsisSearchableSelect';
 import { UsisDateTimePicker } from '../../../../common/components/ui/UsisDateTimePicker';
 import {
   buildDailyAttendanceReportHtml,
   buildDailyAttendanceRows,
-  buildMonthlyAttendanceReportHtml,
 } from './reporting/teacherAttendanceReports';
+import { buildSf2MonthlyAttendanceWorkbook } from './reporting/sf2MonthlyReport';
+import type { TeacherAttendanceAccessRecord } from '../../auth/utils/teacherAttendanceAccess';
 
 type Props = {
-  accessLabel: string;
+  access: TeacherAttendanceAccessRecord;
+  schoolYearLabel: string;
   learners: Learner[];
   scheduleConfig: AttendanceScheduleConfig;
+  classDayConfig: AttendanceClassDayConfig;
+  noClassDates: string[];
   queryAttendanceRecordsByRange: (fromDate: string, toDate: string, learnerIds?: string[]) => Promise<AttendanceRecord[]>;
   onLogout: () => void;
 };
@@ -24,6 +33,7 @@ type LearnerMatrixDay = {
   day: number;
   dateKey: string;
   taps: AttendanceRecord[];
+  isClassDay: boolean;
 };
 
 type LearnerMatrixMonth = {
@@ -38,11 +48,25 @@ type LearnerMonthStats = {
   absentDays: number;
 };
 
+type LearnerAttendanceAlertState = {
+  hasAlert: boolean;
+  consecutiveCount: number;
+  label: string;
+  detail: string;
+  tone: 'danger' | 'warning';
+};
+
+type LearnerAttendanceAlertBundle = {
+  absent: LearnerAttendanceAlertState;
+  late: LearnerAttendanceAlertState;
+};
+
 type LearnerReportRow = {
   learner: Learner;
   name: string;
   monthRecords: AttendanceRecord[];
   stats: LearnerMonthStats;
+  alerts: LearnerAttendanceAlertBundle;
 };
 
 const getCurrentMonthKey = () => {
@@ -77,6 +101,14 @@ const formatAttendanceMonth = (timestamp: string) => formatAttendanceDate(timest
 
 const formatTime = (timestamp: string) => new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
+const getManilaDateKey = (value = new Date()) =>
+  new Intl.DateTimeFormat('en-CA', {
+    timeZone: MANILA_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(value);
+
 const monthLabelFromKey = (monthKey: string) => {
   const parsed = new Date(`${monthKey}-01T00:00:00`);
   if (Number.isNaN(parsed.getTime())) return monthKey;
@@ -84,14 +116,124 @@ const monthLabelFromKey = (monthKey: string) => {
 };
 
 const todayIso = () => {
-  const now = new Date();
-  const yyyy = now.getFullYear();
-  const mm = `${now.getMonth() + 1}`.padStart(2, '0');
-  const dd = `${now.getDate()}`.padStart(2, '0');
-  return `${yyyy}-${mm}-${dd}`;
+  return getManilaDateKey();
 };
 
-const buildMonthMatrix = (monthKey: string, records: AttendanceRecord[]): LearnerMatrixMonth => {
+const isFutureDateKey = (dateKey: string, referenceDateKey: string) => dateKey > referenceDateKey;
+
+const toManilaDate = (dateKey: string) => new Date(`${dateKey}T00:00:00+08:00`);
+
+const diffInDays = (leftDateKey: string, rightDateKey: string) =>
+  Math.abs(Math.round((toManilaDate(rightDateKey).getTime() - toManilaDate(leftDateKey).getTime()) / 86400000));
+
+const getLearnerMonthDayStatus = (
+  dayRecords: AttendanceRecord[],
+  learner: Learner,
+  scheduleConfig: AttendanceScheduleConfig,
+) => {
+  if (dayRecords.length === 0) return 'absent' as const;
+
+  const gradeBand = normalizeGradeBand(String(learner.grade_level || ''));
+  const requiredSlotTypes =
+    gradeBand === 'grade11' ? (['AM_IN', 'AM_OUT'] as const) : gradeBand === 'grade12' ? (['PM_IN', 'PM_OUT'] as const) : SLOT_TYPES;
+  const hasLate = dayRecords.some((record) => isAttendanceRecordLate(record, learner, scheduleConfig));
+  const hasCompleteInOut = requiredSlotTypes.every((slotType) => dayRecords.some((record) => record.type === slotType));
+
+  if (hasLate) return 'late' as const;
+  if (!hasCompleteInOut) return 'incomplete' as const;
+  return 'present' as const;
+};
+
+const calculateAttendanceAlert = (
+  monthDays: LearnerMatrixDay[],
+  learnerMonthRecords: AttendanceRecord[],
+  learner: Learner,
+  scheduleConfig: AttendanceScheduleConfig,
+  targetStatus: 'absent' | 'late',
+  label: string,
+  tone: 'danger' | 'warning',
+): LearnerAttendanceAlertState => {
+  const byDay = new Map<string, AttendanceRecord[]>();
+  learnerMonthRecords.forEach((record) => {
+    const dayKey = formatAttendanceDate(record.timestamp);
+    const list = byDay.get(dayKey) || [];
+    list.push(record);
+    byDay.set(dayKey, list);
+  });
+
+  const currentDateKey = todayIso();
+  const orderedDays = monthDays
+    .filter((day) => day.isClassDay && !isFutureDateKey(day.dateKey, currentDateKey))
+    .slice()
+    .sort((left, right) => left.dateKey.localeCompare(right.dateKey));
+
+  let consecutiveCount = 0;
+  let lastAttendanceEvidence: string | null = null;
+
+  for (const day of orderedDays) {
+    const dayRecords = byDay.get(day.dateKey) || [];
+    const hasRecords = dayRecords.length > 0;
+    const status = getLearnerMonthDayStatus(dayRecords, learner, scheduleConfig);
+    const isAlertDay = status === targetStatus;
+
+    if (hasRecords) {
+      lastAttendanceEvidence = day.dateKey;
+    }
+
+    if (!isAlertDay) {
+      if (status === 'present') {
+        consecutiveCount = 0;
+      }
+      continue;
+    }
+
+    if (!lastAttendanceEvidence) {
+      consecutiveCount = 0;
+      continue;
+    }
+
+    if (diffInDays(lastAttendanceEvidence, day.dateKey) > 7) {
+      consecutiveCount = 0;
+      continue;
+    }
+
+    consecutiveCount += 1;
+    if (consecutiveCount >= 3) {
+      return {
+        hasAlert: true,
+        consecutiveCount,
+        label,
+        detail: `${consecutiveCount} consecutive ${targetStatus} days`,
+        tone,
+      };
+    }
+  }
+
+  return {
+    hasAlert: false,
+    consecutiveCount: 0,
+    label: '',
+    detail: '',
+    tone,
+  };
+};
+
+const calculateAttendanceAlerts = (
+  monthDays: LearnerMatrixDay[],
+  learnerMonthRecords: AttendanceRecord[],
+  learner: Learner,
+  scheduleConfig: AttendanceScheduleConfig,
+): LearnerAttendanceAlertBundle => ({
+  absent: calculateAttendanceAlert(monthDays, learnerMonthRecords, learner, scheduleConfig, 'absent', 'Absent Alert', 'danger'),
+  late: calculateAttendanceAlert(monthDays, learnerMonthRecords, learner, scheduleConfig, 'late', 'Tardy Alert', 'warning'),
+});
+
+const buildMonthMatrix = (
+  monthKey: string,
+  records: AttendanceRecord[],
+  classDayConfig: AttendanceClassDayConfig,
+  noClassDates: string[],
+): LearnerMatrixMonth => {
   const daysByKey = new Map<string, AttendanceRecord[]>();
   records
     .filter((record) => formatAttendanceMonth(record.timestamp) === monthKey)
@@ -114,9 +256,11 @@ const buildMonthMatrix = (monthKey: string, records: AttendanceRecord[]): Learne
     const mm = String(cursor.getMonth() + 1).padStart(2, '0');
     const dd = String(cursor.getDate()).padStart(2, '0');
     const dateKey = `${yyyy}-${mm}-${dd}`;
+    const isClassDay = isAttendanceClassDay(dateKey, classDayConfig) && !isAttendanceNoClassDate(dateKey, noClassDates);
     days.push({
       day: cursor.getDate(),
       dateKey,
+      isClassDay,
       taps: (daysByKey.get(dateKey) || []).slice().sort((left, right) => new Date(left.timestamp).getTime() - new Date(right.timestamp).getTime()),
     });
     cursor.setDate(cursor.getDate() + 1);
@@ -166,8 +310,13 @@ const buildLearnerMonthStats = (
   let presentDays = 0;
   let lateDays = 0;
   let absentDays = 0;
+  const currentDateKey = todayIso();
 
   monthDays.forEach((day) => {
+    if (!day.isClassDay || isFutureDateKey(day.dateKey, currentDateKey)) {
+      return;
+    }
+
     const dayRecords = byDay.get(day.dateKey) || [];
     const hasAnyRecords = dayRecords.length > 0;
     const hasCompleteInOut = requiredSlotTypes.every((slotType) => dayRecords.some((record) => record.type === slotType));
@@ -202,9 +351,12 @@ const groupLearnersByGender = (learners: Learner[]) => {
 };
 
 export default function TeacherLearnerAttendanceMatrix({
-  accessLabel,
+  access,
+  schoolYearLabel,
   learners,
   scheduleConfig,
+  classDayConfig,
+  noClassDates,
   queryAttendanceRecordsByRange,
   onLogout,
 }: Props) {
@@ -215,6 +367,8 @@ export default function TeacherLearnerAttendanceMatrix({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isPrintingDailyReport, setIsPrintingDailyReport] = useState(false);
+  const [isDownloadingSf2, setIsDownloadingSf2] = useState(false);
+  const [reportError, setReportError] = useState<string | null>(null);
 
   const sectionLearners = useMemo(
     () =>
@@ -270,7 +424,10 @@ export default function TeacherLearnerAttendanceMatrix({
     () => (availableMonths.length > 0 ? buildMonthOptions(availableMonths) : [{ value: selectedMonth, label: formatMonthLabel(selectedMonth) }]),
     [availableMonths, selectedMonth],
   );
-  const selectedMonthMatrix = useMemo(() => buildMonthMatrix(selectedMonth, records), [records, selectedMonth]);
+  const selectedMonthMatrix = useMemo(
+    () => buildMonthMatrix(selectedMonth, records, classDayConfig, noClassDates),
+    [classDayConfig, noClassDates, records, selectedMonth],
+  );
   const learnerIds = useMemo(() => new Set(sectionLearners.map((learner) => String(learner.id))), [sectionLearners]);
   const filteredLearners = useMemo(() => {
     const query = searchValue.trim().toLowerCase();
@@ -310,6 +467,7 @@ export default function TeacherLearnerAttendanceMatrix({
           name,
           monthRecords: learnerMonthRecords,
           stats,
+          alerts: calculateAttendanceAlerts(selectedMonthMatrix.days, learnerMonthRecords, learner, scheduleConfig),
         };
       }),
     [learnerCards, scheduleConfig, sectionLearners, selectedMonth, selectedMonthMatrix.days],
@@ -351,30 +509,58 @@ export default function TeacherLearnerAttendanceMatrix({
     document.body.appendChild(iframe);
   };
 
-  const handleCreateMonthlyReport = () => {
-    const html = buildMonthlyAttendanceReportHtml(
-      sectionLearners[0]?.section_name || accessLabel,
-      selectedMonthMatrix.monthLabel,
-      reportRows,
-    );
-    triggerPrint(html, `${selectedMonthMatrix.monthLabel} attendance report`);
+  const handleCreateMonthlyReport = async () => {
+    setIsDownloadingSf2(true);
+    setReportError(null);
+    try {
+      const output = await buildSf2MonthlyAttendanceWorkbook({
+        schoolId: access.schoolId || '',
+        schoolName: access.schoolName || '',
+        schoolYearLabel: schoolYearLabel || '',
+        sectionName: access.sectionName || sectionLearners[0]?.section_name || 'Section',
+        sectionGradeLevel: access.sectionGradeLevel || sectionLearners[0]?.grade_level || '',
+        monthKey: selectedMonth,
+        monthLabel: selectedMonthMatrix.monthLabel,
+        days: selectedMonthMatrix.days,
+        rows: reportRows,
+        scheduleConfig,
+      });
+
+      const blob = new Blob([output.buffer], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = output.fileName;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (downloadError: any) {
+      setReportError(downloadError?.message || 'Unable to generate the SF2 workbook.');
+    } finally {
+      setIsDownloadingSf2(false);
+    }
   };
 
   const handleCreateDailyReport = async () => {
     if (!selectedDailyDate) return;
     setIsPrintingDailyReport(true);
     try {
+      const isNoClassDay = noClassDates.includes(selectedDailyDate);
       const dailyRecords = await queryAttendanceRecordsByRange(
         selectedDailyDate,
         selectedDailyDate,
         sectionLearners.map((learner) => String(learner.id)),
       );
-      const dailyRows = buildDailyAttendanceRows(sectionLearners, dailyRecords, selectedDailyDate, scheduleConfig);
+      const dailyRows = buildDailyAttendanceRows(sectionLearners, dailyRecords, selectedDailyDate, scheduleConfig, noClassDates);
       const html = buildDailyAttendanceReportHtml(
-        sectionLearners[0]?.section_name || accessLabel,
+        sectionLearners[0]?.section_name || access.sectionName,
         selectedDailyDate,
         dailyRows,
         scheduleConfig,
+        { noClassDay: isNoClassDay },
       );
       triggerPrint(html, `${selectedDailyDate} attendance report`);
     } finally {
@@ -408,12 +594,17 @@ export default function TeacherLearnerAttendanceMatrix({
           <div className="attendance-teacher-matrix__title-block">
             <div className="attendance-teacher-matrix__title-copy">
               <p className="attendance-teacher-matrix__eyebrow">Teacher Access</p>
-              <h1>{accessLabel}</h1>
+              <h1>{access.sectionName} attendance matrix</h1>
               <p>Learners are listed individually. Expanding a learner shows the monthly attendance matrix.</p>
             </div>
             <div className="attendance-teacher-matrix__title-actions">
-              <button type="button" className="secondary-button rounded-md attendance-teacher-matrix__report-btn" onClick={handleCreateMonthlyReport}>
-                Print Monthly Report
+              <button
+                type="button"
+                className="secondary-button rounded-md attendance-teacher-matrix__report-btn"
+                onClick={() => void handleCreateMonthlyReport()}
+                disabled={isDownloadingSf2}
+              >
+                {isDownloadingSf2 ? 'Preparing SF2...' : 'Download SF2'}
               </button>
               <UsisDateTimePicker
                 ariaLabel="Report Date"
@@ -476,6 +667,7 @@ export default function TeacherLearnerAttendanceMatrix({
 
         {isLoading ? <p className="attendance-teacher-matrix__state">Loading attendance records.</p> : null}
         {error ? <p className="attendance-teacher-matrix__state attendance-teacher-matrix__state--error">{error}</p> : null}
+        {reportError ? <p className="attendance-teacher-matrix__state attendance-teacher-matrix__state--error">{reportError}</p> : null}
 
         <div className="attendance-teacher-matrix__learner-list">
           {sectionLearners.length === 0 ? (
@@ -502,6 +694,7 @@ export default function TeacherLearnerAttendanceMatrix({
                     const learnerMonthRecords = learnerRecords.filter((record) => formatAttendanceMonth(record.timestamp) === selectedMonth);
                     const fullName = `${learner.last_name || ''}, ${learner.first_name || ''}`.replace(/^,\s*/, '').trim();
                     const stats = buildLearnerMonthStats(learnerMonthRecords, learner, scheduleConfig, selectedMonthMatrix.days);
+                    const alerts = calculateAttendanceAlerts(selectedMonthMatrix.days, learnerMonthRecords, learner, scheduleConfig);
 
                     return (
                       <details key={learner.id} className="attendance-teacher-matrix__learner-card rounded-md">
@@ -513,6 +706,34 @@ export default function TeacherLearnerAttendanceMatrix({
                             </span>
                           </div>
                           <div className="attendance-teacher-matrix__learner-summary-meta">
+                            {alerts.absent.hasAlert ? (
+                              <span
+                                className="attendance-teacher-matrix__alert-card attendance-teacher-matrix__alert-card--danger"
+                                title={alerts.absent.detail}
+                              >
+                                <span className="material-symbols-outlined attendance-teacher-matrix__alert-icon" aria-hidden="true">
+                                  warning
+                                </span>
+                                <span className="attendance-teacher-matrix__alert-copy">
+                                  <strong>{alerts.absent.label}</strong>
+                                  <span>{alerts.absent.detail}</span>
+                                </span>
+                              </span>
+                            ) : null}
+                            {alerts.late.hasAlert ? (
+                              <span
+                                className="attendance-teacher-matrix__alert-card attendance-teacher-matrix__alert-card--warning"
+                                title={alerts.late.detail}
+                              >
+                                <span className="material-symbols-outlined attendance-teacher-matrix__alert-icon" aria-hidden="true">
+                                  schedule
+                                </span>
+                                <span className="attendance-teacher-matrix__alert-copy">
+                                  <strong>{alerts.late.label}</strong>
+                                  <span>{alerts.late.detail}</span>
+                                </span>
+                              </span>
+                            ) : null}
                             <span className="attendance-teacher-matrix__meta-pill">Present: {stats.presentDays}</span>
                             <span className="attendance-teacher-matrix__meta-pill">Late: {stats.lateDays}</span>
                             <span className="attendance-teacher-matrix__meta-pill">Absent: {stats.absentDays}</span>
@@ -535,7 +756,11 @@ export default function TeacherLearnerAttendanceMatrix({
                                   <th>Month</th>
                                   <th>Type</th>
                                   {selectedMonthMatrix.days.map((day) => (
-                                    <th key={day.dateKey} title={`Day ${day.day}`}>
+                                    <th
+                                      key={day.dateKey}
+                                      title={`Day ${day.day}`}
+                                      className={day.isClassDay ? 'attendance-teacher-matrix__day-head' : 'attendance-teacher-matrix__day-head attendance-teacher-matrix__day-head--no-class'}
+                                    >
                                       {day.day}
                                     </th>
                                   ))}
@@ -567,10 +792,12 @@ export default function TeacherLearnerAttendanceMatrix({
                                         return (
                                           <td
                                             key={`${learner.id}-${selectedMonth}-${day.dateKey}-${slotType}`}
-                                            className={`attendance-teacher-matrix__day-cell attendance-teacher-matrix__day-cell--${slotType.toLowerCase()} ${hasLate ? 'attendance-teacher-matrix__day-cell--late' : ''}`}
+                                            className={`attendance-teacher-matrix__day-cell attendance-teacher-matrix__day-cell--${slotType.toLowerCase()} ${day.isClassDay ? '' : 'attendance-teacher-matrix__day-cell--no-class'} ${hasLate ? 'attendance-teacher-matrix__day-cell--late' : ''}`}
                                           >
                                             <div className="attendance-teacher-matrix__tap-list">
-                                              {taps.length > 0 ? (
+                                              {!day.isClassDay ? (
+                                                <span className="attendance-teacher-matrix__tap-empty">No Class</span>
+                                              ) : taps.length > 0 ? (
                                                 taps.map((tap, tapIndex) => renderTapChip(tap, day.dateKey, tapIndex))
                                               ) : (
                                                 <span className="attendance-teacher-matrix__tap-empty">-</span>

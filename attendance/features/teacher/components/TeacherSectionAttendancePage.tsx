@@ -1,4 +1,4 @@
-import { AttendanceScheduleConfig, Learner } from '../../../types';
+import { AttendanceClassDayConfig, AttendanceScheduleConfig, Learner } from '../../../types';
 import { UsisGlobalFooter } from '../../../../common/footer/UsisGlobalFooter';
 import { UsisUnifiedHeader } from '../../../../common/header/UsisUnifiedHeader';
 import TeacherLearnerAttendanceMatrix from './TeacherLearnerAttendanceMatrix';
@@ -6,8 +6,11 @@ import type { TeacherAttendanceAccessRecord } from '../../auth/utils/teacherAtte
 
 type Props = {
   access: TeacherAttendanceAccessRecord;
+  schoolYearLabel: string;
   learners: Learner[];
   scheduleConfig: AttendanceScheduleConfig;
+  classDayConfig: AttendanceClassDayConfig;
+  noClassDates: string[];
   onLogout: () => void;
   queryAttendanceRecordsByRange: (fromDate: string, toDate: string, learnerIds?: string[]) => Promise<
     Array<{
@@ -22,8 +25,11 @@ type Props = {
 
 export default function TeacherSectionAttendancePage({
   access,
+  schoolYearLabel,
   learners,
   scheduleConfig,
+  classDayConfig,
+  noClassDates,
   onLogout,
   queryAttendanceRecordsByRange,
 }: Props) {
@@ -46,9 +52,12 @@ export default function TeacherSectionAttendancePage({
         <div className="content-width">
           <section className="section-shell attendance-login">
             <TeacherLearnerAttendanceMatrix
-              accessLabel={`${access.sectionName} attendance matrix`}
+              access={access}
+              schoolYearLabel={schoolYearLabel}
               learners={sectionLearners}
               scheduleConfig={scheduleConfig}
+              classDayConfig={classDayConfig}
+              noClassDates={noClassDates}
               queryAttendanceRecordsByRange={queryAttendanceRecordsByRange}
               onLogout={onLogout}
             />

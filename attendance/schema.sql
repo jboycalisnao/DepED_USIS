@@ -13,6 +13,16 @@ create index if not exists idx_registrar_learners_rfid
 create table if not exists public.attendance_settings (
   id smallint primary key default 1 check (id = 1),
   selected_school_year_id text null references public.registrar_school_years(id) on update cascade on delete set null,
+  class_day_config jsonb not null default '{
+    "sunday": false,
+    "monday": true,
+    "tuesday": true,
+    "wednesday": true,
+    "thursday": true,
+    "friday": true,
+    "saturday": true
+  }'::jsonb,
+  no_class_dates jsonb not null default '[]'::jsonb,
   schedule_config jsonb not null default '{
     "grade7To10": {
       "amIn": { "in": { "start": "05:00", "end": "07:30" }, "lateAfter": "07:30" },
@@ -94,12 +104,24 @@ alter table public.attendance_records
 insert into public.attendance_settings (
   id,
   selected_school_year_id,
+  class_day_config,
+  no_class_dates,
   schedule_config,
   updated_at
 )
 values (
   1,
   null,
+  '{
+    "sunday": false,
+    "monday": true,
+    "tuesday": true,
+    "wednesday": true,
+    "thursday": true,
+    "friday": true,
+    "saturday": true
+  }'::jsonb,
+  '[]'::jsonb,
   '{
     "grade7To10": {
       "amIn": { "in": { "start": "05:00", "end": "07:30" }, "lateAfter": "07:30" },
@@ -120,6 +142,8 @@ values (
 )
 on conflict (id) do update set
   selected_school_year_id = excluded.selected_school_year_id,
+  class_day_config = excluded.class_day_config,
+  no_class_dates = excluded.no_class_dates,
   schedule_config = excluded.schedule_config,
   updated_at = now();
 

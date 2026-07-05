@@ -18,32 +18,65 @@ export function AttendanceServicePage({ session }: AttendanceServicePageProps) {
     totalMonths: 0,
     totalDays: 0,
     totalTaps: 0,
+    classDayConfig: {
+      sunday: false,
+      monday: true,
+      tuesday: true,
+      wednesday: true,
+      thursday: true,
+      friday: true,
+      saturday: true,
+    },
+    noClassDates: [],
   });
   const [gradeLevel, setGradeLevel] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastLoadedAt, setLastLoadedAt] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
+
+  const runLoad = async (options?: { forceRefresh?: boolean }) => {
+    const forceRefresh = options?.forceRefresh === true;
+    if (forceRefresh) {
+      setIsRefreshing(true);
+    } else {
+      setIsLoading(true);
+    }
+    setError(null);
+    try {
+      const [nextSnapshot, profile] = await Promise.all([
+        fetchLearnerAttendanceSnapshot({ learnerId: session.learnerId, lrn: session.lrn }, { forceRefresh }),
+        fetchLearnerProfile({ learnerId: session.learnerId, lrn: session.lrn }),
+      ]);
+      setSnapshot(nextSnapshot);
+      setGradeLevel(profile.gradeLevel || '');
+      setLastLoadedAt(new Date().toLocaleString('en-PH', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      }));
+    } catch (fetchError: any) {
+      setError(fetchError?.message || 'Unable to load attendance records.');
+    } finally {
+      if (forceRefresh) {
+        setIsRefreshing(false);
+      } else {
+        setIsLoading(false);
+      }
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
 
     const run = async () => {
-      setIsLoading(true);
-      setError(null);
-      try {
-        const [nextSnapshot, profile] = await Promise.all([
-          fetchLearnerAttendanceSnapshot({ learnerId: session.learnerId, lrn: session.lrn }),
-          fetchLearnerProfile({ learnerId: session.learnerId, lrn: session.lrn }),
-        ]);
-        if (!cancelled) setSnapshot(nextSnapshot);
-        if (!cancelled) setGradeLevel(profile.gradeLevel || '');
-      } catch (fetchError: any) {
-        if (!cancelled) setError(fetchError?.message || 'Unable to load attendance records.');
-      } finally {
-        if (!cancelled) setIsLoading(false);
-      }
+      if (cancelled) return;
+      await runLoad();
     };
 
-    run();
+    void run();
     return () => {
       cancelled = true;
     };
@@ -51,13 +84,33 @@ export function AttendanceServicePage({ session }: AttendanceServicePageProps) {
 
   return (
     <section className="section-shell learner-attendance-service" aria-label="Monthly attendance records">
-      <div className="learner-attendance-service__back-row">
-        <Link to="/services" className="learner-attendance-service__back-button">
-          <span className="material-symbols-outlined" aria-hidden="true">
-            chevron_left
-          </span>
-          Back to Services
-        </Link>
+      <div className="learner-attendance-service__topbar">
+        <div className="learner-attendance-service__back-row">
+          <Link to="/services" className="learner-attendance-service__back-button">
+            <span className="material-symbols-outlined" aria-hidden="true">
+              chevron_left
+            </span>
+            Back to Services
+          </Link>
+        </div>
+
+        <div className="learner-attendance-service__actions">
+          <div className="learner-attendance-service__timestamp">
+            <span className="learner-attendance-service__timestamp-label">Last loaded from database</span>
+            <strong>{lastLoadedAt || 'Not loaded yet'}</strong>
+          </div>
+          <button
+            type="button"
+            className="learner-attendance-service__refresh-button"
+            onClick={() => void runLoad({ forceRefresh: true })}
+            disabled={isLoading || isRefreshing}
+          >
+            <span className="material-symbols-outlined" aria-hidden="true">
+              sync
+            </span>
+            {isRefreshing ? 'Refreshing...' : 'Refresh Records'}
+          </button>
+        </div>
       </div>
 
       {isLoading ? <p className="learner-services-history__state">Loading consolidated attendance history.</p> : null}
@@ -67,7 +120,12 @@ export function AttendanceServicePage({ session }: AttendanceServicePageProps) {
       ) : null}
 
       {!isLoading && !error && snapshot.months.length > 0 ? (
-        <MonthlyAttendanceTable months={snapshot.months} gradeLevel={gradeLevel} />
+        <MonthlyAttendanceTable
+          months={snapshot.months}
+          gradeLevel={gradeLevel}
+          classDayConfig={snapshot.classDayConfig}
+          noClassDates={snapshot.noClassDates}
+        />
       ) : null}
     </section>
   );

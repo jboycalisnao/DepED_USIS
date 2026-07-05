@@ -168,6 +168,7 @@ export function UsisDateTimePicker({
     return parsed?.minutes ?? 0;
   });
   const [popoverPosition, setPopoverPosition] = useState<{ left: number; top: number }>({ left: 0, top: 0 });
+  const [popoverPlacement, setPopoverPlacement] = useState<'bottom' | 'top'>('bottom');
   const [guidedInputValue, setGuidedInputValue] = useState(() => (useCustomCalendar ? formatDateDisplay(value) : value));
 
   const selectedDate = useMemo(() => parseDateValue(value), [value]);
@@ -303,11 +304,18 @@ export function UsisDateTimePicker({
       const controlRect = controlRef.current?.getBoundingClientRect();
       if (!controlRect) return;
       const popoverWidth = useCustomTimePicker ? 352 : 292;
+      const popoverHeight = useCustomTimePicker ? 420 : 480;
       const viewportPadding = 8;
       const maxLeft = Math.max(viewportPadding, window.innerWidth - popoverWidth - viewportPadding);
       const desiredLeft = Math.min(controlRect.right - popoverWidth, maxLeft);
       const left = Math.max(viewportPadding, desiredLeft);
-      const top = controlRect.bottom + 8;
+      const spaceBelow = window.innerHeight - controlRect.bottom - viewportPadding;
+      const spaceAbove = controlRect.top - viewportPadding;
+      const openUpward = spaceBelow < popoverHeight && spaceAbove > spaceBelow;
+      const top = openUpward
+        ? Math.max(viewportPadding, controlRect.top - popoverHeight - 8)
+        : Math.min(window.innerHeight - popoverHeight - viewportPadding, controlRect.bottom + 8);
+      setPopoverPlacement(openUpward ? 'top' : 'bottom');
       setPopoverPosition({ left, top });
     };
     updatePosition();
@@ -550,6 +558,7 @@ export function UsisDateTimePicker({
                 className="usis-calendar-popover usis-time-popover usis-calendar-popover--portal"
                 role="dialog"
                 aria-label={`${fieldLabel} time picker`}
+                data-placement={popoverPlacement}
                 style={{ left: `${popoverPosition.left}px`, top: `${popoverPosition.top}px` }}
               >
                 <div className="usis-time-popover__header">

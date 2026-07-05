@@ -12,8 +12,11 @@ import { normalizeRfidValue } from '../utils/rfid';
 import { supabase } from '@deped-usis/shared-supabase';
 import {
   loadAttendanceLocalState,
+  loadTeacherAttendanceRangeCache,
+  buildTeacherAttendanceRangeCacheKey,
   saveAdminUids,
   saveAttendanceLogs,
+  saveTeacherAttendanceRangeCache,
   saveUidMappings,
 } from '../utils/attendanceStorage';
 
@@ -564,6 +567,12 @@ export const useAttendance = () => {
       const endDate = String(toDate || '').trim();
       if (!startDate || !endDate) return [];
 
+      const cacheKey = buildTeacherAttendanceRangeCacheKey(startDate, endDate, learnerIds);
+      const cached = await loadTeacherAttendanceRangeCache(cacheKey);
+      if (cached?.rows?.length) {
+        return [...cached.rows].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      }
+
       const startTimestamp = new Date(`${startDate}T00:00:00+08:00`).toISOString();
       const endTimestamp = new Date(`${endDate}T23:59:59.999+08:00`).toISOString();
 
@@ -584,13 +593,23 @@ export const useAttendance = () => {
         throw error;
       }
 
-      return (data || []).map((row: any) => ({
+      const rows = (data || []).map((row: any) => ({
         id: String(row.id || ''),
         learnerId: String(row.learner_id || ''),
         type: row.attendance_type as AttendanceType,
         timestamp: String(row.logged_at || ''),
         synced: true,
       }));
+
+      await saveTeacherAttendanceRangeCache(cacheKey, {
+        rows,
+        cachedAt: Date.now(),
+        fromDate: startDate,
+        toDate: endDate,
+        learnerIds: Array.from(new Set(learnerIds.map((id) => String(id || '').trim()).filter(Boolean))).sort(),
+      });
+
+      return rows;
     },
     [],
   );

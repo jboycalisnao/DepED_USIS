@@ -1950,6 +1950,74 @@ body {
   justify-content: flex-end;
 }
 
+.attendance-teacher-matrix__alert-card {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-height: 34px;
+  max-width: 280px;
+  padding: 6px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(234, 88, 12, 0.22);
+  background: linear-gradient(180deg, #fff7ed 0%, #fff 100%);
+  color: #9a3412;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.65) inset;
+}
+
+.attendance-teacher-matrix__alert-card--danger {
+  border-color: rgba(220, 38, 38, 0.22);
+  background: linear-gradient(180deg, #fef2f2 0%, #fff 100%);
+  color: #991b1b;
+}
+
+.attendance-teacher-matrix__alert-card--danger .attendance-teacher-matrix__alert-icon,
+.attendance-teacher-matrix__alert-card--danger .attendance-teacher-matrix__alert-copy strong {
+  color: #dc2626;
+}
+
+.attendance-teacher-matrix__alert-card--danger .attendance-teacher-matrix__alert-copy span {
+  color: #b91c1c;
+}
+
+.attendance-teacher-matrix__alert-card--warning {
+  border-color: rgba(234, 88, 12, 0.22);
+  background: linear-gradient(180deg, #fff7ed 0%, #fff 100%);
+  color: #9a3412;
+}
+
+.attendance-teacher-matrix__alert-card--warning .attendance-teacher-matrix__alert-icon,
+.attendance-teacher-matrix__alert-card--warning .attendance-teacher-matrix__alert-copy strong {
+  color: #f97316;
+}
+
+.attendance-teacher-matrix__alert-card--warning .attendance-teacher-matrix__alert-copy span {
+  color: #b45309;
+}
+
+.attendance-teacher-matrix__alert-icon {
+  color: #f97316;
+  font-size: 20px;
+  line-height: 1;
+  margin-top: 1px;
+}
+
+.attendance-teacher-matrix__alert-copy {
+  display: grid;
+  gap: 2px;
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.attendance-teacher-matrix__alert-copy strong {
+  font-size: 12px;
+  font-weight: 700;
+  color: #9a3412;
+}
+
+.attendance-teacher-matrix__alert-copy span {
+  color: #b45309;
+}
+
 .attendance-teacher-matrix__meta-pill {
   display: inline-flex;
   align-items: center;
@@ -2088,6 +2156,75 @@ body {
 
 .attendance-teacher-matrix__day-cell--late {
   background: #fff1f2 !important;
+}
+
+.attendance-teacher-matrix__table thead th.attendance-teacher-matrix__day-head--weekend,
+.attendance-teacher-matrix__table thead th.attendance-teacher-matrix__day-head--no-class {
+  background: #eef2f7 !important;
+  color: #8b98aa !important;
+}
+
+.attendance-teacher-matrix__day-cell.attendance-teacher-matrix__day-cell--weekend,
+.attendance-teacher-matrix__day-cell.attendance-teacher-matrix__day-cell--weekend.attendance-teacher-matrix__day-cell--am_in,
+.attendance-teacher-matrix__day-cell.attendance-teacher-matrix__day-cell--weekend.attendance-teacher-matrix__day-cell--am_out,
+.attendance-teacher-matrix__day-cell.attendance-teacher-matrix__day-cell--weekend.attendance-teacher-matrix__day-cell--pm_in,
+.attendance-teacher-matrix__day-cell.attendance-teacher-matrix__day-cell--weekend.attendance-teacher-matrix__day-cell--pm_out,
+.attendance-teacher-matrix__day-cell.attendance-teacher-matrix__day-cell--no-class,
+.attendance-teacher-matrix__day-cell.attendance-teacher-matrix__day-cell--no-class.attendance-teacher-matrix__day-cell--am_in,
+.attendance-teacher-matrix__day-cell.attendance-teacher-matrix__day-cell--no-class.attendance-teacher-matrix__day-cell--am_out,
+.attendance-teacher-matrix__day-cell.attendance-teacher-matrix__day-cell--no-class.attendance-teacher-matrix__day-cell--pm_in,
+.attendance-teacher-matrix__day-cell.attendance-teacher-matrix__day-cell--no-class.attendance-teacher-matrix__day-cell--pm_out {
+  background: #eef2f7 !important;
+  color: #8b98aa !important;
+}
+
+.attendance-teacher-matrix__day-cell.attendance-teacher-matrix__day-cell--weekend .attendance-teacher-matrix__tap-empty,
+.attendance-teacher-matrix__day-cell.attendance-teacher-matrix__day-cell--weekend .attendance-teacher-matrix__tap-item,
+.attendance-teacher-matrix__day-cell.attendance-teacher-matrix__day-cell--no-class .attendance-teacher-matrix__tap-empty,
+.attendance-teacher-matrix__day-cell.attendance-teacher-matrix__day-cell--no-class .attendance-teacher-matrix__tap-item {
+  color: #8b98aa;
+}
+
+.attendance-class-day-toggle {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid #d0d5dd;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #101828;
+  text-align: left;
+  transition:
+    background-color 0.16s ease,
+    border-color 0.16s ease,
+    transform 0.16s ease;
+}
+
+.attendance-class-day-toggle:hover {
+  border-color: #143b8f;
+  transform: translateY(-1px);
+}
+
+.attendance-class-day-toggle--active {
+  border-color: #143b8f;
+  background: #eef4ff;
+}
+
+.attendance-class-day-toggle:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.attendance-class-day-toggle__label {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.attendance-class-day-toggle__state {
+  font-size: 12px;
+  color: #667085;
 }
 
 .attendance-teacher-matrix__tap-list {

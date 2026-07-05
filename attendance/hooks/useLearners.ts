@@ -3,7 +3,10 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Learner, Section } from '../types';
 import { supabase } from '@deped-usis/shared-supabase';
 import { normalizeRfidValue } from '../utils/rfid';
-import { loadLearnerRosterCache, saveLearnerRosterCache } from '../utils/learnerRosterCache';
+import {
+  loadLearnerRosterCache,
+  saveLearnerRosterCache,
+} from '../utils/learnerRosterCache';
 
 export type RegisterLearnerPayload = {
   learnerId: string;
@@ -17,6 +20,7 @@ export const useLearners = (selectedSchoolYearId: string) => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [fetchedCount, setFetchedCount] = useState(0);
   const [hasCachedRoster, setHasCachedRoster] = useState(false);
+  const [hasHydratedRosterCache, setHasHydratedRosterCache] = useState(false);
   const [lastSyncedAt, setLastSyncedAt] = useState<string>('');
   const syncLockRef = useRef(false);
   const sectionsCacheRef = useRef<Section[]>([]);
@@ -75,6 +79,7 @@ export const useLearners = (selectedSchoolYearId: string) => {
     } catch (err) {
       console.error('Roster cache hydration error:', err);
     } finally {
+      setHasHydratedRosterCache(true);
       setIsLoading(false);
     }
   }, [selectedSchoolYearKey]);
@@ -95,33 +100,27 @@ export const useLearners = (selectedSchoolYearId: string) => {
     setIsLoading(true);
 
     try {
-      // 1. Fetch shared registrar section catalog first, then fallback to legacy sections table.
-      const { data: registrarSectionsData, error: registrarSectionsError } = await supabase
-        .from('registrar_sections')
-        .select('*');
+      const [registrarSectionsResult, fallbackSectionsResult, learnersResult] = await Promise.all([
+        supabase.from('registrar_sections').select('*'),
+        supabase.from('sections').select('*'),
+        supabase
+          .from('registrar_learners')
+          .select('*')
+          .order('last_name', { ascending: true })
+          .order('id', { ascending: true }),
+      ]);
+
+      const { data: registrarSectionsData, error: registrarSectionsError } = registrarSectionsResult;
+      const { data: fallbackSectionsData, error: fallbackSectionsError } = fallbackSectionsResult;
+      const { data, error } = learnersResult;
+
+      if (error) throw error;
 
       let sectionsData: Section[] | null = registrarSectionsData as Section[] | null;
-
-      if (registrarSectionsError) {
-        const { data: fallbackSectionsData, error: fallbackSectionsError } = await supabase
-          .from('sections')
-          .select('*');
+      if (registrarSectionsError || !sectionsData) {
         if (fallbackSectionsError) throw fallbackSectionsError;
         sectionsData = fallbackSectionsData as Section[] | null;
       }
-
-      const sectionsMap = (sectionsData || []).reduce((acc, s) => {
-        acc[String(s.id)] = s;
-        return acc;
-      }, {} as Record<string, Section>);
-
-      const { data, error } = await supabase
-        .from('registrar_learners')
-        .select('*')
-        .order('last_name', { ascending: true })
-        .order('id', { ascending: true });
-
-      if (error) throw error;
 
       sectionsCacheRef.current = sectionsData || [];
       setSections(sectionsData || []);
@@ -141,7 +140,15 @@ export const useLearners = (selectedSchoolYearId: string) => {
       setIsSyncing(false);
       setIsLoading(false);
     }
-  }, [enrichLearners]);
+  }, [enrichLearners, selectedSchoolYearKey]);
+
+  const syncRosterIfNeeded = useCallback(async (options?: { force?: boolean }) => {
+    const force = options?.force === true;
+    if (syncLockRef.current) return;
+    if (!force && hasCachedRoster) return;
+
+    await fetchAll();
+  }, [fetchAll, hasCachedRoster]);
 
   const getFiltered = useCallback((query: string, uidMappings: Record<string, string>) => {
     const raw = query.trim().toLowerCase();
@@ -260,7 +267,9 @@ export const useLearners = (selectedSchoolYearId: string) => {
     clearLearnerRfid,
     registerLearner,
     loadLearners: fetchAll,
+    syncRosterIfNeeded,
     hasCachedRoster,
+    hasHydratedRosterCache,
     lastSyncedAt,
   };
 };

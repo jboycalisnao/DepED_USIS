@@ -7,6 +7,7 @@ const STORE_NAME = 'kv';
 const LEARNERS_KEY = 'attendance_learner_roster';
 const SECTIONS_KEY = 'attendance_section_catalog';
 const UPDATED_AT_KEY = 'attendance_learner_roster_updated_at';
+const SYNC_META_KEY = 'attendance_learner_roster_sync_meta';
 
 const openDb = (): Promise<IDBDatabase> =>
   new Promise((resolve, reject) => {
@@ -53,6 +54,13 @@ export interface LearnerRosterCache {
   updatedAt: string;
 }
 
+export interface LearnerRosterSyncMeta {
+  learnersUpdatedAt: string;
+  sectionsUpdatedAt: string;
+  schoolYearId: string;
+  syncedAt: string;
+}
+
 export const loadLearnerRosterCache = async (): Promise<LearnerRosterCache | null> => {
   const [learners, sections, updatedAt] = await Promise.all([
     getValue<Learner[]>(LEARNERS_KEY),
@@ -76,4 +84,12 @@ export const saveLearnerRosterCache = async (value: { learners: Learner[]; secti
     setValue(SECTIONS_KEY, value.sections),
     setValue(UPDATED_AT_KEY, updatedAt),
   ]);
+};
+
+export const loadLearnerRosterSyncMeta = async (): Promise<LearnerRosterSyncMeta | null> => {
+  return getValue<LearnerRosterSyncMeta>(SYNC_META_KEY);
+};
+
+export const saveLearnerRosterSyncMeta = async (value: LearnerRosterSyncMeta): Promise<void> => {
+  await setValue(SYNC_META_KEY, value);
 };
