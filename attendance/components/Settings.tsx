@@ -1,9 +1,11 @@
 import React from 'react';
 import { UsisDateTimePicker } from '../../common/components/ui/UsisDateTimePicker';
 import { UsisSearchableSelect } from '../../common/components/ui/UsisSearchableSelect';
+import ConfirmationModal from './ConfirmationModal';
 import type {
   AttendanceClassDayConfig,
   AttendanceNoClassDateConfig,
+  AttendanceSmsSettings,
   AttendanceScheduleConfig,
   SchoolYearOption,
 } from '../types';
@@ -15,6 +17,8 @@ interface SettingsProps {
   onClassDayConfigChange: (nextConfig: AttendanceClassDayConfig) => void;
   noClassDates: AttendanceNoClassDateConfig;
   onNoClassDatesChange: (nextConfig: AttendanceNoClassDateConfig) => void;
+  smsSettings: AttendanceSmsSettings;
+  onSmsSettingsChange: (nextConfig: AttendanceSmsSettings) => void;
   activeSchoolYearLabel: string;
   isSettingsLoading: boolean;
   isSchoolYearsLoading: boolean;
@@ -85,6 +89,8 @@ const Settings: React.FC<SettingsProps> = ({
   onClassDayConfigChange,
   noClassDates,
   onNoClassDatesChange,
+  smsSettings,
+  onSmsSettingsChange,
   activeSchoolYearLabel,
   isSettingsLoading,
   isSchoolYearsLoading,
@@ -112,8 +118,15 @@ const Settings: React.FC<SettingsProps> = ({
   };
 
   const [noClassDateValue, setNoClassDateValue] = React.useState('');
+  const [smsApiKeyDraft, setSmsApiKeyDraft] = React.useState(smsSettings.apiKey);
+  const [isSmsApiKeyConfirmOpen, setIsSmsApiKeyConfirmOpen] = React.useState(false);
 
   const noClassDateItems = [...noClassDates].sort((left, right) => left.localeCompare(right));
+  const smsTemplateLength = smsSettings.messageTemplate.trim().length;
+
+  React.useEffect(() => {
+    setSmsApiKeyDraft(smsSettings.apiKey);
+  }, [smsSettings.apiKey]);
 
   const addNoClassDate = () => {
     const value = noClassDateValue.trim();
@@ -128,6 +141,13 @@ const Settings: React.FC<SettingsProps> = ({
 
   const removeNoClassDate = (value: string) => {
     onNoClassDatesChange(noClassDateItems.filter((date) => date !== value));
+  };
+
+  const handleConfirmSmsApiKeySave = () => {
+    onSmsSettingsChange({
+      ...smsSettings,
+      apiKey: smsApiKeyDraft.trim(),
+    });
   };
 
   return (
@@ -146,6 +166,77 @@ const Settings: React.FC<SettingsProps> = ({
             </h2>
           </div>
         </div>
+        </div>
+      </section>
+
+      <section className="section-card">
+        <div className="section-card__bar" />
+        <div className="section-card__content">
+          <div className="flex flex-col gap-2">
+            <p className="text-[11px] font-semibold uppercase tracking-normal text-gray-500">System Settings</p>
+            <h3 className="text-[12px] font-semibold text-gray-700">SMS gateway key</h3>
+            <p className="text-[12px] text-gray-500">
+              Store the SkySMS API key here. The key is applied only after confirmation so it can be changed safely.
+            </p>
+          </div>
+
+          <div className="mt-5 grid gap-4 max-w-2xl">
+            <label className="attendance-sms-settings__field floating-field">
+              <span className="attendance-sms-settings__label">SkySMS API Key</span>
+              <div className="floating-field__control attendance-sms-settings__control">
+                <input
+                  type="password"
+                  value={smsApiKeyDraft}
+                  onChange={(event) => setSmsApiKeyDraft(event.target.value)}
+                  placeholder=" "
+                  disabled={isSettingsLoading || isSettingsSaving}
+                  className="rounded-md"
+                />
+                <span>SkySMS API Key</span>
+              </div>
+              <small>Saved only after confirmation.</small>
+            </label>
+
+            <div className="form-actions">
+              <button
+                type="button"
+                className="primary-button rounded-md"
+                onClick={() => setIsSmsApiKeyConfirmOpen(true)}
+                disabled={isSettingsLoading || isSettingsSaving || smsApiKeyDraft.trim() === smsSettings.apiKey.trim()}
+              >
+                Save API Key
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="section-card">
+        <div className="section-card__bar" />
+        <div className="section-card__content">
+          <div className="flex flex-col gap-2">
+            <p className="text-[11px] font-semibold uppercase tracking-normal text-gray-500">SMS Notification</p>
+            <h3 className="text-[12px] font-semibold text-gray-700">Message template</h3>
+            <p className="text-[12px] text-gray-500">
+              Keep the message within 160 characters for SMS delivery. The gender label is inserted automatically.
+            </p>
+          </div>
+
+          <div className="mt-5 grid gap-4">
+            <label className="attendance-sms-settings__field">
+              <span>Message Template</span>
+              <textarea
+                value={smsSettings.messageTemplate}
+                onChange={(event) => onSmsSettingsChange({ ...smsSettings, messageTemplate: event.target.value.slice(0, 160) })}
+                placeholder="Hello! This is to inform you that your {gender_term} has entered/exited Leon NHS at {time}. Thank you."
+                rows={5}
+                maxLength={160}
+                disabled={isSettingsLoading || isSettingsSaving}
+                className="rounded-md"
+              />
+              <small>{smsTemplateLength}/160 characters</small>
+            </label>
+          </div>
         </div>
       </section>
 
@@ -253,7 +344,7 @@ const Settings: React.FC<SettingsProps> = ({
                   <button
                     key={date}
                     type="button"
-                    className="inline-flex items-center gap-2 rounded-full border border-red-200 bg-white px-3 py-1.5 text-[12px] font-semibold text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex items-center gap-2 rounded-md border border-red-200 bg-white px-3 py-1.5 text-[12px] font-semibold text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
                     onClick={() => removeNoClassDate(date)}
                     disabled={isSettingsLoading || isSettingsSaving}
                     aria-label={`Remove no-class date ${date}`}
@@ -422,9 +513,20 @@ const Settings: React.FC<SettingsProps> = ({
       <section className="notice-box">
         <strong>Save behavior</strong>
         <span>
-          Changes are saved to the <code>attendance_settings</code> table automatically after you edit the times, school year, or class days.
+          Changes are saved to the <code>attendance_settings</code> table automatically after you edit the times, school year, class days, or SMS template.
         </span>
       </section>
+
+      <ConfirmationModal
+        isOpen={isSmsApiKeyConfirmOpen}
+        onClose={() => setIsSmsApiKeyConfirmOpen(false)}
+        onConfirm={handleConfirmSmsApiKeySave}
+        title="Save API Key"
+        message="Are you sure you want to save the SMS API key for this attendance system?"
+        confirmLabel="Save Key"
+        cancelLabel="Cancel"
+        variant="primary"
+      />
     </div>
   );
 };

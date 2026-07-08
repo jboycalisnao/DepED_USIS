@@ -39,6 +39,13 @@ create table if not exists public.attendance_settings (
       "pmOut": { "in": { "start": "17:00", "end": "23:59" } }
     }
   }'::jsonb,
+  sms_settings jsonb not null default '{
+    "apiKey": "",
+    "messageTemplate": "Hello! This is to inform you that your {gender_term} has entered/exited Leon NHS at {time}. Thank you."
+  }'::jsonb,
+  sms_recipient_state jsonb not null default '{
+    "enabledLearnerIds": []
+  }'::jsonb,
   updated_at timestamptz not null default now()
 );
 
@@ -90,6 +97,17 @@ alter table if exists public.attendance_settings
   add constraint attendance_settings_selected_school_year_id_fkey
   foreign key (selected_school_year_id) references public.registrar_school_years(id) on update cascade on delete set null;
 
+alter table if exists public.attendance_settings
+  add column if not exists sms_settings jsonb not null default '{
+    "apiKey": "",
+    "messageTemplate": "Hello! This is to inform you that your {gender_term} has entered/exited Leon NHS at {time}. Thank you."
+  }'::jsonb;
+
+alter table if exists public.attendance_settings
+  add column if not exists sms_recipient_state jsonb not null default '{
+    "enabledLearnerIds": []
+  }'::jsonb;
+
 alter table public.attendance_records
   alter column learner_id type uuid
   using (
@@ -107,6 +125,8 @@ insert into public.attendance_settings (
   class_day_config,
   no_class_dates,
   schedule_config,
+  sms_settings,
+  sms_recipient_state,
   updated_at
 )
 values (
@@ -138,6 +158,13 @@ values (
       "pmOut": { "in": { "start": "17:00", "end": "23:59" } }
     }
   }'::jsonb,
+  '{
+    "apiKey": "",
+    "messageTemplate": "Hello! This is to inform you that your {gender_term} has entered/exited Leon NHS at {time}. Thank you."
+  }'::jsonb,
+  '{
+    "enabledLearnerIds": []
+  }'::jsonb,
   now()
 )
 on conflict (id) do update set
@@ -145,6 +172,8 @@ on conflict (id) do update set
   class_day_config = excluded.class_day_config,
   no_class_dates = excluded.no_class_dates,
   schedule_config = excluded.schedule_config,
+  sms_settings = excluded.sms_settings,
+  sms_recipient_state = excluded.sms_recipient_state,
   updated_at = now();
 
 delete from public.attendance_records

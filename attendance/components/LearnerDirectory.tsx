@@ -56,7 +56,7 @@ const SectionLearnersTable: React.FC<{
   const sortedLearners = [...learners].sort(learnerGenderNameSort);
 
   return (
-    <div className="table-card border-0 rounded-none border-t border-gray-200">
+    <div className="table-card border-0 rounded-md border-t border-gray-200">
       <table className="usis-table">
         <thead>
           <tr>
@@ -299,18 +299,20 @@ const LearnerDirectory: React.FC<LearnerDirectoryProps> = ({
               <label htmlFor="global-section-search" className="sr-only">
                 Search shared global section list
               </label>
-              <div className="relative">
-                <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-[18px] leading-none">
-                  search
-                </span>
-                <input
-                  id="global-section-search"
-                  type="text"
-                  value={listSearchQuery}
-                  onChange={(event) => setListSearchQuery(event.target.value)}
-                  placeholder="Search shared global section list (grade, section, learner, LRN)"
-                  className="w-full rounded-md border border-gray-200 bg-white py-3 pl-11 pr-4 text-[13px] text-gray-700 outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
-                />
+              <div className="floating-field">
+                <div className="floating-field__control" data-has-value={listSearchQuery.trim().length > 0 ? 'true' : 'false'}>
+                  <input
+                    id="global-section-search"
+                    type="text"
+                    value={listSearchQuery}
+                    onChange={(event) => setListSearchQuery(event.target.value)}
+                    placeholder=" "
+                    aria-label="Search shared global section list"
+                    className="rounded-md"
+                  />
+                  <span>Search shared global section list</span>
+                </div>
+                <small>Grade, section, learner, LRN</small>
               </div>
             </div>
           )}

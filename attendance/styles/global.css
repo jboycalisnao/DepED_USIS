@@ -930,48 +930,18 @@ body {
 }
 
 .attendance-records-page__history-search-field {
-  position: relative;
   flex: 1 1 280px;
-  min-width: 220px;
-  display: block;
+  min-width: 240px;
+}
+
+.attendance-records-page__history-search-control {
+  width: 100%;
 }
 
 .attendance-records-page__history-search {
   width: 100%;
-  min-height: 52px;
-  padding: 20px 14px 10px;
-  border: 1px solid var(--deped-line);
-  border-radius: 12px;
-  background: #fff;
-  color: var(--deped-ink);
-  font-size: 14px;
-  outline: none;
-}
-
-.attendance-records-page__history-search:focus {
-  border-color: var(--deped-blue);
-  box-shadow: 0 0 0 3px rgba(16, 64, 172, 0.08);
-}
-
-.attendance-records-page__history-search-field > span {
-  position: absolute;
-  left: 14px;
-  top: 16px;
-  color: #6c7688;
-  font-size: 14px;
-  font-weight: 400;
-  line-height: 1.2;
-  pointer-events: none;
-  transform-origin: left top;
-  transition: top 0.16s ease, color 0.16s ease, font-size 0.16s ease, transform 0.16s ease;
-}
-
-.attendance-records-page__history-search-field:focus-within > span,
-.attendance-records-page__history-search-field[data-has-value="true"] > span {
-  top: 8px;
-  color: var(--deped-blue);
-  font-size: 11px;
-  transform: translateY(0);
+  -webkit-appearance: none;
+  appearance: none;
 }
 
 .attendance-records-page__history-list {
@@ -2401,6 +2371,652 @@ body {
   font-weight: 700;
 }
 
+.attendance-sms-page {
+  width: 100%;
+}
+
+.attendance-sms-page__subtitle {
+  margin: 0;
+  color: var(--deped-muted);
+  font-size: 13px;
+  line-height: 1.5;
+  max-width: 64ch;
+}
+
+.attendance-sms-page__eyebrow {
+  margin: 0 0 6px;
+  color: var(--deped-blue);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.attendance-sms-page__body {
+  display: grid;
+  gap: 16px;
+}
+
+.attendance-sms-page__grade-list {
+  display: grid;
+  gap: 12px;
+}
+
+.attendance-sms-page__section-shell {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--deped-line);
+  background: #fbfcfe;
+}
+
+.attendance-sms-page__section-actions {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.attendance-sms-page__section-actions p {
+  margin: 0;
+  color: var(--deped-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.attendance-sms-page__recipient-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.attendance-sms-page__form-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.attendance-sms-page__form-head p {
+  margin: 0;
+  color: var(--deped-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.attendance-sms-page__bulk-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.attendance-sms-page__tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 4px 0 0;
+}
+
+.attendance-sms-page__tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 10px 16px;
+  border: 1px solid var(--deped-line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--deped-text);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
+}
+
+.attendance-sms-page__tab:hover {
+  border-color: rgba(20, 59, 143, 0.24);
+  box-shadow: 0 0 0 3px rgba(20, 59, 143, 0.06);
+}
+
+.attendance-sms-page__tab.is-active {
+  border-color: rgba(20, 59, 143, 0.28);
+  background: #eef4ff;
+  color: #143b8f;
+}
+
+.attendance-sms-page__logs-tab {
+  display: grid;
+  gap: 16px;
+}
+
+.attendance-sms-page__logs-content {
+  display: grid;
+  gap: 18px;
+}
+
+.attendance-sms-page__logs-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.attendance-sms-page__logs-head h3,
+.attendance-sms-page__block-title h4 {
+  margin: 0 0 6px;
+  color: var(--deped-text);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.attendance-sms-page__logs-head p,
+.attendance-sms-page__block-title p {
+  margin: 0;
+  color: var(--deped-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.attendance-sms-page__logs-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.attendance-sms-page__processing-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(18, 35, 61, 0.14);
+  background: #f8fafc;
+  color: var(--deped-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.attendance-sms-page__processing-pill.is-active {
+  border-color: rgba(20, 59, 143, 0.22);
+  background: #eef4ff;
+  color: #143b8f;
+}
+
+.attendance-sms-page__queue-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.attendance-sms-page__metric-card {
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+  border: 1px solid var(--deped-line);
+  background: #fff;
+}
+
+.attendance-sms-page__metric-card span {
+  color: var(--deped-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.attendance-sms-page__metric-card strong {
+  color: var(--deped-text);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.attendance-sms-page__queue-block {
+  display: grid;
+  gap: 12px;
+}
+
+.attendance-sms-page__block-title--with-filter {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.attendance-sms-page__logs-filter {
+  display: grid;
+  gap: 6px;
+  min-width: 160px;
+}
+
+.attendance-sms-page__logs-filter-label {
+  color: var(--deped-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.attendance-sms-page__logs-filter-select {
+  width: 100%;
+  min-height: 42px;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.attendance-sms-page__queue-table-wrap {
+  overflow: auto;
+  border: 1px solid var(--deped-line);
+  border-radius: var(--attendance-radius-md);
+  background: #fff;
+}
+
+.attendance-sms-page__queue-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 760px;
+}
+
+.attendance-sms-page__queue-table th,
+.attendance-sms-page__queue-table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(18, 35, 61, 0.08);
+  text-align: left;
+  vertical-align: top;
+  font-size: 13px;
+}
+
+.attendance-sms-page__queue-table th {
+  color: var(--deped-muted);
+  font-weight: 700;
+  background: #f8fafc;
+}
+
+.attendance-sms-page__queue-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.attendance-sms-page__empty-cell {
+  padding: 24px 14px;
+  color: var(--deped-muted);
+  text-align: center;
+}
+
+.attendance-sms-page__queue-learner {
+  display: grid;
+  gap: 2px;
+}
+
+.attendance-sms-page__queue-learner strong {
+  color: var(--deped-text);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.attendance-sms-page__queue-learner span {
+  color: var(--deped-muted);
+  font-size: 12px;
+}
+
+.attendance-sms-page__status-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.attendance-sms-page__status-chip--queued {
+  border: 1px solid rgba(20, 59, 143, 0.16);
+  background: #eef4ff;
+  color: #143b8f;
+}
+
+.attendance-sms-page__status-chip--sending {
+  border: 1px solid rgba(12, 99, 86, 0.16);
+  background: #ecfdf5;
+  color: #0f766e;
+}
+
+.attendance-sms-page__status-chip--sent {
+  border: 1px solid rgba(21, 128, 61, 0.16);
+  background: #f0fdf4;
+  color: #15803d;
+}
+
+.attendance-sms-page__status-chip--failed {
+  border: 1px solid rgba(185, 28, 28, 0.16);
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.attendance-sms-page__status-note {
+  display: block;
+  margin-top: 4px;
+  color: var(--deped-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.attendance-sms-page__log-list {
+  display: grid;
+  gap: 10px;
+}
+
+.attendance-sms-page__empty-log {
+  margin: 0;
+  padding: 14px;
+  border: 1px dashed var(--deped-line);
+  border-radius: var(--attendance-radius-md);
+  color: var(--deped-muted);
+  font-size: 13px;
+}
+
+.attendance-sms-page__log-entry {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid var(--deped-line);
+  border-radius: var(--attendance-radius-md);
+  background: #fff;
+}
+
+.attendance-sms-page__log-entry-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.attendance-sms-page__log-entry-head strong {
+  color: var(--deped-text);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.attendance-sms-page__log-entry-head span,
+.attendance-sms-page__log-entry p {
+  color: var(--deped-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.attendance-sms-page__log-entry p {
+  margin: 0;
+}
+
+.attendance-sms-page__log-entry--success {
+  border-color: rgba(21, 128, 61, 0.16);
+  background: #f0fdf4;
+}
+
+.attendance-sms-page__log-entry--error {
+  border-color: rgba(185, 28, 28, 0.16);
+  background: #fef2f2;
+}
+
+.attendance-sms-page__log-entry--info {
+  border-color: rgba(18, 35, 61, 0.12);
+  background: #fff;
+}
+
+.attendance-sms-page__field--search {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.attendance-sms-page__search-control {
+  width: 100%;
+}
+
+.attendance-sms-page__search-input {
+  width: 100%;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.attendance-sms-page__field:not(.attendance-sms-page__field--search) input,
+.attendance-sms-page__field:not(.attendance-sms-page__field--search) textarea,
+.attendance-sms-page__field:not(.attendance-sms-page__field--search) select {
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid var(--deped-line);
+  background: #fff;
+  color: var(--deped-text);
+  font-size: 14px;
+  line-height: 1.5;
+  padding: 12px 14px;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.attendance-sms-page__field:not(.attendance-sms-page__field--search) input:focus,
+.attendance-sms-page__field:not(.attendance-sms-page__field--search) textarea:focus,
+.attendance-sms-page__field:not(.attendance-sms-page__field--search) select:focus {
+  outline: none;
+  border-color: #143b8f;
+  box-shadow: 0 0 0 3px rgba(20, 59, 143, 0.12);
+}
+
+.attendance-sms-page__recipient-list {
+  display: grid;
+  gap: 10px;
+  max-height: 360px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.attendance-sms-page__recipient {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--deped-line);
+  background: #fff;
+  cursor: pointer;
+}
+
+.attendance-sms-page__recipient.is-selected {
+  border-color: #143b8f;
+  background: #eef4ff;
+}
+
+.attendance-sms-page__recipient.is-disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.attendance-sms-page__recipient input {
+  margin-top: 2px;
+}
+
+.attendance-sms-page__recipient-copy {
+  display: grid;
+  gap: 2px;
+}
+
+.attendance-sms-page__recipient-copy strong {
+  color: var(--deped-text);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.attendance-sms-page__recipient-copy span {
+  color: var(--deped-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.attendance-sms-page__empty {
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px dashed var(--deped-line);
+  color: var(--deped-muted);
+  font-size: 13px;
+}
+
+.attendance-sms-page__preview-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 16px;
+}
+
+.attendance-sms-page__intro-content {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.attendance-sms-page__intro-content h3,
+.attendance-sms-page__form-card h3,
+.attendance-sms-page__preview-card h3 {
+  margin: 0 0 6px;
+  color: var(--deped-text);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.attendance-sms-page__intro-content p {
+  margin: 0;
+  color: var(--deped-muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.attendance-sms-page__status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(20, 59, 143, 0.16);
+  background: #eef4ff;
+  color: #143b8f;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.attendance-sms-page__form-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.attendance-sms-page__field {
+  display: grid;
+  gap: 6px;
+}
+
+.attendance-sms-page__field input,
+.attendance-sms-page__field textarea,
+.attendance-sms-page__field select {
+  min-height: 48px;
+}
+
+.attendance-sms-page__field--full {
+  grid-column: 1 / -1;
+}
+
+.attendance-sms-page__field span {
+  color: var(--deped-text);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.attendance-sms-page__field small {
+  color: var(--deped-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.attendance-sms-page__field input,
+.attendance-sms-page__field textarea {
+  min-height: 48px;
+}
+
+.attendance-sms-page__field textarea {
+  min-height: 140px;
+  resize: vertical;
+}
+
+.attendance-sms-page__field select {
+  min-height: 48px;
+}
+
+.attendance-sms-page__actions {
+  margin-top: 4px;
+}
+
+.attendance-sms-page__status {
+  margin: 14px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.attendance-sms-page__status--success {
+  color: #067647;
+}
+
+.attendance-sms-page__status--error {
+  color: #b42318;
+}
+
+.attendance-sms-page__payload {
+  margin: 0;
+  padding: 14px;
+  border-radius: 12px;
+  background: #f8fafc;
+  border: 1px solid var(--deped-line);
+  color: #1f2937;
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.attendance-sms-settings__field {
+  display: grid;
+  gap: 6px;
+}
+
+.attendance-sms-settings__field span {
+  color: var(--deped-text);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.attendance-sms-settings__field input,
+.attendance-sms-settings__field textarea {
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid var(--deped-line);
+  background: #fff;
+  color: var(--deped-text);
+  font-size: 14px;
+  line-height: 1.5;
+  padding: 12px 14px;
+}
+
+.attendance-sms-settings__field textarea {
+  resize: vertical;
+}
+
+.attendance-sms-settings__field small {
+  color: var(--deped-muted);
+  font-size: 12px;
+}
+
 @media (max-width: 640px) {
   .attendance-teacher-matrix__gender-group-header {
     align-items: flex-start;
@@ -2585,6 +3201,58 @@ body {
   .attendance-teacher-matrix__search-field,
   .attendance-teacher-matrix__month-select-wrap {
     min-width: 220px;
+  }
+
+  .attendance-sms-page__intro-content {
+    flex-direction: column;
+  }
+
+  .attendance-sms-page__form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .attendance-sms-page__form-head {
+    flex-direction: column;
+  }
+
+  .attendance-sms-page__preview-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .attendance-sms-page__section-actions {
+    flex-direction: column;
+  }
+
+  .attendance-sms-page__tabs {
+    flex-direction: column;
+  }
+
+  .attendance-sms-page__tab {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .attendance-sms-page__logs-head,
+  .attendance-sms-page__logs-actions {
+    align-items: flex-start;
+    flex-direction: column;
+    justify-content: flex-start;
+  }
+
+  .attendance-sms-page__block-title--with-filter {
+    align-items: stretch;
+  }
+
+  .attendance-sms-page__logs-filter {
+    min-width: 100%;
+  }
+
+  .attendance-sms-page__queue-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .attendance-sms-page__log-entry-head {
+    flex-direction: column;
   }
 }
 

@@ -42,6 +42,12 @@ export interface Learner {
   gender: string | null;
   address: string | null;
   contact_number: string | null;
+  guardian_contact_number?: string | null;
+  guardian_contact?: string | null;
+  guardianContact?: string | null;
+  parent_contact_number?: string | null;
+  parent_contact?: string | null;
+  parentContact?: string | null;
   guardian_name: string | null;
   father_name: string | null;
   mother_name: string | null;
@@ -63,6 +69,45 @@ export interface Learner {
   // Legacy fields for compatibility
   firstName?: string | null;
   lastName?: string | null;
+}
+
+export interface AttendanceSmsSettings {
+  apiKey: string;
+  messageTemplate: string;
+}
+
+export interface AttendanceSmsRecipientState {
+  enabledLearnerIds: string[];
+}
+
+export type SmsQueueStatus = 'queued' | 'sending' | 'sent' | 'failed';
+
+export interface SmsQueueItem {
+  id: string;
+  learnerId: string;
+  learnerName: string;
+  phoneNumber: string;
+  message: string;
+  apiKey: string;
+  status: SmsQueueStatus;
+  attempts: number;
+  queuedAt: string;
+  updatedAt: string;
+  startedAt: string | null;
+  completedAt: string | null;
+  responseMessage: string | null;
+  errorMessage: string | null;
+}
+
+export type SmsQueueLogLevel = 'info' | 'success' | 'error';
+
+export interface SmsQueueLogEntry {
+  id: string;
+  queueItemId: string;
+  timestamp: string;
+  level: SmsQueueLogLevel;
+  title: string;
+  detail: string | null;
 }
 
 export type AttendanceType = 'AM_IN' | 'AM_OUT' | 'PM_IN' | 'PM_OUT' | 'UNSCHEDULED';

@@ -491,22 +491,25 @@ const AttendanceRecordsBrowser: React.FC<Props> = ({
           </div>
           <div className="attendance-records-page__history-controls">
             <label
-              className="attendance-records-page__history-search-field floating-field__control"
+              className="attendance-records-page__history-search-field floating-field"
               data-has-value={searchValue.trim().length > 0 ? 'true' : 'false'}
             >
-              <input
-                type="search"
-                value={searchValue}
-                onChange={(event) => setSearchValue(event.target.value)}
-                placeholder=" "
-                className="attendance-records-page__history-search"
-                aria-label="Search month or day"
-              />
-              <span>Search month: 2026-06 | day: 2026-06-08</span>
+              <div className="floating-field__control attendance-records-page__history-search-control">
+                <input
+                  type="search"
+                  value={searchValue}
+                  onChange={(event) => setSearchValue(event.target.value)}
+                  placeholder=" "
+                  className="attendance-records-page__history-search rounded-md"
+                  aria-label="Search month or day"
+                />
+                <span>Month or day</span>
+              </div>
+              <small>Example: 2026-06 or 2026-06-08</small>
             </label>
-          <button type="button" className="primary-button" onClick={() => void loadOverview()} disabled={isLoadingOverview}>
-            {isLoadingOverview ? 'Loading...' : 'Load Month/Day'}
-          </button>
+            <button type="button" className="primary-button" onClick={() => void loadOverview()} disabled={isLoadingOverview}>
+              {isLoadingOverview ? 'Loading...' : 'Load Month/Day'}
+            </button>
           </div>
         </div>
 

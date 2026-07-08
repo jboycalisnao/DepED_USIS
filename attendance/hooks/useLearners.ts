@@ -20,14 +20,37 @@ export const useLearners = (selectedSchoolYearId: string) => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [fetchedCount, setFetchedCount] = useState(0);
   const [hasCachedRoster, setHasCachedRoster] = useState(false);
-  const [hasHydratedRosterCache, setHasHydratedRosterCache] = useState(false);
   const [lastSyncedAt, setLastSyncedAt] = useState<string>('');
   const syncLockRef = useRef(false);
   const sectionsCacheRef = useRef<Section[]>([]);
+  const guardianContactLookupRef = useRef<Map<string, string>>(new Map());
 
   const selectedSchoolYearKey = String(selectedSchoolYearId || '').trim();
 
-  const enrichLearners = useCallback((rows: Learner[], sourceSections: Section[]) => {
+  const resolveGuardianContactNumber = useCallback((learner: Learner, guardianContactLookup: Map<string, string>) => {
+    const contactSources = [
+      (learner as any).guardian_contact_number,
+      (learner as any).guardian_contact,
+      (learner as any).guardianContact,
+      (learner as any).parent_contact_number,
+      (learner as any).parent_contact,
+      (learner as any).parentContact,
+    ];
+
+    for (const source of contactSources) {
+      const value = String(source || '').trim();
+      if (value) return value;
+    }
+
+    const lrn = String((learner as any).lrn || '').trim();
+    if (lrn && guardianContactLookup.has(lrn)) {
+      return guardianContactLookup.get(lrn) || null;
+    }
+
+    return null;
+  }, []);
+
+  const enrichLearners = useCallback((rows: Learner[], sourceSections: Section[], guardianContactLookup: Map<string, string>) => {
     const sectionsMap = sourceSections.reduce((acc, section) => {
       acc[String(section.id)] = section;
       return acc;
@@ -37,18 +60,20 @@ export const useLearners = (selectedSchoolYearId: string) => {
       const sId = String((learner as any).section_id || (learner as any).sectionId || '').trim();
       const section = sId ? sectionsMap[sId] : null;
       const gradeVal = section ? (section.grade_level || section.gradeLevel || 'General Education') : 'NO GRADE ASSIGNED';
+      const guardianContactNumber = resolveGuardianContactNumber(learner, guardianContactLookup);
       return {
         ...learner,
+        guardian_contact_number: guardianContactNumber,
         section_name: section
           ? (section.name || 'Unknown Section')
           : (sId ? 'Unknown Section' : 'No Section Assigned'),
         grade_level: gradeVal,
       };
     });
-  }, []);
+  }, [resolveGuardianContactNumber]);
 
   const visibleLearners = useMemo(() => {
-    const enriched = enrichLearners(allLearners, sections);
+    const enriched = enrichLearners(allLearners, sections, guardianContactLookupRef.current);
     if (!selectedSchoolYearKey) return enriched;
 
     const sectionsMap = sections.reduce((acc, section) => {
@@ -65,33 +90,40 @@ export const useLearners = (selectedSchoolYearId: string) => {
     });
   }, [allLearners, enrichLearners, sections, selectedSchoolYearKey]);
 
-  const hydrateRosterCache = useCallback(async () => {
+  const fetchGuardianContactLookup = useCallback(async () => {
+    const guardianContactLookup = new Map<string, string>();
+
     try {
-      const cached = await loadLearnerRosterCache();
-      if (cached) {
-        sectionsCacheRef.current = cached.sections || [];
-        setSections(cached.sections || []);
-        setAllLearners(cached.learners || []);
-        setFetchedCount((cached.learners || []).length);
-        setHasCachedRoster((cached.learners || []).length > 0);
-        setLastSyncedAt(cached.updatedAt || '');
+      const { data, error } = await supabase
+        .from('registrar_public_enrollment_submissions')
+        .select('lrn,created_at,guardian_contact,payload')
+        .order('created_at', { ascending: false });
+
+      if (error || !Array.isArray(data)) {
+        return guardianContactLookup;
+      }
+
+      for (const row of data as Array<any>) {
+        const lrn = String(row?.lrn || row?.payload?.lrn || '').trim();
+        if (!lrn || guardianContactLookup.has(lrn)) continue;
+
+        const guardianContact = String(
+          row?.guardian_contact ||
+          row?.payload?.guardianContact ||
+          row?.payload?.guardian_contact ||
+          '',
+        ).trim();
+
+        if (guardianContact) {
+          guardianContactLookup.set(lrn, guardianContact);
+        }
       }
     } catch (err) {
-      console.error('Roster cache hydration error:', err);
-    } finally {
-      setHasHydratedRosterCache(true);
-      setIsLoading(false);
+      console.error('Guardian contact lookup error:', err);
     }
-  }, [selectedSchoolYearKey]);
 
-  useEffect(() => {
-    setFetchedCount(visibleLearners.length);
-    setHasCachedRoster(allLearners.length > 0);
-  }, [allLearners.length, visibleLearners.length]);
-
-  useEffect(() => {
-    void hydrateRosterCache();
-  }, [hydrateRosterCache]);
+    return guardianContactLookup;
+  }, []);
 
   const fetchAll = useCallback(async () => {
     if (syncLockRef.current) return;
@@ -109,7 +141,6 @@ export const useLearners = (selectedSchoolYearId: string) => {
           .order('last_name', { ascending: true })
           .order('id', { ascending: true }),
       ]);
-
       const { data: registrarSectionsData, error: registrarSectionsError } = registrarSectionsResult;
       const { data: fallbackSectionsData, error: fallbackSectionsError } = fallbackSectionsResult;
       const { data, error } = learnersResult;
@@ -124,13 +155,16 @@ export const useLearners = (selectedSchoolYearId: string) => {
 
       sectionsCacheRef.current = sectionsData || [];
       setSections(sectionsData || []);
-      setAllLearners(data || []);
-      const enriched = enrichLearners((data || []) as Learner[], sectionsData || []);
+      const guardianContactLookup = await fetchGuardianContactLookup();
+      guardianContactLookupRef.current = guardianContactLookup;
+
+      const enriched = enrichLearners((data || []) as Learner[], sectionsData || [], guardianContactLookup);
+      setAllLearners(enriched);
       setFetchedCount(enriched.length);
       setHasCachedRoster(enriched.length > 0);
       setLastSyncedAt(new Date().toISOString());
       await saveLearnerRosterCache({
-        learners: (data || []) as Learner[],
+        learners: enriched,
         sections: sectionsData || [],
       });
     } catch (err) {
@@ -140,15 +174,39 @@ export const useLearners = (selectedSchoolYearId: string) => {
       setIsSyncing(false);
       setIsLoading(false);
     }
-  }, [enrichLearners, selectedSchoolYearKey]);
+  }, [enrichLearners, fetchGuardianContactLookup, selectedSchoolYearKey]);
 
-  const syncRosterIfNeeded = useCallback(async (options?: { force?: boolean }) => {
-    const force = options?.force === true;
-    if (syncLockRef.current) return;
-    if (!force && hasCachedRoster) return;
+  const hydrateRosterCache = useCallback(async () => {
+    try {
+      const cached = await loadLearnerRosterCache();
+      if (cached) {
+        sectionsCacheRef.current = cached.sections || [];
+        const cachedLearners = cached.learners || [];
+        guardianContactLookupRef.current = new Map();
+        setSections(cached.sections || []);
+        setAllLearners(cachedLearners);
+        setFetchedCount(cachedLearners.length);
+        setHasCachedRoster(cachedLearners.length > 0);
+        setLastSyncedAt(cached.updatedAt || '');
+        return;
+      }
 
-    await fetchAll();
-  }, [fetchAll, hasCachedRoster]);
+      await fetchAll();
+    } catch (err) {
+      console.error('Roster cache hydration error:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [enrichLearners, fetchAll, fetchGuardianContactLookup, selectedSchoolYearKey]);
+
+  useEffect(() => {
+    setFetchedCount(visibleLearners.length);
+    setHasCachedRoster(allLearners.length > 0);
+  }, [allLearners.length, visibleLearners.length]);
+
+  useEffect(() => {
+    void hydrateRosterCache();
+  }, [hydrateRosterCache]);
 
   const getFiltered = useCallback((query: string, uidMappings: Record<string, string>) => {
     const raw = query.trim().toLowerCase();
@@ -267,9 +325,7 @@ export const useLearners = (selectedSchoolYearId: string) => {
     clearLearnerRfid,
     registerLearner,
     loadLearners: fetchAll,
-    syncRosterIfNeeded,
     hasCachedRoster,
-    hasHydratedRosterCache,
     lastSyncedAt,
   };
 };

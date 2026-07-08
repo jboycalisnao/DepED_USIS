@@ -15,10 +15,10 @@ import LearnerDirectory from './components/LearnerDirectory';
 import Terminal from './components/Terminal';
 import AttendanceLogs from './components/AttendanceLogs';
 import Settings from './components/Settings';
-import AttendanceSummaryPage from './features/reports/components/AttendanceSummaryPage';
 import { normalizeRfidValue } from './utils/rfid';
 import AttendanceLandingPage from './features/auth/components/AttendanceLandingPage';
 import TeacherAttendanceLandingPage from './features/auth/components/TeacherAttendanceLandingPage';
+import SmsNotificationPage from './features/sms/components/SmsNotificationPage';
 import {
   clearStoredAttendanceAccess,
   getStoredAttendanceAccess,
@@ -32,6 +32,7 @@ import {
 import TeacherSectionAttendancePage from './features/teacher/components/TeacherSectionAttendancePage';
 import { resolveAttendanceDecision } from './utils/attendanceSchedule';
 import {
+  ATTENDANCE_BASENAME,
   ATTENDANCE_DEFAULT_PATH,
   ATTENDANCE_KIOSK_PATH,
   ATTENDANCE_LAST_PATH_KEY,
@@ -75,6 +76,10 @@ function App() {
     setClassDayConfig,
     noClassDates,
     setNoClassDates,
+    smsSettings,
+    setSmsSettings,
+    smsRecipientState,
+    setSmsRecipientState,
     activeSchoolYear,
     isSettingsLoading,
     isSchoolYearsLoading,
@@ -94,9 +99,7 @@ function App() {
     clearLearnerRfid,
     registerLearner,
     loadLearners,
-    syncRosterIfNeeded,
     hasCachedRoster,
-    hasHydratedRosterCache,
     lastSyncedAt,
   } = useLearners(selectedSchoolYearId);
   const {
@@ -109,15 +112,14 @@ function App() {
     logAttendance,
     addManualAttendanceRecord,
     deleteRecord,
-    querySummaryByDateRange,
     queryAttendanceRecordsByRange,
     refreshAttendanceStatusByRange,
   } = useAttendance();
 
-  const currentView: 'registrar' | 'attendance' | 'summary' | 'settings' = useMemo(() => {
+  const currentView: 'registrar' | 'attendance' | 'settings' | 'sms' = useMemo(() => {
     if (location.pathname.startsWith('/records')) return 'attendance';
-    if (location.pathname.startsWith('/summary')) return 'summary';
     if (location.pathname.startsWith('/settings')) return 'settings';
+    if (location.pathname.startsWith('/sms')) return 'sms';
     return 'registrar';
   }, [location.pathname]);
   const isTeacherRoute = location.pathname.startsWith('/teacher');
@@ -154,11 +156,6 @@ function App() {
     if (learners.some((learner) => learner.id === selectedLearnerId)) return;
     setSelectedLearnerId(null);
   }, [learners, selectedLearnerId]);
-
-  useEffect(() => {
-    if (!isTeacherRoute || !teacherAccess || !hasHydratedRosterCache) return;
-    void syncRosterIfNeeded();
-  }, [hasHydratedRosterCache, isTeacherRoute, syncRosterIfNeeded, teacherAccess]);
 
   const clearIdleTimer = (index: number) => {
     if (idleTimers.current[index]) {
@@ -480,9 +477,16 @@ function App() {
       ? 'Registrar'
       : currentView === 'attendance'
         ? 'Attendance Records'
-        : currentView === 'summary'
-          ? 'Attendance Summary'
-          : 'Settings';
+        : currentView === 'settings'
+            ? 'Settings'
+            : 'SMS Notification';
+
+  const goToAttendancePath = (path: string) => {
+    const resolvedPath = resolveAttendancePath(path, ATTENDANCE_DEFAULT_PATH);
+    const nextUrl = `${ATTENDANCE_BASENAME}${resolvedPath}`;
+    if (window.location.pathname === nextUrl) return;
+    window.location.assign(nextUrl);
+  };
 
   useEffect(() => {
     if (!isProfileOpen) return;
@@ -640,7 +644,7 @@ function App() {
               <button
                 type="button"
                 className={`attendance-side-nav__link ${currentView === 'registrar' ? 'attendance-side-nav__link--active' : ''}`}
-                onClick={() => navigate('/registrar')}
+                onClick={() => goToAttendancePath('/registrar')}
               >
                 <span className="material-symbols-outlined" aria-hidden="true">badge</span>
                 Registrar
@@ -648,26 +652,26 @@ function App() {
               <button
                 type="button"
                 className={`attendance-side-nav__link ${currentView === 'attendance' ? 'attendance-side-nav__link--active' : ''}`}
-                onClick={() => navigate('/records')}
+                onClick={() => goToAttendancePath('/records')}
               >
                 <span className="material-symbols-outlined" aria-hidden="true">event_note</span>
                 Attendance Records
               </button>
               <button
                 type="button"
-                className={`attendance-side-nav__link ${currentView === 'summary' ? 'attendance-side-nav__link--active' : ''}`}
-                onClick={() => navigate('/summary')}
-              >
-                <span className="material-symbols-outlined" aria-hidden="true">query_stats</span>
-                Attendance Summary
-              </button>
-              <button
-                type="button"
                 className={`attendance-side-nav__link ${currentView === 'settings' ? 'attendance-side-nav__link--active' : ''}`}
-                onClick={() => navigate('/settings')}
+                onClick={() => goToAttendancePath('/settings')}
               >
                 <span className="material-symbols-outlined" aria-hidden="true">settings</span>
                 Settings
+              </button>
+              <button
+                type="button"
+                className={`attendance-side-nav__link ${currentView === 'sms' ? 'attendance-side-nav__link--active' : ''}`}
+                onClick={() => goToAttendancePath('/sms')}
+              >
+                <span className="material-symbols-outlined" aria-hidden="true">sms</span>
+                SMS Notification
               </button>
             </nav>
             <div className="attendance-side-nav__footer">
@@ -727,7 +731,7 @@ function App() {
               </div>
             </div>
             <main className="attendance-main animate-in fade-in duration-700">
-              <Routes>
+              <Routes key={location.pathname}>
                 <Route
                   path="/registrar"
                   element={
@@ -803,10 +807,6 @@ function App() {
                   }
                 />
                 <Route
-                  path="/summary"
-                  element={<AttendanceSummaryPage onQuerySummaryRange={querySummaryByDateRange} />}
-                />
-                <Route
                   path="/settings"
                   element={
                     <Settings
@@ -819,11 +819,25 @@ function App() {
           onScheduleConfigChange={updateSettings}
           onClassDayConfigChange={setClassDayConfig}
           onNoClassDatesChange={setNoClassDates}
+          smsSettings={smsSettings}
+          onSmsSettingsChange={setSmsSettings}
           onSchoolYearChange={setSelectedSchoolYearId}
           schoolYears={schoolYears}
                       selectedSchoolYearId={selectedSchoolYearId}
                       scheduleConfig={scheduleConfig}
                       settingsError={settingsError}
+                    />
+                  }
+                />
+                <Route
+                  path="/sms"
+                  element={
+                    <SmsNotificationPage
+                      learners={learners}
+                      smsSettings={smsSettings}
+                      smsRecipientState={smsRecipientState}
+                      onSmsRecipientStateChange={setSmsRecipientState}
+                      isSettingsLoading={isSettingsLoading}
                     />
                   }
                 />

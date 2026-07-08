@@ -14,8 +14,8 @@ export function resolveAttendancePath(pathname: string, fallback: string = ATTEN
 
   if (route.startsWith('/registrar')) return '/registrar' + route.slice('/registrar'.length);
   if (route.startsWith('/records')) return '/records' + route.slice('/records'.length);
-  if (route.startsWith('/summary')) return '/summary' + route.slice('/summary'.length);
   if (route.startsWith('/settings')) return '/settings' + route.slice('/settings'.length);
+  if (route.startsWith('/sms')) return '/sms' + route.slice('/sms'.length);
   if (route.startsWith('/kiosk')) return '/kiosk' + route.slice('/kiosk'.length);
   return fallback;
 }

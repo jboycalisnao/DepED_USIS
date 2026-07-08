@@ -34,7 +34,7 @@ const KioskHeader: React.FC<KioskHeaderProps> = ({ currentTime, session, onExit 
               <span className="text-[11px] md:text-[12px] font-bold">
                 {item.label}
               </span>
-              <span className="h-1.5 w-1.5 rounded-full bg-current opacity-25" />
+              <span className="h-1.5 w-1.5 rounded-md bg-current opacity-25" />
               <span className="text-[11px] md:text-[12px] font-bold">
                 {item.range}
               </span>

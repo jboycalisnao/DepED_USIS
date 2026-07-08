@@ -686,46 +686,6 @@ export const useAttendance = () => {
     return getLocalAttendanceRecordsInRange(day, day);
   }, [getLocalAttendanceRecordsInRange]);
 
-  const querySummaryByDateRange = useCallback(
-    async (fromDate: string, toDate: string): Promise<{
-      weekly: AttendanceWeeklySummaryRow[];
-      monthly: AttendanceMonthlySummaryRow[];
-    }> => {
-      const dailyRows = buildDailySummariesFromRecords(getLocalAttendanceRecordsInRange(fromDate, toDate));
-
-      const { data: learnerRows, error: learnerError } = await supabase
-        .from('registrar_learners')
-        .select('id,section_id');
-      if (learnerError) throw learnerError;
-
-      const { data: sectionRows, error: sectionError } = await supabase
-        .from('registrar_sections')
-        .select('id,name,grade_level');
-      if (sectionError) throw sectionError;
-
-      const learnerMap = new Map<string, LearnerSectionMeta>();
-      (learnerRows || []).forEach((row: any) => {
-        learnerMap.set(String(row.id), {
-          sectionId: row.section_id ? String(row.section_id) : null,
-        });
-      });
-
-      const sectionMap = new Map<string, { name: string; gradeLevel: string }>();
-      (sectionRows || []).forEach((row: any) => {
-        sectionMap.set(String(row.id), {
-          name: String(row.name || 'No Section'),
-          gradeLevel: String(row.grade_level || 'Unknown'),
-        });
-      });
-
-      const weekly = buildWeeklySummariesFromDailyRows(dailyRows, learnerMap, sectionMap);
-      const monthly = buildMonthlySummariesFromDailyRows(dailyRows, learnerMap, sectionMap);
-
-      return { weekly, monthly };
-    },
-    [getLocalAttendanceRecordsInRange],
-  );
-
   useEffect(() => {
     if (!isHydrated) return;
     const timer = window.setInterval(() => {
@@ -773,7 +733,6 @@ export const useAttendance = () => {
     queryMonthlySummariesByRange,
     queryDailySummariesByMonth,
     queryRawRecordsByDate,
-    querySummaryByDateRange,
     refreshAttendanceStatusByRange,
   };
 };

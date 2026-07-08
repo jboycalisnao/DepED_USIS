@@ -9,6 +9,7 @@ const UID_MAPPINGS_KEY = 'rfid_mappings';
 const ADMIN_UIDS_KEY = 'admin_uids';
 const ATTENDANCE_LOGS_KEY = 'attendance_logs';
 const TEACHER_RANGE_CACHE_PREFIX = 'teacher_attendance_range_cache:';
+const SMS_NOTIFICATION_RECIPIENTS_KEY = 'sms_notification_recipients';
 
 const openDb = (): Promise<IDBDatabase> =>
   new Promise((resolve, reject) => {
@@ -77,6 +78,16 @@ export const saveAdminUids = async (value: string[]): Promise<void> =>
 
 export const saveAttendanceLogs = async (value: AttendanceRecord[]): Promise<void> =>
   setValue(ATTENDANCE_LOGS_KEY, value);
+
+export type SmsNotificationRecipientState = {
+  enabledLearnerIds: string[];
+};
+
+export const loadSmsNotificationRecipientState = async (): Promise<SmsNotificationRecipientState | null> =>
+  getValue<SmsNotificationRecipientState>(SMS_NOTIFICATION_RECIPIENTS_KEY);
+
+export const saveSmsNotificationRecipientState = async (value: SmsNotificationRecipientState): Promise<void> =>
+  setValue(SMS_NOTIFICATION_RECIPIENTS_KEY, value);
 
 export type TeacherAttendanceRangeCache = {
   rows: AttendanceRecord[];
