@@ -524,6 +524,7 @@ function App() {
           lastScanResults={lastScanResults} 
           unknownTags={unknownTags} 
           settings={scheduleConfig}
+          monitorStatuses={monitors.map((monitor) => monitor.status)}
         />
       </>
     );

@@ -6,21 +6,51 @@ interface KioskStationCardProps {
   index: number;
   result: ScanResult | null;
   unknown: string | null;
+  isConnected: boolean;
 }
 
-const KioskStationCard: React.FC<KioskStationCardProps> = ({ index, result, unknown }) => {
+const KioskStationCard: React.FC<KioskStationCardProps> = ({ index, result, unknown, isConnected }) => {
   const isEmpty = !result && !unknown;
+  const isDisabled = !isConnected;
 
   return (
-    <section className="h-full min-w-0 overflow-hidden rounded-md border border-[#dfe4ee] bg-white shadow-[0_10px_24px_rgba(17,24,39,0.06)]">
+    <section className={`h-full min-w-0 overflow-hidden rounded-md border bg-white shadow-[0_10px_24px_rgba(17,24,39,0.06)] ${isDisabled ? 'border-gray-200 opacity-75 grayscale' : 'border-[#dfe4ee]'}`}>
       <div className="border-b border-[#e8edf5] px-5 py-4">
-        <div className="flex items-center justify-center gap-3">
-          <span className="h-3 w-3 rounded-md bg-[#123f9c]" />
-          <span className="text-[12px] font-black text-[#0f1f5e]">Station {index + 1}</span>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center justify-center gap-3">
+            <span className={`h-3 w-3 rounded-md ${isConnected ? 'bg-emerald-500' : 'bg-gray-300'}`} />
+            <span className="text-[12px] font-black text-[#0f1f5e]">Station {index + 1}</span>
+          </div>
+          <span
+            className={`inline-flex items-center gap-2 rounded-md border px-3 py-1 text-[10px] font-bold uppercase ${
+              isConnected
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                : 'border-gray-200 bg-gray-100 text-gray-500'
+            }`}
+          >
+            <span className={`h-2 w-2 rounded-full ${isConnected ? 'bg-emerald-500' : 'bg-gray-400'}`} aria-hidden="true" />
+            {isConnected ? 'Connected' : 'Disconnected'}
+          </span>
         </div>
       </div>
 
-      {isEmpty ? (
+      {isDisabled ? (
+        <div className="grid min-h-[22rem] place-items-center px-6 py-10 text-center">
+          <div className="flex flex-col items-center justify-center gap-5">
+            <div className="flex h-28 w-28 items-center justify-center rounded-md border border-gray-200 bg-gray-50">
+              <span className="material-symbols-outlined text-[3.8rem] leading-none text-gray-300">
+                usb_off
+              </span>
+            </div>
+            <h2 className="text-[clamp(1.05rem,2vw,1.55rem)] font-black text-gray-400">
+              Device Not Connected
+            </h2>
+            <p className="mt-3 max-w-[20rem] text-[11px] font-medium text-gray-500">
+              Connect a serial device to enable this station window.
+            </p>
+          </div>
+        </div>
+      ) : isEmpty ? (
         <div className="grid min-h-[22rem] place-items-center px-6 py-10 text-center">
           <div className="flex flex-col items-center justify-center gap-5">
             <div className="flex h-28 w-28 items-center justify-center rounded-md border border-[#dfe4ee] bg-[#f7f9fd]">

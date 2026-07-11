@@ -40,9 +40,11 @@ const BASE_SERVICES: LearnerServiceItem[] = [
   },
   {
     title: 'PTA Fee',
-    description: 'View your PTA transaction history, fee breakdown, and current balance.',
+    description: 'PTA fee services are temporarily unavailable and will reopen soon.',
     path: '/services/pta-fee',
-    actionLabel: 'Open PTA Fee',
+    actionLabel: 'Coming Soon',
+    isDisabled: true,
+    disabledMessage: 'PTA fee services are temporarily disabled.',
   },
   {
     title: 'Merch',
