@@ -1,17 +1,36 @@
 import type { LearnerPortalAccessRecord } from '../../auth/services/learnerAccess';
 import { useEffect, useMemo, useState } from 'react';
-import { loadLearnerPortalNotifications, type LearnerPortalNotificationRecord } from '../services/learnerPortalNotifications';
+import { createPortal } from 'react-dom';
+import { useNavigate } from 'react-router-dom';
+import {
+  isLearnerPortalNotificationRead,
+  loadLearnerPortalNotifications,
+  setLearnerPortalNotificationReadState,
+  subscribeLearnerPortalNotificationReadStateChange,
+  type LearnerPortalNotificationRecord,
+} from '../services/learnerPortalNotifications';
 import { loadLearnerPortalImportantDates, type LearnerPortalImportantDateRecord } from '../services/learnerPortalImportantDates';
+import { fetchLearnerPortalProfileEditingEnabled } from '../services/learnerPortalProfileEditing';
 
 type DashboardPageProps = {
   session: LearnerPortalAccessRecord;
 };
 
+const PROFILE_EDITING_NOTICE = {
+  id: 'learner-profile-self-service-editing',
+  notificationKey: 'learner-profile-self-service-editing',
+  updatedAt: 'enabled',
+};
+
 export function DashboardPage({ session }: DashboardPageProps) {
+  const navigate = useNavigate();
   const [notifications, setNotifications] = useState<LearnerPortalNotificationRecord[]>([]);
   const [importantDates, setImportantDates] = useState<LearnerPortalImportantDateRecord[]>([]);
+  const [isProfileEditingEnabled, setIsProfileEditingEnabled] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [, setReadStateRevision] = useState(0);
+  const [activeNotification, setActiveNotification] = useState<LearnerPortalNotificationRecord | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -19,13 +38,15 @@ export function DashboardPage({ session }: DashboardPageProps) {
       setIsLoading(true);
       setError('');
       try {
-        const [notificationRows, importantDateRows] = await Promise.all([
+        const [notificationRows, importantDateRows, profileEditingEnabled] = await Promise.all([
           loadLearnerPortalNotifications(),
           loadLearnerPortalImportantDates(),
+          fetchLearnerPortalProfileEditingEnabled(),
         ]);
         if (cancelled) return;
         setNotifications(notificationRows);
         setImportantDates(importantDateRows);
+        setIsProfileEditingEnabled(profileEditingEnabled);
       } catch (loadError: any) {
         if (!cancelled) setError(loadError?.message || 'Unable to load dashboard updates.');
       } finally {
@@ -38,15 +59,27 @@ export function DashboardPage({ session }: DashboardPageProps) {
     };
   }, []);
 
+  useEffect(() => subscribeLearnerPortalNotificationReadStateChange(() => setReadStateRevision((current) => current + 1)), []);
+
   const upcomingDates = useMemo(
     () => importantDates.slice(0, 4),
     [importantDates],
   );
 
+  const unreadNotificationCount = notifications.reduce((count, item) => count + (isLearnerPortalNotificationRead(item) ? 0 : 1), 0)
+    + (isProfileEditingEnabled && !isLearnerPortalNotificationRead(PROFILE_EDITING_NOTICE) ? 1 : 0);
+
   const dashboardCards = [
-    { label: 'Notifications', value: notifications.length, tone: 'blue' },
+    { label: 'Notifications', value: unreadNotificationCount, tone: 'blue' },
     { label: 'Important Dates', value: importantDates.length, tone: 'gold' },
   ];
+  const showEmptyNotificationsState = !isLoading && notifications.length === 0 && !isProfileEditingEnabled;
+  const showProfileEditingNotice = !isLoading && isProfileEditingEnabled;
+
+  const handleOpenNotification = (item: LearnerPortalNotificationRecord) => {
+    setLearnerPortalNotificationReadState(item, true);
+    setActiveNotification(item);
+  };
 
   return (
     <section className="section-shell">
@@ -95,29 +128,68 @@ export function DashboardPage({ session }: DashboardPageProps) {
         <article className="portal-panel learner-dashboard-panel">
           <header className="portal-panel__header learner-tab-header">
             <h2>Notifications</h2>
-            <p>Latest learner portal notices posted by Integrated Admin.</p>
+            <p>Latest learner portal notices and service updates.</p>
           </header>
           <div className="portal-panel__body learner-dashboard-panel__body">
             {isLoading ? <p className="learner-services-history__state">Loading notifications...</p> : null}
-            {!isLoading && !notifications.length ? (
+            {showEmptyNotificationsState ? (
               <div className="notice-box learner-hint__box">
                 <strong>No Notifications</strong>
                 <span>No active learner portal notifications are available right now.</span>
               </div>
             ) : null}
-            {notifications.map((item) => (
-              <article key={item.id} className={`learner-dashboard-card${item.isPinned ? ' is-pinned' : ''}`}>
+            {showProfileEditingNotice ? (
+              <button
+                type="button"
+                className="learner-dashboard-card learner-dashboard-card--actionable is-pinned"
+                onClick={() => {
+                  setLearnerPortalNotificationReadState(PROFILE_EDITING_NOTICE, true);
+                  setActiveNotification({
+                    id: PROFILE_EDITING_NOTICE.id,
+                    notificationKey: PROFILE_EDITING_NOTICE.notificationKey,
+                    title: 'Learner Profile Self-Service Editing',
+                    message: 'Your registrar has enabled learner profile self-service editing. You can update allowed profile details from the Profile page in School Portal.',
+                    isActive: true,
+                    isPinned: true,
+                    sortOrder: 0,
+                    createdAt: '',
+                    updatedAt: PROFILE_EDITING_NOTICE.updatedAt,
+                  });
+                }}
+              >
                 <div className="learner-dashboard-card__top">
                   <div>
-                    <p>{item.isPinned ? 'Pinned Notice' : 'Notification'}</p>
+                    <p>Pinned Notice</p>
+                    <h3>Learner Profile Self-Service Editing</h3>
+                  </div>
+                  <span className={`status-badge ${isLearnerPortalNotificationRead(PROFILE_EDITING_NOTICE) ? 'status-badge--success' : 'status-badge--warning'}`}>
+                    {isLearnerPortalNotificationRead(PROFILE_EDITING_NOTICE) ? 'Read' : 'Unread'}
+                  </span>
+                </div>
+                <p>
+                  Your registrar has enabled learner profile self-service editing. You can update allowed profile details
+                  from the Profile page in School Portal.
+                </p>
+              </button>
+            ) : null}
+            {notifications.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className={`learner-dashboard-card learner-dashboard-card--actionable${item.isPinned ? ' is-pinned' : ''}`}
+                onClick={() => handleOpenNotification(item)}
+              >
+                <div className="learner-dashboard-card__top">
+                  <div>
+                    <p>{item.isPinned ? 'Pinned Notice' : 'Portal Notice'}</p>
                     <h3>{item.title}</h3>
                   </div>
-                  <span className={`status-badge ${item.isPinned ? 'status-badge--warning' : 'status-badge--info'}`}>
-                    {item.isPinned ? 'Pinned' : 'New'}
+                  <span className={`status-badge ${isLearnerPortalNotificationRead(item) ? 'status-badge--success' : item.isPinned ? 'status-badge--warning' : 'status-badge--info'}`}>
+                    {isLearnerPortalNotificationRead(item) ? 'Read' : item.isPinned ? 'Pinned' : 'Unread'}
                   </span>
                 </div>
                 <p>{item.message}</p>
-              </article>
+              </button>
             ))}
           </div>
         </article>
@@ -150,6 +222,48 @@ export function DashboardPage({ session }: DashboardPageProps) {
           </div>
         </article>
       </div>
+
+      {activeNotification ? createPortal(
+        <div className="modal-overlay modal-overlay--high" role="presentation">
+          <div className="modal-backdrop" onClick={() => setActiveNotification(null)} />
+          <div className="modal-dialog modal-dialog--wide learner-dashboard-notification-modal" role="dialog" aria-modal="true" aria-label="Dashboard notification details">
+            <div className="modal-dialog__header">
+              <div className="modal-dialog__title-group">
+                <p className="modal-dialog__eyebrow">Dashboard Notice</p>
+                <h3>{activeNotification.title}</h3>
+              </div>
+              <button type="button" className="modal-dialog__close" onClick={() => setActiveNotification(null)} aria-label="Close notification">
+                <span className="material-symbols-outlined" aria-hidden="true">close</span>
+              </button>
+            </div>
+            <div className="modal-dialog__body">
+              <p className="learner-notifications-modal__summary">
+                {activeNotification.message}
+              </p>
+              {activeNotification.notificationKey === PROFILE_EDITING_NOTICE.notificationKey ? (
+                <div className="learner-notifications-modal__card-actions">
+                  <button
+                    type="button"
+                    className="modal-dialog__blue"
+                    onClick={() => {
+                      setActiveNotification(null);
+                      navigate('/profile');
+                    }}
+                  >
+                    Go to Profile
+                  </button>
+                </div>
+              ) : null}
+            </div>
+            <div className="modal-dialog__actions">
+              <button type="button" className="modal-dialog__blue" onClick={() => setActiveNotification(null)}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body,
+      ) : null}
     </section>
   );
 }

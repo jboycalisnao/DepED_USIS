@@ -23,6 +23,8 @@ export function ProfilePage({ session }: ProfilePageProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
 
+  const normalizeField = (value: string) => value.trim();
+
   const toEditableDraft = (record: LearnerProfileRecord): LearnerProfileEditableFields => ({
     address: record.address || '',
     contactNumber: record.contactNumber || '',
@@ -31,6 +33,13 @@ export function ProfilePage({ session }: ProfilePageProps) {
     guardianName: record.guardianName || '',
     motherName: record.motherName || '',
   });
+
+  const formatTimestamp = (value: string) => {
+    if (!value) return 'N/A';
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return value;
+    return parsed.toLocaleString('en-PH');
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -85,6 +94,14 @@ export function ProfilePage({ session }: ProfilePageProps) {
       .slice(0, 2)
       .map((token) => token.charAt(0).toUpperCase())
       .join('');
+  const hasEditableChanges = Boolean(profile && editDraft) && (
+    normalizeField(editDraft?.guardianName || '') !== normalizeField(profile?.guardianName || '') ||
+    normalizeField(editDraft?.fatherName || '') !== normalizeField(profile?.fatherName || '') ||
+    normalizeField(editDraft?.motherName || '') !== normalizeField(profile?.motherName || '') ||
+    normalizeField(editDraft?.contactNumber || '') !== normalizeField(profile?.contactNumber || '') ||
+    normalizeField(editDraft?.email || '') !== normalizeField(profile?.email || '') ||
+    normalizeField(editDraft?.address || '') !== normalizeField(profile?.address || '')
+  );
 
   const handleOpenCorrectionRequest = () => {
     navigate('/services/help-ticket?reason=main-info-correction');
@@ -95,7 +112,7 @@ export function ProfilePage({ session }: ProfilePageProps) {
     setIsSaving(true);
     setSaveFeedback(null);
     try {
-      await updateLearnerPortalProfileFields({
+      const updated = await updateLearnerPortalProfileFields({
         learnerId: profile.id || session.learnerId,
         lrn: profile.lrn || session.lrn,
         fields: editDraft,
@@ -105,6 +122,7 @@ export function ProfilePage({ session }: ProfilePageProps) {
           ? {
               ...current,
               ...editDraft,
+              updatedAt: updated.updatedAt || current.updatedAt,
             }
           : current,
       );
@@ -205,7 +223,12 @@ export function ProfilePage({ session }: ProfilePageProps) {
               {profileEditingEnabled ? (
                 <section className="learner-profile-card learner-profile-card--editor">
                   <div className="learner-profile-card__header">
-                    <h4>Editable Contact Details</h4>
+                    <div className="learner-profile-card__header-row">
+                      <h4>Editable Contact Details</h4>
+                      <span className="learner-profile-card__timestamp">
+                        Last edited: {formatTimestamp(profile?.updatedAt || '')}
+                      </span>
+                    </div>
                     <p>Update guardian, parent, contact, and address information here. Name, LRN, and birth date remain registrar-controlled.</p>
                   </div>
 
@@ -283,10 +306,18 @@ export function ProfilePage({ session }: ProfilePageProps) {
                     <button type="button" className="secondary-button" onClick={handleOpenCorrectionRequest}>
                       Request main information correction
                     </button>
-                    <button type="button" className="primary-button" disabled={isSaving || !editDraft} onClick={() => void handleSaveProfile()}>
+                    <button
+                      type="button"
+                      className="primary-button"
+                      disabled={isSaving || !editDraft || !hasEditableChanges}
+                      onClick={() => void handleSaveProfile()}
+                    >
                       {isSaving ? 'Saving...' : 'Save Contact Details'}
                     </button>
                   </div>
+                  {!hasEditableChanges ? (
+                    <p className="learner-profile-edit-actions__hint">No contact detail changes detected.</p>
+                  ) : null}
                 </section>
               ) : (
                 <article className="notice-box learner-hint__box">

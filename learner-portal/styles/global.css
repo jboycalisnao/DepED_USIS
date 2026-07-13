@@ -211,7 +211,7 @@ body {
   z-index: 40;
   min-width: 250px;
   border: 1px solid var(--deped-line);
-  border-radius: 12px;
+  border-radius: var(--learner-radius-md);
   background: #f9fafb;
   box-shadow: 0 14px 30px rgba(15, 23, 42, 0.18);
   padding: 14px 14px 10px;
@@ -391,7 +391,7 @@ body {
 .learner-tab-panel {
   margin-bottom: 12px;
   border: 1px solid var(--deped-line);
-  border-radius: 12px;
+  border-radius: var(--learner-radius-md);
   background: var(--deped-white);
   box-shadow: 0 6px 18px rgba(18, 35, 61, 0.06);
 }
@@ -469,7 +469,7 @@ body {
 }
 
 .learner-profile-surface {
-  border-radius: 12px;
+  border-radius: var(--learner-radius-md);
 }
 
 .learner-profile-body {
@@ -484,7 +484,7 @@ body {
   align-items: center;
   padding: 14px;
   border: 1px solid var(--deped-line);
-  border-radius: 12px;
+  border-radius: var(--learner-radius-md);
   background: #fbfcff;
 }
 
@@ -540,7 +540,7 @@ body {
 
 .learner-profile-card {
   border: 1px solid var(--deped-line);
-  border-radius: 12px;
+  border-radius: var(--learner-radius-md);
   background: #fbfcff;
   padding: 12px;
 }
@@ -622,6 +622,37 @@ body {
   min-width: 220px;
 }
 
+.learner-profile-edit-actions .primary-button:disabled {
+  border-color: #d0d5dd;
+  background: #e5e7eb;
+  color: #98a2b3;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+.learner-profile-card__header-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.learner-profile-card__timestamp {
+  color: var(--deped-muted);
+  font-size: 12px;
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.learner-profile-edit-actions__hint {
+  margin: 8px 0 0;
+  color: var(--deped-muted);
+  font-size: 12px;
+  font-weight: 400;
+  text-align: right;
+}
+
 .learner-dashboard-summary {
   display: grid;
   gap: 12px;
@@ -634,7 +665,7 @@ body {
   gap: 4px;
   padding: 14px;
   border: 1px solid var(--deped-line);
-  border-radius: 12px;
+  border-radius: var(--learner-radius-md);
   background: var(--deped-white);
 }
 
@@ -677,8 +708,27 @@ body {
   gap: 8px;
   padding: 14px;
   border: 1px solid var(--deped-line);
-  border-radius: 12px;
+  border-radius: var(--learner-radius-md);
   background: #fbfcff;
+}
+
+.learner-dashboard-card--actionable {
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  appearance: none;
+  font: inherit;
+  color: inherit;
+}
+
+.learner-dashboard-card--actionable:hover {
+  border-color: #b8cae8;
+  background: #f8fbff;
+}
+
+.learner-dashboard-card--actionable:focus-visible {
+  outline: 2px solid rgba(0, 56, 168, 0.3);
+  outline-offset: 2px;
 }
 
 .learner-dashboard-card.is-pinned,
@@ -734,10 +784,16 @@ body {
   font-weight: 400;
 }
 
+.learner-dashboard-notification-modal .modal-dialog__body {
+  display: grid;
+  gap: 12px;
+}
+
 .learner-notifications-trigger {
   position: relative;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
   min-height: 42px;
   padding: 0 14px;
@@ -754,6 +810,10 @@ body {
 .learner-notifications-trigger:hover {
   border-color: #b8cae8;
   background: #f8fbff;
+}
+
+.learner-notifications-trigger .material-symbols-outlined {
+  font-size: 20px;
 }
 
 .learner-notifications-trigger__badge {
@@ -792,7 +852,7 @@ body {
   gap: 8px;
   padding: 14px;
   border: 1px solid var(--deped-line);
-  border-radius: 12px;
+  border-radius: var(--learner-radius-md);
   background: #fbfcff;
 }
 
@@ -837,11 +897,41 @@ body {
   font-weight: 400;
 }
 
+.learner-notifications-modal__card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 10px;
+}
+
+.learner-notifications-modal__card-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--deped-blue);
+  border-radius: 0.375rem;
+  background: var(--deped-blue);
+  color: var(--deped-white);
+  font-size: var(--usis-helper-size);
+  font-weight: 700;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.learner-notifications-modal__read-button {
+  border: 1px solid #d0d5dd;
+  background: #ffffff;
+  color: #18345b;
+}
+
 .learner-portal-welcome {
   width: min(100%, 640px);
   margin: 0 auto;
   border: 1px solid var(--deped-line);
-  border-radius: 12px;
+  border-radius: var(--learner-radius-md);
   background: var(--deped-white);
   padding: 20px;
 }
@@ -881,7 +971,7 @@ body {
   overflow: hidden;
   margin-top: 14px;
   border: 1px solid var(--deped-line);
-  border-radius: 12px;
+  border-radius: var(--learner-radius-md);
   background: var(--deped-blue);
   padding: 48px 52px;
 }
@@ -988,6 +1078,15 @@ body {
 }
 
 @media (max-width: 720px) {
+  .learner-notifications-trigger {
+    min-height: 40px;
+    padding: 0 12px;
+  }
+
+  .learner-notifications-trigger__label {
+    display: none;
+  }
+
   .learner-portal-chrome .kit-nav__grid {
     grid-template-columns: 1fr;
     gap: 10px;
@@ -1209,7 +1308,7 @@ body {
 
 .learner-services-card {
   border: 1px solid var(--deped-line);
-  border-radius: 12px;
+  border-radius: var(--learner-radius-md);
   background: var(--deped-white);
   overflow: hidden;
   box-shadow: 0 6px 16px rgba(18, 35, 61, 0.08);
@@ -1332,7 +1431,7 @@ body {
   display: grid;
   gap: 12px;
   border: 1px solid var(--deped-line);
-  border-radius: 12px;
+  border-radius: var(--learner-radius-md);
   background: #ffffff;
   padding: 14px 16px;
   box-shadow: 0 8px 20px rgba(18, 35, 61, 0.06);
@@ -1412,7 +1511,7 @@ body {
 .learner-services-history {
   margin-top: 12px;
   border: 1px solid var(--deped-line);
-  border-radius: 12px;
+  border-radius: var(--learner-radius-md);
   background: var(--deped-white);
   padding: 12px;
 }
@@ -1495,7 +1594,7 @@ body {
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 8px;
   border: 1px solid var(--deped-line);
-  border-radius: 12px;
+  border-radius: var(--learner-radius-md);
   background: #fbfcff;
   padding: 10px;
 }
@@ -1589,7 +1688,7 @@ body {
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 10px;
   border: 1px solid var(--deped-line);
-  border-radius: 12px;
+  border-radius: var(--learner-radius-md);
   background: #fbfcff;
   padding: 12px;
 }
@@ -1622,7 +1721,7 @@ body {
 
 .pta-fee-kpi {
   border: 1px solid var(--deped-line);
-  border-radius: 12px;
+  border-radius: var(--learner-radius-md);
   background: var(--deped-white);
   padding: 10px;
 }
@@ -1649,7 +1748,7 @@ body {
 .pta-fee-progress {
   margin-top: 12px;
   border: 1px solid var(--deped-line);
-  border-radius: 12px;
+  border-radius: var(--learner-radius-md);
   background: var(--deped-white);
   padding: 10px;
 }
@@ -2056,7 +2155,7 @@ body {
   margin: 0;
   padding: 16px 12px;
   border: 1px solid #d0d5dd;
-  border-radius: 12px;
+  border-radius: var(--learner-radius-md);
   background: #ffffff;
   color: #667085;
   font-size: 13px;
@@ -2064,7 +2163,7 @@ body {
 
 .learner-attendance-table-mobile__month-card {
   border: 1px solid #d0d5dd;
-  border-radius: 12px;
+  border-radius: var(--learner-radius-md);
   background: #ffffff;
   overflow: hidden;
 }
@@ -2149,7 +2248,7 @@ body {
 
 .learner-attendance-table-mobile__day-card {
   border: 1px solid #d0d5dd;
-  border-radius: 10px;
+  border-radius: var(--learner-radius-md);
   background: #ffffff;
   overflow: hidden;
 }
@@ -3151,15 +3250,46 @@ body {
 
 @media (max-width: 520px) {
   .learner-attendance-records__controls {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: 44px minmax(0, 1fr) 44px;
+    gap: 8px;
   }
 
   .learner-attendance-records__nav-button {
-    display: none;
+    display: inline-flex;
+    width: 44px;
+    height: 44px;
   }
 
   .learner-attendance-records__month-pill {
-    min-height: 46px;
+    min-height: 44px;
+    padding: 0 10px;
+    font-size: 13px;
+    gap: 8px;
+  }
+
+  .learner-notifications-trigger {
+    width: 40px;
+    min-width: 40px;
+    padding: 0;
+    gap: 0;
+    border-radius: 999px;
+    justify-content: center;
+    overflow: visible;
+  }
+
+  .learner-notifications-trigger .material-symbols-outlined {
+    font-size: 20px;
+  }
+
+  .learner-notifications-trigger__badge {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    font-size: 11px;
+    box-shadow: 0 0 0 2px #ffffff;
   }
 
   .learner-attendance-records__calendar-head-cell {
@@ -3578,7 +3708,7 @@ body {
   width: min(100%, 560px);
   margin: 20px auto 0;
   border: 1px solid var(--deped-line);
-  border-radius: 12px;
+  border-radius: var(--learner-radius-md);
   background: var(--deped-white);
   box-shadow: 0 10px 24px rgba(18, 35, 61, 0.12);
   overflow: hidden;

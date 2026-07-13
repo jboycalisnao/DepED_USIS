@@ -46,16 +46,19 @@ export async function updateLearnerPortalProfileFields(input: {
     mother_name: toText(input.fields.motherName) || null,
   };
 
-  let query = supabase.from(LEARNER_TABLE).update(payload).select('id');
+  let query = supabase.from(LEARNER_TABLE).update(payload);
   if (learnerId) {
     query = query.eq('id', learnerId);
   } else {
     query = query.eq('lrn', lrn);
   }
 
-  const { data, error } = await query.maybeSingle();
+  const { data, error } = await query.select('id,updated_at').maybeSingle();
   if (error) throw new Error(error.message || 'Unable to update learner profile.');
   if (!data) throw new Error('No learner profile record was updated.');
 
-  return String((data as any)?.id || learnerId || lrn);
+  return {
+    id: String((data as any)?.id || learnerId || lrn),
+    updatedAt: String((data as any)?.updated_at || ''),
+  };
 }

@@ -214,8 +214,8 @@ export const fetchMerchControlSectionSnapshot = async (params: {
   if (lrnList.length > 0) {
     const ordersResult = await supabase
       .from('merch_orders')
+      .select('learner_lrn,created_at,order_status,order_kind')
       .eq('order_kind', 'merch')
-      .select('learner_lrn,created_at,order_status')
       .in('learner_lrn', lrnList)
       .order('created_at', { ascending: false });
     if (ordersResult.error) throw new Error(ordersResult.error.message || 'Unable to load section merch orders.');
