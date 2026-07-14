@@ -51,7 +51,7 @@ const mapProfile = (row: any): LearnerProfileRecord => ({
   sectionName: '',
   gradeLevel: '',
   program: '',
-  updatedAt: toText(row?.updated_at),
+  updatedAt: toText(row?.created_at),
 });
 
 export async function fetchLearnerProfile(input: { learnerId?: string; lrn?: string }) {
@@ -80,7 +80,7 @@ export async function fetchLearnerProfile(input: { learnerId?: string; lrn?: str
       email,
       login_username,
       login_status,
-      updated_at,
+      created_at,
       section_id,
       enrollment_history,
       registrar_sections (

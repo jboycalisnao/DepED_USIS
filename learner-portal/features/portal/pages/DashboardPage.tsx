@@ -2,6 +2,7 @@ import type { LearnerPortalAccessRecord } from '../../auth/services/learnerAcces
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
+import { fetchLearnerProfile, type LearnerProfileRecord } from '../services/learnerProfile';
 import {
   isLearnerPortalNotificationRead,
   loadLearnerPortalNotifications,
@@ -11,6 +12,7 @@ import {
 } from '../services/learnerPortalNotifications';
 import { loadLearnerPortalImportantDates, type LearnerPortalImportantDateRecord } from '../services/learnerPortalImportantDates';
 import { fetchLearnerPortalProfileEditingEnabled } from '../services/learnerPortalProfileEditing';
+import { LearnerDashboardCard } from '../components/LearnerDashboardCard';
 
 type DashboardPageProps = {
   session: LearnerPortalAccessRecord;
@@ -24,6 +26,7 @@ const PROFILE_EDITING_NOTICE = {
 
 export function DashboardPage({ session }: DashboardPageProps) {
   const navigate = useNavigate();
+  const [profile, setProfile] = useState<LearnerProfileRecord | null>(null);
   const [notifications, setNotifications] = useState<LearnerPortalNotificationRecord[]>([]);
   const [importantDates, setImportantDates] = useState<LearnerPortalImportantDateRecord[]>([]);
   const [isProfileEditingEnabled, setIsProfileEditingEnabled] = useState(false);
@@ -58,6 +61,22 @@ export function DashboardPage({ session }: DashboardPageProps) {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      try {
+        const learnerProfile = await fetchLearnerProfile({ learnerId: session.learnerId, lrn: session.lrn });
+        if (!cancelled) setProfile(learnerProfile);
+      } catch {
+        if (!cancelled) setProfile(null);
+      }
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [session.learnerId, session.lrn]);
 
   useEffect(() => subscribeLearnerPortalNotificationReadStateChange(() => setReadStateRevision((current) => current + 1)), []);
 
@@ -96,17 +115,23 @@ export function DashboardPage({ session }: DashboardPageProps) {
         <span>/</span>
         <span>Dashboard</span>
       </nav>
-      <header className="enrollment-status-hero" role="banner">
-        <div className="enrollment-status-hero__shape enrollment-status-hero__shape--left" aria-hidden="true" />
-        <div className="enrollment-status-hero__shape enrollment-status-hero__shape--right" aria-hidden="true" />
-        <h2>Welcome back, {session.learnerName}!</h2>
-        <p>Always stay updated with your learner records and service requests.</p>
-      </header>
+      <div className="learner-dashboard-top-grid">
+        <LearnerDashboardCard session={session} profile={profile} isLoading={isLoading} />
 
-      <article className="notice-box learner-hint__box">
-        <strong>Session Access</strong>
-        <span>Signed in as {session.username} (LRN: {session.lrn || 'N/A'}).</span>
-      </article>
+        <div className="learner-dashboard-top-stack">
+          <header className="enrollment-status-hero" role="banner">
+            <div className="enrollment-status-hero__shape enrollment-status-hero__shape--left" aria-hidden="true" />
+            <div className="enrollment-status-hero__shape enrollment-status-hero__shape--right" aria-hidden="true" />
+            <h2>Welcome back, {session.learnerName}!</h2>
+            <p>Always stay updated with your learner records and service requests.</p>
+          </header>
+
+          <article className="notice-box learner-hint__box">
+            <strong>Session Access</strong>
+            <span>Signed in as {session.username} (LRN: {session.lrn || 'N/A'}).</span>
+          </article>
+        </div>
+      </div>
 
       <div className="learner-dashboard-summary">
         {dashboardCards.map((card) => (
@@ -158,13 +183,15 @@ export function DashboardPage({ session }: DashboardPageProps) {
                 }}
               >
                 <div className="learner-dashboard-card__top">
-                  <div>
-                    <p>Pinned Notice</p>
+                  <div className="learner-dashboard-card__top-copy">
+                    <div className="learner-notice-tags">
+                      <span className="learner-notice-tag learner-notice-tag--pinned">Pinned Notice</span>
+                      <span className={`learner-notice-tag ${isLearnerPortalNotificationRead(PROFILE_EDITING_NOTICE) ? 'learner-notice-tag--success' : 'learner-notice-tag--warning'}`}>
+                        {isLearnerPortalNotificationRead(PROFILE_EDITING_NOTICE) ? 'Read' : 'Unread'}
+                      </span>
+                    </div>
                     <h3>Learner Profile Self-Service Editing</h3>
                   </div>
-                  <span className={`status-badge ${isLearnerPortalNotificationRead(PROFILE_EDITING_NOTICE) ? 'status-badge--success' : 'status-badge--warning'}`}>
-                    {isLearnerPortalNotificationRead(PROFILE_EDITING_NOTICE) ? 'Read' : 'Unread'}
-                  </span>
                 </div>
                 <p>
                   Your registrar has enabled learner profile self-service editing. You can update allowed profile details
@@ -180,13 +207,17 @@ export function DashboardPage({ session }: DashboardPageProps) {
                 onClick={() => handleOpenNotification(item)}
               >
                 <div className="learner-dashboard-card__top">
-                  <div>
-                    <p>{item.isPinned ? 'Pinned Notice' : 'Portal Notice'}</p>
+                  <div className="learner-dashboard-card__top-copy">
+                    <div className="learner-notice-tags">
+                      <span className={`learner-notice-tag ${item.isPinned ? 'learner-notice-tag--pinned' : 'learner-notice-tag--info'}`}>
+                        {item.isPinned ? 'Pinned Notice' : 'Portal Notice'}
+                      </span>
+                      <span className={`learner-notice-tag ${isLearnerPortalNotificationRead(item) ? 'learner-notice-tag--success' : item.isPinned ? 'learner-notice-tag--warning' : 'learner-notice-tag--info'}`}>
+                        {isLearnerPortalNotificationRead(item) ? 'Read' : item.isPinned ? 'Pinned' : 'Unread'}
+                      </span>
+                    </div>
                     <h3>{item.title}</h3>
                   </div>
-                  <span className={`status-badge ${isLearnerPortalNotificationRead(item) ? 'status-badge--success' : item.isPinned ? 'status-badge--warning' : 'status-badge--info'}`}>
-                    {isLearnerPortalNotificationRead(item) ? 'Read' : item.isPinned ? 'Pinned' : 'Unread'}
-                  </span>
                 </div>
                 <p>{item.message}</p>
               </button>
@@ -210,8 +241,12 @@ export function DashboardPage({ session }: DashboardPageProps) {
             {upcomingDates.map((item) => (
               <article key={item.id} className={`learner-dashboard-date${item.isPinned ? ' is-pinned' : ''}`}>
                 <div className="learner-dashboard-date__top">
-                  <div>
-                    <p>{item.isPinned ? 'Pinned Reminder' : 'Reminder'}</p>
+                  <div className="learner-dashboard-card__top-copy">
+                    <div className="learner-notice-tags">
+                      <span className={`learner-notice-tag ${item.isPinned ? 'learner-notice-tag--pinned' : 'learner-notice-tag--info'}`}>
+                        {item.isPinned ? 'Pinned Reminder' : 'Reminder'}
+                      </span>
+                    </div>
                     <h3>{item.title}</h3>
                   </div>
                   <strong>{item.dueDate || 'TBA'}</strong>

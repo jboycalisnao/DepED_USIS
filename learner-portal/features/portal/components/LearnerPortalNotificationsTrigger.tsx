@@ -124,13 +124,15 @@ export function LearnerPortalNotificationsTrigger({ learnerName }: LearnerPortal
                     {isProfileEditingEnabled ? (
                       <article className="learner-notifications-modal__card is-pinned learner-notifications-modal__card--system">
                         <div className="learner-notifications-modal__card-top">
-                          <div>
-                            <p className="learner-notifications-modal__eyebrow">Learner Portal</p>
+                          <div className="learner-notifications-modal__card-copy">
+                            <div className="learner-notice-tags">
+                              <span className="learner-notice-tag learner-notice-tag--pinned">Learner Portal</span>
+                              <span className={`learner-notice-tag ${isProfileEditingNoticeRead ? 'learner-notice-tag--success' : 'learner-notice-tag--warning'}`}>
+                                {isProfileEditingNoticeRead ? 'Read' : 'Unread'}
+                              </span>
+                            </div>
                             <h4>Learner Profile Self-Service Editing</h4>
                           </div>
-                          <span className={`status-badge ${isProfileEditingNoticeRead ? 'status-badge--success' : 'status-badge--warning'}`}>
-                            {isProfileEditingNoticeRead ? 'Read' : 'Unread'}
-                          </span>
                         </div>
                         <p>
                           Your registrar has enabled learner profile self-service editing. You can review and update allowed
@@ -163,13 +165,17 @@ export function LearnerPortalNotificationsTrigger({ learnerName }: LearnerPortal
                     {notificationEntries.map(({ item, isRead }) => (
                       <article key={item.id} className={`learner-notifications-modal__card${item.isPinned ? ' is-pinned' : ''}`}>
                         <div className="learner-notifications-modal__card-top">
-                          <div>
-                            <p className="learner-notifications-modal__eyebrow">{item.isPinned ? 'Pinned Notice' : 'Notification'}</p>
+                          <div className="learner-notifications-modal__card-copy">
+                            <div className="learner-notice-tags">
+                              <span className={`learner-notice-tag ${item.isPinned ? 'learner-notice-tag--pinned' : 'learner-notice-tag--info'}`}>
+                                {item.isPinned ? 'Pinned Notice' : 'Notification'}
+                              </span>
+                              <span className={`learner-notice-tag ${isRead ? 'learner-notice-tag--success' : item.isPinned ? 'learner-notice-tag--warning' : 'learner-notice-tag--info'}`}>
+                                {isRead ? 'Read' : item.isPinned ? 'Pinned' : 'Unread'}
+                              </span>
+                            </div>
                             <h4>{item.title}</h4>
                           </div>
-                          <span className={`status-badge ${isRead ? 'status-badge--success' : item.isPinned ? 'status-badge--warning' : 'status-badge--info'}`}>
-                            {isRead ? 'Read' : item.isPinned ? 'Pinned' : 'Unread'}
-                          </span>
                         </div>
                         <p>{item.message}</p>
                         {item.createdAt ? <small>{isRead ? 'Viewed' : 'Posted'} {formatDate(item.createdAt)}</small> : null}

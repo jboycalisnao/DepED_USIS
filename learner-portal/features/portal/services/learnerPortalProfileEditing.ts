@@ -53,12 +53,12 @@ export async function updateLearnerPortalProfileFields(input: {
     query = query.eq('lrn', lrn);
   }
 
-  const { data, error } = await query.select('id,updated_at').maybeSingle();
+  const { data, error } = await query.select('id').maybeSingle();
   if (error) throw new Error(error.message || 'Unable to update learner profile.');
   if (!data) throw new Error('No learner profile record was updated.');
 
   return {
     id: String((data as any)?.id || learnerId || lrn),
-    updatedAt: String((data as any)?.updated_at || ''),
+    updatedAt: new Date().toISOString(),
   };
 }
