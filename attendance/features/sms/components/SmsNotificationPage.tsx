@@ -1,77 +1,87 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { AttendanceSmsRecipientState, AttendanceSmsSettings, Learner } from '../../../types';
+import type { AttendanceSmsRecipientState, AttendanceSmsSettings, AttendanceSmsTestModeConfig, Learner, SmsQueueItem, SmsQueueLogEntry } from '../../../types';
 import { normalizePhilippineMobileNumber } from '../services/skySmsNotification';
 import SmsLogsAndQueueTab from './SmsLogsAndQueueTab';
-import { useSmsNotificationQueue, type SmsQueueRequest } from '../hooks/useSmsNotificationQueue';
+import type { SmsQueueStats } from '../hooks/useSmsNotificationQueue';
+import { normalizeRfidValue } from '../../../utils/rfid';
+import { formatSmsIsoTimestamp, renderSmsMessageTemplate } from '../utils/smsMessageTemplate';
 import {
   UsisGradeSectionList,
   type UsisGradeSectionListGrade,
 } from '../../../../common/components/ui/UsisGradeSectionList';
+import { UsisSearchableSelect } from '../../../../common/components/ui/UsisSearchableSelect';
 
 type Props = {
   learners: Learner[];
   smsSettings: AttendanceSmsSettings;
   smsRecipientState: AttendanceSmsRecipientState;
+  smsTestMode: AttendanceSmsTestModeConfig;
   onSmsRecipientStateChange: (value: AttendanceSmsRecipientState) => void;
+  onSmsTestModeChange: (value: AttendanceSmsTestModeConfig) => void;
+  smsTestStatus: string;
+  smsTestStatusTone: 'idle' | 'success' | 'error';
+  queueItems: SmsQueueItem[];
+  logEntries: SmsQueueLogEntry[];
+  clearHistory: () => void;
+  isProcessing: boolean;
+  stats: SmsQueueStats;
   isSettingsLoading: boolean;
 };
-
-const DEFAULT_EVENT_TIME = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
 const normalize = (value: unknown) => String(value ?? '').trim();
 
 const naturalSort = (a: string, b: string) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
 
-const resolveGenderTerm = (gender: string | null | undefined) => {
-  const normalized = normalize(gender).toLowerCase();
-  if (normalized === 'm' || normalized === 'male' || normalized.startsWith('male')) return 'son';
-  if (normalized === 'f' || normalized === 'female' || normalized.startsWith('female')) return 'daughter';
-  return 'child';
+const normalizeRecipientIds = (value: unknown): string[] =>
+  Array.isArray(value)
+    ? Array.from(new Set(value.map((item) => String(item || '').trim()).filter(Boolean))).sort()
+    : [];
+
+const areSameRecipientIds = (left: string[], right: string[]) => {
+  if (left.length !== right.length) return false;
+  return left.every((value, index) => value === right[index]);
 };
-
-const resolveAction = (value: string) => (value === 'exit' ? 'exited' : 'entered');
-
-const renderTemplate = (template: string, learner: Learner, eventTime: string, action: 'entry' | 'exit') =>
-  template
-    .replaceAll('{time}', eventTime || DEFAULT_EVENT_TIME)
-    .replaceAll('{action}', resolveAction(action))
-    .replaceAll('{gender_term}', resolveGenderTerm(learner.gender))
-    .replaceAll('{learner_name}', `${learner.first_name || ''} ${learner.last_name || ''}`.trim() || 'your learner')
-    .replaceAll('{school}', 'Leon NHS');
 
 const SmsNotificationPage = ({
   learners,
   smsSettings,
   smsRecipientState,
+  smsTestMode,
   onSmsRecipientStateChange,
+  onSmsTestModeChange,
+  smsTestStatus,
+  smsTestStatusTone,
+  queueItems,
+  logEntries,
+  clearHistory,
+  isProcessing,
+  stats,
   isSettingsLoading,
 }: Props) => {
   const [recipientIds, setRecipientIds] = useState<string[]>([]);
   const [query, setQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'recipient-availability' | 'sms-logs'>('recipient-availability');
-  const [isQueueing, setIsQueueing] = useState(false);
-  const [eventTime, setEventTime] = useState(DEFAULT_EVENT_TIME);
-  const [action, setAction] = useState<'entry' | 'exit'>('entry');
-  const [statusMessage, setStatusMessage] = useState('');
-  const [statusTone, setStatusTone] = useState<'idle' | 'success' | 'error'>('idle');
-  const [resultSummary, setResultSummary] = useState('');
   const hasHydratedRecipientState = useRef(false);
-  const { queueItems, logEntries, enqueueRequests, clearHistory, isProcessing, stats } = useSmsNotificationQueue();
 
   useEffect(() => {
     if (isSettingsLoading) return;
 
-    const nextRecipientIds = Array.from(
-      new Set((smsRecipientState.enabledLearnerIds || []).map((value) => String(value || '').trim()).filter(Boolean)),
-    );
-    setRecipientIds(nextRecipientIds);
+    const nextRecipientIds = normalizeRecipientIds(smsRecipientState.enabledLearnerIds);
+    if (!hasHydratedRecipientState.current) {
+      setRecipientIds((current) => (areSameRecipientIds(normalizeRecipientIds(current), nextRecipientIds) ? current : nextRecipientIds));
+    }
     hasHydratedRecipientState.current = true;
   }, [isSettingsLoading, smsRecipientState]);
 
   useEffect(() => {
     if (!hasHydratedRecipientState.current) return;
-    onSmsRecipientStateChange({ enabledLearnerIds: recipientIds });
-  }, [onSmsRecipientStateChange, recipientIds]);
+    const nextRecipientIds = normalizeRecipientIds(recipientIds);
+    if (areSameRecipientIds(nextRecipientIds, normalizeRecipientIds(smsRecipientState.enabledLearnerIds))) return;
+    const syncTimer = window.setTimeout(() => {
+      onSmsRecipientStateChange({ enabledLearnerIds: nextRecipientIds });
+    }, 250);
+    return () => window.clearTimeout(syncTimer);
+  }, [onSmsRecipientStateChange, recipientIds, smsRecipientState.enabledLearnerIds]);
 
   const learnersWithContacts = useMemo(
     () =>
@@ -91,24 +101,36 @@ const SmsNotificationPage = ({
     [learners, query],
   );
 
-  const selectedRecipients = useMemo(
-    () => learnersWithContacts.filter((row) => recipientIds.includes(row.learner.id) && Boolean(normalize(row.guardianContactNumber))),
-    [learnersWithContacts, recipientIds],
+  const learnerOptions = useMemo(
+    () =>
+      learners
+        .map((learner) => {
+          const fullName = `${learner.last_name || ''}, ${learner.first_name || ''}`.replace(/^,\s*/, '').trim() || 'Unnamed learner';
+          const section = [learner.grade_level, learner.section_name].filter(Boolean).join(' | ');
+          return {
+            value: learner.id,
+            label: section ? `${fullName} - ${section}` : fullName,
+          };
+        })
+        .sort((left, right) => naturalSort(left.label, right.label)),
+    [learners],
   );
-
-  const previewRecipient =
-    selectedRecipients[0] ||
-    learnersWithContacts.find((row) => Boolean(normalize(row.guardianContactNumber))) ||
-    null;
-  const previewMessage = previewRecipient
-    ? renderTemplate(smsSettings.messageTemplate, previewRecipient.learner, eventTime, action)
+  const selectedTestLearner = learners.find((learner) => learner.id === smsTestMode.learnerId) || null;
+  const testPreviewMessage = selectedTestLearner
+    ? renderSmsMessageTemplate(smsSettings.messageTemplate, selectedTestLearner, formatSmsIsoTimestamp(), smsTestMode.action)
     : '';
-  const previewLength = previewMessage.length;
-  const canSend = Boolean(smsSettings.apiKey.trim() && smsSettings.messageTemplate.trim() && selectedRecipients.length > 0 && !isQueueing);
+  const normalizedTestPhone = normalizePhilippineMobileNumber(smsTestMode.phoneNumber);
+
+  const updateSmsTestMode = (patch: Partial<AttendanceSmsTestModeConfig>) => {
+    onSmsTestModeChange({
+      ...smsTestMode,
+      ...patch,
+    });
+  };
 
   const toggleRecipient = (learnerId: string) => {
     setRecipientIds((current) =>
-      current.includes(learnerId) ? current.filter((value) => value !== learnerId) : [...current, learnerId],
+      normalizeRecipientIds(current.includes(learnerId) ? current.filter((value) => value !== learnerId) : [...current, learnerId]),
     );
   };
 
@@ -118,11 +140,11 @@ const SmsNotificationPage = ({
       const currentSet = new Set(current);
       if (!enabled) {
         eligibleIds.forEach((id) => currentSet.delete(id));
-        return Array.from(currentSet);
+        return normalizeRecipientIds(Array.from(currentSet));
       }
 
       eligibleIds.forEach((id) => currentSet.add(id));
-      return Array.from(currentSet);
+      return normalizeRecipientIds(Array.from(currentSet));
     });
   };
 
@@ -131,7 +153,7 @@ const SmsNotificationPage = ({
       setRecipientIds([]);
       return;
     }
-    setRecipientIds(learnersWithContacts.filter((row) => Boolean(row.guardianContactNumber)).map((row) => row.learner.id));
+    setRecipientIds(normalizeRecipientIds(learnersWithContacts.filter((row) => Boolean(row.guardianContactNumber)).map((row) => row.learner.id)));
   };
 
   const groupedGrades = useMemo<UsisGradeSectionListGrade[]>(() => {
@@ -202,6 +224,7 @@ const SmsNotificationPage = ({
                             type="checkbox"
                             checked={selected}
                             disabled={!eligible}
+                            onClick={(event) => event.stopPropagation()}
                             onChange={() => toggleRecipient(row.learner.id)}
                           />
                           <div className="attendance-sms-page__recipient-copy">
@@ -229,64 +252,6 @@ const SmsNotificationPage = ({
       });
   }, [learnersWithContacts, recipientIds]);
 
-  const handleSend = async () => {
-    if (!smsSettings.apiKey) {
-      setStatusTone('error');
-      setStatusMessage('Configure the SkySMS API key in Settings first.');
-      return;
-    }
-
-    if (!smsSettings.messageTemplate.trim()) {
-      setStatusTone('error');
-      setStatusMessage('Configure a message template in Settings first.');
-      return;
-    }
-
-    if (selectedRecipients.length === 0) {
-      setStatusTone('error');
-      setStatusMessage('Select at least one learner with a guardian or parent contact number.');
-      return;
-    }
-
-    setIsQueueing(true);
-    setStatusMessage('');
-    setStatusTone('idle');
-
-    try {
-      const requests: SmsQueueRequest[] = [];
-
-      selectedRecipients.forEach((row) => {
-        const phoneNumber = normalizePhilippineMobileNumber(row.guardianContactNumber);
-        if (!phoneNumber) {
-          throw new Error(`Invalid guardian or parent contact number for ${row.fullName}.`);
-        }
-
-        const message = renderTemplate(smsSettings.messageTemplate, row.learner, eventTime, action);
-        if (message.length > 160) {
-          throw new Error(`Template exceeded 160 characters for ${row.fullName}.`);
-        }
-
-        requests.push({
-          learnerId: row.learner.id,
-          learnerName: row.fullName,
-          phoneNumber,
-          message,
-          apiKey: smsSettings.apiKey,
-        });
-      });
-
-      const queuedCount = enqueueRequests(requests);
-      setStatusTone('success');
-      setStatusMessage(`Queued ${queuedCount} SMS request${queuedCount === 1 ? '' : 's'} for delivery.`);
-      setResultSummary(requests.map((request) => `${request.learnerName} -> ${request.phoneNumber}`).join('\n'));
-    } catch (error: any) {
-      setStatusTone('error');
-      setStatusMessage(error?.message || 'Unable to send SMS notifications.');
-    } finally {
-      setIsQueueing(false);
-    }
-  };
-
   const selectedCount = recipientIds.filter((id) => learnersWithContacts.some((row) => row.learner.id === id && Boolean(row.guardianContactNumber))).length;
   const eligibleCount = learnersWithContacts.filter((row) => Boolean(row.guardianContactNumber)).length;
 
@@ -311,6 +276,112 @@ const SmsNotificationPage = ({
               </p>
             </div>
             <div className="attendance-sms-page__status-badge">{smsSettings.apiKey ? 'Gateway Ready' : 'API Key Missing'}</div>
+          </div>
+        </section>
+
+        <section className="section-card attendance-sms-page__test-card rounded-md">
+          <div className="section-card__bar" />
+          <div className="section-card__content">
+            <div className="attendance-sms-page__form-head">
+              <div>
+                <h3>SMS Test Mode</h3>
+                <p>Use a temporary RFID and custom mobile number for gateway testing without saving the RFID to the learner record.</p>
+              </div>
+              <label className="registry-choice-option registry-radio-option--toggle attendance-sms-test-toggle">
+                <span className="registry-choice-option__text">
+                  <span className="registry-choice-option__label">{smsTestMode.isEnabled ? 'Test Mode On' : 'Test Mode Off'}</span>
+                </span>
+                <input
+                  type="checkbox"
+                  checked={smsTestMode.isEnabled}
+                  onChange={(event) => updateSmsTestMode({ isEnabled: event.target.checked })}
+                />
+              </label>
+            </div>
+
+            <div className="floating-field-grid floating-field-grid--two attendance-sms-page__test-grid">
+              <div className="floating-field attendance-sms-page__field--full">
+                <UsisSearchableSelect
+                  ariaLabel="Select SMS test learner"
+                  floatingLabel
+                  label="Select learner from registry"
+                  options={learnerOptions}
+                  value={smsTestMode.learnerId}
+                  onChange={(learnerId) => updateSmsTestMode({ learnerId })}
+                  placeholder="Search learner"
+                  forcePortalMenu
+                />
+                <small>The selected learner supplies the message placeholders only.</small>
+              </div>
+
+              <label className="floating-field">
+                <div className="floating-field__control">
+                  <input
+                    type="text"
+                    value={smsTestMode.temporaryRfid}
+                    onChange={(event) => updateSmsTestMode({ temporaryRfid: normalizeRfidValue(event.target.value) })}
+                    placeholder=" "
+                    data-has-value={smsTestMode.temporaryRfid.trim() ? 'true' : 'false'}
+                  />
+                  <span>Temporary RFID</span>
+                </div>
+                <small>Stored in local browser cache only.</small>
+              </label>
+
+              <label className="floating-field">
+                <div className="floating-field__control">
+                  <input
+                    type="tel"
+                    value={smsTestMode.phoneNumber}
+                    onChange={(event) => updateSmsTestMode({ phoneNumber: event.target.value })}
+                    placeholder=" "
+                    data-has-value={smsTestMode.phoneNumber.trim() ? 'true' : 'false'}
+                  />
+                  <span>Custom Mobile Number</span>
+                </div>
+                <small>{smsTestMode.phoneNumber.trim() && !normalizedTestPhone ? 'Use a valid Philippine mobile number.' : 'SMS is sent to this number only.'}</small>
+              </label>
+
+              <fieldset className="registry-choice-group attendance-sms-page__field--full">
+                <legend>Test Message Action</legend>
+                <label className="registry-choice-option">
+                  <span className="registry-choice-option__text">
+                    <span className="registry-choice-option__label">Enter</span>
+                    <span className="registry-choice-option__description">Send the entry wording when the temporary RFID is scanned.</span>
+                  </span>
+                  <input
+                    type="radio"
+                    name="attendance-sms-test-action"
+                    checked={smsTestMode.action === 'entry'}
+                    onChange={() => updateSmsTestMode({ action: 'entry' })}
+                  />
+                </label>
+                <label className="registry-choice-option">
+                  <span className="registry-choice-option__text">
+                    <span className="registry-choice-option__label">Exit</span>
+                    <span className="registry-choice-option__description">Send the exit wording when the temporary RFID is scanned.</span>
+                  </span>
+                  <input
+                    type="radio"
+                    name="attendance-sms-test-action"
+                    checked={smsTestMode.action === 'exit'}
+                    onChange={() => updateSmsTestMode({ action: 'exit' })}
+                  />
+                </label>
+                <small>The scanned test RFID sends this selected action.</small>
+              </fieldset>
+
+              <div className="notice-box attendance-sms-test-preview attendance-sms-page__field--full">
+                <strong>Preview</strong>
+                <p>{testPreviewMessage || 'Select a learner to preview the test message.'}</p>
+              </div>
+            </div>
+
+            {smsTestStatus ? (
+              <p className={`attendance-sms-page__status attendance-sms-page__status--${smsTestStatusTone === 'success' ? 'success' : smsTestStatusTone === 'error' ? 'error' : 'idle'}`}>
+                {smsTestStatus}
+              </p>
+            ) : null}
           </div>
         </section>
 
@@ -379,37 +450,6 @@ const SmsNotificationPage = ({
                 expandAll={Boolean(query.trim())}
                 emptyMessage="No learners loaded."
               />
-
-              <div className="attendance-sms-page__preview-grid">
-                <label className="attendance-sms-page__field">
-                  <span>Event Time</span>
-                  <input type="text" value={eventTime} onChange={(event) => setEventTime(event.target.value)} placeholder="08:20 AM" className="rounded-md" />
-                </label>
-
-                <label className="attendance-sms-page__field">
-                  <span>Action</span>
-                  <select value={action} onChange={(event) => setAction(event.target.value as 'entry' | 'exit')} className="rounded-md">
-                    <option value="entry">Entered</option>
-                    <option value="exit">Exited</option>
-                  </select>
-                </label>
-
-                <label className="attendance-sms-page__field attendance-sms-page__field--full">
-                  <span>Message Preview</span>
-                  <textarea value={previewMessage} readOnly rows={4} className="rounded-md" />
-                  <small>{previewLength}/160 characters</small>
-                </label>
-              </div>
-
-              <div className="form-actions attendance-sms-page__actions">
-                <button type="button" className="primary-button rounded-md" onClick={() => void handleSend()} disabled={!canSend}>
-                  {isQueueing ? 'Queueing...' : `Queue ${selectedCount} learner${selectedCount === 1 ? '' : 's'}`}
-                </button>
-              </div>
-
-              {statusMessage ? <p className={`attendance-sms-page__status attendance-sms-page__status--${statusTone}`}>{statusMessage}</p> : null}
-
-              {resultSummary ? <pre className="attendance-sms-page__payload rounded-md">{resultSummary}</pre> : null}
             </div>
           </section>
         ) : (

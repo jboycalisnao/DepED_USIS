@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { BrowserRouter, NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { BrowserRouter, NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { UsisUnifiedHeader } from '../common/header/UsisUnifiedHeader';
 import { UsisGlobalFooter } from '../common/footer/UsisGlobalFooter';
 import { UsisSideNav, type UsisSideNavItem } from '../common/components/UsisSideNav';
@@ -33,12 +33,80 @@ import { LearnerPortalSeo } from './components/ui/LearnerPortalSeo';
 import { LearnerPortalNotificationsTrigger } from './features/portal/components/LearnerPortalNotificationsTrigger';
 
 const LEARNER_PORTAL_BASENAME = '/learner-portal';
+const LEARNER_PORTAL_RETURN_TO_KEY = 'learner_portal_return_to';
+const PUBLIC_LEARNER_PATHS = new Set(['/login', '/get-credential']);
+const PRIVATE_LEARNER_PATHS = new Set([
+  '/',
+  '/grades',
+  '/services',
+  '/services/attedance',
+  '/services/attendance',
+  '/services/enrollment-history',
+  '/services/document-requests',
+  '/services/student-support',
+  '/services/help-ticket',
+  '/services/pta-fee',
+  '/services/merch',
+  '/services/id',
+  '/services/merch-control',
+  '/profile',
+]);
+
+const normalizeLearnerPortalPath = (pathname: string) => {
+  const cleanPath = String(pathname || '/').trim() || '/';
+  if (cleanPath === '/') return cleanPath;
+  return cleanPath.replace(/\/+$/, '');
+};
+
+const stripLearnerPortalBasename = (pathname: string, basename = LEARNER_PORTAL_BASENAME) => {
+  const normalizedPath = normalizeLearnerPortalPath(pathname);
+  if (!basename) return normalizedPath;
+  if (normalizedPath === basename) return '/';
+  if (normalizedPath.startsWith(`${basename}/`)) {
+    return normalizeLearnerPortalPath(normalizedPath.slice(basename.length) || '/');
+  }
+  return normalizedPath;
+};
 
 function resolveLearnerPortalBasename(pathname: string): string {
   return pathname === LEARNER_PORTAL_BASENAME || pathname.startsWith(`${LEARNER_PORTAL_BASENAME}/`)
     ? LEARNER_PORTAL_BASENAME
     : '';
 }
+
+const resolveLearnerReturnPath = (pathname: string, search = '', hash = '') => {
+  const normalizedPath = stripLearnerPortalBasename(pathname);
+  if (!PRIVATE_LEARNER_PATHS.has(normalizedPath)) return '';
+  const routedPath = normalizedPath === '/services/attedance' ? '/services/attendance' : normalizedPath;
+  return `${routedPath}${search}${hash}`;
+};
+
+const resolveWindowLearnerReturnPath = (basename: string) => {
+  if (typeof window === 'undefined') return '';
+  const rawPath = window.location.pathname || '/';
+  const routedPath = stripLearnerPortalBasename(rawPath, basename);
+  return resolveLearnerReturnPath(routedPath, window.location.search, window.location.hash);
+};
+
+const readStoredLearnerReturnPath = () => {
+  if (typeof window === 'undefined') return '';
+  const storedPath = window.sessionStorage.getItem(LEARNER_PORTAL_RETURN_TO_KEY) || '';
+  const url = new URL(storedPath || '/', window.location.origin);
+  return resolveLearnerReturnPath(url.pathname, url.search, url.hash);
+};
+
+const storeLearnerReturnPath = (returnPath: string) => {
+  if (typeof window === 'undefined' || !returnPath) return;
+  const url = new URL(returnPath, window.location.origin);
+  const normalizedReturnPath = resolveLearnerReturnPath(url.pathname, url.search, url.hash);
+  if (!normalizedReturnPath) return;
+  window.sessionStorage.setItem(LEARNER_PORTAL_RETURN_TO_KEY, normalizedReturnPath);
+};
+
+const clearLearnerReturnPath = () => {
+  if (typeof window === 'undefined') return;
+  window.sessionStorage.removeItem(LEARNER_PORTAL_RETURN_TO_KEY);
+};
 
 function LearnerPortalShell({
   session,
@@ -106,6 +174,7 @@ function LearnerPortalShell({
                 <Route path="/" element={<DashboardPage session={session} />} />
                 <Route path="/grades" element={<GradesPage session={session} />} />
                 <Route path="/services" element={<ServicesPage session={session} />} />
+                <Route path="/services/attedance" element={<Navigate to="/services/attendance" replace />} />
                 <Route path="/services/attendance" element={<AttendanceServicePage session={session} />} />
                 <Route path="/services/enrollment-history" element={<EnrollmentHistoryServicePage session={session} />} />
                 <Route path="/services/document-requests" element={<DocumentRequestsServicePage />} />
@@ -129,11 +198,47 @@ function LearnerPortalShell({
 
 export default function App() {
   const basename = resolveLearnerPortalBasename(window.location.pathname);
+  const initialReturnPath = resolveWindowLearnerReturnPath(basename);
+  if (initialReturnPath && !getStoredLearnerAccess()) {
+    storeLearnerReturnPath(initialReturnPath);
+  }
+
+  return (
+    <BrowserRouter basename={basename}>
+      <LearnerPortalAppContent />
+    </BrowserRouter>
+  );
+}
+
+function LearnerPortalAppContent() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [session, setSession] = useState<LearnerPortalAccessRecord | null>(() => getStoredLearnerAccess());
+  const returnPathRef = useRef(readStoredLearnerReturnPath());
+  const [postLoginReturnPath, setPostLoginReturnPath] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (session) return;
+    if (PUBLIC_LEARNER_PATHS.has(location.pathname)) return;
+    const returnPath = resolveLearnerReturnPath(location.pathname, location.search, location.hash);
+    if (returnPath) {
+      returnPathRef.current = returnPath;
+      storeLearnerReturnPath(returnPath);
+    }
+  }, [location.hash, location.pathname, location.search, session]);
+
+  useEffect(() => {
+    if (!session || !postLoginReturnPath) return;
+    const currentPath = `${location.pathname}${location.search}${location.hash}`;
+    if (currentPath === postLoginReturnPath) {
+      setPostLoginReturnPath('');
+    }
+  }, [location.hash, location.pathname, location.search, postLoginReturnPath, session]);
+
   const handleUsernameChange = (value: string) => {
     setUsername(value.replace(/\D/g, '').slice(0, 12));
   };
@@ -145,6 +250,10 @@ export default function App() {
 
     const result = await resolveLearnerAccess(username, password);
     if (result.record) {
+      const returnPath = returnPathRef.current || readStoredLearnerReturnPath();
+      clearLearnerReturnPath();
+      returnPathRef.current = '';
+      setPostLoginReturnPath(returnPath);
       storeLearnerAccess(result.record);
       setSession(result.record);
       setUsername('');
@@ -161,40 +270,46 @@ export default function App() {
     clearStoredLearnerAccess();
     clearLearnerPortalCache();
     setSession(null);
+    navigate('/login', { replace: true });
   };
 
-  return (
-    <BrowserRouter basename={basename}>
-      <div className="learner-portal-app">
-        <UsisPortalGate moduleKey="learner_portal" />
-        <LearnerPortalSeo isAuthenticated={Boolean(session)} />
-        <header className="site-chrome learner-portal-chrome">
-          <div className="content-width">
-            <UsisUnifiedHeader searchId="learner-portal-search" searchLabel="Search school portal" />
-          </div>
-        </header>
+  const currentPath = `${location.pathname}${location.search}${location.hash}`;
+  const shouldRestorePostLoginPath = Boolean(
+    session && postLoginReturnPath && currentPath !== postLoginReturnPath,
+  );
 
-        {!session ? (
-          <LearnerPublicAccess
-            username={username}
-            password={password}
-            isSubmitting={isSubmitting}
-            loginError={loginError}
-            onDismissNotice={() => setLoginError(null)}
-            onUsernameChange={handleUsernameChange}
-            onPasswordChange={setPassword}
-            onSubmit={handleSubmit}
-            onPrefillLogin={(nextUsername, nextPassword) => {
-              setUsername(nextUsername.replace(/\D/g, '').slice(0, 12));
-              setPassword(nextPassword);
-              setLoginError(null);
-            }}
-          />
-        ) : (
-          <LearnerPortalShell session={session} onLogout={handleLogout} />
-        )}
-      </div>
-    </BrowserRouter>
+  return (
+    <div className="learner-portal-app">
+      <UsisPortalGate moduleKey="learner_portal" />
+      <LearnerPortalSeo isAuthenticated={Boolean(session)} />
+      <header className="site-chrome learner-portal-chrome">
+        <div className="content-width">
+          <UsisUnifiedHeader searchId="learner-portal-search" searchLabel="Search school portal" />
+        </div>
+      </header>
+
+      {!session ? (
+        <LearnerPublicAccess
+          username={username}
+          password={password}
+          isSubmitting={isSubmitting}
+          loginError={loginError}
+          onDismissNotice={() => setLoginError(null)}
+          onUsernameChange={handleUsernameChange}
+          onPasswordChange={setPassword}
+          onSubmit={handleSubmit}
+          onPrefillLogin={(nextUsername, nextPassword) => {
+            setUsername(nextUsername.replace(/\D/g, '').slice(0, 12));
+            setPassword(nextPassword);
+            setLoginError(null);
+          }}
+        />
+      ) : shouldRestorePostLoginPath ? (
+        <Navigate to={postLoginReturnPath} replace />
+      ) : (
+        <LearnerPortalShell session={session} onLogout={handleLogout} />
+      )}
+    </div>
   );
 }
 

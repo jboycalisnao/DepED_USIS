@@ -33,7 +33,8 @@ const createId = () => globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Mat
 
 const delay = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms));
 
-const randomDelayMs = () => 1000 + Math.floor(Math.random() * 1001);
+const MIN_QUEUE_INTERVAL_MS = 1000;
+const randomDelayMs = () => MIN_QUEUE_INTERVAL_MS + Math.floor(Math.random() * 1001);
 
 const normalizeStatus = (value: unknown): SmsQueueStatus => {
   const status = String(value || '').trim();

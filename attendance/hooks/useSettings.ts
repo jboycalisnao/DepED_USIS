@@ -46,7 +46,12 @@ const DEFAULT_SMS_RECIPIENT_STATE: AttendanceSmsRecipientState = {
 
 const DEFAULT_SMS_SETTINGS: AttendanceSmsSettings = {
   apiKey: '',
-  messageTemplate: 'Hello! This is to inform you that your {gender_term} has entered/exited Leon NHS at {time}. Thank you.',
+  messageTemplate: 'Hello! This is to inform you that your {gender_term} has {action} Leon NHS at {time}. Thank you.',
+};
+
+const normalizeSmsMessageTemplate = (value: unknown) => {
+  const template = String(value || DEFAULT_SMS_SETTINGS.messageTemplate).trim();
+  return template.replaceAll('entered/exited', '{action}');
 };
 
 const readCachedSchedule = (): AttendanceScheduleConfig => {
@@ -108,7 +113,7 @@ const readCachedSmsSettings = (): AttendanceSmsSettings => {
     const parsed = JSON.parse(raw) as Partial<AttendanceSmsSettings>;
     return {
       apiKey: String(parsed.apiKey || '').trim(),
-      messageTemplate: String(parsed.messageTemplate || DEFAULT_SMS_SETTINGS.messageTemplate).trim(),
+      messageTemplate: normalizeSmsMessageTemplate(parsed.messageTemplate),
     };
   } catch {
     return DEFAULT_SMS_SETTINGS;
@@ -276,7 +281,7 @@ export const useSettings = () => {
         if ('sms_settings' in (row || {}) && row?.sms_settings) {
           setSmsSettings({
             apiKey: String(row.sms_settings.apiKey || '').trim(),
-            messageTemplate: String(row.sms_settings.messageTemplate || DEFAULT_SMS_SETTINGS.messageTemplate).trim(),
+            messageTemplate: normalizeSmsMessageTemplate(row.sms_settings.messageTemplate),
           });
         }
 
@@ -392,7 +397,7 @@ export const useSettings = () => {
   const updateSmsSettings = (nextSmsSettings: AttendanceSmsSettings) => {
     setSmsSettings({
       apiKey: String(nextSmsSettings.apiKey || '').trim(),
-      messageTemplate: String(nextSmsSettings.messageTemplate || DEFAULT_SMS_SETTINGS.messageTemplate).trim(),
+      messageTemplate: normalizeSmsMessageTemplate(nextSmsSettings.messageTemplate),
     });
   };
 

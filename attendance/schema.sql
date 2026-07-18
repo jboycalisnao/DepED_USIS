@@ -41,7 +41,7 @@ create table if not exists public.attendance_settings (
   }'::jsonb,
   sms_settings jsonb not null default '{
     "apiKey": "",
-    "messageTemplate": "Hello! This is to inform you that your {gender_term} has entered/exited Leon NHS at {time}. Thank you."
+    "messageTemplate": "Hello! This is to inform you that your {gender_term} has {action} Leon NHS at {time}. Thank you."
   }'::jsonb,
   sms_recipient_state jsonb not null default '{
     "enabledLearnerIds": []
@@ -100,7 +100,7 @@ alter table if exists public.attendance_settings
 alter table if exists public.attendance_settings
   add column if not exists sms_settings jsonb not null default '{
     "apiKey": "",
-    "messageTemplate": "Hello! This is to inform you that your {gender_term} has entered/exited Leon NHS at {time}. Thank you."
+    "messageTemplate": "Hello! This is to inform you that your {gender_term} has {action} Leon NHS at {time}. Thank you."
   }'::jsonb;
 
 alter table if exists public.attendance_settings
@@ -160,7 +160,7 @@ values (
   }'::jsonb,
   '{
     "apiKey": "",
-    "messageTemplate": "Hello! This is to inform you that your {gender_term} has entered/exited Leon NHS at {time}. Thank you."
+    "messageTemplate": "Hello! This is to inform you that your {gender_term} has {action} Leon NHS at {time}. Thank you."
   }'::jsonb,
   '{
     "enabledLearnerIds": []

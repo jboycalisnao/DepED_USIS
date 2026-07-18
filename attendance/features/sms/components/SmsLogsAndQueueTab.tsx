@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
 import type { SmsQueueStats } from '../hooks/useSmsNotificationQueue';
 import type { SmsQueueItem, SmsQueueLogEntry, SmsQueueLogLevel } from '../../../types';
+import { formatSmsIsoTimestamp } from '../utils/smsMessageTemplate';
+import { UsisSearchableSelect } from '../../../../common/components/ui/UsisSearchableSelect';
 
 type Props = {
   queueItems: SmsQueueItem[];
@@ -14,7 +16,7 @@ const formatTimestamp = (value: string) => {
   if (!value) return '--';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '--';
-  return date.toLocaleString();
+  return formatSmsIsoTimestamp(date);
 };
 
 const getStatusLabel = (status: SmsQueueItem['status']) => {
@@ -26,6 +28,12 @@ const getStatusLabel = (status: SmsQueueItem['status']) => {
 
 const SmsLogsAndQueueTab = ({ queueItems, logEntries, stats, isProcessing, onClearHistory }: Props) => {
   const [logFilter, setLogFilter] = useState<'all' | SmsQueueLogLevel>('all');
+  const logFilterOptions = [
+    { value: 'all', label: 'All logs' },
+    { value: 'info', label: 'Info' },
+    { value: 'success', label: 'Success' },
+    { value: 'error', label: 'Error' },
+  ];
 
   const visibleLogEntries = useMemo(
     () => (logFilter === 'all' ? logEntries : logEntries.filter((entry) => entry.level === logFilter)),
@@ -45,10 +53,10 @@ const SmsLogsAndQueueTab = ({ queueItems, logEntries, stats, isProcessing, onCle
               </p>
             </div>
             <div className="attendance-sms-page__logs-actions">
-              <div className={`attendance-sms-page__processing-pill ${isProcessing ? 'is-active' : ''}`}>
+              <div className={`attendance-sms-page__processing-pill registry-choice-option ${isProcessing ? 'is-active' : ''}`}>
                 {isProcessing ? 'Processing queue' : 'Queue idle'}
               </div>
-              <button type="button" className="secondary-button rounded-md" onClick={onClearHistory} disabled={queueItems.length === 0 && logEntries.length === 0}>
+              <button type="button" className="secondary-button" onClick={onClearHistory} disabled={queueItems.length === 0 && logEntries.length === 0}>
                 Clear History
               </button>
             </div>
@@ -135,40 +143,55 @@ const SmsLogsAndQueueTab = ({ queueItems, logEntries, stats, isProcessing, onCle
               </div>
 
               <div className="attendance-sms-page__logs-filter">
-                <label className="attendance-sms-page__logs-filter-label" htmlFor="attendance-sms-log-filter">
-                  Filter
-                </label>
-                <select
-                  id="attendance-sms-log-filter"
-                  className="attendance-sms-page__logs-filter-select rounded-md"
+                <UsisSearchableSelect
+                  ariaLabel="Filter SMS activity logs"
+                  floatingLabel
+                  label="Filter"
+                  options={logFilterOptions}
                   value={logFilter}
-                  onChange={(event) => setLogFilter(event.target.value as 'all' | SmsQueueLogLevel)}
-                >
-                  <option value="all">All logs</option>
-                  <option value="info">Info</option>
-                  <option value="success">Success</option>
-                  <option value="error">Error</option>
-                </select>
+                  onChange={(value) => setLogFilter(value as 'all' | SmsQueueLogLevel)}
+                  allowTyping={false}
+                  forcePortalMenu
+                />
               </div>
             </div>
 
-            <div className="attendance-sms-page__log-list">
-              {visibleLogEntries.length === 0 ? (
-                <p className="attendance-sms-page__empty-log">No activity recorded yet.</p>
-              ) : (
-                visibleLogEntries
-                  .slice()
-                  .reverse()
-                  .map((entry) => (
-                    <article key={entry.id} className={`attendance-sms-page__log-entry attendance-sms-page__log-entry--${entry.level}`}>
-                      <div className="attendance-sms-page__log-entry-head">
-                        <strong>{entry.title}</strong>
-                        <span>{formatTimestamp(entry.timestamp)}</span>
-                      </div>
-                      {entry.detail ? <p>{entry.detail}</p> : null}
-                    </article>
-                  ))
-              )}
+            <div className="attendance-sms-page__queue-table-wrap">
+              <table className="attendance-sms-page__queue-table attendance-sms-page__log-table">
+                <thead>
+                  <tr>
+                    <th>Time</th>
+                    <th>Level</th>
+                    <th>Event</th>
+                    <th>Detail</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibleLogEntries.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="attendance-sms-page__empty-cell">
+                        No activity recorded yet.
+                      </td>
+                    </tr>
+                  ) : (
+                    visibleLogEntries
+                      .slice()
+                      .reverse()
+                      .map((entry) => (
+                        <tr key={entry.id}>
+                          <td>{formatTimestamp(entry.timestamp)}</td>
+                          <td>
+                            <span className={`attendance-sms-page__status-chip attendance-sms-page__status-chip--${entry.level}`}>
+                              {entry.level}
+                            </span>
+                          </td>
+                          <td>{entry.title}</td>
+                          <td>{entry.detail || '--'}</td>
+                        </tr>
+                      ))
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>

@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { createPortal } from 'react-dom';
 
 interface ConfirmationModalProps {
   isOpen: boolean;
@@ -23,70 +23,37 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
   cancelLabel = 'Cancel',
   variant = 'danger'
 }) => {
-  return (
-    <AnimatePresence>
-      {isOpen && (
-        <div className="fixed inset-0 z-[3000] flex items-center justify-center p-4">
-          {/* Backdrop */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-            className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm"
-          />
+  if (!isOpen) return null;
 
-          {/* Modal Content */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="relative w-full max-w-md bg-white rounded-md shadow-2xl border border-gray-100 overflow-hidden"
-          >
-            <div className="p-8">
-              <div className="flex items-center gap-4 mb-6">
-                <div className={`w-12 h-12 rounded-md flex items-center justify-center ${
-                  variant === 'danger' ? 'bg-accent-50 text-accent-600' : 'bg-primary-50 text-primary-600'
-                }`}>
-                  <span className="material-symbols-outlined text-2xl leading-none">
-                    {variant === 'danger' ? 'delete_forever' : 'help'}
-                  </span>
-                </div>
-                <h3 className="text-xl font-black text-gray-900 uppercase tracking-tight">{title}</h3>
-              </div>
+  const toneClass = variant === 'danger' ? 'alert-modal--danger' : '';
+  const confirmClass = variant === 'danger' ? 'alert-modal__danger' : 'alert-modal__blue';
 
-              <p className="text-gray-500 text-sm leading-relaxed font-medium mb-8">
-                {message}
-              </p>
-
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="flex-1 px-6 py-3.5 rounded-md text-xs font-black uppercase tracking-widest text-gray-500 hover:bg-gray-50 border border-gray-200 transition-all active:scale-95"
-                >
-                  {cancelLabel}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    onConfirm();
-                    onClose();
-                  }}
-                  className={`flex-1 px-6 py-3.5 rounded-md text-xs font-black uppercase tracking-widest text-white transition-all active:scale-95 shadow-lg ${
-                    variant === 'danger' 
-                    ? 'bg-accent-600 hover:bg-accent-700 shadow-accent-600/20' 
-                    : 'bg-primary-600 hover:bg-primary-700 shadow-primary-600/20'
-                  }`}
-                >
-                  {confirmLabel}
-                </button>
-              </div>
-            </div>
-          </motion.div>
+  return createPortal(
+    <div className="modal-overlay modal-overlay--high" role="presentation">
+      <button type="button" className="modal-backdrop" onClick={onClose} aria-label={`Cancel ${title}`} />
+      <div className={`alert-modal ${toneClass}`} role="dialog" aria-modal="true" aria-label={title}>
+        <div className="alert-modal__content">
+          <h3>{title}</h3>
+          <p>{message}</p>
         </div>
-      )}
-    </AnimatePresence>
+        <div className="alert-modal__actions">
+          <button type="button" onClick={onClose}>
+            {cancelLabel}
+          </button>
+          <button
+            type="button"
+            className={confirmClass}
+            onClick={() => {
+              onConfirm();
+              onClose();
+            }}
+          >
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
   );
 };
 

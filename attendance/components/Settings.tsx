@@ -228,7 +228,7 @@ const Settings: React.FC<SettingsProps> = ({
               <textarea
                 value={smsSettings.messageTemplate}
                 onChange={(event) => onSmsSettingsChange({ ...smsSettings, messageTemplate: event.target.value.slice(0, 160) })}
-                placeholder="Hello! This is to inform you that your {gender_term} has entered/exited Leon NHS at {time}. Thank you."
+                placeholder="Hello! This is to inform you that your {gender_term} has {action} Leon NHS at {time}. Thank you."
                 rows={5}
                 maxLength={160}
                 disabled={isSettingsLoading || isSettingsSaving}

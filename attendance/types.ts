@@ -80,6 +80,16 @@ export interface AttendanceSmsRecipientState {
   enabledLearnerIds: string[];
 }
 
+export type AttendanceSmsTestModeAction = 'entry' | 'exit';
+
+export interface AttendanceSmsTestModeConfig {
+  isEnabled: boolean;
+  learnerId: string;
+  temporaryRfid: string;
+  phoneNumber: string;
+  action: AttendanceSmsTestModeAction;
+}
+
 export type SmsQueueStatus = 'queued' | 'sending' | 'sent' | 'failed';
 
 export interface SmsQueueItem {

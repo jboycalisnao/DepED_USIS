@@ -175,8 +175,11 @@
   pointer-events: none;
   transform: translateY(calc(-50% - 1px)) scale(1);
   transform-origin: left center;
-  will-change: transform, top, color;
-  transition: top 220ms cubic-bezier(0.2, 0.8, 0.2, 1), color 180ms ease, transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1), font-size 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  will-change: top, transform, color;
+  transition:
+    top 180ms ease,
+    color 180ms ease,
+    transform 180ms ease;
   white-space: normal;
   overflow: hidden;
   text-overflow: clip;
@@ -241,13 +244,13 @@
   font-size: 16px;
   font-weight: 400;
   text-transform: none;
-  top: 10px;
+  top: 9px;
   transform: translateY(0) scale(0.82);
 }
 
 .floating-field__control--guided:focus-within > span,
 .floating-field__control--guided[data-has-value="true"] > span {
-  top: 7px;
+  top: 9px;
   transform: translateY(0) scale(0.82);
   color: var(--deped-blue);
 }
@@ -509,8 +512,11 @@
   pointer-events: none;
   transform: translateY(-50%) scale(1);
   transform-origin: left center;
-  will-change: transform, top, color;
-  transition: top 220ms cubic-bezier(0.2, 0.8, 0.2, 1), color 180ms ease, transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  will-change: top, transform, color;
+  transition:
+    top 180ms ease,
+    color 180ms ease,
+    transform 180ms ease;
   white-space: normal;
   overflow: hidden;
   text-overflow: clip;
@@ -534,7 +540,7 @@
 .searchable-select--floating .floating-field__control input:focus ~ .searchable-select__floating-label,
 .searchable-select--floating .floating-field__control input:not(:placeholder-shown) ~ .searchable-select__floating-label,
 .searchable-select--floating .floating-field__control input[data-has-value="true"] ~ .searchable-select__floating-label {
-  top: 10px;
+  top: 9px;
   color: var(--deped-blue);
   font-size: 16px;
   transform: translateY(0) scale(0.82);
