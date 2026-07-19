@@ -17,6 +17,9 @@ export type LearnerProfileRecord = {
   email: string;
   loginUsername: string;
   loginStatus: string;
+  profilePhotoDriveFileId: string;
+  profilePhotoMimeType: string;
+  profilePhotoUpdatedAt: string;
   sectionName: string;
   gradeLevel: string;
   program: string;
@@ -48,18 +51,21 @@ const mapProfile = (row: any): LearnerProfileRecord => ({
   email: toText(row?.email),
   loginUsername: toText(row?.login_username),
   loginStatus: toText(row?.login_status || 'Active'),
+  profilePhotoDriveFileId: toText(row?.profile_photo_drive_file_id),
+  profilePhotoMimeType: toText(row?.profile_photo_mime_type),
+  profilePhotoUpdatedAt: toText(row?.profile_photo_updated_at),
   sectionName: '',
   gradeLevel: '',
   program: '',
   updatedAt: toText(row?.created_at),
 });
 
-export async function fetchLearnerProfile(input: { learnerId?: string; lrn?: string }) {
+export async function fetchLearnerProfile(input: { learnerId?: string; lrn?: string; forceRefresh?: boolean }) {
   const learnerId = toText(input.learnerId);
   const lrn = toText(input.lrn);
   const cacheKey = resolveLearnerCacheKey({ learnerId, lrn });
   const cached = getCachedLearnerData<LearnerProfileRecord>('profile', cacheKey);
-  if (cached) return cached;
+  if (cached && !input.forceRefresh) return cached;
 
   let query = supabase
     .from('registrar_learners')
@@ -80,6 +86,9 @@ export async function fetchLearnerProfile(input: { learnerId?: string; lrn?: str
       email,
       login_username,
       login_status,
+      profile_photo_drive_file_id,
+      profile_photo_mime_type,
+      profile_photo_updated_at,
       created_at,
       section_id,
       enrollment_history,

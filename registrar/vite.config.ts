@@ -2,6 +2,32 @@ import path from 'path';
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import { createClient } from '@supabase/supabase-js';
+import { deleteProfilePhotoFromDrive, fetchProfilePhotoFromDrive, uploadProfilePhotoToDrive } from '../common/server/googleDriveProfilePhotos';
+import { assertSquareImage } from '../common/server/imageDimensions';
+
+const readJsonBody = async (req: any) => {
+  const chunks: Buffer[] = [];
+  for await (const chunk of req) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  const raw = Buffer.concat(chunks).toString('utf8');
+  return raw ? JSON.parse(raw) : {};
+};
+
+const setServerEnvFallbacks = (env: Record<string, string>) => {
+  for (const key of [
+    'SUPABASE_URL',
+    'VITE_SUPABASE_URL',
+    'SUPABASE_SERVICE_ROLE_KEY',
+    'GOOGLE_SERVICE_ACCOUNT_JSON',
+    'GOOGLE_SERVICE_ACCOUNT_JSON_BASE64',
+    'GOOGLE_SERVICE_ACCOUNT_EMAIL',
+    'GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY',
+    'GOOGLE_DRIVE_PROFILE_PHOTOS_FOLDER_ID',
+  ]) {
+    if (!process.env[key] && env[key]) process.env[key] = env[key];
+  }
+};
 
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, '..', '');
@@ -997,6 +1023,169 @@ export default defineConfig(({ mode }) => {
       },
     };
 
+    const learnerProfilePhotoApiPlugin = {
+      name: 'registrar-learner-profile-photo-api',
+      configureServer(server: any) {
+        server.middlewares.use('/api/learner-profile-photo', async (req: any, res: any) => {
+          try {
+            setServerEnvFallbacks(env);
+            const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || env.SUPABASE_URL || env.VITE_SUPABASE_URL || '';
+            const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_SERVICE_ROLE_KEY || '';
+            if (!supabaseUrl || !serviceRoleKey) throw new Error('Supabase service-role credentials are missing.');
+            const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
+
+            if (req.method === 'DELETE') {
+              const body = await readJsonBody(req).catch(() => ({}));
+              const requestUrl = new URL(req.url || '', 'http://localhost');
+              const learnerId = String(body?.learnerId || requestUrl.searchParams.get('learnerId') || '').trim();
+              if (!learnerId) throw new Error('learnerId is required.');
+
+              const { data: learnerRow, error: learnerError } = await supabaseAdmin
+                .from('registrar_learners')
+                .select('id,profile_photo_drive_file_id')
+                .eq('id', learnerId)
+                .maybeSingle();
+              if (learnerError) throw learnerError;
+              if (!learnerRow) throw new Error('Learner record was not found.');
+
+              const fileId = String((learnerRow as any).profile_photo_drive_file_id || '').trim();
+              if (fileId) await deleteProfilePhotoFromDrive(fileId);
+
+              const { error: updateError } = await supabaseAdmin
+                .from('registrar_learners')
+                .update({
+                  profile_photo_drive_file_id: null,
+                  profile_photo_mime_type: null,
+                  profile_photo_updated_at: null,
+                })
+                .eq('id', learnerId);
+              if (updateError) throw updateError;
+
+              res.statusCode = 200;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ ok: true, removed: Boolean(fileId) }));
+              return;
+            }
+
+            if (req.method === 'GET') {
+              const requestUrl = new URL(req.url || '', 'http://localhost');
+              const learnerId = String(requestUrl.searchParams.get('learnerId') || '').trim();
+              const lrn = String(requestUrl.searchParams.get('lrn') || '').trim();
+              if (!learnerId) throw new Error('learnerId is required.');
+
+              const { data, error } = await supabaseAdmin
+                .from('registrar_learners')
+                .select('id,lrn,profile_photo_drive_file_id,profile_photo_mime_type,profile_photo_updated_at')
+                .eq('id', learnerId)
+                .maybeSingle();
+              if (error) throw error;
+
+              let photoRow = data as any;
+              let fileId = String(photoRow?.profile_photo_drive_file_id || '').trim();
+
+              if ((!photoRow || !fileId) && lrn) {
+                const { data: lrnRow, error: lrnError } = await supabaseAdmin
+                  .from('registrar_learners')
+                  .select('id,lrn,profile_photo_drive_file_id,profile_photo_mime_type,profile_photo_updated_at')
+                  .eq('lrn', lrn)
+                  .maybeSingle();
+                if (lrnError) throw lrnError;
+                if (lrnRow) {
+                  photoRow = lrnRow as any;
+                  fileId = String(photoRow?.profile_photo_drive_file_id || '').trim();
+                }
+              }
+
+              if (!photoRow || !fileId) {
+                res.statusCode = 404;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({ error: 'Learner profile picture was not found.', hasLearner: Boolean(photoRow), learnerId, lrn }));
+                return;
+              }
+
+              const photo = await fetchProfilePhotoFromDrive(fileId);
+              res.statusCode = 200;
+              res.setHeader('Content-Type', String(photoRow.profile_photo_mime_type || photo.contentType || 'application/octet-stream'));
+              res.setHeader('Cache-Control', 'private, max-age=300');
+              res.end(photo.bytes);
+              return;
+            }
+
+            if (req.method !== 'POST') {
+              res.statusCode = 405;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ error: 'Method not allowed.' }));
+              return;
+            }
+
+            const body = await readJsonBody(req);
+            const learnerId = String(body?.learnerId || '').trim();
+            const mimeType = String(body?.mimeType || '').trim().toLowerCase();
+            const dataBase64 = String(body?.dataBase64 || '').trim().replace(/^data:[^;]+;base64,/, '');
+            const allowedMimeTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
+            const maxFileBytes = 2 * 1024 * 1024;
+
+            if (!learnerId) throw new Error('learnerId is required.');
+            if (!allowedMimeTypes.has(mimeType)) throw new Error('Use a JPG, PNG, or WebP image.');
+            const bytes = Buffer.from(dataBase64, 'base64');
+            if (!bytes.length) throw new Error('Image data is invalid.');
+            if (bytes.length > maxFileBytes) throw new Error('Profile picture must be 2 MB or smaller.');
+            assertSquareImage(bytes, mimeType);
+
+            const { data: learnerRow, error: learnerError } = await supabaseAdmin
+              .from('registrar_learners')
+              .select('id,lrn,profile_photo_drive_file_id')
+              .eq('id', learnerId)
+              .maybeSingle();
+            if (learnerError) throw learnerError;
+            if (!learnerRow) throw new Error('Learner record was not found.');
+
+            const extension = mimeType === 'image/png' ? 'png' : mimeType === 'image/webp' ? 'webp' : 'jpg';
+            const uploadResult = await uploadProfilePhotoToDrive({
+              fileName: `${String((learnerRow as any).lrn || learnerId).trim()}-profile-photo.${extension}`,
+              mimeType,
+              bytes,
+              existingFileId: String((learnerRow as any).profile_photo_drive_file_id || '').trim(),
+            });
+
+            const updatedAt = new Date().toISOString();
+            const { error: updateError } = await supabaseAdmin
+              .from('registrar_learners')
+              .update({
+                profile_photo_drive_file_id: uploadResult.id,
+                profile_photo_mime_type: uploadResult.mimeType,
+                profile_photo_updated_at: updatedAt,
+              })
+              .eq('id', learnerId);
+            if (updateError) throw updateError;
+
+            const { data: savedRow, error: savedError } = await supabaseAdmin
+              .from('registrar_learners')
+              .select('id,profile_photo_drive_file_id,profile_photo_mime_type,profile_photo_updated_at')
+              .eq('id', learnerId)
+              .maybeSingle();
+            if (savedError) throw savedError;
+            if (String((savedRow as any)?.profile_photo_drive_file_id || '').trim() !== uploadResult.id) {
+              throw new Error('Google Drive upload completed, but the learner photo file ID was not saved in Supabase.');
+            }
+
+            res.statusCode = 200;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({
+              ok: true,
+              profilePhotoDriveFileId: uploadResult.id,
+              profilePhotoMimeType: uploadResult.mimeType,
+              profilePhotoUpdatedAt: updatedAt,
+            }));
+          } catch (error: any) {
+            res.statusCode = 500;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ error: 'Unable to upload learner profile picture.', details: error?.message || String(error) }));
+          }
+        });
+      },
+    };
+
     return {
       envDir: '..',
       server: {
@@ -1010,7 +1199,7 @@ export default defineConfig(({ mode }) => {
           },
         },
       },
-      plugins: [react(), microsoftUserApiPlugin],
+      plugins: [react(), microsoftUserApiPlugin, learnerProfilePhotoApiPlugin],
       define: {
         'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
         'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)

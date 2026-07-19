@@ -729,6 +729,7 @@ body {
 }
 
 .learner-dashboard-card-panel__avatar-wrap {
+  position: relative;
   width: 100%;
   max-width: 230px;
   margin: 0 auto;
@@ -741,11 +742,36 @@ body {
   place-items: center;
 }
 
+.learner-dashboard-card-panel__avatar-spinner {
+  position: absolute;
+  width: 42px;
+  height: 42px;
+  border: 4px solid rgba(0, 56, 168, 0.16);
+  border-top-color: var(--deped-blue);
+  border-radius: 999px;
+  animation: learner-dashboard-avatar-spin 760ms linear infinite;
+}
+
+@keyframes learner-dashboard-avatar-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .learner-dashboard-card-panel__avatar-image {
   width: 100%;
   height: 100%;
   object-fit: contain;
   object-position: center;
+}
+
+.learner-dashboard-card-panel__avatar-image--loading {
+  opacity: 0;
+}
+
+.learner-dashboard-card-panel__avatar-image--photo {
+  border-radius: 999px;
+  object-fit: cover;
 }
 
 .learner-dashboard-card-panel__identity {

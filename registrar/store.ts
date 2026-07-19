@@ -33,6 +33,7 @@ const CACHE_TTL_MS = 10 * 60 * 1000;
 const REGISTRAR_TABLES = {
   users: 'usis_core_coordinators',
   learners: 'registrar_learners',
+  enrollmentHistory: 'registrar_enrollment_history',
   submissions: 'registrar_public_enrollment_submissions',
   sections: 'registrar_sections',
   strands: 'registrar_strands',
@@ -163,6 +164,9 @@ const mergeLearnerForBulkImport = (incoming: Student) => {
     microsoftLicenseSkuId: normalizeLrnKey(incoming.microsoftLicenseSkuId) ? incoming.microsoftLicenseSkuId : existing.microsoftLicenseSkuId,
     microsoftCreatedAt: normalizeLrnKey(incoming.microsoftCreatedAt) ? incoming.microsoftCreatedAt : existing.microsoftCreatedAt,
     microsoftLastSyncedAt: normalizeLrnKey(incoming.microsoftLastSyncedAt) ? incoming.microsoftLastSyncedAt : existing.microsoftLastSyncedAt,
+    profilePhotoDriveFileId: normalizeLrnKey(incoming.profilePhotoDriveFileId) ? incoming.profilePhotoDriveFileId : existing.profilePhotoDriveFileId,
+    profilePhotoMimeType: normalizeLrnKey(incoming.profilePhotoMimeType) ? incoming.profilePhotoMimeType : existing.profilePhotoMimeType,
+    profilePhotoUpdatedAt: normalizeLrnKey(incoming.profilePhotoUpdatedAt) ? incoming.profilePhotoUpdatedAt : existing.profilePhotoUpdatedAt,
     tags: incomingTags.length > 0 ? incomingTags : existing.tags,
     enrollments: Array.isArray(incoming.enrollments) && incoming.enrollments.length > 0 ? incoming.enrollments : existing.enrollments,
   };
@@ -181,6 +185,50 @@ const normalizeEnrollmentRecord = (entry: any) => ({
         ? entry.submission_payload
         : undefined,
 });
+
+const normalizeEnrollmentHistoryKey = (entry: any) => [
+  String(entry?.schoolYear || '').trim().toLowerCase(),
+  String(entry?.gradeLevel || '').trim().toLowerCase(),
+  String(entry?.section || '').trim().toLowerCase(),
+  String(entry?.status || '').trim().toLowerCase(),
+  String(entry?.enrollmentDate || '').trim().toLowerCase(),
+].join('|');
+
+const mergeEnrollmentRecords = (existing: any[] = [], incoming: any[] = []) => {
+  const merged = new Map<string, ReturnType<typeof normalizeEnrollmentRecord>>();
+
+  [...existing, ...incoming].forEach((entry) => {
+    const normalized = normalizeEnrollmentRecord(entry);
+    if (!normalized.schoolYear) return;
+    const key = normalizeEnrollmentHistoryKey(normalized);
+    if (!merged.has(key)) merged.set(key, normalized);
+  });
+
+  return Array.from(merged.values()).sort((a, b) => String(b.schoolYear || '').localeCompare(String(a.schoolYear || '')));
+};
+
+const mergeLearnerEnrollmentHistoryRows = (baseLearners: Student[], rows: any[]) => {
+  if (!rows.length) return baseLearners;
+
+  const rowsByLearnerId = new Map<string, any[]>();
+  rows.forEach((row) => {
+    const learnerId = String(row?.learner_id || '').trim();
+    if (!learnerId) return;
+    const current = rowsByLearnerId.get(learnerId) || [];
+    current.push(row);
+    rowsByLearnerId.set(learnerId, current);
+  });
+
+  return baseLearners.map((learner) => {
+    const historyRows = rowsByLearnerId.get(String(learner.id || '').trim()) || [];
+    if (!historyRows.length) return learner;
+    return {
+      ...learner,
+      enrollments: mergeEnrollmentRecords(learner.enrollments || [], historyRows),
+    };
+  });
+};
+
 const commitLearners = (nextLearners: Student[]) => {
   learners = nextLearners;
   isFirstLoad = false;
@@ -258,6 +306,9 @@ const mapLearnerToDb = (data: Partial<Student>) => {
     microsoft_license_sku_id: data.microsoftLicenseSkuId || null,
     microsoft_created_at: data.microsoftCreatedAt || null,
     microsoft_last_synced_at: data.microsoftLastSyncedAt || null,
+    profile_photo_drive_file_id: data.profilePhotoDriveFileId || null,
+    profile_photo_mime_type: data.profilePhotoMimeType || null,
+    profile_photo_updated_at: data.profilePhotoUpdatedAt || null,
     tags: normalizeLearnerTags((data as Partial<Student> & { tags?: unknown; orgAffiliations?: unknown }).tags ?? (data as Partial<Student> & { tags?: unknown; orgAffiliations?: unknown }).orgAffiliations),
     enrollment_history: Array.isArray(data.enrollments) ? data.enrollments : []
   };
@@ -277,6 +328,9 @@ const mapDbToLearner = (l: any): Student => ({
   microsoftLicenseSkuId: l.microsoft_license_sku_id || '',
   microsoftCreatedAt: l.microsoft_created_at || '',
   microsoftLastSyncedAt: l.microsoft_last_synced_at || '',
+  profilePhotoDriveFileId: l.profile_photo_drive_file_id || '',
+  profilePhotoMimeType: l.profile_photo_mime_type || '',
+  profilePhotoUpdatedAt: l.profile_photo_updated_at || '',
   firstName: l.first_name || l.firstName || '',
   lastName: l.last_name || l.lastName || '',
   middleName: l.middle_name || l.middleName || '',
@@ -496,12 +550,22 @@ const fetchUsers = async (forceRefresh = false) => {
   }
 };
 
-const fetchLearners = (forceRefresh = false) => fetchAllFromTable(REGISTRAR_TABLES.learners, (data) => {
-  commitLearners(data.map(mapDbToLearner));
-}, {
-  forceRefresh,
-  selectColumns: 'id,lrn,first_name,last_name,middle_name,birth_date,gender,address,contact_number,guardian_name,father_name,mother_name,email,status,section_id,school_year,is_4ps,tags,login_username,login_password_plain,login_status,last_login_at,microsoft_user_id,microsoft_upn,microsoft_mail_nickname,microsoft_account_status,microsoft_license_sku_id,microsoft_created_at,microsoft_last_synced_at,created_at',
-});
+const fetchLearners = async (forceRefresh = false) => {
+  await fetchAllFromTable(REGISTRAR_TABLES.learners, (data) => {
+    commitLearners(data.map(mapDbToLearner));
+  }, {
+    forceRefresh,
+    selectColumns: 'id,lrn,first_name,last_name,middle_name,birth_date,gender,address,contact_number,guardian_name,father_name,mother_name,email,status,section_id,school_year,is_4ps,tags,enrollment_history,login_username,login_password_plain,login_status,last_login_at,microsoft_user_id,microsoft_upn,microsoft_mail_nickname,microsoft_account_status,microsoft_license_sku_id,microsoft_created_at,microsoft_last_synced_at,profile_photo_drive_file_id,profile_photo_mime_type,profile_photo_updated_at,created_at',
+  });
+
+  await fetchAllFromTable(REGISTRAR_TABLES.enrollmentHistory, (data) => {
+    commitLearners(mergeLearnerEnrollmentHistoryRows(learners, data));
+  }, {
+    cacheKey: REGISTRAR_TABLES.enrollmentHistory,
+    forceRefresh,
+    selectColumns: 'id,learner_id,school_year,grade_level,section,status,enrollment_date,created_at,submission_payload',
+  });
+};
 
 const fetchSections = (forceRefresh = false) => fetchAllFromTable(REGISTRAR_TABLES.sections, (data) => {
   commitSections(data.map(mapDbToSection));
@@ -848,6 +912,9 @@ export const useStore = () => {
         const schoolYear = merged.schoolYear ? String(merged.schoolYear).trim() : '';
         const basePayload = { ...payload };
         delete (basePayload as any).school_year;
+        delete (basePayload as any).profile_photo_drive_file_id;
+        delete (basePayload as any).profile_photo_mime_type;
+        delete (basePayload as any).profile_photo_updated_at;
 
         const { error: baseUpdateError } = await supabase.from(REGISTRAR_TABLES.learners).update(basePayload).eq('id', id);
         if (baseUpdateError) return { error: baseUpdateError.message };

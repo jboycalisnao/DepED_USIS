@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import ConfirmationModal from '../../components/ConfirmationModal';
 import { SearchableSelect } from '../../components/ui/SearchableSelect';
 import type { Student } from '../../types';
 import { supabase } from '../../lib/supabase';
@@ -71,6 +72,36 @@ type Props = {
 
 const firstNonEmpty = (...values: Array<string | undefined | null>) =>
   values.map((v) => String(v || '').trim()).find(Boolean) || '';
+
+const MAX_PROFILE_PHOTO_BYTES = 2 * 1024 * 1024;
+const ALLOWED_PROFILE_PHOTO_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+
+const readFileAsBase64 = (file: File) =>
+  new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error || new Error('Unable to read profile picture.'));
+    reader.onload = () => {
+      const result = String(reader.result || '');
+      resolve(result.includes(',') ? result.split(',').pop() || '' : result);
+    };
+    reader.readAsDataURL(file);
+  });
+
+const readImageFileDimensions = (file: File) =>
+  new Promise<{ width: number; height: number }>((resolve, reject) => {
+    const image = new Image();
+    const objectUrl = URL.createObjectURL(file);
+    image.onload = () => {
+      const dimensions = { width: image.naturalWidth, height: image.naturalHeight };
+      URL.revokeObjectURL(objectUrl);
+      resolve(dimensions);
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error('Unable to read image dimensions.'));
+    };
+    image.src = objectUrl;
+  });
 
 const buildDraft = (student: Student, activeSchoolYearLabel: string, latestSubmissionPayload?: Record<string, any>): LearnerModalDraft => {
   const history = Array.isArray(student.enrollments) ? [...student.enrollments] : [];
@@ -162,6 +193,15 @@ export default function LearnerEditModal({ student, activeSchoolYearLabel, stran
   const [availableSections, setAvailableSections] = useState<Array<{ id: string; name: string; gradeLevel: string; strand?: string; schoolYearId: string }>>([]);
   const [selectedSchoolYearLabel, setSelectedSchoolYearLabel] = useState('');
   const [selectedSectionId, setSelectedSectionId] = useState('');
+  const [profilePhotoFile, setProfilePhotoFile] = useState<File | null>(null);
+  const [profilePhotoPreviewUrl, setProfilePhotoPreviewUrl] = useState('');
+  const [profilePhotoMeta, setProfilePhotoMeta] = useState({ driveFileId: '', mimeType: '', updatedAt: '' });
+  const [profilePhotoLoadFailed, setProfilePhotoLoadFailed] = useState(false);
+  const [profilePhotoNotice, setProfilePhotoNotice] = useState('');
+  const [isLoadingProfilePhotoPreview, setIsLoadingProfilePhotoPreview] = useState(false);
+  const [isUploadingProfilePhoto, setIsUploadingProfilePhoto] = useState(false);
+  const [isDeletingProfilePhoto, setIsDeletingProfilePhoto] = useState(false);
+  const [isConfirmingProfilePhotoDelete, setIsConfirmingProfilePhotoDelete] = useState(false);
   const selectedSchoolYearLabelRef = useRef('');
   const selectedSectionIdRef = useRef('');
 
@@ -179,9 +219,29 @@ export default function LearnerEditModal({ student, activeSchoolYearLabel, stran
       if (!student) {
         setDraft(null);
         draftRef.current = null;
+        setProfilePhotoFile(null);
+        setProfilePhotoPreviewUrl('');
+        setProfilePhotoMeta({ driveFileId: '', mimeType: '', updatedAt: '' });
+        setProfilePhotoLoadFailed(false);
+        setProfilePhotoNotice('');
+        setIsLoadingProfilePhotoPreview(false);
+        setIsDeletingProfilePhoto(false);
+        setIsConfirmingProfilePhotoDelete(false);
         return;
       }
 
+      setProfilePhotoFile(null);
+      setProfilePhotoPreviewUrl('');
+      setProfilePhotoLoadFailed(false);
+      setProfilePhotoNotice('');
+      setIsLoadingProfilePhotoPreview(false);
+      setIsDeletingProfilePhoto(false);
+      setIsConfirmingProfilePhotoDelete(false);
+      setProfilePhotoMeta({
+        driveFileId: String(student.profilePhotoDriveFileId || ''),
+        mimeType: String(student.profilePhotoMimeType || ''),
+        updatedAt: String(student.profilePhotoUpdatedAt || ''),
+      });
       // Immediate fallback so modal can render while fetching canonical record.
       const initialDraft = buildDraft(student, activeSchoolYearLabel);
       draftRef.current = initialDraft;
@@ -222,6 +282,9 @@ export default function LearnerEditModal({ student, activeSchoolYearLabel, stran
           sectionId: String((data as any).section_id || ''),
           schoolYear: String((data as any).school_year || ''),
           enrollments: Array.isArray((data as any).enrollment_history) ? (data as any).enrollment_history : [],
+          profilePhotoDriveFileId: String((data as any).profile_photo_drive_file_id || ''),
+          profilePhotoMimeType: String((data as any).profile_photo_mime_type || ''),
+          profilePhotoUpdatedAt: String((data as any).profile_photo_updated_at || ''),
           status: student.status,
           is4Ps: !!(data as any).is_4ps,
           tags: normalizeLearnerTags([(data as any).tags ?? (data as any).org_affiliations, data]),
@@ -232,6 +295,11 @@ export default function LearnerEditModal({ student, activeSchoolYearLabel, stran
         const nextDraft = buildDraft(dbStudent, activeSchoolYearLabel, latestSubmissionPayload);
         draftRef.current = nextDraft;
         setDraft(nextDraft);
+        setProfilePhotoMeta({
+          driveFileId: String((data as any).profile_photo_drive_file_id || ''),
+          mimeType: String((data as any).profile_photo_mime_type || ''),
+          updatedAt: String((data as any).profile_photo_updated_at || ''),
+        });
         const mappedSchoolYears = (schoolYearRows || []).map((row: any) => ({ id: String(row.id || ''), label: String(row.label || '') })).filter((row) => row.id && row.label);
         const mappedSections = (sectionRows || []).map((row: any) => ({
           id: String(row.id || ''),
@@ -269,8 +337,71 @@ export default function LearnerEditModal({ student, activeSchoolYearLabel, stran
     applyDraftChange((current) => ({ ...current, lastGradeLevel: 'Grade 6' }));
   }, [draft]);
 
+  useEffect(() => {
+    return () => {
+      if (profilePhotoPreviewUrl) URL.revokeObjectURL(profilePhotoPreviewUrl);
+    };
+  }, [profilePhotoPreviewUrl]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadSavedProfilePhoto = async () => {
+      const learnerId = String(student?.id || '').trim();
+      if (!learnerId || profilePhotoFile) return;
+
+      try {
+        setIsLoadingProfilePhotoPreview(true);
+        const lrn = String(student?.lrn || draftRef.current?.lrn || '').trim();
+        const query = new URLSearchParams({
+          learnerId,
+          v: String(Date.now()),
+        });
+        if (lrn) query.set('lrn', lrn);
+        const response = await fetch(`/api/learner-profile-photo?${query.toString()}`, {
+          cache: 'no-store',
+        });
+        if (cancelled) return;
+
+        if (response.status === 404) {
+          const errorPayload = await response.json().catch(() => ({}));
+          setProfilePhotoLoadFailed(false);
+          setProfilePhotoNotice(
+            errorPayload?.hasLearner
+              ? 'No saved profile picture file ID is linked to this learner record yet.'
+              : 'The profile picture preview could not find this learner record by ID or LRN.',
+          );
+          return;
+        }
+
+        if (!response.ok) {
+          const errorPayload = await response.json().catch(() => ({}));
+          throw new Error(errorPayload?.details || errorPayload?.error || 'Saved profile picture could not be loaded.');
+        }
+
+        const blob = await response.blob();
+        if (cancelled) return;
+        if (profilePhotoPreviewUrl) URL.revokeObjectURL(profilePhotoPreviewUrl);
+        setProfilePhotoPreviewUrl(URL.createObjectURL(blob));
+        setProfilePhotoLoadFailed(false);
+        setProfilePhotoNotice('');
+      } catch (error: any) {
+        if (cancelled) return;
+        setProfilePhotoLoadFailed(true);
+        setProfilePhotoNotice(error?.message || 'Saved profile picture could not be loaded.');
+      } finally {
+        if (!cancelled) setIsLoadingProfilePhotoPreview(false);
+      }
+    };
+
+    void loadSavedProfilePhoto();
+    return () => {
+      cancelled = true;
+    };
+  }, [student?.id, profilePhotoFile]);
+
   if (!student || !draft) return null;
   draftRef.current = draft;
+  const profilePhotoUrl = profilePhotoPreviewUrl;
   const isJuniorHighTargetGrade = ['Grade 7', 'Grade 8', 'Grade 9', 'Grade 10'].includes(String(draft.gradeToEnroll || '').trim());
   const lastGradeLevelOptions = ['Grade 6', ...gradeLevelOptions];
   const normalizeSchoolYearValue = (value: string) => String(value || '').trim();
@@ -307,7 +438,35 @@ export default function LearnerEditModal({ student, activeSchoolYearLabel, stran
       label: `${section.name}${section.strand ? ` [${section.strand}]` : ''} - ${section.gradeLevel}`,
     }));
 
+  const deleteProfilePhoto = async () => {
+    setIsDeletingProfilePhoto(true);
+    try {
+      const response = await fetch('/api/learner-profile-photo', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ learnerId: student.id }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload?.error) {
+        throw new Error(payload?.details || payload?.error || 'Unable to remove learner profile picture.');
+      }
+      if (profilePhotoPreviewUrl) URL.revokeObjectURL(profilePhotoPreviewUrl);
+      setProfilePhotoFile(null);
+      setProfilePhotoPreviewUrl('');
+      setProfilePhotoMeta({ driveFileId: '', mimeType: '', updatedAt: '' });
+      setProfilePhotoLoadFailed(false);
+      setProfilePhotoNotice('Profile picture link removed.');
+      setIsConfirmingProfilePhotoDelete(false);
+      onSuccess?.('Learner profile picture removed successfully.');
+    } catch (error: any) {
+      onError(error?.message || 'Unable to remove learner profile picture.');
+    } finally {
+      setIsDeletingProfilePhoto(false);
+    }
+  };
+
   return (
+    <>
     <div className="modal-overlay">
       <div className="modal-backdrop" onClick={onClose} />
       <div className="modal-dialog modal-dialog--wide" role="dialog" aria-modal="true" aria-labelledby="edit-learner-info-title">
@@ -322,6 +481,129 @@ export default function LearnerEditModal({ student, activeSchoolYearLabel, stran
         </div>
         <div className="modal-dialog__body custom-scrollbar" style={{ paddingRight: 28 }}>
           <div className="grid gap-6">
+            <section className="registrar-public-enrollment__section">
+              <h3>Learner Profile Picture</h3>
+              <div className="learner-profile-photo-uploader">
+                <div className="learner-profile-photo-uploader__preview" aria-hidden="true">
+                  {isLoadingProfilePhotoPreview ? (
+                    <span className="learner-profile-photo-uploader__spinner" />
+                  ) : profilePhotoUrl ? (
+                    <img
+                      src={profilePhotoUrl}
+                      alt=""
+                      onLoad={() => setProfilePhotoLoadFailed(false)}
+                      onError={() => setProfilePhotoLoadFailed(true)}
+                    />
+                  ) : (
+                    <span className="material-symbols-outlined">person</span>
+                  )}
+                </div>
+                <div className="learner-profile-photo-uploader__controls">
+                  <label className="secondary-button learner-profile-photo-uploader__pick">
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      onChange={async (event) => {
+                        const input = event.currentTarget;
+                        const file = event.target.files?.[0] || null;
+                        if (!file) {
+                          setProfilePhotoFile(null);
+                          setProfilePhotoPreviewUrl('');
+                          return;
+                        }
+                        if (!ALLOWED_PROFILE_PHOTO_TYPES.has(file.type)) {
+                          onError('Use a JPG, PNG, or WebP profile picture.');
+                          event.target.value = '';
+                          return;
+                        }
+                        if (file.size > MAX_PROFILE_PHOTO_BYTES) {
+                          onError('Profile picture must be 2 MB or smaller.');
+                          event.target.value = '';
+                          return;
+                        }
+                        try {
+                          const dimensions = await readImageFileDimensions(file);
+                          if (dimensions.width !== dimensions.height) {
+                            onError(`Profile picture must be square. Selected image is ${dimensions.width}x${dimensions.height}.`);
+                            input.value = '';
+                            return;
+                          }
+                        } catch (error: any) {
+                          onError(error?.message || 'Unable to read image dimensions.');
+                          input.value = '';
+                          return;
+                        }
+                        if (profilePhotoPreviewUrl) URL.revokeObjectURL(profilePhotoPreviewUrl);
+                        setProfilePhotoFile(file);
+                        setProfilePhotoPreviewUrl(URL.createObjectURL(file));
+                        setProfilePhotoLoadFailed(false);
+                        setProfilePhotoNotice('');
+                      }}
+                    />
+                    Choose Picture
+                  </label>
+                  <button
+                    type="button"
+                    className="primary-button learner-profile-photo-uploader__button"
+                    disabled={!profilePhotoFile || isUploadingProfilePhoto || isLoadingRecord}
+                    onClick={async () => {
+                      if (!profilePhotoFile) return;
+                      setIsUploadingProfilePhoto(true);
+                      try {
+                        const dataBase64 = await readFileAsBase64(profilePhotoFile);
+                        const response = await fetch('/api/learner-profile-photo', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            learnerId: student.id,
+                            mimeType: profilePhotoFile.type,
+                            dataBase64,
+                          }),
+                        });
+                        const payload = await response.json().catch(() => ({}));
+                        if (!response.ok || payload?.error) {
+                          throw new Error(payload?.details || payload?.error || 'Unable to upload learner profile picture.');
+                        }
+                        setProfilePhotoMeta({
+                          driveFileId: String(payload.profilePhotoDriveFileId || ''),
+                          mimeType: String(payload.profilePhotoMimeType || profilePhotoFile.type),
+                          updatedAt: String(payload.profilePhotoUpdatedAt || new Date().toISOString()),
+                        });
+                        setProfilePhotoLoadFailed(false);
+                        setProfilePhotoNotice('');
+                        setProfilePhotoFile(null);
+                        onSuccess?.('Learner profile picture uploaded successfully.');
+                      } catch (error: any) {
+                        onError(error?.message || 'Unable to upload learner profile picture.');
+                      } finally {
+                        setIsUploadingProfilePhoto(false);
+                      }
+                    }}
+                  >
+                    {isUploadingProfilePhoto ? 'Uploading...' : 'Upload Picture'}
+                  </button>
+                  <button
+                    type="button"
+                    className="secondary-button learner-profile-photo-uploader__delete"
+                    aria-label={isDeletingProfilePhoto ? 'Deleting profile picture' : 'Delete profile picture'}
+                    title={isDeletingProfilePhoto ? 'Deleting profile picture' : 'Delete profile picture'}
+                    disabled={!profilePhotoUrl || isDeletingProfilePhoto || isUploadingProfilePhoto || isLoadingRecord}
+                    onClick={() => setIsConfirmingProfilePhotoDelete(true)}
+                  >
+                    {isDeletingProfilePhoto ? (
+                      <span className="learner-profile-photo-uploader__delete-spinner" aria-hidden="true" />
+                    ) : (
+                      <span className="material-symbols-outlined" aria-hidden="true">delete</span>
+                    )}
+                  </button>
+                  <p>
+                    {profilePhotoLoadFailed
+                      ? profilePhotoNotice || 'A profile picture may be saved, but the preview could not be loaded.'
+                      : profilePhotoNotice || 'Square JPG, PNG, or WebP. Maximum file size is 2 MB.'}
+                  </p>
+                </div>
+              </div>
+            </section>
             <section className="registrar-public-enrollment__section">
               <h3>Enrollment Context</h3>
               <div className="floating-field-grid">
@@ -503,6 +785,17 @@ export default function LearnerEditModal({ student, activeSchoolYearLabel, stran
         </div>
       </div>
     </div>
+    <ConfirmationModal
+      isOpen={isConfirmingProfilePhotoDelete}
+      type="danger"
+      title="Delete Profile Picture"
+      message="Delete this learner profile picture? This action cannot be undone."
+      confirmLabel="Delete"
+      onConfirm={() => void deleteProfilePhoto()}
+      onCancel={() => setIsConfirmingProfilePhotoDelete(false)}
+      isLoading={isDeletingProfilePhoto}
+    />
+    </>
   );
 }
 

@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import type { LearnerPortalAccessRecord } from '../../auth/services/learnerAccess';
 import type { LearnerProfileRecord } from '../services/learnerProfile';
 import headerImage from '../../../../common/assets/Leon-NHS_USIS-Header-Image.png';
@@ -15,8 +16,20 @@ const showValue = (value?: string) => {
 };
 
 export function LearnerDashboardCard({ session, profile, isLoading }: LearnerDashboardCardProps) {
+  const [isPhotoLoading, setIsPhotoLoading] = useState(false);
+  const [hasPhotoError, setHasPhotoError] = useState(false);
   const fullName = showValue((profile ? [profile.firstName, profile.lastName].filter(Boolean).join(' ') : '') || session.learnerName);
   const gradeSection = [profile?.gradeLevel, profile?.sectionName].filter(Boolean).join(' - ');
+  const profilePhotoUrl = profile?.profilePhotoDriveFileId
+    ? `/api/learner-profile-photo?learnerId=${encodeURIComponent(profile.id)}&lrn=${encodeURIComponent(profile.lrn || session.lrn)}&v=${encodeURIComponent(profile.profilePhotoUpdatedAt || '')}`
+    : '';
+  const shouldLoadProfilePhoto = Boolean(profilePhotoUrl && !hasPhotoError);
+  const isAvatarLoading = isPhotoLoading || (isLoading && !profile);
+
+  useEffect(() => {
+    setHasPhotoError(false);
+    setIsPhotoLoading(Boolean(profilePhotoUrl));
+  }, [profilePhotoUrl]);
 
   return (
     <article className="portal-panel learner-dashboard-card-panel">
@@ -34,7 +47,20 @@ export function LearnerDashboardCard({ session, profile, isLoading }: LearnerDas
 
       <div className="learner-dashboard-card-panel__body">
         <div className="learner-dashboard-card-panel__avatar-wrap" aria-hidden="true">
-          <img src={userIcon} alt="" className="learner-dashboard-card-panel__avatar-image" />
+          {isAvatarLoading ? <span className="learner-dashboard-card-panel__avatar-spinner" /> : null}
+          <img
+            src={shouldLoadProfilePhoto ? profilePhotoUrl : userIcon}
+            alt=""
+            className={`learner-dashboard-card-panel__avatar-image${shouldLoadProfilePhoto ? ' learner-dashboard-card-panel__avatar-image--photo' : ''}${isAvatarLoading ? ' learner-dashboard-card-panel__avatar-image--loading' : ''}`}
+            onLoad={() => setIsPhotoLoading(false)}
+            onError={(event) => {
+              setHasPhotoError(true);
+              setIsPhotoLoading(false);
+              event.currentTarget.src = userIcon;
+              event.currentTarget.classList.remove('learner-dashboard-card-panel__avatar-image--photo');
+              event.currentTarget.classList.remove('learner-dashboard-card-panel__avatar-image--loading');
+            }}
+          />
         </div>
 
         <div className="learner-dashboard-card-panel__content">

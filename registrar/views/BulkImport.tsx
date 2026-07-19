@@ -15,7 +15,7 @@ import type { EnrollmentDraft } from '../features/registrar/public-enrollment/ty
 
 const BulkImport: React.FC = () => {
   const navigate = useNavigate();
-  const { activeSchoolYear, gradeLevels, sections, learners, loading: storeLoading, registrarAccess } = useStore();
+  const { activeSchoolYear, gradeLevels, sections, learners, loading: storeLoading, registrarAccess, bulkAddLearners } = useStore();
 
   const [file, setFile] = useState<File | null>(null);
   const [gradeLevel, setGradeLevel] = useState<GradeLevel>(gradeLevels[0] || GradeLevel.GRADE_7);

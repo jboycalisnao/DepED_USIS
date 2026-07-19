@@ -64,6 +64,9 @@ export interface Student {
   microsoftLicenseSkuId?: string;
   microsoftCreatedAt?: string;
   microsoftLastSyncedAt?: string;
+  profilePhotoDriveFileId?: string;
+  profilePhotoMimeType?: string;
+  profilePhotoUpdatedAt?: string;
   firstName: string;
   lastName: string;
   middleName?: string;

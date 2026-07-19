@@ -2,6 +2,35 @@ import { supabase } from '../../../lib/supabase';
 import { fetchEnrollmentSchoolYear } from '../../../lib/enrollmentSchoolYear';
 
 const normalize = (value: unknown) => String(value ?? '').trim();
+const PLACEHOLDER = '--';
+
+const loadSectionNameMap = async (sectionValues: string[]) => {
+  const sectionIds = Array.from(
+    new Set(sectionValues.map((value) => normalize(value)).filter((value) => value && value !== PLACEHOLDER)),
+  );
+
+  if (sectionIds.length === 0) return new Map<string, string>();
+
+  const { data } = await supabase
+    .from('registrar_sections')
+    .select('id,name')
+    .in('id', sectionIds);
+
+  const sectionMap = new Map<string, string>();
+  for (const row of data || []) {
+    const id = normalize((row as any).id);
+    const name = normalize((row as any).name);
+    if (id && name) sectionMap.set(id, name);
+  }
+  return sectionMap;
+};
+
+const resolveSectionName = (sectionValue: unknown, sectionMap: Map<string, string>) => {
+  const normalized = normalize(sectionValue);
+  if (!normalized || normalized === PLACEHOLDER) return PLACEHOLDER;
+  return sectionMap.get(normalized) || normalized;
+};
+
 const normalizeHistoryStatus = (value: string, isCurrentLearner: boolean) => {
   const normalized = normalize(value);
   if (isCurrentLearner && normalized.toLowerCase().includes('section assigned')) return 'Enrolled';
@@ -64,7 +93,9 @@ export async function lookupSubmissionStatus(queryValue: string): Promise<Submis
   const submissionSchoolYear = normalize((submissionRow as any)?.school_year || payload.schoolYear);
 
   if (submissionRow && activeSchoolYear && submissionSchoolYear === activeSchoolYear) {
-    const currentAssignedSection = normalize(payload.assignedSectionId || payload.assignedSectionName);
+    const currentAssignedSectionId = normalize(payload.assignedSectionId);
+    const currentAssignedSectionName = normalize(payload.assignedSectionName);
+    const currentAssignedSection = currentAssignedSectionName || currentAssignedSectionId;
     const currentGradeLevel = normalize((submissionRow as any)?.grade_to_enroll || payload.gradeToEnroll) || '--';
     const currentStatusLabel = currentAssignedSection ? 'Enrolled' : normalize(payload.status || (submissionRow as any)?.status || 'Submission Received') || 'Submission Received';
     currentSubmissionHistoryRow = {
@@ -98,18 +129,28 @@ export async function lookupSubmissionStatus(queryValue: string): Promise<Submis
         .order('enrollment_date', { ascending: false, nullsFirst: false })
         .order('created_at', { ascending: false });
       if (historyError) throw historyError;
-        const canonicalHistory = (historyRows || []).map((row: any) => ({
-          id: normalize(row.id),
-          schoolYear: normalize(row.school_year) || '--',
-          gradeLevel: normalize(row.grade_level) || '--',
-          section: normalize(row.section) || '--',
-          status:
-            normalize(row.school_year) && activeSchoolYear && normalize(row.school_year) !== activeSchoolYear
-              ? 'Previously Enrolled'
-              : normalizeHistoryStatus(String(row.status || ''), true),
-          enrollmentDate: normalize(row.enrollment_date || row.created_at),
-          source: 'learner-history' as const,
-        }));
+      const sectionNameMap = await loadSectionNameMap([
+        currentSubmissionHistoryRow?.section || '',
+        ...(historyRows || []).map((row: any) => row.section),
+      ]);
+      if (currentSubmissionHistoryRow) {
+        currentSubmissionHistoryRow = {
+          ...currentSubmissionHistoryRow,
+          section: resolveSectionName(currentSubmissionHistoryRow.section, sectionNameMap),
+        };
+      }
+      const canonicalHistory = (historyRows || []).map((row: any) => ({
+        id: normalize(row.id),
+        schoolYear: normalize(row.school_year) || '--',
+        gradeLevel: normalize(row.grade_level) || '--',
+        section: resolveSectionName(row.section, sectionNameMap),
+        status:
+          normalize(row.school_year) && activeSchoolYear && normalize(row.school_year) !== activeSchoolYear
+            ? 'Previously Enrolled'
+            : normalizeHistoryStatus(String(row.status || ''), true),
+        enrollmentDate: normalize(row.enrollment_date || row.created_at),
+        source: 'learner-history' as const,
+      }));
       const filteredCanonicalHistory = currentSubmissionHistoryRow
         ? canonicalHistory.filter((row) => normalize(row.schoolYear) !== normalize(activeSchoolYear))
         : canonicalHistory;
@@ -117,6 +158,13 @@ export async function lookupSubmissionStatus(queryValue: string): Promise<Submis
         ? [currentSubmissionHistoryRow, ...filteredCanonicalHistory]
         : filteredCanonicalHistory;
     } else {
+      if (currentSubmissionHistoryRow) {
+        const sectionNameMap = await loadSectionNameMap([currentSubmissionHistoryRow.section]);
+        currentSubmissionHistoryRow = {
+          ...currentSubmissionHistoryRow,
+          section: resolveSectionName(currentSubmissionHistoryRow.section, sectionNameMap),
+        };
+      }
       history = currentSubmissionHistoryRow ? [currentSubmissionHistoryRow] : [];
     }
   }

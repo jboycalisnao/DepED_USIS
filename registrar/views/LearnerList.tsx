@@ -7,7 +7,7 @@ import { openLearnerInformationPrintWindow } from '../features/registrar/learner
 import { openGradeLevelSectionListPrintWindow, openSectionListPrintWindow } from '../features/registrar/learners/utils/printSectionList';
 import { sendLearnerCredentialsViaWebhook } from '../features/registrar/learners/services/sendLearnerCredentialsEmail';
 import LearnerEditModal from './learners/LearnerEditModal';
-import { getActiveLearnersForYear } from '../services/dashboardService';
+import { getActiveLearnersForYear, getLearnerPlacementForYear } from '../services/dashboardService';
 import { resolveAdviserLinkedSections, groupLearnersByLinkedSection } from './adviser-learners/utils/adviserLearnerAccess';
 import { downloadAdviserSectionWorkbook } from './adviser-learners/utils/adviserLearnerWorkbook';
 import { loadAdviserLearnerSnapshot, saveAdviserLearnerSnapshot } from './adviser-learners/utils/adviserLearnerCache';
@@ -44,24 +44,7 @@ const LearnerList: React.FC = () => {
 
   const baseActiveLearnersForYear = useMemo(() => getActiveLearnersForYear(learners, sections, activeSchoolYear), [learners, sections, activeSchoolYear]);
 
-  const resolvePlacement = (student: Student) => {
-    const studentSid = String(student.sectionId || '').trim();
-    const section = sections.find((sec) => String(sec.id).trim() === studentSid);
-
-    if (section && section.schoolYearId === activeSchoolYear.id) {
-      return {
-        gradeLevel: section.gradeLevel,
-        sectionLabel: `${section.name}${section.strand ? ` [${section.strand}]` : ''}`,
-        sectionId: section.id,
-      };
-    }
-
-    return {
-      gradeLevel: 'Unassigned Registry' as GradeLevel | 'Unassigned Registry',
-      sectionLabel: 'Pending Placement',
-      sectionId: undefined,
-    };
-  };
+  const resolvePlacement = (student: Student) => getLearnerPlacementForYear(student, sections, activeSchoolYear);
 
   const activeLearnersForYear = useMemo(() => {
     const query = searchTerm.toLowerCase();
@@ -99,6 +82,15 @@ const LearnerList: React.FC = () => {
     const historyMap = new Map<string, EnrollmentRecord>();
 
     allInstances.forEach((instance) => {
+      (instance.enrollments || []).forEach((entry) => {
+        if (!entry.schoolYear) return;
+        historyMap.set(entry.schoolYear, {
+          ...entry,
+          id: entry.id || instance.id,
+          status: entry.status || instance.status,
+        });
+      });
+
       const studentSid = String(instance.sectionId || '').trim();
       const section = sections.find((s) => String(s.id).trim() === studentSid);
 

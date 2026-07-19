@@ -31,6 +31,7 @@ export function DashboardPage({ session }: DashboardPageProps) {
   const [importantDates, setImportantDates] = useState<LearnerPortalImportantDateRecord[]>([]);
   const [isProfileEditingEnabled, setIsProfileEditingEnabled] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isProfileLoading, setIsProfileLoading] = useState(true);
   const [error, setError] = useState('');
   const [, setReadStateRevision] = useState(0);
   const [activeNotification, setActiveNotification] = useState<LearnerPortalNotificationRecord | null>(null);
@@ -65,11 +66,14 @@ export function DashboardPage({ session }: DashboardPageProps) {
   useEffect(() => {
     let cancelled = false;
     const run = async () => {
+      setIsProfileLoading(true);
       try {
-        const learnerProfile = await fetchLearnerProfile({ learnerId: session.learnerId, lrn: session.lrn });
+        const learnerProfile = await fetchLearnerProfile({ learnerId: session.learnerId, lrn: session.lrn, forceRefresh: true });
         if (!cancelled) setProfile(learnerProfile);
       } catch {
         if (!cancelled) setProfile(null);
+      } finally {
+        if (!cancelled) setIsProfileLoading(false);
       }
     };
     void run();
@@ -116,7 +120,7 @@ export function DashboardPage({ session }: DashboardPageProps) {
         <span>Dashboard</span>
       </nav>
       <div className="learner-dashboard-top-grid">
-        <LearnerDashboardCard session={session} profile={profile} isLoading={isLoading} />
+        <LearnerDashboardCard session={session} profile={profile} isLoading={isLoading || isProfileLoading} />
 
         <div className="learner-dashboard-top-stack">
           <header className="enrollment-status-hero" role="banner">

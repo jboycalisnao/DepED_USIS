@@ -324,6 +324,7 @@
   top: 0;
   min-height: 100%;
   border-right: 1px solid var(--deped-line);
+  border-radius: var(--usis-radius-surface);
   background: #f3f4f6;
   padding: 14px 12px;
   display: flex;
@@ -1020,9 +1021,127 @@
     justify-content: stretch;
   }
 
-  .registrar-tagging-page__actions > * {
-    width: 100%;
+.registrar-tagging-page__actions > * {
+  width: 100%;
+}
+}
+
+.learner-profile-photo-uploader {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+}
+
+.learner-profile-photo-uploader__preview {
+  width: 120px;
+  aspect-ratio: 1 / 1;
+  border: 1px solid rgba(18, 35, 61, 0.14);
+  border-radius: 0.375rem;
+  background: #f8fbff;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.learner-profile-photo-uploader__preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.learner-profile-photo-uploader__preview .material-symbols-outlined {
+  color: var(--deped-blue);
+  font-size: 56px;
+}
+
+.learner-profile-photo-uploader__spinner {
+  width: 34px;
+  height: 34px;
+  border: 3px solid rgba(0, 56, 168, 0.16);
+  border-top-color: var(--deped-blue);
+  border-radius: 999px;
+  animation: learner-profile-photo-spin 760ms linear infinite;
+}
+
+@keyframes learner-profile-photo-spin {
+  to {
+    transform: rotate(360deg);
   }
+}
+
+.learner-profile-photo-uploader__controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+}
+
+.learner-profile-photo-uploader__controls p {
+  width: 100%;
+  margin: 0;
+  color: var(--deped-muted);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.learner-profile-photo-uploader__button,
+.learner-profile-photo-uploader__pick {
+  min-width: 124px;
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 0.375rem;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.learner-profile-photo-uploader__pick input {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.learner-profile-photo-uploader__button--danger {
+  border-color: rgba(206, 17, 38, 0.28);
+  color: var(--deped-red);
+}
+
+.learner-profile-photo-uploader__delete {
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0;
+  border-color: rgba(206, 17, 38, 0.28);
+  border-radius: 0.375rem;
+  color: var(--deped-red);
+}
+
+.learner-profile-photo-uploader__delete .material-symbols-outlined {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.learner-profile-photo-uploader__delete:hover:not(:disabled) {
+  background: #fff4f5;
+}
+
+.learner-profile-photo-uploader__delete-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(206, 17, 38, 0.18);
+  border-top-color: var(--deped-red);
+  border-radius: 999px;
+  animation: learner-profile-photo-spin 760ms linear infinite;
+}
+
+.learner-profile-photo-uploader__button:disabled,
+.learner-profile-photo-uploader__delete:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
 }
 
 @media (max-width: 920px) {
@@ -1066,6 +1185,15 @@
 }
 
 @media (max-width: 640px) {
+  .learner-profile-photo-uploader {
+    grid-template-columns: 1fr;
+  }
+
+  .learner-profile-photo-uploader__controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
   .registrar-side-nav__menu {
     grid-template-columns: 1fr;
   }

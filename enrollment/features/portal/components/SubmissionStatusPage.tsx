@@ -173,7 +173,7 @@ export function SubmissionStatusPage() {
                     <span>LRN or Submission Reference ID</span>
                   </div>
                 </label>
-                <button type="submit" className="primary-button" disabled={isLoading} style={{ minHeight: 56 }}>
+                <button type="submit" className="primary-button" disabled={isLoading}>
                   {isLoading ? 'Checking...' : 'Lookup'}
                 </button>
               </form>

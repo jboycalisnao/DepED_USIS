@@ -1,10 +1,65 @@
 
 import { Student, Section, SchoolYear, EnrollmentStatus, GradeLevel } from '../types';
 
-const normalizeSchoolYear = (value: string) => {
+export const normalizeSchoolYear = (value: string) => {
   const raw = String(value || '').trim();
   if (!raw) return '';
-  return raw.replace(/^sy\s*/i, '').replace(/\s+/g, ' ').toLowerCase();
+  const normalized = raw.replace(/^sy\s*/i, '').replace(/\s+/g, ' ');
+  const match = normalized.match(/(20\d{2})\s*-\s*(20\d{2})/);
+  if (match) return `${match[1]}-${match[2]}`.toLowerCase();
+  return normalized.toLowerCase();
+};
+
+export const findLearnerEnrollmentForYear = (learner: Student, schoolYearLabel: string) => {
+  const targetYear = normalizeSchoolYear(schoolYearLabel);
+  if (!targetYear) return null;
+  return (learner.enrollments || []).find((entry) => normalizeSchoolYear(entry.schoolYear) === targetYear) || null;
+};
+
+export const getLearnerPlacementForYear = (
+  learner: Student,
+  sections: Section[],
+  activeSchoolYear: SchoolYear,
+) => {
+  const studentSid = String(learner.sectionId || '').trim();
+  const currentSection = sections.find((section) => String(section.id).trim() === studentSid);
+
+  if (currentSection && currentSection.schoolYearId === activeSchoolYear.id) {
+    return {
+      gradeLevel: currentSection.gradeLevel,
+      sectionLabel: `${currentSection.name}${currentSection.strand ? ` [${currentSection.strand}]` : ''}`,
+      sectionId: currentSection.id,
+      source: 'current' as const,
+    };
+  }
+
+  const historyEntry = findLearnerEnrollmentForYear(learner, activeSchoolYear.label);
+  if (historyEntry) {
+    const historySectionName = String(historyEntry.section || '').trim();
+    const historyGradeLevel = String(historyEntry.gradeLevel || '').trim();
+    const matchingSection = sections.find((section) => {
+      const sameYear = section.schoolYearId === activeSchoolYear.id;
+      const sameName = historySectionName && section.name.toLowerCase() === historySectionName.toLowerCase();
+      const sameGrade = !historyGradeLevel || section.gradeLevel === historyGradeLevel;
+      return sameYear && sameName && sameGrade;
+    });
+
+    return {
+      gradeLevel: (historyEntry.gradeLevel || matchingSection?.gradeLevel || 'Unassigned Registry') as GradeLevel | 'Unassigned Registry',
+      sectionLabel: matchingSection
+        ? `${matchingSection.name}${matchingSection.strand ? ` [${matchingSection.strand}]` : ''}`
+        : historySectionName || 'Historical Enrollment',
+      sectionId: matchingSection?.id,
+      source: 'history' as const,
+    };
+  }
+
+  return {
+    gradeLevel: 'Unassigned Registry' as GradeLevel | 'Unassigned Registry',
+    sectionLabel: 'Pending Placement',
+    sectionId: undefined,
+    source: 'unassigned' as const,
+  };
 };
 
 export const getActiveLearnersForYear = (
@@ -22,8 +77,9 @@ export const getActiveLearnersForYear = (
     const studentSid = String(l.sectionId || '').trim();
     const hasActiveSection = studentSid && activeSectionIds.has(studentSid);
     const hasMatchingSchoolYear = normalizeSchoolYear(l.schoolYear) === normalizeSchoolYear(activeSchoolYear.label);
+    const hasMatchingEnrollmentHistory = Boolean(findLearnerEnrollmentForYear(l, activeSchoolYear.label));
     
-    return hasActiveSection || hasMatchingSchoolYear;
+    return hasActiveSection || hasMatchingSchoolYear || hasMatchingEnrollmentHistory;
   });
 };
 
@@ -39,10 +95,10 @@ export const calculateEnrollmentComposition = (
   };
 
   activeLearners.forEach(l => {
-    const studentSid = String(l.sectionId || '').trim();
-    const section = sections.find(s => s.id === studentSid);
-    const g = section?.gradeLevel;
+    const placement = getLearnerPlacementForYear(l, sections, activeSchoolYear);
+    const g = placement.gradeLevel;
     if (!g) return;
+    if (!Object.values(GradeLevel).includes(g as GradeLevel)) return;
     
     const jhs = [GradeLevel.GRADE_7, GradeLevel.GRADE_8, GradeLevel.GRADE_9, GradeLevel.GRADE_10];
     const shs = [GradeLevel.GRADE_11, GradeLevel.GRADE_12];
