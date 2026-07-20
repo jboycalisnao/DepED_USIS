@@ -71,8 +71,8 @@ const UserManagement: React.FC = () => {
                     <td className="px-6 py-4 font-mono text-xs text-outline">{u.username}</td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex justify-end gap-2">
-                        <button onClick={() => startEditUser(u)} className="w-8 h-8 rounded-lg text-outline hover:text-primary transition-all flex items-center justify-center border border-surfaceVariant bg-white"><span className="material-symbols-outlined text-lg">edit</span></button>
-                        <button onClick={() => removeUser(u.id)} disabled={users.length <= 1} className="w-8 h-8 rounded-lg text-outline hover:text-accent disabled:opacity-30 transition-all flex items-center justify-center border border-surfaceVariant bg-white"><span className="material-symbols-outlined text-lg">person_remove</span></button>
+                        <button onClick={() => startEditUser(u)} className="w-8 h-8 rounded-md text-outline hover:text-primary transition-all flex items-center justify-center border border-surfaceVariant bg-white"><span className="material-symbols-outlined text-lg">edit</span></button>
+                        <button onClick={() => removeUser(u.id)} disabled={users.length <= 1} className="w-8 h-8 rounded-md text-outline hover:text-accent disabled:opacity-30 transition-all flex items-center justify-center border border-surfaceVariant bg-white"><span className="material-symbols-outlined text-lg">person_remove</span></button>
                       </div>
                     </td>
                   </tr>

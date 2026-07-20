@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useStore } from '../../store';
 import ConfirmationModal from '../ConfirmationModal';
+import { SearchableSelect } from '../ui/SearchableSelect';
 
 type EnrollmentModuleSettings = {
   id: number;
@@ -72,6 +73,13 @@ const EnrollmentSchoolYearSettings: React.FC = () => {
   const selectedManualSchoolYear = useMemo(
     () => schoolYears.find((schoolYear) => schoolYear.id === settings.manual_school_year_id) || null,
     [schoolYears, settings.manual_school_year_id],
+  );
+  const schoolYearOptions = useMemo(
+    () =>
+      [...schoolYears]
+        .sort((a, b) => b.label.localeCompare(a.label))
+        .map((schoolYear) => ({ value: schoolYear.id, label: schoolYear.label })),
+    [schoolYears],
   );
 
   const effectiveSchoolYearLabel = settings.use_manual_school_year_override
@@ -147,24 +155,16 @@ const EnrollmentSchoolYearSettings: React.FC = () => {
         </div>
 
         <div className="settings-enrollment-controls__dates settings-enrollment-controls__dates--single">
-          <label className="floating-field">
-            <div className="floating-field__control">
-              <select
-                value={settings.manual_school_year_id}
-                onChange={(event) => setSettings((current) => ({ ...current, manual_school_year_id: event.target.value }))}
-                disabled={!settings.use_manual_school_year_override || isLoading}
-                data-has-value={settings.manual_school_year_id ? 'true' : 'false'}
-              >
-                <option value="">Select school year</option>
-                {[...schoolYears].sort((a, b) => b.label.localeCompare(a.label)).map((schoolYear) => (
-                  <option key={schoolYear.id} value={schoolYear.id}>
-                    {schoolYear.label}
-                  </option>
-                ))}
-              </select>
-              <span>Manual Enrollment School Year</span>
-            </div>
-          </label>
+          <SearchableSelect
+            label="Manual Enrollment School Year"
+            placeholder="Select school year"
+            floatingLabel
+            showLabel={false}
+            value={settings.manual_school_year_id}
+            onChange={(value) => setSettings((current) => ({ ...current, manual_school_year_id: value }))}
+            disabled={!settings.use_manual_school_year_override || isLoading}
+            options={schoolYearOptions}
+          />
         </div>
 
         <div className="settings-enrollment-controls__actions">
