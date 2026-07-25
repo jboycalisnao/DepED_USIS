@@ -1,25 +1,18 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import type { AttendanceSmsRecipientState, AttendanceSmsSettings, AttendanceSmsTestModeConfig, Learner, SmsQueueItem, SmsQueueLogEntry } from '../../../types';
-import { normalizePhilippineMobileNumber } from '../services/skySmsNotification';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import type { AttendanceSmsRecipientState, AttendanceSmsSettings, Learner, SmsQueueItem, SmsQueueLogEntry } from '../../../types';
+import { normalizePhilippineMobileNumber, sendSkySmsNotification } from '../services/skySmsNotification';
 import SmsLogsAndQueueTab from './SmsLogsAndQueueTab';
 import type { SmsQueueStats } from '../hooks/useSmsNotificationQueue';
-import { normalizeRfidValue } from '../../../utils/rfid';
-import { formatSmsIsoTimestamp, renderSmsMessageTemplate } from '../utils/smsMessageTemplate';
 import {
   UsisGradeSectionList,
   type UsisGradeSectionListGrade,
 } from '../../../../common/components/ui/UsisGradeSectionList';
-import { UsisSearchableSelect } from '../../../../common/components/ui/UsisSearchableSelect';
 
 type Props = {
   learners: Learner[];
   smsSettings: AttendanceSmsSettings;
   smsRecipientState: AttendanceSmsRecipientState;
-  smsTestMode: AttendanceSmsTestModeConfig;
   onSmsRecipientStateChange: (value: AttendanceSmsRecipientState) => void;
-  onSmsTestModeChange: (value: AttendanceSmsTestModeConfig) => void;
-  smsTestStatus: string;
-  smsTestStatusTone: 'idle' | 'success' | 'error';
   queueItems: SmsQueueItem[];
   logEntries: SmsQueueLogEntry[];
   clearHistory: () => void;
@@ -46,11 +39,7 @@ const SmsNotificationPage = ({
   learners,
   smsSettings,
   smsRecipientState,
-  smsTestMode,
   onSmsRecipientStateChange,
-  onSmsTestModeChange,
-  smsTestStatus,
-  smsTestStatusTone,
   queueItems,
   logEntries,
   clearHistory,
@@ -61,6 +50,11 @@ const SmsNotificationPage = ({
   const [recipientIds, setRecipientIds] = useState<string[]>([]);
   const [query, setQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'recipient-availability' | 'sms-logs'>('recipient-availability');
+  const [isManualSmsOpen, setIsManualSmsOpen] = useState(false);
+  const [manualPhoneNumber, setManualPhoneNumber] = useState('');
+  const [manualMessage, setManualMessage] = useState('Hello from DepED USIS SkySMS test.');
+  const [manualStatus, setManualStatus] = useState<{ tone: 'idle' | 'success' | 'error'; message: string }>({ tone: 'idle', message: '' });
+  const [isManualSending, setIsManualSending] = useState(false);
   const hasHydratedRecipientState = useRef(false);
 
   useEffect(() => {
@@ -101,31 +95,52 @@ const SmsNotificationPage = ({
     [learners, query],
   );
 
-  const learnerOptions = useMemo(
-    () =>
-      learners
-        .map((learner) => {
-          const fullName = `${learner.last_name || ''}, ${learner.first_name || ''}`.replace(/^,\s*/, '').trim() || 'Unnamed learner';
-          const section = [learner.grade_level, learner.section_name].filter(Boolean).join(' | ');
-          return {
-            value: learner.id,
-            label: section ? `${fullName} - ${section}` : fullName,
-          };
-        })
-        .sort((left, right) => naturalSort(left.label, right.label)),
-    [learners],
-  );
-  const selectedTestLearner = learners.find((learner) => learner.id === smsTestMode.learnerId) || null;
-  const testPreviewMessage = selectedTestLearner
-    ? renderSmsMessageTemplate(smsSettings.messageTemplate, selectedTestLearner, formatSmsIsoTimestamp(), smsTestMode.action)
-    : '';
-  const normalizedTestPhone = normalizePhilippineMobileNumber(smsTestMode.phoneNumber);
+  const normalizedManualPhone = normalizePhilippineMobileNumber(manualPhoneNumber);
+  const trimmedManualMessage = manualMessage.trim();
 
-  const updateSmsTestMode = (patch: Partial<AttendanceSmsTestModeConfig>) => {
-    onSmsTestModeChange({
-      ...smsTestMode,
-      ...patch,
-    });
+  const handleManualSmsSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!smsSettings.apiKey.trim()) {
+      setManualStatus({ tone: 'error', message: 'SkySMS API key is missing. Add it in Attendance Settings first.' });
+      return;
+    }
+
+    if (!normalizedManualPhone) {
+      setManualStatus({ tone: 'error', message: 'Use a valid Philippine mobile number.' });
+      return;
+    }
+
+    if (!trimmedManualMessage) {
+      setManualStatus({ tone: 'error', message: 'Message is required.' });
+      return;
+    }
+
+    if (trimmedManualMessage.length > 160) {
+      setManualStatus({ tone: 'error', message: 'Message must be 160 characters or fewer.' });
+      return;
+    }
+
+    setIsManualSending(true);
+    setManualStatus({ tone: 'idle', message: `Sending manual test SMS to ${normalizedManualPhone}.` });
+    try {
+      const response = await sendSkySmsNotification({
+        apiKey: smsSettings.apiKey,
+        phoneNumber: normalizedManualPhone,
+        message: trimmedManualMessage,
+      });
+      setManualStatus({
+        tone: 'success',
+        message: response.message || `Manual test SMS sent to ${normalizedManualPhone}.`,
+      });
+    } catch (error) {
+      setManualStatus({
+        tone: 'error',
+        message: error instanceof Error ? error.message : 'Manual test SMS failed.',
+      });
+    } finally {
+      setIsManualSending(false);
+    }
   };
 
   const toggleRecipient = (learnerId: string) => {
@@ -272,116 +287,22 @@ const SmsNotificationPage = ({
             <div>
               <h3>Configured Gateway</h3>
               <p>
-                The SkySMS API key and template are edited in Attendance Settings. This page uses the saved settings and only sends to opted-in learners.
+                The SkySMS API key and template are edited in Attendance Settings. Manual testing uses the saved key and sends directly through the local SMS proxy.
               </p>
             </div>
-            <div className="attendance-sms-page__status-badge">{smsSettings.apiKey ? 'Gateway Ready' : 'API Key Missing'}</div>
-          </div>
-        </section>
-
-        <section className="section-card attendance-sms-page__test-card rounded-md">
-          <div className="section-card__bar" />
-          <div className="section-card__content">
-            <div className="attendance-sms-page__form-head">
-              <div>
-                <h3>SMS Test Mode</h3>
-                <p>Use a temporary RFID and custom mobile number for gateway testing without saving the RFID to the learner record.</p>
-              </div>
-              <label className="registry-choice-option registry-radio-option--toggle attendance-sms-test-toggle">
-                <span className="registry-choice-option__text">
-                  <span className="registry-choice-option__label">{smsTestMode.isEnabled ? 'Test Mode On' : 'Test Mode Off'}</span>
-                </span>
-                <input
-                  type="checkbox"
-                  checked={smsTestMode.isEnabled}
-                  onChange={(event) => updateSmsTestMode({ isEnabled: event.target.checked })}
-                />
-              </label>
+            <div className="attendance-sms-page__intro-actions">
+              <div className="attendance-sms-page__status-badge">{smsSettings.apiKey ? 'Gateway Ready' : 'API Key Missing'}</div>
+              <button
+                type="button"
+                className="primary-button rounded-md"
+                onClick={() => {
+                  setManualStatus({ tone: 'idle', message: '' });
+                  setIsManualSmsOpen(true);
+                }}
+              >
+                Manual SMS Test
+              </button>
             </div>
-
-            <div className="floating-field-grid floating-field-grid--two attendance-sms-page__test-grid">
-              <div className="floating-field attendance-sms-page__field--full">
-                <UsisSearchableSelect
-                  ariaLabel="Select SMS test learner"
-                  floatingLabel
-                  label="Select learner from registry"
-                  options={learnerOptions}
-                  value={smsTestMode.learnerId}
-                  onChange={(learnerId) => updateSmsTestMode({ learnerId })}
-                  placeholder="Search learner"
-                  forcePortalMenu
-                />
-                <small>The selected learner supplies the message placeholders only.</small>
-              </div>
-
-              <label className="floating-field">
-                <div className="floating-field__control">
-                  <input
-                    type="text"
-                    value={smsTestMode.temporaryRfid}
-                    onChange={(event) => updateSmsTestMode({ temporaryRfid: normalizeRfidValue(event.target.value) })}
-                    placeholder=" "
-                    data-has-value={smsTestMode.temporaryRfid.trim() ? 'true' : 'false'}
-                  />
-                  <span>Temporary RFID</span>
-                </div>
-                <small>Stored in local browser cache only.</small>
-              </label>
-
-              <label className="floating-field">
-                <div className="floating-field__control">
-                  <input
-                    type="tel"
-                    value={smsTestMode.phoneNumber}
-                    onChange={(event) => updateSmsTestMode({ phoneNumber: event.target.value })}
-                    placeholder=" "
-                    data-has-value={smsTestMode.phoneNumber.trim() ? 'true' : 'false'}
-                  />
-                  <span>Custom Mobile Number</span>
-                </div>
-                <small>{smsTestMode.phoneNumber.trim() && !normalizedTestPhone ? 'Use a valid Philippine mobile number.' : 'SMS is sent to this number only.'}</small>
-              </label>
-
-              <fieldset className="registry-choice-group attendance-sms-page__field--full">
-                <legend>Test Message Action</legend>
-                <label className="registry-choice-option">
-                  <span className="registry-choice-option__text">
-                    <span className="registry-choice-option__label">Enter</span>
-                    <span className="registry-choice-option__description">Send the entry wording when the temporary RFID is scanned.</span>
-                  </span>
-                  <input
-                    type="radio"
-                    name="attendance-sms-test-action"
-                    checked={smsTestMode.action === 'entry'}
-                    onChange={() => updateSmsTestMode({ action: 'entry' })}
-                  />
-                </label>
-                <label className="registry-choice-option">
-                  <span className="registry-choice-option__text">
-                    <span className="registry-choice-option__label">Exit</span>
-                    <span className="registry-choice-option__description">Send the exit wording when the temporary RFID is scanned.</span>
-                  </span>
-                  <input
-                    type="radio"
-                    name="attendance-sms-test-action"
-                    checked={smsTestMode.action === 'exit'}
-                    onChange={() => updateSmsTestMode({ action: 'exit' })}
-                  />
-                </label>
-                <small>The scanned test RFID sends this selected action.</small>
-              </fieldset>
-
-              <div className="notice-box attendance-sms-test-preview attendance-sms-page__field--full">
-                <strong>Preview</strong>
-                <p>{testPreviewMessage || 'Select a learner to preview the test message.'}</p>
-              </div>
-            </div>
-
-            {smsTestStatus ? (
-              <p className={`attendance-sms-page__status attendance-sms-page__status--${smsTestStatusTone === 'success' ? 'success' : smsTestStatusTone === 'error' ? 'error' : 'idle'}`}>
-                {smsTestStatus}
-              </p>
-            ) : null}
           </div>
         </section>
 
@@ -462,6 +383,89 @@ const SmsNotificationPage = ({
           />
         )}
       </div>
+
+      {isManualSmsOpen ? (
+        <div className="modal-overlay modal-overlay--high" role="presentation">
+          <button type="button" className="modal-backdrop" onClick={() => setIsManualSmsOpen(false)} aria-label="Close manual SMS test modal" />
+          <form className="modal-dialog modal-dialog--wide attendance-sms-manual-modal" role="dialog" aria-modal="true" aria-labelledby="manual-sms-test-title" onSubmit={handleManualSmsSubmit}>
+            <div className="modal-dialog__header">
+              <div className="modal-dialog__title-group">
+                <p className="modal-dialog__eyebrow">SkySMS Gateway</p>
+                <h3 id="manual-sms-test-title">Manual SMS Test</h3>
+              </div>
+              <button type="button" className="modal-dialog__close" onClick={() => setIsManualSmsOpen(false)} aria-label="Close manual SMS test modal">
+                <span aria-hidden="true">x</span>
+              </button>
+            </div>
+
+            <div className="modal-dialog__body">
+              <div className="form-grid attendance-manual-modal__grid">
+                <label className="floating-field">
+                  <div className="floating-field__control">
+                    <input
+                      type="tel"
+                      value={manualPhoneNumber}
+                      onChange={(event) => setManualPhoneNumber(event.target.value)}
+                      placeholder=" "
+                      data-has-value={manualPhoneNumber.trim() ? 'true' : 'false'}
+                    />
+                    <span>Recipient Mobile Number</span>
+                  </div>
+                  <small>{manualPhoneNumber.trim() && !normalizedManualPhone ? 'Use 09xxxxxxxxx or +639xxxxxxxxx.' : 'The request is normalized before sending.'}</small>
+                </label>
+
+                <label className="floating-field attendance-sms-page__field--full">
+                  <div className="floating-field__control">
+                    <textarea
+                      value={manualMessage}
+                      onChange={(event) => setManualMessage(event.target.value)}
+                      placeholder=" "
+                      data-has-value={manualMessage.trim() ? 'true' : 'false'}
+                      maxLength={160}
+                    />
+                    <span>Message</span>
+                  </div>
+                  <small>{trimmedManualMessage.length}/160 characters</small>
+                </label>
+              </div>
+
+              <div className="notice-box attendance-sms-manual-modal__request">
+                <strong>Gateway Request</strong>
+                <pre className="attendance-sms-page__payload">
+{JSON.stringify(
+  {
+    url: '/api/sms-notification',
+    method: 'POST',
+    body: {
+      phoneNumber: normalizedManualPhone || manualPhoneNumber,
+      message: trimmedManualMessage,
+      apiKey: smsSettings.apiKey ? '[saved settings key]' : '',
+    },
+  },
+  null,
+  2,
+)}
+                </pre>
+              </div>
+
+              {manualStatus.message ? (
+                <p className={`attendance-sms-page__status attendance-sms-page__status--${manualStatus.tone === 'success' ? 'success' : manualStatus.tone === 'error' ? 'error' : 'idle'}`}>
+                  {manualStatus.message}
+                </p>
+              ) : null}
+            </div>
+
+            <div className="modal-dialog__actions">
+              <button type="button" className="modal-dialog__secondary" onClick={() => setIsManualSmsOpen(false)}>
+                Close
+              </button>
+              <button type="submit" className="modal-dialog__blue" disabled={isManualSending || !smsSettings.apiKey.trim()}>
+                {isManualSending ? 'Sending...' : 'Send Test SMS'}
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : null}
     </section>
   );
 };

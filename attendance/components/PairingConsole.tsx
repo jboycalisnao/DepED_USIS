@@ -1,6 +1,13 @@
 
 import React from 'react';
-import { Learner } from '../types';
+import { ConnectionStatus, Learner, SerialLog } from '../types';
+
+interface ReaderDiagnostic {
+  index: number;
+  status: ConnectionStatus;
+  lastInput: SerialLog | null;
+  lastError: SerialLog | null;
+}
 
 interface PairingConsoleProps {
   activeRfid: string;
@@ -10,10 +17,20 @@ interface PairingConsoleProps {
   onSave: () => void;
   isAdmin?: boolean;
   onToggleAdmin?: () => void;
+  onReaderValueChange?: (value: string) => void;
+  readerDiagnostics?: ReaderDiagnostic[];
 }
 
 const PairingConsole: React.FC<PairingConsoleProps> = ({
-  activeRfid, selectedLearner, conflictWarning, scanFlash, onSave, isAdmin, onToggleAdmin
+  activeRfid,
+  selectedLearner,
+  conflictWarning,
+  scanFlash,
+  onSave,
+  isAdmin,
+  onToggleAdmin,
+  onReaderValueChange,
+  readerDiagnostics = [],
 }) => {
   return (
     <section className="bg-white rounded-md p-8 shadow-sm border border-gray-200 relative overflow-hidden">
@@ -80,6 +97,39 @@ const PairingConsole: React.FC<PairingConsoleProps> = ({
               {conflictWarning}
             </p>
           )}
+          <label className="floating-field block">
+            <small>Reader fallback</small>
+            <div className="floating-field__control" data-has-value={activeRfid ? 'true' : 'false'}>
+              <input
+                type="text"
+                value={activeRfid}
+                onChange={(event) => onReaderValueChange?.(event.target.value)}
+                placeholder=" "
+                autoComplete="off"
+              />
+              <span>Click here, then tap or scan RFID</span>
+            </div>
+          </label>
+          <div className="grid gap-2">
+            {readerDiagnostics.map((diagnostic) => {
+              const isConnected = diagnostic.status === 'connected';
+              const rawText = diagnostic.lastInput?.text || diagnostic.lastError?.text || 'No serial input';
+              return (
+                <div
+                  key={diagnostic.index}
+                  className={`rounded-md border px-3 py-2 text-[10px] ${
+                    isConnected ? 'border-primary-200 bg-primary-50 text-primary-700' : 'border-gray-200 bg-gray-50 text-gray-500'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="font-bold">M{diagnostic.index + 1}</span>
+                    <span className="font-bold uppercase">{diagnostic.status}</span>
+                  </div>
+                  <code className="mt-1 block truncate font-mono text-[11px]">{rawText}</code>
+                </div>
+              );
+            })}
+          </div>
         </div>
 
         <div className="space-y-4">

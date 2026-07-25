@@ -2,12 +2,14 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import TopCenterAlert from '../components/TopCenterAlert';
 import { getActiveLearnersForYear, calculateEnrollmentComposition, calculateGenderDemographics } from '../services/dashboardService';
+import { fetchPendingPublicEnrollmentSubmissionCount } from '../features/registrar/public-enrollment/services/publicEnrollmentSubmissions';
 import { useStore } from '../store';
 import { EnrollmentStatus } from '../types';
 
 const Dashboard: React.FC = () => {
   const { learners, sections, activeSchoolYear, loading, refreshData, connectionError } = useStore();
   const [showConnectionAlert, setShowConnectionAlert] = useState(false);
+  const [pendingSubmissionCount, setPendingSubmissionCount] = useState(0);
 
   useEffect(() => {
     refreshData();
@@ -22,17 +24,35 @@ const Dashboard: React.FC = () => {
     [learners, sections, activeSchoolYear],
   );
 
+  useEffect(() => {
+    let active = true;
+    const existingLearnerLrns = new Set(
+      learners.map((learner) => String(learner.lrn || '').trim()).filter(Boolean),
+    );
+
+    void fetchPendingPublicEnrollmentSubmissionCount(activeSchoolYear.label, existingLearnerLrns)
+      .then((count) => {
+        if (active) setPendingSubmissionCount(count);
+      })
+      .catch(() => {
+        if (active) setPendingSubmissionCount(0);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [activeSchoolYear.label, learners]);
+
   const displayStats = useMemo(() => {
     const totalVal = activeLearnersList.length;
-    const pendingVal = activeLearnersList.filter((l) => l.status === EnrollmentStatus.PENDING).length;
     const withdrawnVal = activeLearnersList.filter((l) => l.status === EnrollmentStatus.WITHDRAWN).length;
 
     return [
       { label: `Learners (SY ${activeSchoolYear.label})`, value: totalVal, icon: 'group', color: 'bg-primary' },
-      { label: 'Pending Applications', value: pendingVal, icon: 'hourglass_top', color: 'bg-accent' },
+      { label: 'Pending Applications', value: pendingSubmissionCount, icon: 'hourglass_top', color: 'bg-accent' },
       { label: 'Withdrawn/Dropped', value: withdrawnVal, icon: 'person_off', color: 'bg-slate-600' },
     ];
-  }, [activeLearnersList, activeSchoolYear]);
+  }, [activeLearnersList, activeSchoolYear, pendingSubmissionCount]);
 
   const enrollmentData = useMemo(
     () => calculateEnrollmentComposition(activeLearnersList, sections, activeSchoolYear),

@@ -15,6 +15,7 @@ interface LearnerRegistrationModalProps {
   onClose: () => void;
   onSubmit: (value: RegisterLearnerPayload) => Promise<void> | void;
   onUnlinkLearner?: (learnerId: string) => Promise<void> | void;
+  onReaderValueChange?: (value: string) => void;
 }
 
 const formatLearnerLabel = (learner: Learner) => {
@@ -35,6 +36,7 @@ export default function LearnerRegistrationModal({
   onClose,
   onSubmit,
   onUnlinkLearner,
+  onReaderValueChange,
 }: LearnerRegistrationModalProps) {
   const [form, setForm] = useState<RegisterLearnerPayload>({
     learnerId: selectedLearnerId || learners[0]?.id || '',
@@ -109,9 +111,17 @@ export default function LearnerRegistrationModal({
             <label className="floating-field">
               <small>Reader Value</small>
               <div className="floating-field__control">
-                <input type="text" value={readerValue || 'Waiting for reader...'} placeholder=" " readOnly />
+                <input
+                  type="text"
+                  value={readerValue}
+                  onChange={(event) => onReaderValueChange?.(event.target.value)}
+                  placeholder=" "
+                  autoComplete="off"
+                  data-has-value={readerValue ? 'true' : 'false'}
+                />
                 <span>RFID Reader Log</span>
               </div>
+              <small>{readerValue ? 'Ready to link.' : 'Click this field, then tap or scan RFID.'}</small>
             </label>
           </div>
 

@@ -5,7 +5,7 @@ import { useSerial } from './hooks/useSerial';
 import { useLearners } from './hooks/useLearners';
 import { useAttendance } from './hooks/useAttendance';
 import { useSettings } from './hooks/useSettings';
-import { ScanResult } from './types';
+import { AttendanceSmsTestModeAction, AttendanceType, ScanResult } from './types';
 import { UsisUnifiedHeader } from '../common/header/UsisUnifiedHeader';
 import { UsisGlobalFooter } from '../common/footer/UsisGlobalFooter';
 import { UsisPortalGate } from '../common/components/UsisPortalGate';
@@ -19,10 +19,9 @@ import { normalizeRfidValue } from './utils/rfid';
 import AttendanceLandingPage from './features/auth/components/AttendanceLandingPage';
 import TeacherAttendanceLandingPage from './features/auth/components/TeacherAttendanceLandingPage';
 import SmsNotificationPage from './features/sms/components/SmsNotificationPage';
-import { useSmsTestMode } from './features/sms/hooks/useSmsTestMode';
-import { normalizePhilippineMobileNumber } from './features/sms/services/skySmsNotification';
-import { formatSmsIsoTimestamp, renderSmsMessageTemplate } from './features/sms/utils/smsMessageTemplate';
-import { useSmsNotificationQueue, type SmsQueueRequest } from './features/sms/hooks/useSmsNotificationQueue';
+import { buildAttendanceSmsRequest } from './features/sms/services/buildAttendanceSmsRequest';
+import { formatSmsIsoTimestamp } from './features/sms/utils/smsMessageTemplate';
+import { useSmsNotificationQueue } from './features/sms/hooks/useSmsNotificationQueue';
 import {
   clearStoredAttendanceAccess,
   getStoredAttendanceAccess,
@@ -93,7 +92,6 @@ function App() {
     selectedSchoolYearId,
     setSelectedSchoolYearId,
   } = useSettings();
-  const { smsTestMode, setSmsTestMode } = useSmsTestMode();
   const {
     queueItems: smsQueueItems,
     logEntries: smsLogEntries,
@@ -153,8 +151,8 @@ function App() {
   
   const [lastScanResults, setLastScanResults] = useState<(ScanResult | null)[]>([null, null, null]);
   const [unknownTags, setUnknownTags] = useState<(string | null)[]>([null, null, null]);
-  const [smsTestStatus, setSmsTestStatus] = useState('');
-  const [smsTestStatusTone, setSmsTestStatusTone] = useState<'idle' | 'success' | 'error'>('idle');
+  const [kioskSmsTestEnabled, setKioskSmsTestEnabled] = useState(false);
+  const [kioskSmsTestAction, setKioskSmsTestAction] = useState<AttendanceSmsTestModeAction>('entry');
   
   const lastProcessedIds = useRef<(string | null)[]>([null, null, null]);
   const idleTimers = useRef<(number | null)[]>([null, null, null]);
@@ -165,6 +163,51 @@ function App() {
     const savedPath = window.localStorage.getItem(ATTENDANCE_LAST_PATH_KEY) || ATTENDANCE_DEFAULT_PATH;
     return resolveAttendancePath(savedPath, ATTENDANCE_DEFAULT_PATH);
   }, []);
+  const kioskSmsTestAttendanceType: AttendanceType = kioskSmsTestAction === 'exit' ? 'PM_OUT' : 'AM_IN';
+  const readerDiagnostics = useMemo(
+    () =>
+      monitors.map((monitor, index) => ({
+        index,
+        status: monitor.status,
+        lastInput: [...monitor.logs].reverse().find((log) => log.type === 'in') || null,
+        lastError: [...monitor.logs].reverse().find((log) => log.type === 'error') || null,
+      })),
+    [monitor1.logs, monitor1.status, monitor2.logs, monitor2.status, monitor3.logs, monitor3.status],
+  );
+
+  const handleRegistrarRfidCapture = useCallback((value: string) => {
+    const scannedUid = extractUid(value) || normalizeRfidValue(value);
+    if (!scannedUid) return;
+
+    setScanFlash(true);
+    setActiveRfid(scannedUid);
+    setConflictWarning(null);
+
+    const owner = learners.find(l => {
+      const dbUid = normalizeRfidValue(l.rfid);
+      const localUid = normalizeRfidValue(uidMappings[l.id]);
+      return dbUid === scannedUid || localUid === scannedUid;
+    });
+
+    if (owner) {
+      setConflictWarning(`Tag assigned to: ${owner.last_name}, ${owner.first_name}`);
+    }
+    window.setTimeout(() => setScanFlash(false), 500);
+  }, [learners, uidMappings]);
+
+  useEffect(() => {
+    if (isKioskRoute) return;
+
+    const latestReaderSignal = readerDiagnostics
+      .map((diagnostic) => diagnostic.lastInput)
+      .filter((log): log is NonNullable<typeof log> => Boolean(log))
+      .sort((left, right) => right.timestamp.getTime() - left.timestamp.getTime())[0];
+
+    const scannedUid = extractUid(latestReaderSignal?.text || '');
+    if (!scannedUid || scannedUid === activeRfid) return;
+
+    handleRegistrarRfidCapture(scannedUid);
+  }, [activeRfid, handleRegistrarRfidCapture, isKioskRoute, readerDiagnostics]);
 
   useEffect(() => {
     if (!selectedLearnerId) return;
@@ -197,158 +240,22 @@ function App() {
     }, 5000); // 5 seconds idle
   };
 
-  const isSmsTestScan = useCallback(
-    (scannedUid: string) =>
-      smsTestMode.isEnabled &&
-      Boolean(normalizeRfidValue(smsTestMode.temporaryRfid)) &&
-      normalizeRfidValue(smsTestMode.temporaryRfid) === scannedUid,
-    [smsTestMode.isEnabled, smsTestMode.temporaryRfid],
-  );
-
-  const shouldCaptureSmsTestRfid = useCallback(
-    (scannedUid: string) =>
-      currentView === 'sms' &&
-      smsTestMode.isEnabled &&
-      Boolean(scannedUid) &&
-      normalizeRfidValue(smsTestMode.temporaryRfid) !== scannedUid,
-    [currentView, smsTestMode.isEnabled, smsTestMode.temporaryRfid],
-  );
-
-  const captureSmsTestRfid = useCallback(
-    (scannedUid: string, stationIndex = 0, writeToStation?: (message: string) => void) => {
-      setSmsTestMode({
-        ...smsTestMode,
-        temporaryRfid: scannedUid,
-      });
-      setSmsTestStatusTone('success');
-      setSmsTestStatus(`Captured temporary RFID ${scannedUid} from Arduino monitor ${stationIndex + 1}. Scan it again to send the SMS test.`);
-      setScanFlash(true);
-      window.setTimeout(() => setScanFlash(false), 400);
-      writeToStation?.('DISPLAY|SMS TEST|RFID SAVED');
-    },
-    [setSmsTestMode, smsTestMode],
-  );
-
-  const handleSmsTestScan = useCallback(
-    async (scannedUid: string, stationIndex = 0, writeToStation?: (message: string) => void) => {
-      const learner = learners.find((item) => item.id === smsTestMode.learnerId) || null;
-      const phoneNumber = normalizePhilippineMobileNumber(smsTestMode.phoneNumber);
-      const actionLabel = smsTestMode.action === 'exit' ? 'exit' : 'entry';
-      const now = new Date();
-      const eventTime = formatSmsIsoTimestamp(now);
-      const displayType = smsTestMode.action === 'exit' ? 'PM_OUT' : 'AM_IN';
-
-      setScanFlash(true);
-      window.setTimeout(() => setScanFlash(false), 400);
-      setUnknownTags((prev) => {
-        const next = [...prev];
-        next[stationIndex] = null;
-        return next;
-      });
-
-      if (learner) {
-        setLastScanResults((prev) => {
-          const next = [...prev];
-          next[stationIndex] = {
-            learner,
-            type: displayType,
-            uid: scannedUid,
-            isLate: false,
-            isDuplicate: false,
-            time: eventTime,
-          };
-          return next;
-        });
-      }
-
-      if (!smsSettings.apiKey.trim()) {
-        setSmsTestStatusTone('error');
-        setSmsTestStatus('SMS test mode is enabled, but the SkySMS API key is missing.');
-        writeToStation?.('ERROR|SMS Key Missing');
-        startIdleTimer(stationIndex);
-        return;
-      }
-
-      if (!learner) {
-        setSmsTestStatusTone('error');
-        setSmsTestStatus('SMS test mode is enabled, but no test learner is selected.');
-        writeToStation?.('ERROR|No Test Learner');
-        startIdleTimer(stationIndex);
-        return;
-      }
-
-      if (!phoneNumber) {
-        setSmsTestStatusTone('error');
-        setSmsTestStatus('SMS test mode is enabled, but the custom mobile number is invalid.');
-        writeToStation?.('ERROR|Invalid Number');
-        startIdleTimer(stationIndex);
-        return;
-      }
-
-      if (!smsSettings.messageTemplate.trim()) {
-        setSmsTestStatusTone('error');
-        setSmsTestStatus('SMS test mode is enabled, but the SMS template is blank.');
-        writeToStation?.('ERROR|Blank Template');
-        startIdleTimer(stationIndex);
-        return;
-      }
-
-      const message = renderSmsMessageTemplate(smsSettings.messageTemplate, learner, eventTime, smsTestMode.action);
-      if (message.length > 160) {
-        setSmsTestStatusTone('error');
-        setSmsTestStatus('SMS test message exceeds 160 characters.');
-        writeToStation?.('ERROR|SMS Too Long');
-        startIdleTimer(stationIndex);
-        return;
-      }
-
-      setSmsTestStatusTone('idle');
-      setSmsTestStatus(`Queueing ${actionLabel} trial SMS to ${phoneNumber}.`);
-      writeToStation?.(`DISPLAY|${learner.last_name || 'SMS TEST'}|${learner.first_name || actionLabel.toUpperCase()}`);
-
-      const trialRequest: SmsQueueRequest = {
-        learnerId: learner.id,
-        learnerName: `SMS Trial - ${`${learner.last_name || ''}, ${learner.first_name || ''}`.replace(/^,\s*/, '').trim() || 'Unnamed learner'}`,
-        phoneNumber,
-        message,
-        apiKey: smsSettings.apiKey,
-      };
-
-      const queuedCount = enqueueSmsRequests([trialRequest]);
-      if (queuedCount > 0) {
-        setSmsTestStatusTone('success');
-        setSmsTestStatus(`Queued ${actionLabel} trial SMS to ${phoneNumber}. Track delivery in SMS Logs and Queue.`);
-      } else {
-        setSmsTestStatusTone('error');
-        setSmsTestStatus('Unable to queue the SMS trial request.');
-        writeToStation?.('ERROR|SMS Queue Failed');
-      }
-
-      startIdleTimer(stationIndex);
-    },
-    [
-      learners,
-      enqueueSmsRequests,
-      smsSettings.apiKey,
-      smsSettings.messageTemplate,
-      smsTestMode.action,
-      smsTestMode.learnerId,
-      smsTestMode.phoneNumber,
-    ],
-  );
-
   // Process logs for each monitor
   useEffect(() => {
     monitors.forEach((monitor, index) => {
       if (monitor.logs.length === 0) return;
-      
-      const lastLog = monitor.logs[monitor.logs.length - 1];
-      if (!lastLog || lastLog.type !== 'in' || lastLog.id === lastProcessedIds.current[index]) return;
 
-      const scannedUid = extractUid(lastLog.text);
+      const lastProcessedIndex = monitor.logs.findIndex((log) => log.id === lastProcessedIds.current[index]);
+      const newLogs = monitor.logs.slice(lastProcessedIndex + 1);
+      if (newLogs.length === 0) return;
+
+      lastProcessedIds.current[index] = newLogs[newLogs.length - 1].id;
+
+      const uidLog = [...newLogs].reverse().find((log) => log.type === 'in' && extractUid(log.text));
+      if (!uidLog) return;
+
+      const scannedUid = extractUid(uidLog.text);
       if (!scannedUid) return;
-
-      lastProcessedIds.current[index] = lastLog.id;
 
       // MASTER KEY LOGIC
       if (adminUids.includes(scannedUid)) {
@@ -363,16 +270,6 @@ function App() {
         return;
       }
 
-      if (isSmsTestScan(scannedUid)) {
-        void handleSmsTestScan(scannedUid, index, monitor.write);
-        return;
-      }
-
-      if (shouldCaptureSmsTestRfid(scannedUid)) {
-        captureSmsTestRfid(scannedUid, index, monitor.write);
-        return;
-      }
-
       if (isKioskRoute) {
           const learner = learners.find(l => {
           const dbUid = normalizeRfidValue(l.rfid);
@@ -383,7 +280,37 @@ function App() {
         if (learner) {
           const now = new Date();
           const decision = resolveAttendanceDecision(String(learner.grade_level || ''), now, scheduleConfig);
-          const type = decision.type;
+          const type = kioskSmsTestEnabled ? kioskSmsTestAttendanceType : decision.type;
+
+          if (kioskSmsTestEnabled) {
+            const smsRequest = buildAttendanceSmsRequest(learner, type, now, smsSettings, smsRecipientState);
+            if (smsRequest) {
+              enqueueSmsRequests([smsRequest]);
+              monitor.write(`DISPLAY|SMS TEST|${kioskSmsTestAction.toUpperCase()}`);
+            } else {
+              monitor.write('ERROR|SMS Not Ready');
+            }
+
+            setLastScanResults(prev => {
+              const next = [...prev];
+              next[index] = {
+                learner,
+                type,
+                uid: scannedUid,
+                isLate: false,
+                isDuplicate: false,
+                time: formatSmsIsoTimestamp(now)
+              };
+              return next;
+            });
+            setUnknownTags(prev => {
+              const next = [...prev];
+              next[index] = null;
+              return next;
+            });
+            startIdleTimer(index);
+            return;
+          }
           
           const todayStr = now.toDateString();
           const isDuplicate = attendanceLogs.some(log => {
@@ -407,6 +334,10 @@ function App() {
             });
           } else {
             logAttendance(learner.id, type, decision.isLate);
+            const smsRequest = buildAttendanceSmsRequest(learner, type, now, smsSettings, smsRecipientState);
+            if (smsRequest) {
+              enqueueSmsRequests([smsRequest]);
+            }
             monitor.write(`DISPLAY|${learner.last_name}|${learner.first_name}`);
 
             setLastScanResults(prev => {
@@ -443,23 +374,10 @@ function App() {
           startIdleTimer(index);
         }
       } else {
-        setScanFlash(true);
-        setActiveRfid(scannedUid);
-        setConflictWarning(null);
-        
-        const owner = learners.find(l => {
-          const dbUid = normalizeRfidValue(l.rfid);
-          const localUid = normalizeRfidValue(uidMappings[l.id]);
-          return dbUid === scannedUid || localUid === scannedUid;
-        });
-
-        if (owner) {
-          setConflictWarning(`Tag assigned to: ${owner.last_name}, ${owner.first_name}`);
-        }
-        setTimeout(() => setScanFlash(false), 500);
+        handleRegistrarRfidCapture(scannedUid);
       }
     });
-  }, [monitor1.logs, monitor2.logs, monitor3.logs, isKioskRoute, uidMappings, adminUids, learners, scheduleConfig, logAttendance, attendanceLogs, navigate, isSmsTestScan, handleSmsTestScan, shouldCaptureSmsTestRfid, captureSmsTestRfid]);
+  }, [monitor1.logs, monitor2.logs, monitor3.logs, isKioskRoute, uidMappings, adminUids, learners, scheduleConfig, logAttendance, attendanceLogs, navigate, smsSettings, smsRecipientState, enqueueSmsRequests, kioskSmsTestEnabled, kioskSmsTestAttendanceType, kioskSmsTestAction, handleRegistrarRfidCapture]);
 
   useEffect(() => {
     const hasActive = lastScanResults.some(r => r !== null) || unknownTags.some(t => t !== null);
@@ -486,7 +404,7 @@ function App() {
       usbRfidBufferRef.current = '';
       if (!raw) return;
 
-      const scannedUid = normalizeRfidValue(raw);
+      const scannedUid = extractUid(raw);
       if (!scannedUid) return;
 
       if (adminUids.includes(scannedUid)) {
@@ -501,16 +419,6 @@ function App() {
         return;
       }
 
-      if (isSmsTestScan(scannedUid)) {
-        void handleSmsTestScan(scannedUid, 0);
-        return;
-      }
-
-      if (shouldCaptureSmsTestRfid(scannedUid)) {
-        captureSmsTestRfid(scannedUid, 0);
-        return;
-      }
-
       if (isKioskRoute) {
         const learner = learners.find(l => {
           const dbUid = normalizeRfidValue(l.rfid);
@@ -521,7 +429,34 @@ function App() {
         if (learner) {
           const now = new Date();
           const decision = resolveAttendanceDecision(String(learner.grade_level || ''), now, scheduleConfig);
-          const type = decision.type;
+          const type = kioskSmsTestEnabled ? kioskSmsTestAttendanceType : decision.type;
+
+          if (kioskSmsTestEnabled) {
+            const smsRequest = buildAttendanceSmsRequest(learner, type, now, smsSettings, smsRecipientState);
+            if (smsRequest) {
+              enqueueSmsRequests([smsRequest]);
+            }
+
+            setLastScanResults(prev => {
+              const next = [...prev];
+              next[0] = {
+                learner,
+                type,
+                uid: scannedUid,
+                isLate: false,
+                isDuplicate: false,
+                time: formatSmsIsoTimestamp(now),
+              };
+              return next;
+            });
+            setUnknownTags(prev => {
+              const next = [...prev];
+              next[0] = null;
+              return next;
+            });
+            return;
+          }
+
           const todayStr = now.toDateString();
           const isDuplicate = attendanceLogs.some(log => {
             const logDate = new Date(log.timestamp).toDateString();
@@ -530,6 +465,10 @@ function App() {
 
           if (!isDuplicate) {
             logAttendance(learner.id, type, decision.isLate);
+            const smsRequest = buildAttendanceSmsRequest(learner, type, now, smsSettings, smsRecipientState);
+            if (smsRequest) {
+              enqueueSmsRequests([smsRequest]);
+            }
           }
 
           setLastScanResults(prev => {
@@ -564,27 +503,11 @@ function App() {
         return;
       }
 
-      setScanFlash(true);
-      setActiveRfid(scannedUid);
-      setConflictWarning(null);
-
-      const owner = learners.find(l => {
-        const dbUid = normalizeRfidValue(l.rfid);
-        const localUid = normalizeRfidValue(uidMappings[l.id]);
-        return dbUid === scannedUid || localUid === scannedUid;
-      });
-      if (owner) {
-        setConflictWarning(`Tag assigned to: ${owner.last_name}, ${owner.first_name}`);
-      }
-      setTimeout(() => setScanFlash(false), 500);
+      handleRegistrarRfidCapture(scannedUid);
     };
 
     const onKeyDown = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement | null;
-      const tag = target?.tagName?.toLowerCase();
-      if (tag === 'input' || tag === 'textarea' || tag === 'select' || target?.isContentEditable) return;
-
-      if (event.key === 'Enter') {
+      if (event.key === 'Enter' || event.key === 'Tab') {
         finalizeUsbUid();
         return;
       }
@@ -601,12 +524,12 @@ function App() {
       }
     };
 
-    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keydown', onKeyDown, true);
     return () => {
-      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keydown', onKeyDown, true);
       clearUsbTimer();
     };
-  }, [adminUids, attendanceLogs, isKioskRoute, learners, logAttendance, scheduleConfig, uidMappings, navigate, isSmsTestScan, handleSmsTestScan, shouldCaptureSmsTestRfid, captureSmsTestRfid]);
+  }, [adminUids, attendanceLogs, isKioskRoute, learners, logAttendance, scheduleConfig, uidMappings, navigate, smsSettings, smsRecipientState, enqueueSmsRequests, kioskSmsTestEnabled, kioskSmsTestAttendanceType, handleRegistrarRfidCapture]);
 
   const handleSaveMapping = async () => {
     if (!selectedLearnerId || !activeRfid || conflictWarning) return;
@@ -700,6 +623,10 @@ function App() {
           unknownTags={unknownTags} 
           settings={scheduleConfig}
           monitorStatuses={monitors.map((monitor) => monitor.status)}
+          smsTestModeEnabled={kioskSmsTestEnabled}
+          smsTestModeAction={kioskSmsTestAction}
+          onSmsTestModeEnabledChange={setKioskSmsTestEnabled}
+          onSmsTestModeActionChange={setKioskSmsTestAction}
         />
       </>
     );
@@ -921,6 +848,8 @@ function App() {
                           onSave={handleSaveMapping}
                           isAdmin={adminUids.includes(activeRfid)}
                           onToggleAdmin={() => toggleAdmin(activeRfid)}
+                          onReaderValueChange={handleRegistrarRfidCapture}
+                          readerDiagnostics={readerDiagnostics}
                         />
 
                         <section className="bg-white rounded-md p-6 shadow-sm border border-gray-200">
@@ -956,6 +885,7 @@ function App() {
                           selectedId={selectedLearnerId}
                           onSelect={setSelectedLearnerId}
                           onUnlink={handleUnlinkMapping}
+                          onReaderValueChange={handleRegistrarRfidCapture}
                           onLoadRoster={() => void loadLearners()}
                           onRegisterLearner={registerLearner}
                           isLoading={isLoading}
@@ -1012,11 +942,7 @@ function App() {
                       learners={learners}
                       smsSettings={smsSettings}
                       smsRecipientState={smsRecipientState}
-                      smsTestMode={smsTestMode}
                       onSmsRecipientStateChange={setSmsRecipientState}
-                      onSmsTestModeChange={setSmsTestMode}
-                      smsTestStatus={smsTestStatus}
-                      smsTestStatusTone={smsTestStatusTone}
                       queueItems={smsQueueItems}
                       logEntries={smsLogEntries}
                       clearHistory={clearSmsHistory}

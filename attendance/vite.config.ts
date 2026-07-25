@@ -3,6 +3,7 @@ import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 
 const DEFAULT_SKYSMS_URL = 'https://skysms.skyio.site/api/v1/sms/send';
+const SKYSMS_USER_AGENT = 'DepED-USIS-Attendance/1.0 (local-dev; school-sms-notification)';
 const normalize = (value: unknown) => String(value ?? '').trim();
 const normalizePhilippineMobileNumber = (value: string) => {
   const digits = normalize(value).replace(/[^\d+]/g, '');
@@ -10,6 +11,43 @@ const normalizePhilippineMobileNumber = (value: string) => {
   if (/^639\d{9}$/.test(digits)) return `+${digits}`;
   if (/^09\d{9}$/.test(digits)) return `+63${digits.slice(1)}`;
   return '';
+};
+
+const forwardSmsRequest = async (gatewayUrl: string, apiKey: string, phoneNumber: string, message: string) => {
+  const requestBody = JSON.stringify({
+    phone_number: phoneNumber,
+    message,
+  });
+
+  const response = await fetch(gatewayUrl, {
+    method: 'POST',
+    headers: {
+      'X-API-Key': apiKey,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'User-Agent': SKYSMS_USER_AGENT,
+    },
+    body: requestBody,
+  });
+
+  return {
+    response,
+    requestBody,
+  };
+};
+
+const isGatewayAccepted = (forwardResponseOk: boolean, forwarded: unknown) => {
+  if (!forwardResponseOk) return false;
+  if (forwarded && typeof forwarded === 'object' && 'success' in forwarded) {
+    return Boolean((forwarded as { success?: unknown }).success);
+  }
+  if (forwarded && typeof forwarded === 'object' && 'message' in forwarded) {
+    const gatewayMessage = String((forwarded as { message?: unknown }).message || '').toLowerCase();
+    if (gatewayMessage.includes('access denied') || gatewayMessage.includes('bot-protection')) {
+      return false;
+    }
+  }
+  return true;
 };
 
 const smsNotificationDevProxy = () => ({
@@ -53,17 +91,8 @@ const smsNotificationDevProxy = () => ({
           return;
         }
 
-        const forwardResponse = await fetch(gatewayUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-API-Key': apiKey,
-          },
-          body: JSON.stringify({
-            phone_number: phoneNumber,
-            message,
-          }),
-        });
+        const forwardedRequest = await forwardSmsRequest(gatewayUrl, apiKey, phoneNumber, message);
+        const forwardResponse = forwardedRequest.response;
 
         const forwardText = await forwardResponse.text().catch(() => '');
         let forwarded: unknown = null;
@@ -73,12 +102,36 @@ const smsNotificationDevProxy = () => ({
           forwarded = forwardText;
         }
 
-        res.statusCode = forwardResponse.status;
+        const gatewayAccepted = isGatewayAccepted(forwardResponse.ok, forwarded);
+
+        res.statusCode = gatewayAccepted ? forwardResponse.status : 502;
         res.setHeader('Content-Type', 'application/json');
         res.end(JSON.stringify(
-          forwardResponse.ok
-            ? { ok: true, message: 'SMS request sent through the SkySMS gateway.', forwarded }
-            : { ok: false, message: 'SMS gateway returned an error.', details: forwarded },
+          gatewayAccepted
+            ? {
+                ok: true,
+                message: 'SMS request sent through the SkySMS gateway.',
+                forwarded,
+                gatewayStatus: forwardResponse.status,
+              }
+            : {
+                ok: false,
+                message: 'SMS gateway returned an error.',
+                details: forwarded,
+                gatewayStatus: forwardResponse.status,
+                gatewayResponseText: forwardText,
+                gatewayRequest: {
+                  url: gatewayUrl,
+                  method: 'POST',
+                  headers: {
+                    'X-API-Key': '[configured]',
+                    'Content-Type': 'application/json',
+                    Accept: 'application/json',
+                    'User-Agent': SKYSMS_USER_AGENT,
+                  },
+                  body: forwardedRequest.requestBody,
+                },
+              },
         ));
       } catch (error: any) {
         res.statusCode = 500;

@@ -2879,6 +2879,14 @@ body {
   gap: 16px;
 }
 
+.attendance-sms-page__intro-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .attendance-sms-page__intro-content h3,
 .attendance-sms-page__form-card h3,
 .attendance-sms-page__preview-card h3 {
@@ -2996,6 +3004,7 @@ body {
   margin: 14px 0 0;
   font-size: 13px;
   font-weight: 600;
+  overflow-wrap: anywhere;
 }
 
 .attendance-sms-page__status--success {
@@ -3017,6 +3026,14 @@ body {
   line-height: 1.6;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.attendance-sms-manual-modal .floating-field__control textarea {
+  min-height: 128px;
+}
+
+.attendance-sms-manual-modal__request {
+  margin-top: 16px;
 }
 
 .attendance-sms-settings__field {

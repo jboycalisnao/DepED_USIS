@@ -9,9 +9,22 @@ type SkySmsSendResponse = {
   message?: string;
   details?: unknown;
   forwarded?: unknown;
+  gatewayStatus?: number;
+  gatewayResponseText?: string;
+  gatewayRequest?: unknown;
 };
 
 const normalize = (value: unknown) => String(value ?? '').trim();
+
+const stringifyDetails = (value: unknown) => {
+  if (value == null) return '';
+  if (typeof value === 'string') return value;
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+};
 
 export const normalizePhilippineMobileNumber = (value: string) => {
   const digits = normalize(value).replace(/[^\d+]/g, '');
@@ -46,9 +59,22 @@ export async function sendSkySmsNotification(payload: SkySmsSendPayload): Promis
   }
 
   if (!response.ok || data?.ok === false) {
-    const message = data?.message || `Unable to send SMS (${response.status}).`;
+    const details = stringifyDetails(data?.details || data?.forwarded || data?.gatewayResponseText);
+    const requestDetails = stringifyDetails(data?.gatewayRequest);
+    const message = [
+      data?.message || `Unable to send SMS (${response.status}).`,
+      `Status ${data?.gatewayStatus || response.status}`,
+      details ? `Details: ${details}` : '',
+      requestDetails ? `Request: ${requestDetails}` : '',
+    ].filter(Boolean).join(' ');
     throw new Error(message);
   }
 
-  return data || { ok: true, message: 'SMS sent.' };
+  const forwardedDetails = stringifyDetails(data?.forwarded);
+  return {
+    ...(data || { ok: true }),
+    message: forwardedDetails
+      ? `${data?.message || 'SMS sent.'} Gateway: ${forwardedDetails}`
+      : data?.message || 'SMS sent.',
+  };
 }

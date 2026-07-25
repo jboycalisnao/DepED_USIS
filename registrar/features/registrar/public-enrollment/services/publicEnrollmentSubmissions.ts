@@ -124,6 +124,33 @@ export async function fetchPublicEnrollmentSubmissions(limit?: number, schoolYea
   return typeof limit === 'number' && Number.isFinite(limit) ? rows.slice(0, limit) : rows;
 }
 
+const normalizeLrn = (value: unknown) => String(value || '').trim();
+
+export function isPendingPublicEnrollmentSubmission(
+  submission: Pick<PublicEnrollmentSubmission, 'lrn' | 'payload'>,
+  existingLearnerLrns: Set<string> = new Set(),
+) {
+  const payload = (submission.payload || {}) as Record<string, unknown>;
+  const hasAssignedSection = Boolean(
+    String(payload.assignedSectionId || '').trim() ||
+    String(payload.assignedSectionName || '').trim(),
+  );
+  if (hasAssignedSection) return false;
+
+  const lrn = normalizeLrn(submission.lrn || payload.lrn);
+  if (lrn && existingLearnerLrns.has(lrn)) return false;
+
+  return true;
+}
+
+export async function fetchPendingPublicEnrollmentSubmissionCount(
+  schoolYearLabel: string,
+  existingLearnerLrns: Set<string> = new Set(),
+) {
+  const submissions = await fetchPublicEnrollmentSubmissions(undefined, schoolYearLabel);
+  return submissions.filter((submission) => isPendingPublicEnrollmentSubmission(submission, existingLearnerLrns)).length;
+}
+
 export async function fetchPublicEnrollmentSubmissionById(id: string): Promise<PublicEnrollmentSubmission | null> {
   const { data, error } = await supabase
     .from(REGISTRAR_PUBLIC_ENROLLMENT_TABLE)

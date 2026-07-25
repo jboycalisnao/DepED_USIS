@@ -18,6 +18,7 @@ interface LearnerDirectoryProps {
   selectedId: string | null;
   onSelect: (id: string | null) => void;
   onUnlink: (id: string) => void;
+  onReaderValueChange: (value: string) => void;
   onLoadRoster: () => void;
   onRegisterLearner: (payload: RegisterLearnerPayload) => Promise<{ ok: boolean; error?: string }>;
   isLoading: boolean;
@@ -159,6 +160,7 @@ const LearnerDirectory: React.FC<LearnerDirectoryProps> = ({
   selectedId,
   onSelect,
   onUnlink,
+  onReaderValueChange,
   onLoadRoster,
   onRegisterLearner,
   isLoading,
@@ -389,6 +391,7 @@ const LearnerDirectory: React.FC<LearnerDirectoryProps> = ({
           setIsRegisterOpen(false);
         }}
         onUnlinkLearner={handleUnlinkSelectedLearner}
+        onReaderValueChange={onReaderValueChange}
       />
 
       <ConfirmationModal
