@@ -4,6 +4,10 @@ const PROFILE_SETTINGS_TABLE = 'registrar_enrollment_form_schedule';
 const LEARNER_TABLE = 'registrar_learners';
 
 const toText = (value: unknown) => String(value || '').trim();
+const isMissingUpdatedAtError = (error: unknown) => {
+  const message = toText((error as any)?.message || error).toLowerCase();
+  return message.includes('registrar_learners.updated_at') || (message.includes('updated_at') && message.includes('does not exist'));
+};
 
 export type LearnerProfileEditableFields = {
   address: string;
@@ -37,7 +41,8 @@ export async function updateLearnerPortalProfileFields(input: {
     throw new Error('Learner profile update requires a learner ID or LRN.');
   }
 
-  const payload = {
+  const updatedAt = new Date().toISOString();
+  const basePayload = {
     address: toText(input.fields.address) || null,
     contact_number: toText(input.fields.contactNumber) || null,
     email: toText(input.fields.email) || null,
@@ -45,20 +50,32 @@ export async function updateLearnerPortalProfileFields(input: {
     guardian_name: toText(input.fields.guardianName) || null,
     mother_name: toText(input.fields.motherName) || null,
   };
+  const payload = {
+    ...basePayload,
+    updated_at: updatedAt,
+  };
 
-  let query = supabase.from(LEARNER_TABLE).update(payload);
-  if (learnerId) {
-    query = query.eq('id', learnerId);
-  } else {
-    query = query.eq('lrn', lrn);
+  const buildUpdateQuery = (nextPayload: typeof basePayload | typeof payload) => {
+    let query = supabase.from(LEARNER_TABLE).update(nextPayload);
+    if (learnerId) {
+      query = query.eq('id', learnerId);
+    } else {
+      query = query.eq('lrn', lrn);
+    }
+    return query;
+  };
+
+  let { data, error } = await buildUpdateQuery(payload).select('id,updated_at').maybeSingle();
+  if (error && isMissingUpdatedAtError(error)) {
+    const legacyResult = await buildUpdateQuery(basePayload).select('id').maybeSingle();
+    data = legacyResult.data;
+    error = legacyResult.error;
   }
-
-  const { data, error } = await query.select('id').maybeSingle();
   if (error) throw new Error(error.message || 'Unable to update learner profile.');
   if (!data) throw new Error('No learner profile record was updated.');
 
   return {
     id: String((data as any)?.id || learnerId || lrn),
-    updatedAt: new Date().toISOString(),
+    updatedAt: toText((data as any)?.updated_at) || updatedAt,
   };
 }

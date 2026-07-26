@@ -64,7 +64,7 @@ export function ProfilePage({ session }: ProfilePageProps) {
       setError(null);
       setSaveFeedback(null);
       try {
-        const record = await fetchLearnerProfile({ learnerId: session.learnerId, lrn: session.lrn });
+        const record = await fetchLearnerProfile({ learnerId: session.learnerId, lrn: session.lrn, forceRefresh: true });
         if (!cancelled) {
           setProfile(record);
           setEditDraft(toEditableDraft(record));

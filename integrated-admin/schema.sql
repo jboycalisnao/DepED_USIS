@@ -10,7 +10,12 @@ begin;
 alter table registrar_learners
   add column if not exists profile_photo_drive_file_id text,
   add column if not exists profile_photo_mime_type text,
-  add column if not exists profile_photo_updated_at timestamptz;
+  add column if not exists profile_photo_updated_at timestamptz,
+  add column if not exists updated_at timestamptz default now();
+
+update registrar_learners
+set updated_at = coalesce(updated_at, created_at, now())
+where updated_at is null;
 
 create index if not exists idx_registrar_learners_profile_photo_drive_file_id
   on registrar_learners(profile_photo_drive_file_id);
@@ -961,6 +966,11 @@ begin
   return new;
 end;
 $$ language plpgsql;
+
+drop trigger if exists trg_registrar_learners_updated_at on registrar_learners;
+create trigger trg_registrar_learners_updated_at
+before update on registrar_learners
+for each row execute function set_updated_at();
 
 drop trigger if exists trg_registrar_enrollment_form_schedule_updated_at on registrar_enrollment_form_schedule;
 create trigger trg_registrar_enrollment_form_schedule_updated_at

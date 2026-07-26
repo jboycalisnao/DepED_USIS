@@ -27,6 +27,72 @@ export type LearnerProfileRecord = {
 };
 
 const toText = (value: unknown) => String(value || '').trim();
+const isMissingUpdatedAtError = (error: unknown) => {
+  const message = toText((error as any)?.message || error).toLowerCase();
+  return message.includes('registrar_learners.updated_at') || (message.includes('updated_at') && message.includes('does not exist'));
+};
+
+const PROFILE_SELECT_WITH_UPDATED_AT = `
+  id,
+  lrn,
+  first_name,
+  middle_name,
+  last_name,
+  gender,
+  birth_date,
+  address,
+  contact_number,
+  guardian_name,
+  father_name,
+  mother_name,
+  email,
+  login_username,
+  login_status,
+  profile_photo_drive_file_id,
+  profile_photo_mime_type,
+  profile_photo_updated_at,
+  created_at,
+  updated_at,
+  section_id,
+  enrollment_history,
+  registrar_sections (
+    id,
+    name,
+    grade_level,
+    strand
+  )
+`;
+
+const PROFILE_SELECT_LEGACY = `
+  id,
+  lrn,
+  first_name,
+  middle_name,
+  last_name,
+  gender,
+  birth_date,
+  address,
+  contact_number,
+  guardian_name,
+  father_name,
+  mother_name,
+  email,
+  login_username,
+  login_status,
+  profile_photo_drive_file_id,
+  profile_photo_mime_type,
+  profile_photo_updated_at,
+  created_at,
+  section_id,
+  enrollment_history,
+  registrar_sections (
+    id,
+    name,
+    grade_level,
+    strand
+  )
+`;
+
 const firstNonEmpty = (values: unknown[]) => {
   for (const value of values) {
     const text = toText(value);
@@ -57,7 +123,7 @@ const mapProfile = (row: any): LearnerProfileRecord => ({
   sectionName: '',
   gradeLevel: '',
   program: '',
-  updatedAt: toText(row?.created_at),
+  updatedAt: toText(row?.updated_at || row?.created_at),
 });
 
 export async function fetchLearnerProfile(input: { learnerId?: string; lrn?: string; forceRefresh?: boolean }) {
@@ -67,50 +133,31 @@ export async function fetchLearnerProfile(input: { learnerId?: string; lrn?: str
   const cached = getCachedLearnerData<LearnerProfileRecord>('profile', cacheKey);
   if (cached && !input.forceRefresh) return cached;
 
-  let query = supabase
-    .from('registrar_learners')
-    .select(
-      `
-      id,
-      lrn,
-      first_name,
-      middle_name,
-      last_name,
-      gender,
-      birth_date,
-      address,
-      contact_number,
-      guardian_name,
-      father_name,
-      mother_name,
-      email,
-      login_username,
-      login_status,
-      profile_photo_drive_file_id,
-      profile_photo_mime_type,
-      profile_photo_updated_at,
-      created_at,
-      section_id,
-      enrollment_history,
-      registrar_sections (
-        id,
-        name,
-        grade_level,
-        strand
-      )
-      `
-    )
-    .limit(1);
+  const buildProfileQuery = (selectColumns: string) => {
+    let query = supabase
+      .from('registrar_learners')
+      .select(selectColumns)
+      .limit(1);
 
-  if (learnerId) {
-    query = query.eq('id', learnerId);
-  } else if (lrn) {
-    query = query.eq('lrn', lrn);
-  } else {
+    if (learnerId) {
+      query = query.eq('id', learnerId);
+    } else if (lrn) {
+      query = query.eq('lrn', lrn);
+    }
+
+    return query;
+  };
+
+  if (!learnerId && !lrn) {
     throw new Error('Learner profile lookup requires learner ID or LRN.');
   }
 
-  const { data, error } = await query.maybeSingle();
+  let { data, error } = await buildProfileQuery(PROFILE_SELECT_WITH_UPDATED_AT).maybeSingle();
+  if (error && isMissingUpdatedAtError(error)) {
+    const legacyResult = await buildProfileQuery(PROFILE_SELECT_LEGACY).maybeSingle();
+    data = legacyResult.data;
+    error = legacyResult.error;
+  }
   if (error) throw new Error(error.message || 'Unable to load learner profile right now.');
   if (!data) throw new Error('No learner profile record was found.');
 

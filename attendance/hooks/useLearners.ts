@@ -35,6 +35,8 @@ export const useLearners = (selectedSchoolYearId: string) => {
       (learner as any).parent_contact_number,
       (learner as any).parent_contact,
       (learner as any).parentContact,
+      (learner as any).contact_number,
+      (learner as any).contactNumber,
     ];
 
     for (const source of contactSources) {

@@ -42,6 +42,7 @@ export interface Learner {
   gender: string | null;
   address: string | null;
   contact_number: string | null;
+  contactNumber?: string | null;
   guardian_contact_number?: string | null;
   guardian_contact?: string | null;
   guardianContact?: string | null;

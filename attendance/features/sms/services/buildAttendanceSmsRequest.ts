@@ -24,7 +24,9 @@ const resolveLearnerSmsContact = (learner: Learner) =>
         learner.guardianContact ||
         learner.parent_contact_number ||
         learner.parent_contact ||
-        learner.parentContact,
+        learner.parentContact ||
+        learner.contact_number ||
+        learner.contactNumber,
     ),
   );
 
