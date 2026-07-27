@@ -198,7 +198,7 @@ export function ProfilePage({ session }: ProfilePageProps) {
                   <article><span>Gender</span><strong>{show(profile?.gender || '')}</strong></article>
                   <article><span>Date of Birth</span><strong>{show(profile?.birthDate || '')}</strong></article>
                   <article><span>Address</span><strong>{show(profile?.address || '')}</strong></article>
-                  <article><span>Contact Number</span><strong>{show(profile?.contactNumber || '')}</strong></article>
+                  <article><span>Guardian Mobile Number</span><strong>{show(profile?.contactNumber || '')}</strong></article>
                   <article><span>Email</span><strong>{show(profile?.email || '')}</strong></article>
                 </div>
               </section>
@@ -229,7 +229,7 @@ export function ProfilePage({ session }: ProfilePageProps) {
                         Last edited: {formatTimestamp(profile?.updatedAt || '')}
                       </span>
                     </div>
-                    <p>Update guardian, parent, contact, and address information here. Name, LRN, and birth date remain registrar-controlled.</p>
+                    <p>Update guardian, parent, mobile number, and address information here. Name, LRN, and birth date remain registrar-controlled.</p>
                   </div>
 
                   <div className="floating-field-grid floating-field-grid--two learner-profile-edit-grid">
@@ -274,7 +274,7 @@ export function ProfilePage({ session }: ProfilePageProps) {
                           placeholder=" "
                           disabled={isSaving || !editDraft}
                         />
-                        <span>Contact Number</span>
+                        <span>Guardian Mobile Number</span>
                       </div>
                     </label>
                     <label className="floating-field">
