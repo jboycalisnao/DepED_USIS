@@ -29,14 +29,11 @@ export const useLearners = (selectedSchoolYearId: string) => {
 
   const resolveGuardianContactNumber = useCallback((learner: Learner, guardianContactLookup: Map<string, string>) => {
     const contactSources = [
-      (learner as any).guardian_contact_number,
       (learner as any).guardian_contact,
       (learner as any).guardianContact,
       (learner as any).parent_contact_number,
       (learner as any).parent_contact,
       (learner as any).parentContact,
-      (learner as any).contact_number,
-      (learner as any).contactNumber,
     ];
 
     for (const source of contactSources) {
@@ -190,6 +187,7 @@ export const useLearners = (selectedSchoolYearId: string) => {
         setFetchedCount(cachedLearners.length);
         setHasCachedRoster(cachedLearners.length > 0);
         setLastSyncedAt(cached.updatedAt || '');
+        void fetchAll();
         return;
       }
 

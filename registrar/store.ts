@@ -287,6 +287,7 @@ const mapLearnerToDb = (data: Partial<Student>) => {
     gender: data.gender || null,
     address: data.address || null,
     contact_number: data.contactNumber || null,
+    guardian_contact: data.guardian_contact || null,
     email: data.email || null,
     guardian_name: data.guardian_name || null,
     father_name: data.father_name || null,
@@ -338,6 +339,7 @@ const mapDbToLearner = (l: any): Student => ({
   gender: l.gender,
   address: l.address,
   contactNumber: l.contact_number || l.contactNumber || '',
+  guardian_contact: l.guardian_contact || l.guardianContact || '',
   email: l.email || '',
   guardian_name: l.guardian_name,
   father_name: l.father_name,
@@ -555,7 +557,7 @@ const fetchLearners = async (forceRefresh = false) => {
     commitLearners(data.map(mapDbToLearner));
   }, {
     forceRefresh,
-    selectColumns: 'id,lrn,first_name,last_name,middle_name,birth_date,gender,address,contact_number,guardian_name,father_name,mother_name,email,status,section_id,school_year,is_4ps,tags,enrollment_history,login_username,login_password_plain,login_status,last_login_at,microsoft_user_id,microsoft_upn,microsoft_mail_nickname,microsoft_account_status,microsoft_license_sku_id,microsoft_created_at,microsoft_last_synced_at,profile_photo_drive_file_id,profile_photo_mime_type,profile_photo_updated_at,created_at',
+    selectColumns: 'id,lrn,first_name,last_name,middle_name,birth_date,gender,address,contact_number,guardian_contact,guardian_name,father_name,mother_name,email,status,section_id,school_year,is_4ps,tags,enrollment_history,login_username,login_password_plain,login_status,last_login_at,microsoft_user_id,microsoft_upn,microsoft_mail_nickname,microsoft_account_status,microsoft_license_sku_id,microsoft_created_at,microsoft_last_synced_at,profile_photo_drive_file_id,profile_photo_mime_type,profile_photo_updated_at,created_at',
   });
 
   await fetchAllFromTable(REGISTRAR_TABLES.enrollmentHistory, (data) => {

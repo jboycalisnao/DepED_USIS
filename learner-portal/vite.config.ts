@@ -68,7 +68,6 @@ const updateLatestEnrollmentGuardianContact = (value: unknown, guardianContact: 
       submissionPayload: {
         ...submissionPayload,
         guardianContact,
-        learnerContact: guardianContact,
       },
     };
   });
@@ -113,7 +112,7 @@ export default defineConfig(({ mode }) => {
           const guardianContact = toText(fields.contactNumber);
           const basePayload = {
             address: toText(fields.address) || null,
-            contact_number: guardianContact || null,
+            guardian_contact: guardianContact || null,
             email: toText(fields.email) || null,
             father_name: toText(fields.fatherName) || null,
             guardian_name: toText(fields.guardianName) || null,

@@ -19,14 +19,12 @@ const resolveAttendanceSmsAction = (type: AttendanceType) => {
 const resolveLearnerSmsContact = (learner: Learner) =>
   normalizePhilippineMobileNumber(
     normalize(
-      learner.guardian_contact_number ||
-        learner.guardian_contact ||
+      learner.guardian_contact ||
         learner.guardianContact ||
+        learner.guardian_contact_number ||
         learner.parent_contact_number ||
         learner.parent_contact ||
-        learner.parentContact ||
-        learner.contact_number ||
-        learner.contactNumber,
+        learner.parentContact,
     ),
   );
 

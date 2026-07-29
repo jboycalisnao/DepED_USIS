@@ -42,6 +42,7 @@ const PROFILE_SELECT_WITH_UPDATED_AT = `
   birth_date,
   address,
   contact_number,
+  guardian_contact,
   guardian_name,
   father_name,
   mother_name,
@@ -73,6 +74,7 @@ const PROFILE_SELECT_LEGACY = `
   birth_date,
   address,
   contact_number,
+  guardian_contact,
   guardian_name,
   father_name,
   mother_name,
@@ -101,6 +103,22 @@ const firstNonEmpty = (values: unknown[]) => {
   return '';
 };
 
+const resolveLatestEnrollmentPayloadValue = (history: unknown, keys: string[]) => {
+  if (!Array.isArray(history) || history.length === 0) return '';
+  const sortedHistory = [...history].sort((a: any, b: any) =>
+    toText(b?.enrollmentDate || b?.enrollment_date || b?.created_at).localeCompare(toText(a?.enrollmentDate || a?.enrollment_date || a?.created_at))
+  );
+
+  for (const entry of sortedHistory) {
+    const payload = (entry as any)?.submissionPayload;
+    if (!payload || typeof payload !== 'object') continue;
+    const value = firstNonEmpty(keys.map((key) => (payload as any)[key]));
+    if (value) return value;
+  }
+
+  return '';
+};
+
 const mapProfile = (row: any): LearnerProfileRecord => ({
   id: toText(row?.id),
   lrn: toText(row?.lrn),
@@ -110,7 +128,10 @@ const mapProfile = (row: any): LearnerProfileRecord => ({
   gender: toText(row?.gender),
   birthDate: toText(row?.birth_date),
   address: toText(row?.address),
-  contactNumber: toText(row?.contact_number),
+  contactNumber: firstNonEmpty([
+    row?.guardian_contact,
+    resolveLatestEnrollmentPayloadValue(row?.enrollment_history, ['guardianContact', 'guardian_contact']),
+  ]),
   guardianName: toText(row?.guardian_name),
   fatherName: toText(row?.father_name),
   motherName: toText(row?.mother_name),

@@ -75,6 +75,7 @@ export interface Student {
   gender: string;
   address: string;
   contactNumber: string;
+  guardian_contact?: string;
   guardian_name?: string;
   father_name?: string;
   mother_name?: string;

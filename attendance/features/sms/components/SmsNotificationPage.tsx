@@ -247,7 +247,7 @@ const SmsNotificationPage = ({
                             <span>
                               {row.gradeLabel} | {row.sectionLabel}
                             </span>
-                            <span>{eligible ? row.guardianContactNumber : 'No guardian or parent contact number'}</span>
+                            <span>{eligible ? row.guardianContactNumber : 'No guardian mobile number'}</span>
                           </div>
                         </label>
                       );
@@ -334,7 +334,7 @@ const SmsNotificationPage = ({
               <div className="attendance-sms-page__form-head">
                 <div>
                   <h3>Recipient Availability</h3>
-                  <p>Select who can receive SMS notifications. Only learners with a guardian or parent contact number can be enabled.</p>
+                  <p>Select who can receive SMS notifications. Only learners with a guardian mobile number can be enabled.</p>
                 </div>
                 <div className="attendance-sms-page__bulk-actions">
                   <button type="button" className="secondary-button rounded-md" onClick={() => setAllRecipients(true)} disabled={eligibleCount === 0}>
@@ -362,7 +362,7 @@ const SmsNotificationPage = ({
                   />
                   <span>Search learners</span>
                 </div>
-                <small>Search by name, section, or guardian / parent number</small>
+                <small>Search by name, section, or guardian mobile number</small>
               </label>
 
               <UsisGradeSectionList
