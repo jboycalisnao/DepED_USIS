@@ -93,6 +93,12 @@ const createLogEntry = (queueItemId: string, level: SmsQueueLogLevel, title: str
   detail: detail ?? null,
 });
 
+const getLocalDateKey = (value: string) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+};
+
 export const useSmsNotificationQueue = () => {
   const [queueItems, setQueueItems] = useState<SmsQueueItem[]>([]);
   const [logEntries, setLogEntries] = useState<SmsQueueLogEntry[]>([]);
@@ -141,7 +147,7 @@ export const useSmsNotificationQueue = () => {
   useEffect(() => {
     const snapshot = normalizeSnapshot(loadSmsQueueStorage());
     const recoveredCount = snapshot.queueItems.filter((item) => item.status === 'sending').length;
-    const recoveredQueueItems = snapshot.queueItems.map((item) =>
+    const recoveredQueueItems: SmsQueueItem[] = snapshot.queueItems.map((item) =>
       item.status === 'sending'
         ? {
             ...item,
@@ -178,7 +184,7 @@ export const useSmsNotificationQueue = () => {
         if (!nextItem) break;
 
         const startedAt = new Date().toISOString();
-        const sendingItems = queueItemsRef.current.map((item) =>
+        const sendingItems: SmsQueueItem[] = queueItemsRef.current.map((item) =>
           item.id === nextItem.id
             ? {
                 ...item,
@@ -203,7 +209,7 @@ export const useSmsNotificationQueue = () => {
 
           const completedAt = new Date().toISOString();
           const responseMessage = response.message || 'SkySMS accepted the request.';
-          const sentItems = queueItemsRef.current.map((item) =>
+          const sentItems: SmsQueueItem[] = queueItemsRef.current.map((item) =>
             item.id === nextItem.id
               ? {
                   ...item,
@@ -220,7 +226,7 @@ export const useSmsNotificationQueue = () => {
         } catch (error: any) {
           const completedAt = new Date().toISOString();
           const errorMessage = error?.message || 'Unable to send SMS through SkySMS.';
-          const failedItems = queueItemsRef.current.map((item) =>
+          const failedItems: SmsQueueItem[] = queueItemsRef.current.map((item) =>
             item.id === nextItem.id
               ? {
                   ...item,
@@ -290,6 +296,43 @@ export const useSmsNotificationQueue = () => {
     [processQueue, setLogEntriesAndPersist, setQueueItemsAndPersist],
   );
 
+  const retryTodayFailedMessages = useCallback(() => {
+    const todayKey = getLocalDateKey(new Date().toISOString());
+    const failedItems = queueItemsRef.current.filter(
+      (item) => item.status === 'failed' && getLocalDateKey(item.queuedAt) === todayKey,
+    );
+
+    if (failedItems.length === 0) return 0;
+
+    const retriedAt = new Date().toISOString();
+    const failedItemIds = new Set(failedItems.map((item) => item.id));
+    const nextQueueItems: SmsQueueItem[] = queueItemsRef.current.map((item) =>
+      failedItemIds.has(item.id)
+        ? {
+            ...item,
+            status: 'queued',
+            updatedAt: retriedAt,
+            startedAt: null,
+            completedAt: null,
+            responseMessage: null,
+            errorMessage: null,
+          }
+        : item,
+    );
+    const retryLog = createLogEntry(
+      'system',
+      'info',
+      "Today's failed SMS requests returned to queue",
+      `${failedItems.length} request${failedItems.length === 1 ? '' : 's'} will be sent again.`,
+    );
+
+    setQueueItemsAndPersist(nextQueueItems);
+    setLogEntriesAndPersist([...logEntriesRef.current, retryLog]);
+    void processQueue();
+
+    return failedItems.length;
+  }, [processQueue, setLogEntriesAndPersist, setQueueItemsAndPersist]);
+
   const clearHistory = useCallback(() => {
     queueItemsRef.current = [];
     logEntriesRef.current = [];
@@ -317,6 +360,7 @@ export const useSmsNotificationQueue = () => {
     queueItems,
     logEntries,
     enqueueRequests,
+    retryTodayFailedMessages,
     clearHistory,
     isProcessing,
     stats,

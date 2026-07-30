@@ -16,6 +16,7 @@ type Props = {
   queueItems: SmsQueueItem[];
   logEntries: SmsQueueLogEntry[];
   clearHistory: () => void;
+  retryTodayFailedMessages: () => number;
   isProcessing: boolean;
   stats: SmsQueueStats;
   isSettingsLoading: boolean;
@@ -43,6 +44,7 @@ const SmsNotificationPage = ({
   queueItems,
   logEntries,
   clearHistory,
+  retryTodayFailedMessages,
   isProcessing,
   stats,
   isSettingsLoading,
@@ -379,6 +381,7 @@ const SmsNotificationPage = ({
             logEntries={logEntries}
             stats={stats}
             isProcessing={isProcessing}
+            onRetryTodayFailedMessages={retryTodayFailedMessages}
             onClearHistory={clearHistory}
           />
         )}

@@ -96,6 +96,7 @@ function App() {
     queueItems: smsQueueItems,
     logEntries: smsLogEntries,
     enqueueRequests: enqueueSmsRequests,
+    retryTodayFailedMessages: retryTodayFailedSmsMessages,
     clearHistory: clearSmsHistory,
     isProcessing: isSmsQueueProcessing,
     stats: smsQueueStats,
@@ -946,6 +947,7 @@ function App() {
                       queueItems={smsQueueItems}
                       logEntries={smsLogEntries}
                       clearHistory={clearSmsHistory}
+                      retryTodayFailedMessages={retryTodayFailedSmsMessages}
                       isProcessing={isSmsQueueProcessing}
                       stats={smsQueueStats}
                       isSettingsLoading={isSettingsLoading}

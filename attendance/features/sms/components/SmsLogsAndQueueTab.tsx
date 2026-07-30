@@ -9,6 +9,7 @@ type Props = {
   logEntries: SmsQueueLogEntry[];
   stats: SmsQueueStats;
   isProcessing: boolean;
+  onRetryTodayFailedMessages: () => number;
   onClearHistory: () => void;
 };
 
@@ -26,7 +27,14 @@ const getStatusLabel = (status: SmsQueueItem['status']) => {
   return 'Queued';
 };
 
-const SmsLogsAndQueueTab = ({ queueItems, logEntries, stats, isProcessing, onClearHistory }: Props) => {
+const isToday = (value: string) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return false;
+  const today = new Date();
+  return date.getFullYear() === today.getFullYear() && date.getMonth() === today.getMonth() && date.getDate() === today.getDate();
+};
+
+const SmsLogsAndQueueTab = ({ queueItems, logEntries, stats, isProcessing, onRetryTodayFailedMessages, onClearHistory }: Props) => {
   const [logFilter, setLogFilter] = useState<'all' | SmsQueueLogLevel>('all');
   const logFilterOptions = [
     { value: 'all', label: 'All logs' },
@@ -38,6 +46,10 @@ const SmsLogsAndQueueTab = ({ queueItems, logEntries, stats, isProcessing, onCle
   const visibleLogEntries = useMemo(
     () => (logFilter === 'all' ? logEntries : logEntries.filter((entry) => entry.level === logFilter)),
     [logEntries, logFilter],
+  );
+  const todayFailedCount = useMemo(
+    () => queueItems.filter((item) => item.status === 'failed' && isToday(item.queuedAt)).length,
+    [queueItems],
   );
 
   return (
@@ -56,6 +68,14 @@ const SmsLogsAndQueueTab = ({ queueItems, logEntries, stats, isProcessing, onCle
               <div className={`attendance-sms-page__processing-pill registry-choice-option ${isProcessing ? 'is-active' : ''}`}>
                 {isProcessing ? 'Processing queue' : 'Queue idle'}
               </div>
+              <button
+                type="button"
+                className="primary-button rounded-md"
+                onClick={onRetryTodayFailedMessages}
+                disabled={isProcessing || todayFailedCount === 0}
+              >
+                Try Send Failed Today
+              </button>
               <button type="button" className="secondary-button" onClick={onClearHistory} disabled={queueItems.length === 0 && logEntries.length === 0}>
                 Clear History
               </button>
