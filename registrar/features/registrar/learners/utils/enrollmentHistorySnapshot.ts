@@ -24,7 +24,7 @@ const normalizeSchoolYear = (value: string) => {
   const raw = toText(value);
   if (!raw) return '';
   const normalized = raw.replace(/^sy\s*/i, '').replace(/\s+/g, ' ');
-  const match = normalized.match(/(20\d{2})\s*-\s*(20\d{2})/);
+  const match = normalized.match(/(20\d{2})\s*[-\u2013]\s*(20\d{2})/);
   if (match) return `${match[1]}-${match[2]}`;
   return normalized.toLowerCase();
 };
@@ -109,13 +109,16 @@ export async function fetchLearnerEnrollmentSnapshot(
     query = query.eq('lrn', lrn);
   }
 
-  const { data, error } = await query.maybeSingle();
+  const [{ data, error }, activeSchoolYearResult] = await Promise.all([
+    query.maybeSingle(),
+    supabase.from('registrar_school_years').select('label').eq('is_active', true).limit(1).maybeSingle(),
+  ]);
 
   if (error) throw new Error(error.message || 'Unable to load enrollment history right now.');
 
   const learnerRow = (data as any) || {};
   const learnerSectionId = toText(learnerRow.section_id);
-  const learnerSchoolYear = toText(learnerRow.school_year) || toText(fallbackSchoolYearLabel);
+  const learnerSchoolYear = toText(learnerRow.school_year) || toText(activeSchoolYearResult.data?.label) || toText(fallbackSchoolYearLabel);
 
   const sectionResult = learnerSectionId
     ? await supabase
@@ -164,7 +167,7 @@ export async function fetchLearnerEnrollmentSnapshot(
           id: `current:${String(learnerRow.id)}`,
           isCurrent: true,
           source: 'current',
-          schoolYear: learnerSchoolYear || fallbackSchoolYearLabel,
+          schoolYear: learnerSchoolYear,
           gradeLevel: toText(sectionRow?.grade_level),
           section: toText(sectionRow?.name),
           status: toText(learnerRow.status) || 'Enrolled',

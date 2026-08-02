@@ -1,27 +1,48 @@
 import React, { useEffect, useState } from 'react';
 import { UsisSearchableSelect } from '../../../common/components/ui/UsisSearchableSelect';
+import { ReusableTag } from '../../types';
 
 interface ReusableTagModalProps {
   isOpen: boolean;
   isSaving: boolean;
+  tag?: ReusableTag | null;
   onClose: () => void;
-  onSubmit: (payload: { label: string; category: string; description: string; color: string }) => Promise<void>;
+  onSubmit: (payload: { label: string; category: string; description: string; color: string; officerPositions: string[] }) => Promise<void>;
 }
 
-const ReusableTagModal: React.FC<ReusableTagModalProps> = ({ isOpen, isSaving, onClose, onSubmit }) => {
+const ReusableTagModal: React.FC<ReusableTagModalProps> = ({ isOpen, isSaving, tag, onClose, onSubmit }) => {
   const [label, setLabel] = useState('');
   const [category, setCategory] = useState('');
   const [description, setDescription] = useState('');
   const [color, setColor] = useState('#004E8C');
+  const [officerPositionsText, setOfficerPositionsText] = useState('');
+  const isEditMode = Boolean(tag);
+  const requiresOfficerPositions = ['club', 'organization'].includes(category.trim().toLowerCase());
+
+  const parseOfficerPositions = (value: string) =>
+    value
+      .split(/[\n,;]/g)
+      .map((entry) => entry.trim())
+      .filter((entry, index, entries) => entry && entries.indexOf(entry) === index);
 
   useEffect(() => {
-    if (!isOpen) {
+    if (isOpen && tag) {
+      setLabel(tag.label || '');
+      setCategory(tag.category || '');
+      setDescription(tag.description || '');
+      setColor(tag.color || '#004E8C');
+      setOfficerPositionsText((tag.officerPositions || []).join('\n'));
+      return;
+    }
+
+    if (!isOpen || !tag) {
       setLabel('');
       setCategory('');
       setDescription('');
       setColor('#004E8C');
+      setOfficerPositionsText('');
     }
-  }, [isOpen]);
+  }, [isOpen, tag]);
 
   if (!isOpen) return null;
 
@@ -32,6 +53,7 @@ const ReusableTagModal: React.FC<ReusableTagModalProps> = ({ isOpen, isSaving, o
       category: category.trim(),
       description: description.trim(),
       color: color.trim(),
+      officerPositions: requiresOfficerPositions ? parseOfficerPositions(officerPositionsText) : [],
     });
   };
 
@@ -42,9 +64,9 @@ const ReusableTagModal: React.FC<ReusableTagModalProps> = ({ isOpen, isSaving, o
         <div className="modal-dialog__header">
           <div className="modal-dialog__title-group">
             <p className="modal-dialog__eyebrow">Reusable Tags</p>
-            <h3 id="registrar-reusable-tag-title">Create Tag Template</h3>
+            <h3 id="registrar-reusable-tag-title">{isEditMode ? 'Edit Tag Template' : 'Create Tag Template'}</h3>
           </div>
-          <button type="button" className="modal-dialog__close" onClick={onClose} aria-label="Close create reusable tag modal">
+          <button type="button" className="modal-dialog__close" onClick={onClose} aria-label={`Close ${isEditMode ? 'edit' : 'create'} reusable tag modal`}>
             <span className="material-symbols-outlined">close</span>
           </button>
         </div>
@@ -109,6 +131,21 @@ const ReusableTagModal: React.FC<ReusableTagModalProps> = ({ isOpen, isSaving, o
                 <span>Badge color</span>
               </div>
             </label>
+
+            {requiresOfficerPositions ? (
+              <label className="floating-field">
+                <div className="floating-field__control" data-has-value={officerPositionsText.trim() ? 'true' : 'false'}>
+                  <textarea
+                    value={officerPositionsText}
+                    onChange={(event) => setOfficerPositionsText(event.target.value)}
+                    placeholder=" "
+                    rows={4}
+                    required
+                  />
+                  <span>Officer positions</span>
+                </div>
+              </label>
+            ) : null}
           </div>
         </form>
 
@@ -116,8 +153,13 @@ const ReusableTagModal: React.FC<ReusableTagModalProps> = ({ isOpen, isSaving, o
           <button type="button" className="modal-dialog__primary" onClick={onClose} disabled={isSaving}>
             Cancel
           </button>
-          <button type="submit" form="registrar-reusable-tag-form" className="modal-dialog__blue" disabled={isSaving || !label.trim()}>
-            {isSaving ? 'Saving...' : 'Create Tag'}
+          <button
+            type="submit"
+            form="registrar-reusable-tag-form"
+            className="modal-dialog__blue"
+            disabled={isSaving || !label.trim() || (requiresOfficerPositions && parseOfficerPositions(officerPositionsText).length === 0)}
+          >
+            {isSaving ? 'Saving...' : isEditMode ? 'Update Tag' : 'Create Tag'}
           </button>
         </div>
       </div>

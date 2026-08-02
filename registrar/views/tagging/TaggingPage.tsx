@@ -1,9 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useStore } from '../../store';
 import { getActiveLearnersForYear } from '../../services/dashboardService';
+import { UsisSearchInput } from '../../../common/components/ui/UsisSearchInput';
 import { UsisSearchableSelect } from '../../../common/components/ui/UsisSearchableSelect';
-import { normalizeLearnerTags, parseLearnerTagsInput } from '../../utils/learnerTags';
-import { GradeLevel, Section, Student } from '../../types';
+import { matchesUsisLearnerSearch } from '../../../common/utils/usisLearnerSearch';
+import { normalizeLearnerTags } from '../../utils/learnerTags';
+import { GradeLevel, ReusableTag, Section, Student } from '../../types';
+import ConfirmationModal from '../../components/ConfirmationModal';
+import LearnerTagSelectionModal from './LearnerTagSelectionModal';
 import ReusableTagModal from './ReusableTagModal';
 
 const buildLearnerLabel = (learner: Student) =>
@@ -25,19 +29,25 @@ const resolveGradeLabel = (learner: Student, sections: Section[]) => {
 };
 
 const normalizeKey = (value: string[]) => [...value].sort((a, b) => a.localeCompare(b)).join('|');
+const tagRequiresPosition = (tag: ReusableTag) => ['club', 'organization'].includes(String(tag.category || '').trim().toLowerCase());
+const buildPositionedTagLabel = (tagLabel: string, position: string) => `${tagLabel} - ${position}`.trim();
 
 const TaggingPage: React.FC = () => {
-  const { learners, sections, activeSchoolYear, updateLearner, loading, reusableTags, addReusableTag } = useStore();
+  const { learners, sections, activeSchoolYear, updateLearner, loading, reusableTags, addReusableTag, updateReusableTag } = useStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedGrades, setExpandedGrades] = useState<Set<string>>(new Set());
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
   const [expandedLearners, setExpandedLearners] = useState<Set<string>>(new Set());
-  const [draftTagsByLearner, setDraftTagsByLearner] = useState<Record<string, string>>({});
+  const [selectedReusableTagIds, setSelectedReusableTagIds] = useState<Record<string, string[]>>({});
   const [selectedTagFilter, setSelectedTagFilter] = useState('');
   const [fourPsOnly, setFourPsOnly] = useState(false);
   const [isReusableTagModalOpen, setIsReusableTagModalOpen] = useState(false);
-  const [isCreatingReusableTag, setIsCreatingReusableTag] = useState(false);
+  const [editingReusableTag, setEditingReusableTag] = useState<ReusableTag | null>(null);
+  const [taggingLearner, setTaggingLearner] = useState<Student | null>(null);
+  const [clearTagsLearner, setClearTagsLearner] = useState<Student | null>(null);
+  const [isSavingReusableTag, setIsSavingReusableTag] = useState(false);
   const [savingLearnerId, setSavingLearnerId] = useState<string | null>(null);
+  const [selectedReusableTagPositions, setSelectedReusableTagPositions] = useState<Record<string, string>>({});
 
   const activeLearners = useMemo(
     () => getActiveLearnersForYear(learners, sections, activeSchoolYear),
@@ -45,30 +55,23 @@ const TaggingPage: React.FC = () => {
   );
 
   const filteredLearners = useMemo(() => {
-    const query = searchTerm.trim().toLowerCase();
     const selectedTag = selectedTagFilter.trim();
     return activeLearners.filter((learner) => {
       if (fourPsOnly && !learner.is4Ps) {
         return false;
       }
 
-      if (selectedTag && !normalizeLearnerTags(learner.tags).includes(selectedTag)) {
+      if (
+        selectedTag &&
+        !normalizeLearnerTags(learner.tags).some((tag) => tag === selectedTag || tag.startsWith(`${selectedTag} - `))
+      ) {
         return false;
       }
 
-      if (!query) {
-        return true;
-      }
-
-      return [
-        learner.lrn,
-        buildLearnerLabel(learner),
+      return matchesUsisLearnerSearch(learner, searchTerm, [
         resolveSectionLabel(learner, sections),
         normalizeLearnerTags(learner.tags).join(' '),
-      ]
-        .join(' ')
-        .toLowerCase()
-        .includes(query);
+      ]);
     });
   }, [activeLearners, fourPsOnly, searchTerm, selectedTagFilter, sections]);
 
@@ -163,43 +166,106 @@ const TaggingPage: React.FC = () => {
     }
   };
 
-  const handleAddDraftTags = (learner: Student) => {
-    const draftText = draftTagsByLearner[learner.id] || '';
-    const draftTags = parseLearnerTagsInput(draftText);
-    if (draftTags.length === 0) return;
-    const nextTags = normalizeLearnerTags([normalizeLearnerTags(learner.tags), draftTags]);
-    setDraftTagsByLearner((current) => ({ ...current, [learner.id]: '' }));
-    void updateLearnerTags(learner, nextTags);
-  };
-
   const handleRemoveTag = (learner: Student, tag: string) => {
     const nextTags = normalizeLearnerTags(learner.tags).filter((entry) => entry !== tag);
     void updateLearnerTags(learner, nextTags);
   };
 
-  const handleClearTags = (learner: Student) => {
-    void updateLearnerTags(learner, []);
+  const handleConfirmClearTags = async () => {
+    if (!clearTagsLearner) return;
+    const learner = clearTagsLearner;
+    await updateLearnerTags(learner, []);
+    setClearTagsLearner(null);
   };
 
-  const handleAddReusableTagToLearner = (learner: Student, tag: string) => {
-    const nextTags = normalizeLearnerTags([normalizeLearnerTags(learner.tags), [tag]]);
-    void updateLearnerTags(learner, nextTags);
+  const handleToggleReusableTagSelection = (learnerId: string, tagId: string, checked: boolean) => {
+    setSelectedReusableTagIds((current) => {
+      const currentSelections = current[learnerId] || [];
+      const nextSelections = checked
+        ? Array.from(new Set([...currentSelections, tagId]))
+        : currentSelections.filter((entry) => entry !== tagId);
+      return { ...current, [learnerId]: nextSelections };
+    });
   };
 
-  const handleCreateReusableTag = async (payload: { label: string; category: string; description: string; color: string }) => {
-    setIsCreatingReusableTag(true);
+  const handleSetReusableTagPosition = (learnerId: string, tagId: string, position: string) => {
+    setSelectedReusableTagPositions((current) => ({
+      ...current,
+      [`${learnerId}::${tagId}`]: position,
+    }));
+  };
+
+  const handleOpenLearnerTagModal = (learner: Student) => {
+    setTaggingLearner(learner);
+  };
+
+  const handleCloseLearnerTagModal = () => {
+    setTaggingLearner(null);
+  };
+
+  const handleApplyReusableTagsToLearner = async (learner: Student) => {
+    const selectedTagIds = selectedReusableTagIds[learner.id] || [];
+    const selectedTags = activeReusableTags.filter((tag) => selectedTagIds.includes(tag.id));
+    if (selectedTags.length === 0) return false;
+    if (selectedTags.some((tag) => tagRequiresPosition(tag) && !String(selectedReusableTagPositions[`${learner.id}::${tag.id}`] || '').trim())) {
+      return false;
+    }
+
+    let nextTags = normalizeLearnerTags(learner.tags);
+    selectedTags.forEach((tag) => {
+      const positionKey = `${learner.id}::${tag.id}`;
+      const selectedPosition = String(selectedReusableTagPositions[positionKey] || '').trim();
+      const tagLabel = tagRequiresPosition(tag) ? buildPositionedTagLabel(tag.label, selectedPosition) : tag.label;
+      nextTags = normalizeLearnerTags([
+        nextTags.filter((entry) => entry !== tag.label && !entry.startsWith(`${tag.label} - `)),
+        [tagLabel],
+      ]);
+    });
+
+    setSelectedReusableTagIds((current) => ({ ...current, [learner.id]: [] }));
+    await updateLearnerTags(learner, nextTags);
+    setTaggingLearner(null);
+    return true;
+  };
+
+  const openCreateReusableTagModal = () => {
+    setEditingReusableTag(null);
+    setIsReusableTagModalOpen(true);
+  };
+
+  const openEditReusableTagModal = (tag: ReusableTag) => {
+    setEditingReusableTag(tag);
+    setIsReusableTagModalOpen(true);
+  };
+
+  const closeReusableTagModal = () => {
+    setIsReusableTagModalOpen(false);
+    setEditingReusableTag(null);
+  };
+
+  const handleSaveReusableTag = async (payload: { label: string; category: string; description: string; color: string; officerPositions: string[] }) => {
+    setIsSavingReusableTag(true);
     try {
-      const result = await addReusableTag({
-        label: payload.label,
-        category: payload.category,
-        description: payload.description,
-        color: payload.color,
-      });
+      const result = editingReusableTag
+        ? await updateReusableTag(editingReusableTag.id, {
+            label: payload.label,
+            category: payload.category,
+            description: payload.description,
+            color: payload.color,
+            officerPositions: payload.officerPositions,
+          })
+        : await addReusableTag({
+            label: payload.label,
+            category: payload.category,
+            description: payload.description,
+            color: payload.color,
+            officerPositions: payload.officerPositions,
+          });
       if (!result?.error) {
-        setIsReusableTagModalOpen(false);
+        closeReusableTagModal();
       }
     } finally {
-      setIsCreatingReusableTag(false);
+      setIsSavingReusableTag(false);
     }
   };
 
@@ -210,49 +276,65 @@ const TaggingPage: React.FC = () => {
     () => activeReusableTags.map((tag) => ({ label: tag.label, value: tag.label })),
     [activeReusableTags],
   );
+  const taggingLearnerSelectedTagIds = taggingLearner ? selectedReusableTagIds[taggingLearner.id] || [] : [];
+  const taggingLearnerSelectedPositions = useMemo(() => {
+    if (!taggingLearner) return {};
+    const prefix = `${taggingLearner.id}::`;
+    return Object.fromEntries(
+      Object.entries(selectedReusableTagPositions)
+        .filter(([key]) => key.startsWith(prefix))
+        .map(([key, value]) => [key.slice(prefix.length), value]),
+    );
+  }, [selectedReusableTagPositions, taggingLearner]);
 
   return (
     <div className="registrar-tagging-page registrar-learners-page">
       <ReusableTagModal
         isOpen={isReusableTagModalOpen}
-        isSaving={isCreatingReusableTag}
-        onClose={() => setIsReusableTagModalOpen(false)}
-        onSubmit={handleCreateReusableTag}
+        isSaving={isSavingReusableTag}
+        tag={editingReusableTag}
+        onClose={closeReusableTagModal}
+        onSubmit={handleSaveReusableTag}
+      />
+      <LearnerTagSelectionModal
+        isOpen={Boolean(taggingLearner)}
+        isSaving={Boolean(taggingLearner && savingLearnerId === taggingLearner.id)}
+        learner={taggingLearner}
+        tags={activeReusableTags}
+        selectedTagIds={taggingLearnerSelectedTagIds}
+        selectedPositions={taggingLearnerSelectedPositions}
+        getLearnerLabel={buildLearnerLabel}
+        onApply={() => {
+          if (taggingLearner) void handleApplyReusableTagsToLearner(taggingLearner);
+        }}
+        onClose={handleCloseLearnerTagModal}
+        onPositionChange={(tagId, position) => {
+          if (taggingLearner) handleSetReusableTagPosition(taggingLearner.id, tagId, position);
+        }}
+        onSelectionChange={(tagId, checked) => {
+          if (taggingLearner) handleToggleReusableTagSelection(taggingLearner.id, tagId, checked);
+        }}
+      />
+      <ConfirmationModal
+        isOpen={Boolean(clearTagsLearner)}
+        title="Clear Learner Tags"
+        message={clearTagsLearner ? `Remove all tags assigned to ${buildLearnerLabel(clearTagsLearner)}?` : ''}
+        confirmLabel="Clear Tags"
+        cancelLabel="Cancel"
+        type="danger"
+        isLoading={Boolean(clearTagsLearner && savingLearnerId === clearTagsLearner.id)}
+        onCancel={() => setClearTagsLearner(null)}
+        onConfirm={() => void handleConfirmClearTags()}
       />
 
       <div className="registrar-learners-page__search registrar-tagging-page__toolbar">
-        <div className="registrar-learners-page__search-field">
-          <label className="floating-field">
-            <div className="floating-field__control registrar-learners-page__search-control" data-has-value={searchTerm.trim() ? 'true' : 'false'}>
-              <input
-                type="text"
-                placeholder=" "
-                className="registrar-learners-page__search-input"
-                value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
-              />
-              <span className="registrar-learners-page__search-label">
-                <span className="material-symbols-outlined" aria-hidden="true">
-                  search
-                </span>
-                <span>Search learners</span>
-              </span>
-              {searchTerm.trim() ? (
-                <button
-                  type="button"
-                  className="registrar-search-clear-btn"
-                  onClick={() => setSearchTerm('')}
-                  aria-label="Clear tagging search"
-                  title="Clear"
-                >
-                  <span className="material-symbols-outlined" aria-hidden="true">
-                    close
-                  </span>
-                </button>
-              ) : null}
-            </div>
-          </label>
-        </div>
+        <UsisSearchInput
+          ariaLabel="Search learners"
+          clearLabel="Clear tagging search"
+          label="Search Learners"
+          onChange={setSearchTerm}
+          value={searchTerm}
+        />
 
         <div className="registrar-tagging-page__toolbar-actions">
           <UsisSearchableSelect
@@ -304,7 +386,7 @@ const TaggingPage: React.FC = () => {
             <span className="registrar-learners-page__meta-label">Tag Entries</span>
             <span className="registrar-learners-page__meta-value">{tagCount}</span>
           </div>
-          <button type="button" className="secondary-button" onClick={() => setIsReusableTagModalOpen(true)}>
+          <button type="button" className="secondary-button" onClick={openCreateReusableTagModal}>
             <span className="material-symbols-outlined" aria-hidden="true">
               add
             </span>
@@ -325,13 +407,19 @@ const TaggingPage: React.FC = () => {
           <div className="registrar-tagging-page__chips">
             {activeReusableTags.length > 0 ? (
               activeReusableTags.map((tag) => (
-                <span
+                <button
+                  type="button"
                   key={tag.id}
                   className="registrar-tagging-page__chip registrar-tagging-page__chip--reusable"
                   style={tag.color ? { borderColor: tag.color, color: tag.color } : undefined}
+                  onClick={() => openEditReusableTagModal(tag)}
+                  aria-label={`Edit reusable tag ${tag.label}`}
                 >
-                  {tag.label}
-                </span>
+                  <span>{tag.label}</span>
+                  <span className="material-symbols-outlined" aria-hidden="true">
+                    edit
+                  </span>
+                </button>
               ))
             ) : (
               <div className="registrar-tagging-page__empty-state registrar-tagging-page__empty-state--compact">
@@ -414,7 +502,6 @@ const TaggingPage: React.FC = () => {
                                     const learnerId = learner.id;
                                     const isOpen = expandedLearners.has(learnerId);
                                     const learnerTags = normalizeLearnerTags(learner.tags);
-                                    const draftText = draftTagsByLearner[learnerId] || '';
 
                                     return (
                                       <article key={learnerId} className="registrar-tagging-page__learner">
@@ -442,108 +529,71 @@ const TaggingPage: React.FC = () => {
 
                                         {isOpen ? (
                                           <div className="registrar-tagging-page__learner-panel">
-                                            <div className="registrar-tagging-page__section-title">
-                                              <h4>Current Tags</h4>
-                                              <button
-                                                type="button"
-                                                className="registrar-tagging-page__text-button"
-                                                onClick={() => handleClearTags(learner)}
-                                                disabled={savingLearnerId === learnerId || learnerTags.length === 0}
-                                              >
-                                                Clear all
-                                              </button>
-                                            </div>
-
-                                            {learnerTags.length > 0 ? (
-                                              <div className="registrar-tagging-page__chips">
-                                                {learnerTags.map((tag) => (
+                                            <section className="registrar-tagging-page__tag-section" aria-labelledby={`current-tags-${learnerId}`}>
+                                              <div className="registrar-tagging-page__dropdown-head">
+                                                <div>
+                                                  <h4 id={`current-tags-${learnerId}`}>Current Tags</h4>
+                                                  <p>{learnerTags.length} assigned to this learner.</p>
+                                                </div>
+                                                {activeReusableTags.length > 0 ? (
                                                   <button
-                                                    key={tag}
                                                     type="button"
-                                                    className="registrar-tagging-page__chip registrar-tagging-page__chip--assigned"
-                                                    onClick={() => handleRemoveTag(learner, tag)}
+                                                    className="primary-button registrar-tagging-page__dropdown-primary"
+                                                    onClick={() => handleOpenLearnerTagModal(learner)}
                                                     disabled={savingLearnerId === learnerId}
-                                                    aria-label={`Remove ${tag}`}
                                                   >
-                                                    <span>{tag}</span>
                                                     <span className="material-symbols-outlined" aria-hidden="true">
-                                                      close
+                                                      sell
                                                     </span>
+                                                    Add tags
                                                   </button>
-                                                ))}
+                                                ) : null}
                                               </div>
-                                            ) : (
-                                              <div className="registrar-tagging-page__empty-state registrar-tagging-page__empty-state--compact">
-                                                <p>No tags assigned yet.</p>
-                                              </div>
-                                            )}
 
-                                            <label className="registrar-tagging-page__search-field">
-                                              <span>Add tags</span>
-                                              <textarea
-                                                className="registrar-tagging-page__textarea"
-                                                rows={3}
-                                                value={draftText}
-                                                onChange={(event) =>
-                                                  setDraftTagsByLearner((current) => ({
-                                                    ...current,
-                                                    [learnerId]: event.target.value,
-                                                  }))
-                                                }
-                                                placeholder="Type tags separated by commas, lines, or semicolons"
-                                              />
-                                            </label>
-
-                                            <div className="registrar-tagging-page__actions">
-                                              <button
-                                                type="button"
-                                                className="secondary-button"
-                                                onClick={() => handleAddDraftTags(learner)}
-                                                disabled={savingLearnerId === learnerId}
-                                              >
-                                                Apply typed tags
-                                              </button>
-                                              <button
-                                                type="button"
-                                                className="primary-button"
-                                                onClick={() =>
-                                                  setDraftTagsByLearner((current) => ({
-                                                    ...current,
-                                                    [learnerId]: '',
-                                                  }))
-                                                }
-                                                disabled={savingLearnerId === learnerId}
-                                              >
-                                                Clear input
-                                              </button>
-                                            </div>
-
-                                            <div>
-                                              <div className="registrar-tagging-page__section-title">
-                                                <h4>Reusable Tags</h4>
-                                                <p>Tap a reusable tag to assign it to this learner.</p>
-                                              </div>
-                                              {activeReusableTags.length > 0 ? (
+                                              {learnerTags.length > 0 ? (
                                                 <div className="registrar-tagging-page__chips">
-                                                  {activeReusableTags.map((tag) => (
+                                                  {learnerTags.map((tag) => (
                                                     <button
-                                                      key={tag.id}
+                                                      key={tag}
                                                       type="button"
-                                                      className="registrar-tagging-page__chip registrar-tagging-page__chip--reusable"
-                                                      style={tag.color ? { borderColor: tag.color, color: tag.color } : undefined}
-                                                      onClick={() => handleAddReusableTagToLearner(learner, tag.label)}
+                                                      className="registrar-tagging-page__chip registrar-tagging-page__chip--assigned"
+                                                      onClick={() => handleRemoveTag(learner, tag)}
                                                       disabled={savingLearnerId === learnerId}
+                                                      aria-label={`Remove ${tag}`}
                                                     >
-                                                      {tag.label}
+                                                      <span>{tag}</span>
+                                                      <span className="material-symbols-outlined" aria-hidden="true">
+                                                        close
+                                                      </span>
                                                     </button>
                                                   ))}
                                                 </div>
                                               ) : (
-                                                <div className="registrar-tagging-page__empty-state registrar-tagging-page__empty-state--compact">
-                                                  <p>Create a reusable tag first.</p>
+                                                <div className="notice-box registrar-tagging-page__notice">
+                                                  <strong>No current tags</strong>
+                                                  <span>No tags are assigned yet.</span>
                                                 </div>
                                               )}
-                                            </div>
+
+                                              <div className="registrar-tagging-page__dropdown-actions">
+                                                {activeReusableTags.length === 0 ? (
+                                                  <div className="notice-box registrar-tagging-page__notice registrar-tagging-page__notice--inline">
+                                                    <strong>No reusable tags</strong>
+                                                    <span>Create a reusable tag first.</span>
+                                                  </div>
+                                                ) : null}
+                                                <div className="form-actions registrar-tagging-page__form-actions">
+                                                  <button
+                                                    type="button"
+                                                    className="secondary-button registrar-tagging-page__clear-button"
+                                                    onClick={() => setClearTagsLearner(learner)}
+                                                    disabled={savingLearnerId === learnerId || learnerTags.length === 0}
+                                                  >
+                                                    Clear all
+                                                  </button>
+                                                </div>
+                                              </div>
+                                            </section>
                                           </div>
                                         ) : null}
                                       </article>

@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '../store';
 import { EnrollmentRecord, GradeLevel, Student } from '../types';
+import { UsisSearchInput } from '../../common/components/ui/UsisSearchInput';
+import { matchesUsisLearnerSearch } from '../../common/utils/usisLearnerSearch';
 import ConfirmationModal from '../components/ConfirmationModal';
 import LearnerDetailsModal from '../components/LearnerDetailsModal';
 import { openLearnerInformationPrintWindow } from '../features/registrar/learners/utils/printLearnerInformation';
@@ -47,33 +49,7 @@ const LearnerList: React.FC = () => {
   const resolvePlacement = (student: Student) => getLearnerPlacementForYear(student, sections, activeSchoolYear);
 
   const activeLearnersForYear = useMemo(() => {
-    const query = searchTerm.toLowerCase();
-    return baseActiveLearnersForYear.filter((l) => {
-      const lastFirstMiddle = `${l.lastName}, ${l.firstName} ${l.middleName || ''}`.toLowerCase();
-      const firstMiddleLast = `${l.firstName} ${l.middleName || ''} ${l.lastName}`.toLowerCase();
-      const firstLastMiddle = `${l.firstName} ${l.lastName} ${l.middleName || ''}`.toLowerCase();
-      const fullNameParts = [
-        l.lastName,
-        l.firstName,
-        l.middleName || '',
-        `${l.firstName} ${l.lastName}`,
-        `${l.firstName} ${l.middleName || ''}`,
-        `${l.middleName || ''} ${l.lastName}`,
-      ]
-        .join(' ')
-        .replace(/\s+/g, ' ')
-        .trim()
-        .toLowerCase();
-      return (
-        lastFirstMiddle.includes(query) ||
-        firstMiddleLast.includes(query) ||
-        firstLastMiddle.includes(query) ||
-        fullNameParts.includes(query) ||
-        l.lrn.includes(query) ||
-        String(l.loginUsername || '').toLowerCase().includes(query) ||
-        String(l.loginStatus || '').toLowerCase().includes(query)
-      );
-    });
+    return baseActiveLearnersForYear.filter((learner) => matchesUsisLearnerSearch(learner, searchTerm));
   }, [baseActiveLearnersForYear, searchTerm]);
 
   const derivedHistory = useMemo(() => {
@@ -334,34 +310,13 @@ const LearnerList: React.FC = () => {
           </>
         ) : (
           <>
-            <div className="registrar-learners-page__search-field">
-              <label className="floating-field">
-                <div className="floating-field__control registrar-learners-page__search-control" data-has-value={hasSearchQuery ? 'true' : 'false'}>
-                  <input
-                    type="text"
-                    placeholder=" "
-                    className="registrar-learners-page__search-input"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                  />
-                  <span className="registrar-learners-page__search-label">
-                    <span className="material-symbols-outlined" aria-hidden="true">search</span>
-                    <span>Search Learners</span>
-                  </span>
-                  {hasSearchQuery && (
-                    <button
-                      type="button"
-                      className="registrar-search-clear-btn"
-                      onClick={() => setSearchTerm('')}
-                      aria-label="Clear learner search"
-                      title="Clear"
-                    >
-                      <span className="material-symbols-outlined" aria-hidden="true">close</span>
-                    </button>
-                  )}
-                </div>
-              </label>
-            </div>
+            <UsisSearchInput
+              ariaLabel="Search learners"
+              clearLabel="Clear learner search"
+              label="Search Learners"
+              onChange={setSearchTerm}
+              value={searchTerm}
+            />
             <div className="registrar-learners-page__meta-box">
               <span className="registrar-learners-page__meta-label">Active Registry</span>
               <span className="registrar-learners-page__meta-value">{baseActiveLearnersForYear.length}</span>

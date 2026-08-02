@@ -503,6 +503,76 @@ begin
   end if;
 end $$;
 
+-- =========================================================
+-- Registrar Document Signatory Settings
+-- =========================================================
+create table if not exists registrar_document_signatories (
+  school_id text primary key,
+  registrar_name text not null default 'Registrar',
+  registrar_position text not null default 'School Registrar',
+  principal_name text not null default 'School Principal',
+  principal_position text not null default 'School Principal',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table if exists registrar_document_signatories
+  add column if not exists registrar_position text not null default 'School Registrar';
+
+alter table if exists registrar_document_signatories
+  add column if not exists principal_position text not null default 'School Principal';
+
+alter table if exists registrar_document_signatories enable row level security;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_policies
+    where schemaname = 'public'
+      and tablename = 'registrar_document_signatories'
+      and policyname = 'Registrar document signatories select'
+  ) then
+    create policy "Registrar document signatories select"
+      on public.registrar_document_signatories
+      for select
+      to authenticated
+      using (true);
+  end if;
+end $$;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_policies
+    where schemaname = 'public'
+      and tablename = 'registrar_document_signatories'
+      and policyname = 'Registrar document signatories insert'
+  ) then
+    create policy "Registrar document signatories insert"
+      on public.registrar_document_signatories
+      for insert
+      to authenticated
+      with check (true);
+  end if;
+end $$;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_policies
+    where schemaname = 'public'
+      and tablename = 'registrar_document_signatories'
+      and policyname = 'Registrar document signatories update'
+  ) then
+    create policy "Registrar document signatories update"
+      on public.registrar_document_signatories
+      for update
+      to authenticated
+      using (true)
+      with check (true);
+  end if;
+end $$;
+
 create table if not exists registrar_enrollment_email_queue (
   id uuid primary key default gen_random_uuid(),
   submission_id uuid not null references registrar_public_enrollment_submissions(id) on update cascade on delete cascade,
@@ -1070,6 +1140,11 @@ for each row execute function set_updated_at();
 drop trigger if exists trg_registrar_enrollment_email_settings_updated_at on registrar_enrollment_email_settings;
 create trigger trg_registrar_enrollment_email_settings_updated_at
 before update on registrar_enrollment_email_settings
+for each row execute function set_updated_at();
+
+drop trigger if exists trg_registrar_document_signatories_updated_at on registrar_document_signatories;
+create trigger trg_registrar_document_signatories_updated_at
+before update on registrar_document_signatories
 for each row execute function set_updated_at();
 
 drop trigger if exists trg_registrar_enrollment_email_queue_updated_at on registrar_enrollment_email_queue;

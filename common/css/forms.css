@@ -270,6 +270,108 @@
   -webkit-text-fill-color: #6c7688;
 }
 
+.usis-search-input {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.usis-search-input .floating-field {
+  width: 100%;
+}
+
+.usis-search-input__control {
+  position: relative;
+  min-height: 56px;
+  border: 1px solid rgba(18, 35, 61, 0.14);
+  border-radius: var(--usis-radius-surface);
+  background: #fbfcff;
+  transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+
+.usis-search-input__control input.usis-search-input__field {
+  width: 100%;
+  min-height: 56px;
+  padding: 24px 44px 10px 16px;
+  border: 0;
+  border-radius: var(--usis-radius-surface);
+  background: transparent;
+  color: var(--deped-ink);
+  position: relative;
+  z-index: 0;
+}
+
+.usis-search-input__control:focus-within {
+  border-color: rgba(0, 56, 168, 0.44);
+  box-shadow: 0 0 0 4px rgba(0, 56, 168, 0.08);
+  transform: translateY(-1px);
+}
+
+.usis-search-input__control input.usis-search-input__field:focus {
+  border: 0;
+  box-shadow: none;
+  transform: none;
+}
+
+.usis-search-input__control[data-disabled="true"] {
+  background: #e8edf5;
+  border-color: rgba(18, 35, 61, 0.22);
+  box-shadow: none;
+  transform: none;
+}
+
+.usis-search-input__control > .usis-search-input__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.usis-search-input__control:focus-within > .usis-search-input__label,
+.usis-search-input__control[data-has-value="true"] > .usis-search-input__label {
+  top: 9px;
+  color: var(--deped-blue);
+  font-size: 16px;
+  font-weight: 400;
+  transform: translateY(0) scale(0.82);
+}
+
+.usis-search-input__control > .usis-search-input__label .material-symbols-outlined {
+  font-size: 18px;
+  color: var(--deped-muted);
+}
+
+.usis-search-input__control:focus-within > .usis-search-input__label .material-symbols-outlined,
+.usis-search-input__control[data-has-value="true"] > .usis-search-input__label .material-symbols-outlined {
+  color: var(--deped-blue);
+}
+
+.usis-search-input__clear {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--deped-muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 4;
+}
+
+.usis-search-input__clear:hover {
+  background: #e9edf3;
+  color: var(--deped-blue);
+}
+
+.usis-search-input__clear .material-symbols-outlined {
+  font-size: 18px;
+}
+
 .floating-field__control input:disabled + span,
 .floating-field__control select:disabled + span,
 .floating-field__control textarea:disabled + span,

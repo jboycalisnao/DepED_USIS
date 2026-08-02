@@ -2,6 +2,7 @@ const USIS_SEAL_SRC = new URL('../../../../common/assets/USIS_Icon.png', import.
 
 type PrintSheetHeaderOptions = {
   documentNo: string;
+  issuedBy?: string;
   pageNumber: number;
   titleText: string;
   titleSuffix?: string;
@@ -18,6 +19,7 @@ const escapeHtml = (value: string) =>
 
 export const buildLNHSPrintSheetHeader = ({
   documentNo,
+  issuedBy = 'Registrar',
   pageNumber,
   titleText,
   titleSuffix = '',
@@ -42,7 +44,7 @@ export const buildLNHSPrintSheetHeader = ({
           <tr><td>Issue No.</td><td>1</td></tr>
           <tr><td>Revision No.</td><td>1</td></tr>
           <tr><td>Date of Effectivity</td><td>June 8, 2026</td></tr>
-          <tr><td>Issued by</td><td>Registrar</td></tr>
+          <tr><td>Issued by</td><td>${escapeHtml(issuedBy)}</td></tr>
           <tr><td>Page No.</td><td>Page ${pageNumber} of ${totalPages}</td></tr>
         </table>
       </td>

@@ -1,6 +1,7 @@
 import { Section, Student } from '../../../../types';
 import { supabase } from '../../../../lib/supabase';
 import { buildLNHSPrintSheetHeader } from '../../shared/printSheetHeader';
+import { fetchRegistrarSignatories } from '../../shared/signatorySettings';
 import { fetchLearnerEnrollmentSnapshot } from './enrollmentHistorySnapshot';
 import { normalizeLearnerTags } from '../../../../utils/learnerTags';
 
@@ -146,6 +147,7 @@ const yesNoText = (value: unknown) => {
   if (raw === 'no' || raw === 'false' || raw === '0') return 'No';
   return 'N/A';
 };
+const isEnrolledHistoryStatus = (value: unknown) => toText(value).toLowerCase() === 'enrolled';
 
 const buildVerificationUrl = (learner: Student) => {
   const url = new URL('/verify-document', window.location.origin);
@@ -174,6 +176,7 @@ const buildPrintHtml = async ({ learners, schoolYearLabel, sections }: PrintLear
   const sorted = [...learners].sort((a, b) =>
     `${a.lastName}, ${a.firstName}`.toUpperCase().localeCompare(`${b.lastName}, ${b.firstName}`.toUpperCase()),
   );
+  const signatories = await fetchRegistrarSignatories();
 
   const pagesHtml = (await Promise.all(sorted.map(async (learner) => {
       const latestSubmissionPayload = await fetchLatestSubmissionPayload(learner);
@@ -219,7 +222,11 @@ const buildPrintHtml = async ({ learners, schoolYearLabel, sections }: PrintLear
       ]);
       const verificationCard = await buildVerificationCard(learner);
 
-      const enrollmentHistoryRows = enrollmentSnapshot.history
+      const enrollmentRecords = [
+        ...(enrollmentSnapshot.currentEnrollment ? [enrollmentSnapshot.currentEnrollment] : []),
+        ...enrollmentSnapshot.history,
+      ].filter((record) => isEnrolledHistoryStatus(record.status));
+      const enrollmentHistoryRows = enrollmentRecords
         .map(
           (record) => `
             <tr>
@@ -249,7 +256,7 @@ const buildPrintHtml = async ({ learners, schoolYearLabel, sections }: PrintLear
 
       return `
         <article class="sheet">
-          ${buildLNHSPrintSheetHeader({ documentNo: 'LNHS-REG-USIS-F01', pageNumber: 1, titleText: 'USIS Learner Information Sheet', totalPages: 2 })}
+          ${buildLNHSPrintSheetHeader({ documentNo: 'LNHS-REG-USIS-F01', issuedBy: signatories.registrar_position, pageNumber: 1, titleText: 'USIS Learner Information Sheet', totalPages: 2 })}
           <div class="sheet-meta">
             <span>School Year: ${escapeHtml(schoolYearLabel)}</span>
             <span>Record Generated: ${escapeHtml(new Date().toLocaleString())}</span>
@@ -332,16 +339,15 @@ const buildPrintHtml = async ({ learners, schoolYearLabel, sections }: PrintLear
             </div>
           </section>
 
-          ${latestEnrollmentSnapshot}
-
         </article>
 
         <article class="sheet">
-          ${buildLNHSPrintSheetHeader({ documentNo: 'LNHS-REG-USIS-F01', pageNumber: 2, titleText: 'USIS Learner Information Sheet', titleSuffix: ' - CONTINUATION', totalPages: 2 })}
+          ${buildLNHSPrintSheetHeader({ documentNo: 'LNHS-REG-USIS-F01', issuedBy: signatories.registrar_position, pageNumber: 2, titleText: 'USIS Learner Information Sheet', titleSuffix: ' - CONTINUATION', totalPages: 2 })}
           <div class="sheet-meta">
             <span>School Year: ${escapeHtml(schoolYearLabel)}</span>
             <span>Record Generated: ${escapeHtml(new Date().toLocaleString())}</span>
           </div>
+          ${latestEnrollmentSnapshot}
           <section class="block">
             <h3>9. Enrollment History</h3>
             <table class="history">
@@ -374,6 +380,19 @@ const buildPrintHtml = async ({ learners, schoolYearLabel, sections }: PrintLear
             <div class="verification-card__qr">
               <img src="${verificationCard.qrDataUrl}" alt="Verification QR Code" />
               <span>Scan to verify</span>
+            </div>
+          </section>
+
+          <section class="signatories">
+            <div class="signatory">
+              <span>Prepared by</span>
+              <strong>${escapeHtml(signatories.registrar_name)}</strong>
+              <small>${escapeHtml(signatories.registrar_position)}</small>
+            </div>
+            <div class="signatory">
+              <span>Approved by</span>
+              <strong>${escapeHtml(signatories.principal_name)}</strong>
+              <small>${escapeHtml(signatories.principal_position)}</small>
             </div>
           </section>
 
@@ -491,10 +510,44 @@ const buildPrintHtml = async ({ learners, schoolYearLabel, sections }: PrintLear
             font-size: 9px;
             font-weight: 700;
           }
+          .signatories {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 18px;
+            margin-top: 10px;
+            break-inside: avoid;
+          }
+          .signatory {
+            display: grid;
+            gap: 4px;
+            min-height: 74px;
+            padding: 24px 12px 8px;
+            text-align: center;
+          }
+          .signatory span {
+            color: #334155;
+            font-size: 8.75px;
+            text-transform: uppercase;
+          }
+          .signatory strong {
+            display: block;
+            padding-top: 6px;
+            border-top: 1px solid #111;
+            color: #111827;
+            font-size: 10px;
+            font-weight: 700;
+            line-height: 1.2;
+            text-transform: uppercase;
+          }
+          .signatory small {
+            color: #334155;
+            font-size: 9px;
+            line-height: 1.2;
+          }
           @media print {
-            .sheet { break-inside: avoid; }
             .block { break-inside: avoid; }
             .verification-card { break-inside: avoid; }
+            .signatories { break-inside: avoid; }
           }
         </style>
       </head>

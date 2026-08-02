@@ -42,6 +42,7 @@ const REGISTRAR_TABLES = {
   schoolYears: 'registrar_school_years',
   gradeLevels: 'registrar_grade_levels',
 } as const;
+const REUSABLE_TAG_POSITIONS_MARKER = 'USIS_OFFICER_POSITIONS:';
 
 // Shared State
 let learners: Student[] = []; 
@@ -267,7 +268,7 @@ const commitReusableTags = (nextTags: ReusableTag[]) => {
     id: tag.id,
     label: tag.label,
     category: tag.category || null,
-    description: tag.description || null,
+    description: serializeReusableTagDescription(tag.description, tag.officerPositions),
     color: tag.color || null,
     is_active: tag.isActive !== false,
     created_at: tag.createdAt || new Date().toISOString(),
@@ -382,14 +383,49 @@ const mapDbToProgram = (p: any): AcademicProgram => ({
   fullName: p.full_name || p.fullName || p.description || 'Unknown'
 });
 
+const parseReusableTagDescription = (value: unknown) => {
+  const raw = String(value || '');
+  const markerIndex = raw.lastIndexOf(REUSABLE_TAG_POSITIONS_MARKER);
+  if (markerIndex < 0) {
+    return { description: raw.trim() || undefined, officerPositions: [] };
+  }
+
+  const description = raw.slice(0, markerIndex).trim();
+  const markerPayload = raw.slice(markerIndex + REUSABLE_TAG_POSITIONS_MARKER.length).trim();
+  try {
+    const parsed = JSON.parse(markerPayload);
+    const officerPositions = Array.isArray(parsed)
+      ? parsed.map((entry) => String(entry || '').trim()).filter(Boolean)
+      : [];
+    return { description: description || undefined, officerPositions };
+  } catch {
+    return { description: raw.trim() || undefined, officerPositions: [] };
+  }
+};
+
+const serializeReusableTagDescription = (description?: string, officerPositions?: string[]) => {
+  const cleanDescription = String(description || '').trim();
+  const positions = Array.isArray(officerPositions)
+    ? officerPositions.map((entry) => String(entry || '').trim()).filter(Boolean)
+    : [];
+  if (positions.length === 0) return cleanDescription || null;
+  return `${cleanDescription}${cleanDescription ? '\n\n' : ''}${REUSABLE_TAG_POSITIONS_MARKER}${JSON.stringify(positions)}`;
+};
+
 const mapDbToReusableTag = (row: any): ReusableTag => ({
-  id: String(row.id || '').trim(),
-  label: String(row.label || row.name || '').trim(),
-  category: String(row.category || '').trim() || undefined,
-  description: String(row.description || '').trim() || undefined,
-  color: String(row.color || '').trim() || undefined,
-  isActive: !!(row.is_active ?? row.isActive ?? true),
-  createdAt: String(row.created_at || row.createdAt || '').trim() || undefined,
+  ...(() => {
+    const parsedDescription = parseReusableTagDescription(row.description);
+    return {
+      id: String(row.id || '').trim(),
+      label: String(row.label || row.name || '').trim(),
+      category: String(row.category || '').trim() || undefined,
+      description: parsedDescription.description,
+      color: String(row.color || '').trim() || undefined,
+      officerPositions: parsedDescription.officerPositions,
+      isActive: !!(row.is_active ?? row.isActive ?? true),
+      createdAt: String(row.created_at || row.createdAt || '').trim() || undefined,
+    };
+  })(),
 });
 
 const hydrateCachedBootstrapState = () => {
@@ -1175,6 +1211,9 @@ export const useStore = () => {
           category: String(tag.category || '').trim() || undefined,
           description: String(tag.description || '').trim() || undefined,
           color: String(tag.color || '').trim() || undefined,
+          officerPositions: Array.isArray(tag.officerPositions)
+            ? tag.officerPositions.map((entry) => String(entry || '').trim()).filter(Boolean)
+            : [],
           isActive: true,
           createdAt: new Date().toISOString(),
         };
@@ -1183,13 +1222,54 @@ export const useStore = () => {
           school_id: registrarAccess.schoolUuid,
           label: nextTag.label,
           category: nextTag.category || null,
-          description: nextTag.description || null,
+          description: serializeReusableTagDescription(nextTag.description, nextTag.officerPositions),
           color: nextTag.color || null,
           is_active: true,
         };
         const { error } = await supabase.from(REGISTRAR_TABLES.reusableTags).insert([payload]);
         if (!error) {
           commitReusableTags([...reusableTags, nextTag].sort((a, b) => a.label.localeCompare(b.label)));
+          await fetchReusableTags(true);
+        }
+        return { error: error?.message };
+      } finally {
+        setGlobalLoading(false);
+      }
+    },
+    updateReusableTag: async (id: string, updates: Partial<ReusableTag> & { label: string }) => {
+      if (!registrarAccess?.schoolUuid) return { error: 'Not Authorized' };
+      const tagId = String(id || '').trim();
+      const label = String(updates.label || '').trim();
+      if (!tagId) return { error: 'Tag record is required.' };
+      if (!label) return { error: 'Label is required.' };
+      setGlobalLoading(true);
+      try {
+        const nextUpdates: Partial<ReusableTag> = {
+          label,
+          category: String(updates.category || '').trim() || undefined,
+          description: String(updates.description || '').trim() || undefined,
+          color: String(updates.color || '').trim() || undefined,
+          officerPositions: Array.isArray(updates.officerPositions)
+            ? updates.officerPositions.map((entry) => String(entry || '').trim()).filter(Boolean)
+            : [],
+        };
+        const payload = {
+          label: nextUpdates.label,
+          category: nextUpdates.category || null,
+          description: serializeReusableTagDescription(nextUpdates.description, nextUpdates.officerPositions),
+          color: nextUpdates.color || null,
+        };
+        const { error } = await supabase
+          .from(REGISTRAR_TABLES.reusableTags)
+          .update(payload)
+          .eq('id', tagId)
+          .eq('school_id', registrarAccess.schoolUuid);
+        if (!error) {
+          commitReusableTags(
+            reusableTags
+              .map((tag) => (tag.id === tagId ? { ...tag, ...nextUpdates } : tag))
+              .sort((a, b) => a.label.localeCompare(b.label)),
+          );
           await fetchReusableTags(true);
         }
         return { error: error?.message };

@@ -28,6 +28,11 @@ const KioskMode: React.FC<KioskModeProps> = ({
   onSmsTestModeActionChange,
 }) => {
   const [currentTime, setCurrentTime] = useState(new Date());
+  const kioskAlerts = [
+    'Do not Unplug the USB Cable',
+    'Do not close this laptop',
+    'This is remotely controlled laptop, do not disturb',
+  ];
 
   useEffect(() => {
     const timer = window.setInterval(() => setCurrentTime(new Date()), 1000);
@@ -77,6 +82,20 @@ const KioskMode: React.FC<KioskModeProps> = ({
               Exit
             </button>
           </div>
+        </div>
+
+        <div className="mt-4 grid gap-2 md:grid-cols-3">
+          {kioskAlerts.map((alert) => (
+            <div
+              key={alert}
+              className="flex min-h-14 items-center justify-center gap-3 rounded-md border-2 border-red-600 bg-red-50 px-4 py-3 text-center text-[13px] font-bold text-red-800 shadow-[0_10px_24px_rgba(200,21,43,0.18)]"
+            >
+              <span className="material-symbols-outlined text-[18px] leading-none" aria-hidden="true">
+                warning
+              </span>
+              <span>{alert}</span>
+            </div>
+          ))}
         </div>
 
         <main className="mt-6 flex flex-1 gap-4 overflow-x-auto pb-2">

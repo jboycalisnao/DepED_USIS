@@ -37,6 +37,7 @@ export interface ReusableTag {
   category?: string;
   description?: string;
   color?: string;
+  officerPositions?: string[];
   isActive?: boolean;
   createdAt?: string;
 }
