@@ -994,6 +994,10 @@ export const loadMerchOrderCountsSummary = async (selectedOrderPeriod = ''): Pro
     }
 
     const status = normalizeMerchOrderStatus(String(row.order_status || 'pending'));
+    if (status !== 'confirmed') {
+      return;
+    }
+
     const sourceRaw = String(row.order_source || '').trim();
     const source = sourceRaw === 'integrated_admin'
       ? 'Integrated Admin'

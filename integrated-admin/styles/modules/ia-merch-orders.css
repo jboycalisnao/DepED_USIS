@@ -332,6 +332,14 @@
     flex: 1 1 240px;
   }
 
+  .integrated-admin-order-counts-toolbar {
+    flex-wrap: wrap;
+  }
+
+  .integrated-admin-order-counts-toolbar__period {
+    flex: 1 1 240px;
+  }
+
   .integrated-admin-workbook-review-modal__summary {
     grid-template-columns: 1fr;
   }
@@ -392,6 +400,8 @@
 
 .integrated-admin-order-counts-toolbar {
   display: flex;
+  align-items: stretch;
+  gap: 10px;
   justify-content: flex-end;
   margin-bottom: 10px;
 }
@@ -439,11 +449,33 @@
   gap: 8px;
 }
 
+.integrated-admin-order-counts-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
 .integrated-admin-order-counts-card h4 {
   margin: 0;
   color: var(--deped-blue);
   font-size: 16px;
   font-weight: 700;
+}
+
+.integrated-admin-order-counts-card__print {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 10px;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.integrated-admin-order-counts-card__print .material-symbols-outlined {
+  font-size: 18px;
 }
 
 .integrated-admin-order-counts-card__metric {

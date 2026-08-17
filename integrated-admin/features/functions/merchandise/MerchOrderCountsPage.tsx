@@ -4,6 +4,8 @@ import { UsisSearchableSelect } from '../../../../common/components/ui/UsisSearc
 import UsisPageLoader from '../../../../common/components/UsisPageLoader';
 import { loadCachedMerchOrdersPageSnapshot } from './utils/merchOrdersPageCache';
 import type { MerchOrderControlRecord } from './services/merchOrderControlService';
+import { normalizeMerchOrderStatus } from './order-control/utils/orderStatus';
+import { openMerchOrderCountsPrintWindow } from './order-counts/utils/orderCountsPrint';
 
 type MerchOrderCountsSummary = {
   countsByProduct: Array<{ amount: number; count: number; productName: string; quantity: number }>;
@@ -15,7 +17,9 @@ const buildSummary = (records: MerchOrderControlRecord[], selectedOrderPeriod: s
   const periodSet = new Set<string>();
   const productMap = new Map<string, { amount: number; count: number; productName: string; quantity: number }>();
 
-  records.forEach((row) => {
+  const confirmedRecords = records.filter((row) => normalizeMerchOrderStatus(row.orderStatus, row.orderKind) === 'confirmed');
+
+  confirmedRecords.forEach((row) => {
     const items = [row.orderPeriodLabel || ''].filter(Boolean);
     items.forEach((label) => periodSet.add(label));
 
@@ -88,6 +92,16 @@ export function MerchOrderCountsPage() {
 
   const summary = useMemo(() => buildSummary(records, selectedOrderPeriod), [records, selectedOrderPeriod]);
 
+  const printableRecords = useMemo(
+    () =>
+      records.filter((row) => {
+        if (normalizeMerchOrderStatus(row.orderStatus, row.orderKind) !== 'confirmed') return false;
+        if (!selectedOrderPeriod) return true;
+        return row.orderPeriodLabel === selectedOrderPeriod;
+      }),
+    [records, selectedOrderPeriod],
+  );
+
   const orderPeriodOptions = useMemo(
     () => [
       { label: 'All Order Periods', value: '' },
@@ -97,6 +111,31 @@ export function MerchOrderCountsPage() {
   );
 
   if (isLoading) return <UsisPageLoader message="Loading order count dashboard..." />;
+
+  const handlePrintConsolidatedList = (productName: string) => {
+    const productRecords = printableRecords.filter((row) => row.productName === productName);
+    if (productRecords.length === 0) {
+      setAlert({
+        title: 'No Confirmed Orders',
+        message: 'No confirmed orders are available for this product and order period scope.',
+        tone: 'danger',
+      });
+      return;
+    }
+
+    const ok = openMerchOrderCountsPrintWindow({
+      orderPeriodLabel: selectedOrderPeriod || 'All Order Periods',
+      records: productRecords,
+    });
+
+    if (!ok) {
+      setAlert({
+        title: 'Print Blocked',
+        message: 'Allow popups for this site to print the consolidated order count list.',
+        tone: 'danger',
+      });
+    }
+  };
 
   return (
     <section className="section-shell integrated-admin-function">
@@ -123,7 +162,7 @@ export function MerchOrderCountsPage() {
 
           <div className="integrated-admin-order-payment-metrics">
             <div className="integrated-admin-order-payment-summary__metric">
-              <small>Total Orders</small>
+              <small>Confirmed Orders</small>
               <strong>{summary.totalOrders}</strong>
             </div>
             <div className="integrated-admin-order-payment-summary__metric">
@@ -135,18 +174,28 @@ export function MerchOrderCountsPage() {
           <div className="integrated-admin-order-counts-section">
             <div className="integrated-admin-order-counts-section__header">
               <h3>By Product</h3>
-              <p>Orders are grouped from the locally cached IA orders snapshot.</p>
+              <p>Confirmed orders are grouped from the locally cached IA orders snapshot.</p>
             </div>
 
             {summary.countsByProduct.length === 0 ? (
               <article className="integrated-admin-order-counts-empty">
-                <p>No orders found for this scope.</p>
+                <p>No confirmed orders found for this scope.</p>
               </article>
             ) : (
               <div className="integrated-admin-order-counts-grid">
                 {summary.countsByProduct.map((row) => (
                   <article key={row.productName} className="integrated-admin-order-counts-card">
-                    <h4>{row.productName}</h4>
+                    <div className="integrated-admin-order-counts-card__header">
+                      <h4>{row.productName}</h4>
+                      <button
+                        type="button"
+                        className="secondary-button integrated-admin-order-counts-card__print"
+                        onClick={() => handlePrintConsolidatedList(row.productName)}
+                      >
+                        <span className="material-symbols-outlined" aria-hidden="true">print</span>
+                        Print List
+                      </button>
+                    </div>
                     <div className="integrated-admin-order-counts-card__metric">
                       <small>Orders</small>
                       <strong>{row.count}</strong>
