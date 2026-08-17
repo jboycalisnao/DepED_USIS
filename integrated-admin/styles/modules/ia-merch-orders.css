@@ -71,6 +71,19 @@
   align-self: stretch;
 }
 
+.integrated-admin-merch-orders-toolbar .integrated-admin-merch-orders-delete-period {
+  border-color: rgba(200, 30, 30, 0.42);
+  color: #a91515;
+  background: #fff7f7;
+}
+
+.integrated-admin-merch-orders-toolbar .integrated-admin-merch-orders-delete-period:hover:not(:disabled),
+.integrated-admin-merch-orders-toolbar .integrated-admin-merch-orders-delete-period:focus-visible:not(:disabled) {
+  border-color: #c81e1e;
+  color: #7f1010;
+  background: #fff1f1;
+}
+
 .integrated-admin-merch-orders-toolbar .floating-field {
   margin-bottom: 0;
 }
@@ -307,6 +320,18 @@
     margin-left: auto;
   }
 
+  .integrated-admin-order-payment-toolbar {
+    flex-wrap: wrap;
+  }
+
+  .integrated-admin-order-payment-toolbar__search {
+    flex-basis: 100%;
+  }
+
+  .integrated-admin-order-payment-toolbar__period-filter {
+    flex: 1 1 240px;
+  }
+
   .integrated-admin-workbook-review-modal__summary {
     grid-template-columns: 1fr;
   }
@@ -324,6 +349,11 @@
   min-width: 0;
   display: flex;
   width: 100%;
+}
+
+.integrated-admin-order-payment-toolbar__period-filter {
+  flex: 0 0 280px;
+  min-width: 240px;
 }
 
 .integrated-admin-order-payment-toolbar__add-btn {
@@ -348,6 +378,12 @@
 
 .integrated-admin-order-payment-toolbar__search .floating-field__control input {
   width: 100%;
+}
+
+.integrated-admin-order-payment-toolbar__period-filter .searchable-select--floating .floating-field__control,
+.integrated-admin-order-payment-toolbar__period-filter .searchable-select--floating .floating-field__control input {
+  min-height: 64px;
+  height: 64px;
 }
 
 .integrated-admin-order-payment-table-wrap {

@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState, type ChangeEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { UsisAlertModal } from '../../../../common/components/UsisAlertModal';
 import { UsisGradeSectionList, type UsisGradeSectionListGrade } from '../../../../common/components/ui/UsisGradeSectionList';
+import { UsisSearchableSelect } from '../../../../common/components/ui/UsisSearchableSelect';
 import UsisPageLoader from '../../../../common/components/UsisPageLoader';
 import { ManualOrderOverrideModal } from './order-control/components/ManualOrderOverrideModal';
 import { MerchOrderWorkbookReviewModal } from './order-control/components/MerchOrderWorkbookReviewModal';
@@ -56,6 +57,8 @@ export function MerchOrderControlPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isDeletingOrderPeriod, setIsDeletingOrderPeriod] = useState(false);
+  const [collapseListSignal, setCollapseListSignal] = useState(0);
   const [learnerSearch, setLearnerSearch] = useState('');
   const [selectedLearnerId, setSelectedLearnerId] = useState('');
   const [selectedProductId, setSelectedProductId] = useState('');
@@ -68,6 +71,7 @@ export function MerchOrderControlPage() {
   const [isAuditLoading, setIsAuditLoading] = useState(false);
   const [detailStatusValue, setDetailStatusValue] = useState('');
   const [orderSearch, setOrderSearch] = useState('');
+  const [selectedOrderPeriod, setSelectedOrderPeriod] = useState('');
   const [lastLoadedFromDbAt, setLastLoadedFromDbAt] = useState('');
   const [lastLoadedFromCacheAt, setLastLoadedFromCacheAt] = useState('');
   const [bootedFromCache, setBootedFromCache] = useState(false);
@@ -164,6 +168,12 @@ export function MerchOrderControlPage() {
     setSelectedSize(firstSize);
   }, [products, selectedProductId]);
 
+  useEffect(() => {
+    if (!selectedOrderPeriod) return;
+    if (records.some((record) => record.orderPeriodLabel === selectedOrderPeriod)) return;
+    setSelectedOrderPeriod('');
+  }, [records, selectedOrderPeriod]);
+
   const handleStatusChange = async (orderId: string, value: string) => {
     const currentRecord = records.find((row) => row.id === orderId);
     if (!currentRecord) return;
@@ -238,7 +248,24 @@ export function MerchOrderControlPage() {
     .map((learner) => ({ label: learner.label, value: learner.id }));
   const productOptions = products.map((product) => ({ label: product.name, value: product.id }));
   const normalizedOrderSearch = orderSearch.trim().toLowerCase();
+  const orderPeriodOptions = useMemo(() => {
+    const labels = Array.from(
+      new Set(
+        records
+          .map((record) => String(record.orderPeriodLabel || '').trim())
+          .filter(Boolean),
+      ),
+    ).sort((left, right) => left.localeCompare(right, undefined, { numeric: true }));
+
+    return [
+      { label: 'All Order Periods', value: '' },
+      ...labels.map((label) => ({ label, value: label })),
+    ];
+  }, [records]);
   const filteredRecords = records.filter((row) => {
+    if (selectedOrderPeriod && row.orderPeriodLabel !== selectedOrderPeriod) {
+      return false;
+    }
     if (!normalizedOrderSearch) return true;
     const createdAt = row.createdAt ? new Date(row.createdAt).toLocaleString().toLowerCase() : '';
     const haystack = [
@@ -258,6 +285,17 @@ export function MerchOrderControlPage() {
       .toLowerCase();
     return haystack.includes(normalizedOrderSearch);
   });
+  const selectedOrderPeriodOrderIds = useMemo(() => {
+    if (!selectedOrderPeriod) return [];
+    return Array.from(
+      new Set(
+        records
+          .filter((row) => row.orderKind === 'merch' && row.orderPeriodLabel === selectedOrderPeriod)
+          .map((row) => row.id)
+          .filter(Boolean),
+      ),
+    );
+  }, [records, selectedOrderPeriod]);
 
   const groupedRecords = filteredRecords.reduce<Record<string, Record<string, MerchOrderControlRecord[]>>>((acc, row) => {
     const grade = row.gradeLevel || 'Unassigned';
@@ -356,14 +394,15 @@ export function MerchOrderControlPage() {
   };
 
   const handleDownloadWorkbook = async () => {
-    const merchOnlyRecords = records.filter((row) => row.orderKind === 'merch');
+    const merchOnlyRecords = filteredRecords.filter((row) => row.orderKind === 'merch');
     if (merchOnlyRecords.length === 0) {
       setAlert({ title: 'Export Failed', message: 'No merch orders are available for export.', tone: 'danger' });
       return;
     }
     setIsExportingWorkbook(true);
     try {
-      await downloadMerchOrdersWorkbook(merchOnlyRecords, 'Merch Orders');
+      const exportPeriodLabel = selectedOrderPeriod || 'Merch Orders';
+      await downloadMerchOrdersWorkbook(merchOnlyRecords, exportPeriodLabel);
       setAlert({ title: 'Export Complete', message: 'Merch orders workbook has been downloaded.', tone: 'success' });
     } catch (error: any) {
       setAlert({ title: 'Export Failed', message: error?.message || 'Unable to export merch orders.', tone: 'danger' });
@@ -459,6 +498,41 @@ export function MerchOrderControlPage() {
     }
   };
 
+  const handleDeleteSelectedOrderPeriod = async () => {
+    if (!selectedOrderPeriod) {
+      setAlert({ title: 'Select Order Period', message: 'Select an order period before deleting orders.', tone: 'danger' });
+      return;
+    }
+
+    if (selectedOrderPeriodOrderIds.length === 0) {
+      setAlert({ title: 'No Orders Found', message: 'No merch orders were found for the selected order period.', tone: 'danger' });
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Delete all ${selectedOrderPeriodOrderIds.length} merch order${selectedOrderPeriodOrderIds.length === 1 ? '' : 's'} for "${selectedOrderPeriod}"? This cannot be undone.`,
+    );
+    if (!confirmed) return;
+
+    setIsDeletingOrderPeriod(true);
+    setIsSaving(true);
+    try {
+      await Promise.all(selectedOrderPeriodOrderIds.map((orderId) => deleteMerchOrderRecord(orderId)));
+      await refresh({ silent: true });
+      setSelectedOrderPeriod('');
+      setAlert({
+        title: 'Orders Deleted',
+        message: `${selectedOrderPeriodOrderIds.length} merch order${selectedOrderPeriodOrderIds.length === 1 ? '' : 's'} for "${selectedOrderPeriod}" deleted.`,
+        tone: 'success',
+      });
+    } catch (error: any) {
+      setAlert({ title: 'Delete Failed', message: error?.message || 'Unable to delete orders for the selected order period.', tone: 'danger' });
+    } finally {
+      setIsDeletingOrderPeriod(false);
+      setIsSaving(false);
+    }
+  };
+
   const openOrderDetails = async (row: MerchOrderControlRecord) => {
     setSelectedOrderDetail(row);
     setDetailStatusValue(normalizeMerchOrderStatus(row.orderStatus));
@@ -524,7 +598,7 @@ export function MerchOrderControlPage() {
               className="secondary-button"
               onClick={() => void handleDownloadWorkbook()}
               type="button"
-              disabled={isExportingWorkbook || isImportingWorkbook}
+              disabled={isExportingWorkbook || isImportingWorkbook || isDeletingOrderPeriod}
             >
               {isExportingWorkbook ? 'Downloading...' : 'Download Excel'}
             </button>
@@ -532,7 +606,7 @@ export function MerchOrderControlPage() {
               className="secondary-button"
               onClick={handleUploadWorkbook}
               type="button"
-              disabled={isExportingWorkbook || isImportingWorkbook}
+              disabled={isExportingWorkbook || isImportingWorkbook || isDeletingOrderPeriod}
             >
               {isImportingWorkbook ? 'Uploading...' : 'Upload Excel'}
             </button>
@@ -565,14 +639,44 @@ export function MerchOrderControlPage() {
                   </div>
                 </div>
               </div>
+              <div className="integrated-admin-merch-orders-period-filter">
+                <UsisSearchableSelect
+                  ariaLabel="Order Period Filter"
+                  allowTyping={false}
+                  floatingLabel
+                  label="Order Period"
+                  options={orderPeriodOptions}
+                  value={selectedOrderPeriod}
+                  onChange={(value) => setSelectedOrderPeriod(value)}
+                />
+              </div>
+            </div>
+            <div className="integrated-admin-merch-order-manual-trigger integrated-admin-merch-order-manual-trigger--actions">
+              <button
+                type="button"
+                className="secondary-button"
+                disabled={gradeListData.length === 0}
+                onClick={() => setCollapseListSignal((value) => value + 1)}
+              >
+                Collapse All
+              </button>
+              <button
+                type="button"
+                className="secondary-button integrated-admin-merch-orders-delete-period"
+                disabled={!selectedOrderPeriod || selectedOrderPeriodOrderIds.length === 0 || isSaving || isRefreshing || isDeletingOrderPeriod}
+                onClick={() => void handleDeleteSelectedOrderPeriod()}
+              >
+                {isDeletingOrderPeriod ? 'Deleting...' : 'Delete Period Orders'}
+              </button>
             </div>
           </div>
           <UsisGradeSectionList
             className="integrated-admin-merch-groups"
+            collapseSignal={collapseListSignal}
             emptyMessage={records.length === 0
               ? 'No cached merch orders found. Use Refresh to load records from the database.'
-              : 'No merch orders found.'}
-            expandAll={normalizedOrderSearch.length > 0}
+              : 'No merch orders found for the selected filter.'}
+            expandAll={normalizedOrderSearch.length > 0 || selectedOrderPeriod.length > 0}
             grades={gradeListData}
           />
         </div>
