@@ -20,10 +20,14 @@ export const useSerial = (index: number = 0) => {
   const readerRef = useRef<ReadableStreamDefaultReader<Uint8Array> | null>(null);
   const writerRef = useRef<WritableStreamDefaultWriter<Uint8Array> | null>(null);
   const portRef = useRef<any>(null);
+  const lastPortRef = useRef<any>(null);
   const isAutoConnecting = useRef(false);
   const readLoopActive = useRef(false);
+  const shouldReconnectRef = useRef(false);
   const bufferRef = useRef('');
   const flushTimeoutRef = useRef<number | null>(null);
+  const reconnectTimerRef = useRef<number | null>(null);
+  const reconnectWaitingLoggedRef = useRef(false);
 
   const baudRateKey = `last_baud_rate_${index}`;
 
@@ -64,8 +68,20 @@ export const useSerial = (index: number = 0) => {
     }
   }, [addLog]);
 
+  const clearReconnectTimer = useCallback(() => {
+    if (reconnectTimerRef.current) {
+      window.clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    }
+  }, []);
+
   const disconnect = useCallback(async (isHardwareLoss = false) => {
     try {
+      if (!isHardwareLoss) {
+        shouldReconnectRef.current = false;
+        clearReconnectTimer();
+      }
+
       flushBuffer();
       
       if (readerRef.current) {
@@ -85,6 +101,7 @@ export const useSerial = (index: number = 0) => {
       }
 
       if (portRef.current) {
+        lastPortRef.current = portRef.current;
         try {
           await portRef.current.close().catch(() => {});
         } catch (e) {}
@@ -93,6 +110,7 @@ export const useSerial = (index: number = 0) => {
       
       setStatus('disconnected');
       if (isHardwareLoss) {
+        shouldReconnectRef.current = true;
         addLog(`Monitor ${index + 1} - Hardware Disconnected: Device link lost.`, 'error');
       } else {
         addLog(`Monitor ${index + 1} - Disconnected safely.`, 'info');
@@ -101,7 +119,7 @@ export const useSerial = (index: number = 0) => {
       console.error("Cleanup error:", e);
       setStatus('disconnected');
     }
-  }, [addLog, flushBuffer, index]);
+  }, [addLog, clearReconnectTimer, flushBuffer, index]);
 
   const startReading = useCallback(async (selectedPort: any) => {
     if (!selectedPort || !selectedPort.readable) return;
@@ -178,6 +196,10 @@ export const useSerial = (index: number = 0) => {
       
       localStorage.setItem(baudRateKey, options.baudRate.toString());
       portRef.current = selectedPort;
+      lastPortRef.current = selectedPort;
+      shouldReconnectRef.current = true;
+      reconnectWaitingLoggedRef.current = false;
+      clearReconnectTimer();
       
       if (selectedPort.writable) {
         writerRef.current = selectedPort.writable.getWriter();
@@ -196,7 +218,47 @@ export const useSerial = (index: number = 0) => {
       setError(err.message || 'Connection failed.');
       setStatus('disconnected');
     }
-  }, [addLog, startReading, disconnect, index, baudRateKey]);
+  }, [addLog, clearReconnectTimer, startReading, disconnect, index, baudRateKey]);
+
+  const reconnectToLastPort = useCallback(async (port?: any) => {
+    if (!('serial' in navigator) || isAutoConnecting.current || portRef.current || !shouldReconnectRef.current) return;
+
+    try {
+      isAutoConnecting.current = true;
+      const ports = await (navigator as any).serial.getPorts();
+      const rememberedPort = lastPortRef.current && ports.includes(lastPortRef.current) ? lastPortRef.current : null;
+      const savedPort = port || rememberedPort || ports[index];
+      if (!savedPort) return;
+      if (!port && !ports.includes(savedPort)) return;
+
+      const savedBaud = localStorage.getItem(baudRateKey);
+      const baudRate = savedBaud ? parseInt(savedBaud) : 9600;
+      await connect({ baudRate }, savedPort);
+    } catch (e) {
+      console.warn(`Auto-reconnection for monitor ${index + 1} failed:`, e);
+    } finally {
+      isAutoConnecting.current = false;
+    }
+  }, [baudRateKey, connect, index]);
+
+  const scheduleReconnectToLastPort = useCallback(() => {
+    if (!shouldReconnectRef.current) return;
+    clearReconnectTimer();
+    reconnectTimerRef.current = window.setTimeout(() => {
+      reconnectTimerRef.current = null;
+      void reconnectToLastPort().finally(() => {
+        if (!portRef.current && shouldReconnectRef.current) {
+          scheduleReconnectToLastPort();
+        }
+      });
+    }, 2000);
+  }, [clearReconnectTimer, reconnectToLastPort]);
+
+  useEffect(() => {
+    if (status === 'disconnected' && shouldReconnectRef.current) {
+      scheduleReconnectToLastPort();
+    }
+  }, [scheduleReconnectToLastPort, status]);
 
   // Handle Auto-Reconnection on mount
   useEffect(() => {
@@ -204,43 +266,63 @@ export const useSerial = (index: number = 0) => {
       if (!('serial' in navigator) || isAutoConnecting.current) return;
       
       try {
-        isAutoConnecting.current = true;
         const ports = await (navigator as any).serial.getPorts();
-        
-        // If we have authorized ports, try to reconnect to the one at our index
         if (ports.length > index) {
-          const savedBaud = localStorage.getItem(baudRateKey);
-          const baudRate = savedBaud ? parseInt(savedBaud) : 9600;
-          
-          await connect({ baudRate }, ports[index]);
+          shouldReconnectRef.current = true;
+          lastPortRef.current = ports[index];
+          await reconnectToLastPort(ports[index]);
         }
       } catch (e) {
         console.warn(`Auto-reconnection for monitor ${index + 1} failed:`, e);
-      } finally {
-        isAutoConnecting.current = false;
       }
     };
 
     tryAutoConnect();
-  }, [index, baudRateKey, connect]);
+  }, [index, reconnectToLastPort]);
 
   useEffect(() => {
     const handleDisconnect = (event: any) => {
       if (portRef.current && event.port === portRef.current) {
-        disconnect(true);
+        if (!reconnectWaitingLoggedRef.current) {
+          reconnectWaitingLoggedRef.current = true;
+          addLog(`Monitor ${index + 1} - Waiting for serial device to reconnect.`, 'info');
+        }
+        void disconnect(true).finally(() => {
+          scheduleReconnectToLastPort();
+        });
       }
+    };
+
+    const handleConnect = (event: any) => {
+      window.setTimeout(async () => {
+        if (!shouldReconnectRef.current || portRef.current) return;
+
+        const ports = await (navigator as any).serial.getPorts().catch(() => []);
+        const eventPortIndex = ports.indexOf(event.port);
+        const isKnownPort = event.port === lastPortRef.current;
+        const isMonitorSlotPort = eventPortIndex === index;
+        const isUnclaimedMonitorPort = !lastPortRef.current && eventPortIndex === index;
+
+        if (isKnownPort || isMonitorSlotPort || isUnclaimedMonitorPort) {
+          lastPortRef.current = event.port;
+          void reconnectToLastPort(event.port);
+        }
+      }, 300);
     };
 
     if ('serial' in navigator) {
       (navigator as any).serial.addEventListener('disconnect', handleDisconnect);
+      (navigator as any).serial.addEventListener('connect', handleConnect);
     }
 
     return () => {
       if ('serial' in navigator) {
         (navigator as any).serial.removeEventListener('disconnect', handleDisconnect);
+        (navigator as any).serial.removeEventListener('connect', handleConnect);
       }
+      clearReconnectTimer();
     };
-  }, [disconnect]);
+  }, [clearReconnectTimer, disconnect, reconnectToLastPort, scheduleReconnectToLastPort]);
 
   return { status, logs, connect, disconnect: () => disconnect(false), write, error };
 };

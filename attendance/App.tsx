@@ -154,9 +154,12 @@ function App() {
   const [unknownTags, setUnknownTags] = useState<(string | null)[]>([null, null, null]);
   const [kioskSmsTestEnabled, setKioskSmsTestEnabled] = useState(false);
   const [kioskSmsTestAction, setKioskSmsTestAction] = useState<AttendanceSmsTestModeAction>('entry');
+  const [isLearnerRegistrationOpen, setIsLearnerRegistrationOpen] = useState(false);
   
   const lastProcessedIds = useRef<(string | null)[]>([null, null, null]);
   const idleTimers = useRef<(number | null)[]>([null, null, null]);
+  const previousMonitorStatuses = useRef(monitors.map((monitor) => monitor.status));
+  const lastDisconnectEmailAt = useRef<number[]>([0, 0, 0]);
   const usbRfidBufferRef = useRef('');
   const usbRfidTimerRef = useRef<number | null>(null);
   const restoredAttendancePath = useMemo(() => {
@@ -175,6 +178,58 @@ function App() {
       })),
     [monitor1.logs, monitor1.status, monitor2.logs, monitor2.status, monitor3.logs, monitor3.status],
   );
+
+  const openKioskFromReaderTap = useCallback(() => {
+    const currentPath = resolveAttendancePath(`${location.pathname}${location.search}${location.hash}`, ATTENDANCE_DEFAULT_PATH);
+    window.localStorage.setItem(ATTENDANCE_LAST_NON_KIOSK_PATH_KEY, currentPath);
+    navigate(ATTENDANCE_KIOSK_PATH);
+  }, [location.hash, location.pathname, location.search, navigate]);
+
+  useEffect(() => {
+    monitors.forEach((monitor, index) => {
+      const previousStatus = previousMonitorStatuses.current[index];
+      const latestError = [...monitor.logs].reverse().find((log) => log.type === 'error');
+      const isHardwareDisconnect =
+        previousStatus === 'connected' &&
+        monitor.status === 'disconnected' &&
+        Boolean(latestError?.text.toLowerCase().includes('hardware disconnected'));
+
+      if (!isHardwareDisconnect) {
+        previousMonitorStatuses.current[index] = monitor.status;
+        return;
+      }
+
+      const now = Date.now();
+      if (now - lastDisconnectEmailAt.current[index] < 5 * 60 * 1000) {
+        previousMonitorStatuses.current[index] = monitor.status;
+        return;
+      }
+
+      lastDisconnectEmailAt.current[index] = now;
+      previousMonitorStatuses.current[index] = monitor.status;
+
+      void fetch('/api/kiosk-disconnect-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          stationName: `Monitor ${index + 1}`,
+          status: monitor.status,
+          occurredAt: new Date(now).toISOString(),
+          details: latestError?.text || `Monitor ${index + 1} serial device disconnected.`,
+        }),
+      })
+        .then(async (response) => {
+          if (response.ok) return;
+          const payload = await response.json().catch(() => null);
+          console.warn(`Monitor ${index + 1} disconnect email notification was not sent:`, payload || response.statusText);
+        })
+        .catch((error) => {
+          console.warn(`Monitor ${index + 1} disconnect email notification failed:`, error);
+        });
+    });
+  }, [monitor1.logs, monitor1.status, monitor2.logs, monitor2.status, monitor3.logs, monitor3.status]);
 
   const handleRegistrarRfidCapture = useCallback((value: string) => {
     const scannedUid = extractUid(value) || normalizeRfidValue(value);
@@ -207,8 +262,13 @@ function App() {
     const scannedUid = extractUid(latestReaderSignal?.text || '');
     if (!scannedUid || scannedUid === activeRfid) return;
 
+    if (!isLearnerRegistrationOpen) {
+      openKioskFromReaderTap();
+      return;
+    }
+
     handleRegistrarRfidCapture(scannedUid);
-  }, [activeRfid, handleRegistrarRfidCapture, isKioskRoute, readerDiagnostics]);
+  }, [activeRfid, handleRegistrarRfidCapture, isKioskRoute, isLearnerRegistrationOpen, openKioskFromReaderTap, readerDiagnostics]);
 
   useEffect(() => {
     if (!selectedLearnerId) return;
@@ -375,10 +435,14 @@ function App() {
           startIdleTimer(index);
         }
       } else {
+        if (!isLearnerRegistrationOpen) {
+          openKioskFromReaderTap();
+          return;
+        }
         handleRegistrarRfidCapture(scannedUid);
       }
     });
-  }, [monitor1.logs, monitor2.logs, monitor3.logs, isKioskRoute, uidMappings, adminUids, learners, scheduleConfig, logAttendance, attendanceLogs, navigate, smsSettings, smsRecipientState, enqueueSmsRequests, kioskSmsTestEnabled, kioskSmsTestAttendanceType, kioskSmsTestAction, handleRegistrarRfidCapture]);
+  }, [monitor1.logs, monitor2.logs, monitor3.logs, isKioskRoute, uidMappings, adminUids, learners, scheduleConfig, logAttendance, attendanceLogs, navigate, smsSettings, smsRecipientState, enqueueSmsRequests, kioskSmsTestEnabled, kioskSmsTestAttendanceType, kioskSmsTestAction, handleRegistrarRfidCapture, isLearnerRegistrationOpen, openKioskFromReaderTap]);
 
   useEffect(() => {
     const hasActive = lastScanResults.some(r => r !== null) || unknownTags.some(t => t !== null);
@@ -504,6 +568,11 @@ function App() {
         return;
       }
 
+      if (!isLearnerRegistrationOpen) {
+        openKioskFromReaderTap();
+        return;
+      }
+
       handleRegistrarRfidCapture(scannedUid);
     };
 
@@ -530,7 +599,7 @@ function App() {
       window.removeEventListener('keydown', onKeyDown, true);
       clearUsbTimer();
     };
-  }, [adminUids, attendanceLogs, isKioskRoute, learners, logAttendance, scheduleConfig, uidMappings, navigate, smsSettings, smsRecipientState, enqueueSmsRequests, kioskSmsTestEnabled, kioskSmsTestAttendanceType, handleRegistrarRfidCapture]);
+  }, [adminUids, attendanceLogs, isKioskRoute, learners, logAttendance, scheduleConfig, uidMappings, navigate, smsSettings, smsRecipientState, enqueueSmsRequests, kioskSmsTestEnabled, kioskSmsTestAttendanceType, handleRegistrarRfidCapture, isLearnerRegistrationOpen, openKioskFromReaderTap]);
 
   const handleSaveMapping = async () => {
     if (!selectedLearnerId || !activeRfid || conflictWarning) return;
@@ -610,6 +679,20 @@ function App() {
       window.localStorage.setItem(ATTENDANCE_LAST_NON_KIOSK_PATH_KEY, currentPath);
     }
   }, [isKioskRoute, isTeacherRoute, location.hash, location.pathname, location.search]);
+
+  useEffect(() => {
+    const shouldWarnBeforeExit = Boolean(access || teacherAccess || isKioskRoute);
+    if (!shouldWarnBeforeExit) return;
+
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = 'Attendance kiosk is still running.';
+      return 'Attendance kiosk is still running.';
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload, { capture: true });
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload, { capture: true });
+  }, [access, teacherAccess, isKioskRoute]);
 
   if (isKioskRoute) {
     return (
@@ -889,6 +972,7 @@ function App() {
                           onReaderValueChange={handleRegistrarRfidCapture}
                           onLoadRoster={() => void loadLearners()}
                           onRegisterLearner={registerLearner}
+                          onRegistrationModalOpenChange={setIsLearnerRegistrationOpen}
                           isLoading={isLoading}
                           isSearching={searchQuery.trim().length > 0}
                           isSyncing={isSyncing}

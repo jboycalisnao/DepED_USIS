@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Learner } from '../types';
 import ConfirmationModal from './ConfirmationModal';
 import UsisInlineLoader from './ui/UsisInlineLoader';
@@ -19,6 +19,7 @@ interface LearnerDirectoryProps {
   onSelect: (id: string | null) => void;
   onUnlink: (id: string) => void;
   onReaderValueChange: (value: string) => void;
+  onRegistrationModalOpenChange?: (isOpen: boolean) => void;
   onLoadRoster: () => void;
   onRegisterLearner: (payload: RegisterLearnerPayload) => Promise<{ ok: boolean; error?: string }>;
   isLoading: boolean;
@@ -161,6 +162,7 @@ const LearnerDirectory: React.FC<LearnerDirectoryProps> = ({
   onSelect,
   onUnlink,
   onReaderValueChange,
+  onRegistrationModalOpenChange,
   onLoadRoster,
   onRegisterLearner,
   isLoading,
@@ -176,6 +178,13 @@ const LearnerDirectory: React.FC<LearnerDirectoryProps> = ({
   const [isRegistering, setIsRegistering] = useState(false);
   const [isUnlinking, setIsUnlinking] = useState(false);
   const [registerError, setRegisterError] = useState<string | null>(null);
+
+  useEffect(() => {
+    onRegistrationModalOpenChange?.(isRegisterOpen);
+    return () => {
+      onRegistrationModalOpenChange?.(false);
+    };
+  }, [isRegisterOpen, onRegistrationModalOpenChange]);
 
   const handleOpenRegister = (learnerId: string) => {
     onSelect(learnerId);

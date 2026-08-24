@@ -125,3 +125,23 @@ The learner portal attendance service now shows:
 Recommended archive schedule:
 
 - Daily during off-hours, or whenever the raw retention window should be cleared.
+
+## Kiosk Serial Disconnect Email Alerts
+
+The attendance kiosk can send an email when a serial RFID monitor loses its hardware connection. Credentials stay server-side in environment variables and are sent through the `/api/kiosk-disconnect-email` API route.
+
+The alert is sent only after a monitor was connected and then reports hardware loss. Manual OFF actions do not send email. Each monitor is throttled to one disconnect email every five minutes.
+
+### Gmail SMTP env vars
+
+```env
+ATTENDANCE_SMTP_HOST=smtp.gmail.com
+ATTENDANCE_SMTP_PORT=465
+ATTENDANCE_SMTP_SECURE=auto
+ATTENDANCE_SMTP_USER=school.account@gmail.com
+ATTENDANCE_SMTP_APP_PASSWORD=replace-with-google-app-password
+ATTENDANCE_SMTP_FROM=school.account@gmail.com
+ATTENDANCE_KIOSK_ALERT_RECIPIENTS=recipient@example.com
+```
+
+Use `ATTENDANCE_SMTP_PASSWORD` instead of `ATTENDANCE_SMTP_APP_PASSWORD` if your deployment secret naming standard prefers it. `ATTENDANCE_KIOSK_ALERT_RECIPIENTS` accepts multiple addresses separated by commas or semicolons. `ATTENDANCE_SMTP_SECURE=auto` uses implicit TLS for port `465` and STARTTLS for port `587`.

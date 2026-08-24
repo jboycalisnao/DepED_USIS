@@ -1,6 +1,7 @@
 import path from 'path';
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
+import { parseSmtpRecipients, resolveSmtpSecure, sendSmtpMail } from './server/smtpMailer';
 
 const DEFAULT_SKYSMS_URL = 'https://skysms.skyio.site/api/v1/sms/send';
 const SKYSMS_USER_AGENT = 'DepED-USIS-Attendance/1.0 (local-dev; school-sms-notification)';
@@ -146,15 +147,111 @@ const smsNotificationDevProxy = () => ({
   },
 });
 
+const readRequestBody = (req: any) =>
+  new Promise<string>((resolve, reject) => {
+    let raw = '';
+    req.on('data', (chunk: Buffer) => {
+      raw += chunk.toString('utf8');
+    });
+    req.on('end', () => resolve(raw));
+    req.on('error', reject);
+  });
+
+const emailNotificationDevProxy = (env: Record<string, string>) => ({
+  name: 'attendance-kiosk-disconnect-email-dev-proxy',
+  configureServer(server: any) {
+    server.middlewares.use('/api/kiosk-disconnect-email', async (req: any, res: any, next: any) => {
+      if (req.method !== 'POST') return next();
+
+      try {
+        const bodyText = await readRequestBody(req);
+        const body = bodyText ? JSON.parse(bodyText) : {};
+        const host = normalize(env.ATTENDANCE_SMTP_HOST || 'smtp.gmail.com');
+        const port = Number(env.ATTENDANCE_SMTP_PORT || 465);
+        const secure = resolveSmtpSecure(env.ATTENDANCE_SMTP_SECURE, port);
+        const username = normalize(env.ATTENDANCE_SMTP_USER);
+        const password = normalize(env.ATTENDANCE_SMTP_PASSWORD || env.ATTENDANCE_SMTP_APP_PASSWORD);
+        const from = normalize(env.ATTENDANCE_SMTP_FROM || username);
+        const recipients = parseSmtpRecipients(
+          normalize(env.ATTENDANCE_KIOSK_ALERT_RECIPIENTS || env.ATTENDANCE_KIOSK_ALERT_RECIPIENT),
+        );
+        const missing = [
+          !host ? 'ATTENDANCE_SMTP_HOST' : '',
+          !port ? 'ATTENDANCE_SMTP_PORT' : '',
+          !username ? 'ATTENDANCE_SMTP_USER' : '',
+          !password ? 'ATTENDANCE_SMTP_PASSWORD or ATTENDANCE_SMTP_APP_PASSWORD' : '',
+          !from ? 'ATTENDANCE_SMTP_FROM' : '',
+          recipients.length === 0 ? 'ATTENDANCE_KIOSK_ALERT_RECIPIENTS' : '',
+        ].filter(Boolean);
+
+        if (missing.length > 0) {
+          res.statusCode = 503;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({
+            ok: false,
+            message: 'Kiosk email notification is not configured.',
+            missing,
+          }));
+          return;
+        }
+
+        const stationName = normalize(body.stationName) || 'Attendance kiosk';
+        const status = normalize(body.status) || 'disconnected';
+        const occurredAt = normalize(body.occurredAt) || new Date().toISOString();
+        const details = normalize(body.details) || 'The kiosk serial device link was lost.';
+
+        await sendSmtpMail({
+          host,
+          port,
+          secure,
+          username,
+          password,
+          from,
+          to: recipients,
+          subject: `[DepED USIS Attendance] ${stationName} serial device disconnected`,
+          text: [
+            'DepED USIS Attendance Kiosk Alert',
+            '',
+            `Station: ${stationName}`,
+            `Status: ${status}`,
+            `Time: ${occurredAt}`,
+            '',
+            details,
+            '',
+            'Check the kiosk computer, USB cable, RFID reader, and Arduino/serial device connection.',
+          ].join('\n'),
+        });
+
+        res.statusCode = 200;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({
+          ok: true,
+          message: 'Kiosk disconnect email notification sent.',
+        }));
+      } catch (error: any) {
+        res.statusCode = 500;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({
+          ok: false,
+          message: 'Unable to send kiosk disconnect email notification.',
+          details: error?.message || String(error),
+        }));
+      }
+    });
+  },
+});
+
 export default defineConfig(({ mode }) => {
-    const env = loadEnv(mode, '..', '');
+    const rootEnv = loadEnv(mode, '..', '');
+    const attendanceEnv = loadEnv(mode, '.', '');
+    const env = { ...rootEnv, ...attendanceEnv };
     return {
       envDir: '..',
       server: {
         port: 3000,
         host: '0.0.0.0',
       },
-      plugins: [react(), smsNotificationDevProxy()],
+      plugins: [react(), smsNotificationDevProxy(), emailNotificationDevProxy(env)],
       define: {
         'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
         'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)
