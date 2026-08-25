@@ -18,10 +18,12 @@
     "registrar",
     "repository",
     "support",
+    "attendance-kiosk-shell",
     "packages/*"
   ],
   "scripts": {
     "dev:attendance": "npm run dev --workspace ./attendance",
+    "dev:attendance-kiosk-shell": "npm run dev --workspace ./attendance-kiosk-shell",
     "dev:coordinator": "npm run dev --workspace ./coordinator",
     "dev:deped-web-kit": "npm run dev --workspace ./deped-web-kit",
     "dev:data-privacy": "npm run dev --workspace ./data-privacy",
@@ -40,6 +42,7 @@
     "dev:repository": "npm run dev --workspace ./repository",
     "dev:support": "npm run dev --workspace ./support",
     "build:attendance": "npm run build --workspace ./attendance",
+    "build:attendance-kiosk-shell": "npm run build --workspace ./attendance-kiosk-shell",
     "build:coordinator": "npm run build --workspace ./coordinator",
     "build:deped-web-kit": "npm run build --workspace ./deped-web-kit",
     "build:data-privacy": "npm run build --workspace ./data-privacy",
@@ -397,9 +400,9 @@
     "sp-portal": "^0.1.0",
     "spta-management-system": "^1.0.0",
     "ssf": "^0.11.2",
+    "string_decoder": "^1.3.0",
     "string-convert": "^0.2.1",
     "string-width": "^4.2.3",
-    "string_decoder": "^1.3.0",
     "strip-ansi": "^6.0.1",
     "stylis": "^4.4.0",
     "sucrase": "^3.35.1",
@@ -458,7 +461,9 @@
     "zip-stream": "^4.1.1",
     "zod": "^3.22.4"
   },
-  "devDependencies": {},
+  "devDependencies": {
+    "app-builder-bin": "^5.0.0-alpha.10"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC"

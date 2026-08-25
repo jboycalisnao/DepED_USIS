@@ -187,11 +187,14 @@ export const useSerial = (index: number = 0) => {
       setError(null);
       setStatus('connecting');
 
+      const isKioskShell = Boolean((window as any).usisKioskShell);
       const selectedPort =
         existingPort ||
-        await (navigator as any).serial.requestPort({
-          filters: SERIAL_PORT_FILTERS,
-        });
+        await (navigator as any).serial.requestPort(
+          isKioskShell
+            ? undefined
+            : { filters: SERIAL_PORT_FILTERS },
+        );
       await selectedPort.open({ baudRate: options.baudRate });
       
       localStorage.setItem(baudRateKey, options.baudRate.toString());

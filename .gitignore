@@ -5,6 +5,7 @@ node_modules/
 dist/
 dist-ssr/
 coverage/
+attendance-kiosk-shell/release/
 
 # Logs
 logs/

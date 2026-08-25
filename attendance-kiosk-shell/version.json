@@ -1,0 +1,7 @@
+{
+  "appId": "ph.edu.deped-usis.attendance-kiosk",
+  "name": "attendance-kiosk-shell",
+  "productName": "DepED USIS Attendance Kiosk",
+  "version": "0.1.0",
+  "defaultKioskUrl": "https://attendance.leonnhs.edu.ph/attendance/kiosk"
+}

@@ -25,6 +25,7 @@ import { useSmsNotificationQueue } from './features/sms/hooks/useSmsNotification
 import {
   clearStoredAttendanceAccess,
   getStoredAttendanceAccess,
+  resolveAttendanceAccess,
   type AttendanceAccessRecord,
 } from './features/auth/utils/attendanceAccess';
 import {
@@ -63,6 +64,11 @@ function App() {
   const [access, setAccess] = useState<AttendanceAccessRecord | null>(() => getStoredAttendanceAccess());
   const [teacherAccess, setTeacherAccess] = useState<TeacherAttendanceAccessRecord | null>(() => getStoredTeacherAttendanceAccess());
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [shellExitAuthOpen, setShellExitAuthOpen] = useState(false);
+  const [shellExitUsername, setShellExitUsername] = useState('');
+  const [shellExitPassword, setShellExitPassword] = useState('');
+  const [shellExitError, setShellExitError] = useState<string | null>(null);
+  const [isShellExitChecking, setIsShellExitChecking] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
@@ -694,6 +700,101 @@ function App() {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload, { capture: true });
   }, [access, teacherAccess, isKioskRoute]);
 
+  useEffect(() => {
+    const shellApi = (window as any).usisKioskShell;
+    if (!shellApi?.onExitAuthRequest) return;
+
+    return shellApi.onExitAuthRequest(() => {
+      setShellExitError(null);
+      setShellExitPassword('');
+      setShellExitAuthOpen(true);
+    });
+  }, []);
+
+  const shellExitAuthModal = shellExitAuthOpen ? (
+    <div className="modal-overlay modal-overlay--high" role="presentation">
+      <div className="modal-backdrop" aria-hidden="true" />
+      <form
+        className="modal-dialog max-w-md"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="attendance-shell-exit-title"
+        onSubmit={async (event) => {
+          event.preventDefault();
+          setIsShellExitChecking(true);
+          setShellExitError(null);
+          const result = await resolveAttendanceAccess(shellExitUsername, shellExitPassword);
+          setIsShellExitChecking(false);
+
+          if (result.error || !result.record) {
+            setShellExitError(result.error || 'Invalid attendance credentials.');
+            return;
+          }
+
+          setShellExitAuthOpen(false);
+          setShellExitUsername('');
+          setShellExitPassword('');
+          (window as any).usisKioskShell?.approveExit?.();
+        }}
+      >
+        <div className="modal-dialog__header">
+          <div className="modal-dialog__title-group">
+            <p className="modal-dialog__eyebrow">Kiosk Shell</p>
+            <h3 id="attendance-shell-exit-title">Authorize Window Close</h3>
+          </div>
+        </div>
+        <div className="modal-dialog__body">
+          <div className="form-grid">
+            <label className="floating-field">
+              <div className="floating-field__control" data-has-value={shellExitUsername.trim() ? 'true' : 'false'}>
+                <input
+                  type="text"
+                  value={shellExitUsername}
+                  onChange={(event) => setShellExitUsername(event.target.value)}
+                  autoComplete="username"
+                  placeholder=" "
+                  autoFocus
+                />
+                <span>Username</span>
+              </div>
+            </label>
+            <label className="floating-field">
+              <div className="floating-field__control" data-has-value={shellExitPassword ? 'true' : 'false'}>
+                <input
+                  type="password"
+                  value={shellExitPassword}
+                  onChange={(event) => setShellExitPassword(event.target.value)}
+                  autoComplete="current-password"
+                  placeholder=" "
+                />
+                <span>Password</span>
+              </div>
+            </label>
+          </div>
+          {shellExitError ? <p className="attendance-manual-modal__error">{shellExitError}</p> : null}
+        </div>
+        <div className="modal-dialog__actions">
+          <button
+            type="button"
+            className="modal-dialog__secondary"
+            disabled={isShellExitChecking}
+            onClick={() => {
+              setShellExitAuthOpen(false);
+              setShellExitError(null);
+              setShellExitPassword('');
+              (window as any).usisKioskShell?.denyExit?.();
+            }}
+          >
+            Keep Kiosk Open
+          </button>
+          <button type="submit" className="modal-dialog__blue" disabled={isShellExitChecking}>
+            {isShellExitChecking ? 'Checking...' : 'Close Window'}
+          </button>
+        </div>
+      </form>
+    </div>
+  ) : null;
+
   if (isKioskRoute) {
     return (
       <>
@@ -712,6 +813,7 @@ function App() {
           onSmsTestModeEnabledChange={setKioskSmsTestEnabled}
           onSmsTestModeActionChange={setKioskSmsTestAction}
         />
+        {shellExitAuthModal}
       </>
     );
   }
@@ -726,6 +828,7 @@ function App() {
               setTeacherAccess(record);
             }}
           />
+          {shellExitAuthModal}
         </>
       );
     }
@@ -747,6 +850,7 @@ function App() {
           }}
           queryAttendanceRecordsByRange={queryAttendanceRecordsByRange}
         />
+        {shellExitAuthModal}
       </div>
     );
   }
@@ -756,6 +860,7 @@ function App() {
       <>
         <UsisPortalGate moduleKey="attendance" />
         <AttendanceLandingPage onAuthenticated={setAccess} />
+        {shellExitAuthModal}
       </>
     );
   }
@@ -1047,6 +1152,7 @@ function App() {
       </div>
 
       <UsisGlobalFooter />
+      {shellExitAuthModal}
     </div>
   );
 }

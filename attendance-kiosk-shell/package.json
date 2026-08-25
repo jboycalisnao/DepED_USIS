@@ -1,0 +1,53 @@
+{
+  "name": "attendance-kiosk-shell",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Electron kiosk wrapper for the DepED USIS attendance kiosk.",
+  "author": "DepED USIS",
+  "main": "src/main.cjs",
+  "scripts": {
+    "dev": "electron .",
+    "sync-version": "node scripts/sync-version.cjs",
+    "build": "npm run sync-version && electron-builder --win nsis",
+    "pack": "npm run sync-version && electron-builder --dir"
+  },
+  "devDependencies": {
+    "app-builder-bin": "^5.0.0-alpha.10",
+    "electron": "33.4.11",
+    "electron-builder": "25.1.8",
+    "rcedit": "^4.0.1"
+  },
+  "build": {
+    "appId": "ph.edu.deped-usis.attendance-kiosk",
+    "productName": "DepED USIS Attendance Kiosk",
+    "afterPack": "scripts/stamp-windows-icon.cjs",
+    "npmRebuild": false,
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "src/**/*",
+      "build/**/*",
+      "version.json",
+      "package.json"
+    ],
+    "win": {
+      "icon": "build/icon.ico",
+      "signAndEditExecutable": false,
+      "target": [
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "include": "build/installer.nsh",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "artifactName": "${productName} Setup ${version}.${ext}",
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  }
+}
