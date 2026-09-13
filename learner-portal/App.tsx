@@ -26,11 +26,13 @@ import { PtaFeeServicePage } from './features/portal/pages/services/PtaFeeServic
 import { MerchServicePage } from './features/portal/pages/services/MerchServicePage';
 import { MerchControlServicePage } from './features/portal/pages/services/MerchControlServicePage';
 import { IdServicePage } from './features/portal/pages/services/IdServicePage';
+import { MicrosoftAccountServicePage } from './features/portal/pages/services/MicrosoftAccountServicePage';
 import { LearnerLoginPage } from './features/auth/pages/LearnerLoginPage';
 import { LearnerCredentialPage } from './features/auth/pages/LearnerCredentialPage';
 import { UsisPortalGate } from '../common/components/UsisPortalGate';
 import { LearnerPortalSeo } from './components/ui/LearnerPortalSeo';
 import { LearnerPortalNotificationsTrigger } from './features/portal/components/LearnerPortalNotificationsTrigger';
+import { UsisAlertModal } from '../common/components/UsisAlertModal';
 
 const LEARNER_PORTAL_BASENAME = '/learner-portal';
 const LEARNER_PORTAL_RETURN_TO_KEY = 'learner_portal_return_to';
@@ -45,6 +47,7 @@ const PRIVATE_LEARNER_PATHS = new Set([
   '/services/document-requests',
   '/services/student-support',
   '/services/help-ticket',
+  '/services/microsoft-account',
   '/services/pta-fee',
   '/services/merch',
   '/services/id',
@@ -180,6 +183,7 @@ function LearnerPortalShell({
                 <Route path="/services/document-requests" element={<DocumentRequestsServicePage />} />
                 <Route path="/services/student-support" element={<StudentSupportServicePage />} />
                 <Route path="/services/help-ticket" element={<LearnerHelpTicketServicePage session={session} />} />
+                <Route path="/services/microsoft-account" element={<MicrosoftAccountServicePage session={session} />} />
                 <Route path="/services/pta-fee" element={<PtaFeeServicePage session={session} />} />
                 <Route path="/services/merch" element={<MerchServicePage session={session} />} />
                 <Route path="/services/id" element={<IdServicePage session={session} />} />
@@ -220,6 +224,7 @@ function LearnerPortalAppContent() {
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
+  const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
 
   useEffect(() => {
     if (session) return;
@@ -266,11 +271,16 @@ function LearnerPortalAppContent() {
     setIsSubmitting(false);
   };
 
-  const handleLogout = () => {
+  const executeLogout = () => {
     clearStoredLearnerAccess();
     clearLearnerPortalCache();
     setSession(null);
+    setIsLogoutConfirmOpen(false);
     navigate('/login', { replace: true });
+  };
+
+  const handleLogout = () => {
+    setIsLogoutConfirmOpen(true);
   };
 
   const currentPath = `${location.pathname}${location.search}${location.hash}`;
@@ -309,6 +319,17 @@ function LearnerPortalAppContent() {
       ) : (
         <LearnerPortalShell session={session} onLogout={handleLogout} />
       )}
+
+      <UsisAlertModal
+        open={isLogoutConfirmOpen}
+        title="Confirm Logout"
+        message="Log out of your learner portal account?"
+        tone="warning"
+        confirmLabel="Log Out"
+        cancelLabel="Stay Signed In"
+        onClose={() => setIsLogoutConfirmOpen(false)}
+        onConfirm={executeLogout}
+      />
     </div>
   );
 }

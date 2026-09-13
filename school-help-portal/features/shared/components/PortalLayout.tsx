@@ -14,7 +14,7 @@ export function PortalLayout() {
       <header className="site-chrome">
         <div className="content-width">
           <UsisUnifiedHeader homeHref="/" />
-          <nav className="kit-nav school-help-portal-nav" aria-label="School Help Portal sections">
+          <nav className="kit-nav school-help-portal-nav" aria-label="School Helpdesk Portal sections">
             <div className="kit-nav__grid">
               {navItems.map((item) => (
                 <NavLink key={item.to} to={item.to} className={({ isActive }) => `kit-nav__link${isActive ? ' kit-nav__link--active' : ''}`}>

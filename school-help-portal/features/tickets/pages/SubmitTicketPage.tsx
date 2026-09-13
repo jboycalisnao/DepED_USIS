@@ -82,7 +82,7 @@ export function SubmitTicketPage() {
   return (
     <section className="section-shell">
       <div className="page-intro">
-        <p className="page-intro__eyebrow">School Help Portal</p>
+        <p className="page-intro__eyebrow">School Helpdesk Portal</p>
         <h1>Submit a learner help ticket.</h1>
         <p>Use the learner LRN to file a concern, then keep the generated reference number for follow-up.</p>
       </div>

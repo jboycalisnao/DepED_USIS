@@ -39,6 +39,12 @@ const BASE_SERVICES: LearnerServiceItem[] = [
     actionLabel: 'Open Ticket',
   },
   {
+    title: 'Microsoft Account',
+    description: 'View your school Microsoft email status or create one if none is linked yet.',
+    path: '/services/microsoft-account',
+    actionLabel: 'Open Account',
+  },
+  {
     title: 'PTA Fee',
     description: 'PTA fee services are temporarily unavailable and will reopen soon.',
     path: '/services/pta-fee',

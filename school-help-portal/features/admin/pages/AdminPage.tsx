@@ -321,7 +321,7 @@ export function AdminPage() {
       {!session ? (
         <UsisLoginModal
           moduleKey="school_help_portal"
-          title="School Help Portal Admin"
+          title="School Helpdesk Portal Admin"
           username={username}
           password={password}
           isSubmitting={isSubmitting}
