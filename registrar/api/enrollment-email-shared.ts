@@ -15,8 +15,8 @@ const DEFAULT_STATUS_URL = 'https://enroll.leonnhs.edu.ph/submission-status';
 export const normalize = (value: unknown) => String(value ?? '').trim();
 
 export const getSupabaseAdmin = () => {
-  const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+  const supabaseUrl = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').trim().replace(/^["']|["']$/g, '');
+  const serviceRoleKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim().replace(/^["']|["']$/g, '');
   if (!supabaseUrl || !serviceRoleKey) {
     throw new Error('Supabase service-role credentials are missing.');
   }

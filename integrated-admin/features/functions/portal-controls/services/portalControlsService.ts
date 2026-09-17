@@ -42,6 +42,7 @@ const DEFAULT_ROWS: Array<Pick<PortalControlRow, 'module_key' | 'module_label'>>
   { module_key: 'merch', module_label: 'Merch' },
   { module_key: 'election', module_label: 'Election' },
   { module_key: 'sp_portal', module_label: 'SP Portal' },
+  { module_key: 'srcy', module_label: 'SRCY Hub' },
   { module_key: 'registrar', module_label: 'Registrar' },
   { module_key: 'help_admin', module_label: 'Help Desk Admin' },
   { module_key: 'support', module_label: 'Support' },

@@ -6,12 +6,29 @@ const session = electron.session || electron.default?.session;
 const dialog = electron.dialog || electron.default?.dialog;
 const path = require('node:path');
 
+const fs = require('node:fs');
+
 if (!app || !BrowserWindow || !ipcMain || !session || !dialog) {
   throw new Error('Electron main-process APIs are unavailable.');
 }
 
+function getKioskUrl() {
+  if (process.env.ATTENDANCE_KIOSK_URL) {
+    return process.env.ATTENDANCE_KIOSK_URL;
+  }
+  const embeddedDist = path.join(__dirname, '..', 'dist', 'index.html');
+  if (fs.existsSync(embeddedDist)) {
+    return `file://${embeddedDist}#/kiosk`;
+  }
+  const localDist = path.join(__dirname, '..', '..', 'attendance', 'dist', 'index.html');
+  if (fs.existsSync(localDist)) {
+    return `file://${localDist}#/kiosk`;
+  }
+  return 'https://attendance.leonnhs.edu.ph/attendance/kiosk';
+}
+
 const DEFAULT_KIOSK_URL = 'https://attendance.leonnhs.edu.ph/attendance/kiosk';
-const KIOSK_URL = process.env.ATTENDANCE_KIOSK_URL || DEFAULT_KIOSK_URL;
+const KIOSK_URL = getKioskUrl();
 const START_FULLSCREEN = process.env.ATTENDANCE_KIOSK_FULLSCREEN !== 'false';
 const START_KIOSK = process.env.ATTENDANCE_KIOSK_LOCKED === 'true';
 const APP_ICON = path.join(__dirname, '..', 'build', 'icon.png');
@@ -473,24 +490,14 @@ function createMainWindow() {
     }
   });
 
-  mainWindow.on('close', async (event) => {
+  mainWindow.on('close', (event) => {
     if (exitApproved) return;
 
     event.preventDefault();
     if (exitPromptActive) return;
 
     exitPromptActive = true;
-    mainWindow.webContents.send('usis-kiosk-shell:request-exit-auth');
-
-    if (!rendererExitAuthReady) {
-      await showCloseFallbackDialog();
-      return;
-    }
-
-    clearExitAuthFallbackTimer();
-    rendererExitAuthFallbackTimer = setTimeout(() => {
-      void showCloseFallbackDialog();
-    }, 1500);
+    void showCloseFallbackDialog();
   });
 
   mainWindow.on('closed', () => {

@@ -40,6 +40,15 @@
   width: min(100%, 960px);
 }
 
+.modal-dialog > form,
+form.modal-dialog {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .modal-dialog__header,
 .modal-dialog__body,
 .modal-dialog__actions {
@@ -101,8 +110,11 @@
 }
 
 .modal-dialog__body {
-  flex: 1;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   padding-top: 18px;
   padding-bottom: 18px;
 }

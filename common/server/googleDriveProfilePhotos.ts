@@ -11,7 +11,7 @@ export type DriveUploadResult = {
   mimeType: string;
 };
 
-const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
+const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive';
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const DRIVE_FILES_URL = 'https://www.googleapis.com/drive/v3/files';
 const DRIVE_UPLOAD_URL = 'https://www.googleapis.com/upload/drive/v3/files';
@@ -43,7 +43,8 @@ export const resolveGoogleServiceAccountCredentials = () => {
     toText(process.env.GOOGLE_SERVICE_ACCOUNT_JSON || process.env.GOOGLE_SERVICE_ACCOUNT_JSON_BASE64),
   );
   const clientEmail = toText(process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || fromJson.client_email);
-  const privateKey = toText(process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY || fromJson.private_key).replace(/\\n/g, '\n');
+  const rawKey = toText(process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY || fromJson.private_key);
+  const privateKey = rawKey.replace(/^["']|["']$/g, '').replace(/\\n/g, '\n');
 
   if (!clientEmail || !privateKey) {
     throw new Error('Google service account credentials are missing.');

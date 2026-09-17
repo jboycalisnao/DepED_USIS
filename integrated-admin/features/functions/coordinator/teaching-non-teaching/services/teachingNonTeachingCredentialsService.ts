@@ -303,6 +303,7 @@ export const teachingNonTeachingModuleOptions: Array<{ key: UsisModuleKey; label
   { key: 'registrar', label: 'Registrar' },
   { key: 'election', label: 'Election' },
   { key: 'sp_portal', label: 'SP Portal' },
+  { key: 'srcy', label: 'SRCY Hub' },
   { key: 'spta', label: 'SPTA' },
   { key: 'learner_portal', label: 'Learner Portal' },
   { key: 'help_admin', label: 'Help Desk Admin' },

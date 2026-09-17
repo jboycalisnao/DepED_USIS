@@ -7,6 +7,7 @@ export type UsisModuleKey =
   | 'attendance'
   | 'election'
   | 'sp_portal'
+  | 'srcy'
   | 'spta'
   | 'learner_portal'
   | 'help_admin'
@@ -21,7 +22,7 @@ type IaPageAccessMap = Record<string, string[]>;
 const MODULE_ACCESS_TABLE = 'coordinator_module_access';
 const IA_PAGE_ACCESS_TABLE = 'coordinator_account_ia_page_access';
 const IA_PAGE_CATALOG_TABLE = 'coordinator_ia_pages';
-const MODULE_KEYS: UsisModuleKey[] = ['coordinator', 'ia', 'registrar', 'attendance', 'election', 'sp_portal', 'spta', 'learner_portal', 'help_admin', 'support'];
+const MODULE_KEYS: UsisModuleKey[] = ['coordinator', 'ia', 'registrar', 'attendance', 'election', 'sp_portal', 'srcy', 'spta', 'learner_portal', 'help_admin', 'support'];
 
 const parseModuleAccessMap = (raw: string | null): ModuleAccessMap => {
   if (!raw) return {};

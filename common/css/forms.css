@@ -619,19 +619,17 @@
     top 180ms ease,
     color 180ms ease,
     transform 180ms ease;
-  white-space: normal;
+  white-space: nowrap;
   overflow: hidden;
-  text-overflow: clip;
-  overflow-wrap: anywhere;
-  max-height: 2.6em;
+  text-overflow: ellipsis;
+  max-width: calc(100% - 44px);
 }
 
 .searchable-select--floating .floating-field__control > .searchable-select__floating-label .searchable-select__label-text {
   min-width: 0;
-  overflow: visible;
-  text-overflow: clip;
-  white-space: normal;
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .searchable-select--floating .floating-field__control > .searchable-select__floating-label .searchable-select__required-marker {

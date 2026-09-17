@@ -19,4 +19,12 @@ const manifest = {
 };
 
 fs.writeFileSync(versionJsonPath, `${JSON.stringify(manifest, null, 2)}\n`);
+
+const distSrc = path.join(rootDir, '..', 'attendance', 'dist');
+const distDest = path.join(rootDir, 'dist');
+if (fs.existsSync(distSrc)) {
+  fs.cpSync(distSrc, distDest, { recursive: true });
+  console.log(`Synced attendance web build to kiosk shell dist folder.`);
+}
+
 console.log(`Synced kiosk shell version manifest: ${manifest.productName} ${manifest.version}`);

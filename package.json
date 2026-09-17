@@ -14,6 +14,7 @@
     "merch",
     "election",
     "sp-portal",
+    "srcy",
     "spta",
     "registrar",
     "repository",
@@ -37,6 +38,7 @@
     "dev:merch": "npm run dev --workspace ./merch",
     "dev:election": "npm run dev --workspace ./election",
     "dev:sp-portal": "npm run dev --workspace ./sp-portal",
+    "dev:srcy": "npm run dev --workspace ./srcy",
     "dev:spta": "npm run dev --workspace ./spta -- --host 0.0.0.0 --port 5180",
     "dev:registrar": "npm run dev --workspace ./registrar",
     "dev:repository": "npm run dev --workspace ./repository",
@@ -55,11 +57,12 @@
     "build:merch": "npm run build --workspace ./merch",
     "build:election": "npm run build --workspace ./election",
     "build:sp-portal": "npm run build --workspace ./sp-portal",
+    "build:srcy": "npm run build --workspace ./srcy",
     "build:spta": "npm run build --workspace ./spta",
     "build:registrar": "npm run build --workspace ./registrar",
     "build:repository": "npm run build --workspace ./repository",
     "build:support": "npm run build --workspace ./support",
-    "build": "npm run build:attendance && npm run build:coordinator && npm run build:deped-web-kit && npm run build:data-privacy && npm run build:enrollment && npm run build:learner-portal && npm run build:integrated-admin && npm run build:school-help-portal && npm run build:merch && npm run build:election && npm run build:sp-portal && npm run build:spta && npm run build:registrar && npm run build:repository && npm run build:support"
+    "build": "npm run build:attendance && npm run build:coordinator && npm run build:deped-web-kit && npm run build:data-privacy && npm run build:enrollment && npm run build:learner-portal && npm run build:integrated-admin && npm run build:school-help-portal && npm run build:merch && npm run build:election && npm run build:sp-portal && npm run build:srcy && npm run build:spta && npm run build:registrar && npm run build:repository && npm run build:support"
   },
   "engines": {
     "node": ">=20"

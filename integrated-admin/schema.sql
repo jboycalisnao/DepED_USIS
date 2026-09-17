@@ -855,6 +855,94 @@ create table if not exists ia_portal_controls (
 create index if not exists idx_ia_portal_controls_enabled on ia_portal_controls(is_enabled);
 create index if not exists idx_ia_portal_controls_mode on ia_portal_controls(mode);
 
+insert into ia_portal_controls (module_key, module_label, is_enabled, mode, preset_key, title_text, body_text, icon_name)
+values
+  ('srcy', 'SRCY Hub', false, 'maintenance', 'maintenance', 'SRCY Hub Under Maintenance', 'The SRCY Hub is temporarily unavailable. Please check back shortly.', 'volunteer_activism')
+on conflict (module_key) do nothing;
+
+-- =========================================================
+-- SRCY Declaration of Members (DOM) Records
+-- =========================================================
+create table if not exists srcy_dom_records (
+  id uuid primary key default gen_random_uuid(),
+  dom_number text not null unique,
+  title text not null,
+  school_year text,
+  valid_from date not null,
+  valid_until date not null,
+  status text not null default 'Active' check (status in ('Active', 'Pending', 'Expired', 'Archived')),
+  description text,
+  school_id text,
+  created_by uuid references usis_core_coordinators(id) on update cascade on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_srcy_dom_number on srcy_dom_records(dom_number);
+create index if not exists idx_srcy_dom_status on srcy_dom_records(status);
+
+-- =========================================================
+-- SRCY Membership Tracking
+-- =========================================================
+create table if not exists srcy_memberships (
+  id uuid primary key default gen_random_uuid(),
+  learner_lrn text not null,
+  full_name text not null,
+  grade_level text,
+  section text,
+  council_role text not null default 'Member',
+  membership_status text not null default 'Active' check (membership_status in ('Active', 'Pending', 'Inactive')),
+  dom_id uuid references srcy_dom_records(id) on update cascade on delete set null,
+  maab_id text,
+  birthdate date,
+  address text,
+  contact_no text,
+  email text,
+  emergency_contact text,
+  joined_at date not null default current_date,
+  notes text,
+  school_id text,
+  created_by uuid references usis_core_coordinators(id) on update cascade on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_srcy_memberships_lrn on srcy_memberships(learner_lrn);
+create index if not exists idx_srcy_memberships_status on srcy_memberships(membership_status);
+create index if not exists idx_srcy_memberships_school on srcy_memberships(school_id);
+create index if not exists idx_srcy_memberships_dom_id on srcy_memberships(dom_id);
+create index if not exists idx_srcy_memberships_maab_id on srcy_memberships(maab_id);
+
+-- =========================================================
+-- SRCY Membership DOM History View
+-- =========================================================
+create or replace view srcy_membership_dom_history as
+select
+  m.id as membership_id,
+  m.learner_lrn,
+  m.full_name,
+  m.grade_level,
+  m.section,
+  m.council_role,
+  m.maab_id,
+  m.joined_at,
+  d.id as dom_id,
+  coalesce(d.dom_number, 'Unassigned DOM') as dom_number,
+  d.title as dom_title,
+  d.school_year,
+  d.valid_from,
+  d.valid_until,
+  -- Status of the DOM is strictly Active, Pending, or Expired (never Inactive)
+  case
+    when d.id is null then 'Expired'
+    when d.status = 'Expired' or d.status = 'Archived' then 'Expired'
+    when current_date > d.valid_until then 'Expired'
+    when current_date < d.valid_from or d.status = 'Pending' then 'Pending'
+    else 'Active'
+  end as dom_status
+from srcy_memberships m
+left join srcy_dom_records d on m.dom_id = d.id;
+
 -- =========================================================
 -- Learner Portal Notifications
 -- =========================================================
@@ -1125,6 +1213,11 @@ for each row execute function set_updated_at();
 drop trigger if exists trg_ia_portal_controls_updated_at on ia_portal_controls;
 create trigger trg_ia_portal_controls_updated_at
 before update on ia_portal_controls
+for each row execute function set_updated_at();
+
+drop trigger if exists trg_srcy_memberships_updated_at on srcy_memberships;
+create trigger trg_srcy_memberships_updated_at
+before update on srcy_memberships
 for each row execute function set_updated_at();
 
 drop trigger if exists trg_ia_learner_portal_notifications_updated_at on ia_learner_portal_notifications;

@@ -1,7 +1,7 @@
 
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { BrowserRouter } from 'react-router-dom';
+import { BrowserRouter, HashRouter } from 'react-router-dom';
 import App from './App';
 import './styles/global.css';
 import { applyDocumentBranding } from '../common/config/usisBranding';
@@ -13,6 +13,8 @@ import {
   resolveAttendancePath,
 } from './utils/attendanceRoutePersistence';
 
+const isFileProtocol = typeof window !== 'undefined' && window.location.protocol === 'file:';
+
 function resolveAttendanceBasename(pathname: string): string {
   return pathname === ATTENDANCE_BASENAME || pathname.startsWith(`${ATTENDANCE_BASENAME}/`)
     ? ATTENDANCE_BASENAME
@@ -20,7 +22,7 @@ function resolveAttendanceBasename(pathname: string): string {
 }
 
 function restoreAttendanceUrlOnBoot() {
-  if (typeof window === 'undefined') return;
+  if (typeof window === 'undefined' || isFileProtocol) return;
 
   const basename = resolveAttendanceBasename(window.location.pathname);
   if (!basename) return;
@@ -46,9 +48,15 @@ const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
     <UsisAppLoaderGate label="Loading attendance subsystem">
-      <BrowserRouter basename={resolveAttendanceBasename(window.location.pathname)}>
-        <App />
-      </BrowserRouter>
+      {isFileProtocol ? (
+        <HashRouter>
+          <App />
+        </HashRouter>
+      ) : (
+        <BrowserRouter basename={resolveAttendanceBasename(window.location.pathname)}>
+          <App />
+        </BrowserRouter>
+      )}
     </UsisAppLoaderGate>
   </React.StrictMode>
 );

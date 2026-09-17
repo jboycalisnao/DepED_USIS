@@ -111,10 +111,17 @@ const addUserToGroup = async (accessToken: string, groupId: string, userId: stri
   throw new Error(`Failed to add ${userPrincipalName} to Learners group: ${text}`);
 };
 
+const getSupabaseReader = () => {
+  const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
+  const readableKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
+  if (!supabaseUrl || !readableKey) throw new Error('Supabase credentials are missing.');
+  return createClient(supabaseUrl, readableKey);
+};
+
 const getSupabaseAdmin = () => {
   const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
-  if (!supabaseUrl || !serviceRoleKey) throw new Error('Supabase service-role credentials are missing.');
+  if (!supabaseUrl || !serviceRoleKey) throw new Error('Supabase service-role credentials are missing. Microsoft account creation requires SUPABASE_SERVICE_ROLE_KEY.');
   return createClient(supabaseUrl, serviceRoleKey);
 };
 
@@ -157,7 +164,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return json(res, 405, { ok: false, error: 'Method not allowed.' });
     }
 
-    const supabaseAdmin = getSupabaseAdmin();
     const requestData = req.method === 'GET' ? req.query : readBody(req);
     const learnerId = toText((requestData as any).learnerId);
     const lrn = toText((requestData as any).lrn);
@@ -166,7 +172,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return json(res, 400, { ok: false, error: 'Microsoft account creation requires learner ID and LRN.' });
     }
 
-    const learner = await readLearner(supabaseAdmin, learnerId, lrn);
+    const supabaseClient = req.method === 'GET' ? getSupabaseReader() : getSupabaseAdmin();
+    const learner = await readLearner(supabaseClient, learnerId, lrn);
     if (!learner) return json(res, 404, { ok: false, error: 'Learner not found.' });
 
     const existingUserId = toText(learner.microsoft_user_id);
@@ -257,7 +264,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     await addUserToGroup(accessToken, learnersGroupId, createdUserId || userGraphKey, userPrincipalName);
 
     const nowIso = new Date().toISOString();
-    const { data: updatedLearner, error: updateError } = await supabaseAdmin
+    const { data: updatedLearner, error: updateError } = await supabaseClient
       .from(LEARNER_TABLE)
       .update({
         microsoft_user_id: createdUserId || null,

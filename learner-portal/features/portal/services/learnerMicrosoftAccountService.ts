@@ -42,7 +42,10 @@ export async function fetchLearnerMicrosoftAccount(input: { learnerId: string; l
   if (input.lrn) params.set('lrn', input.lrn);
   const response = await fetch(`/api/learner-microsoft-account?${params.toString()}`);
   const result = await readJson(response);
-  if (!response.ok) throw new Error(toText(result?.error) || 'Unable to load Microsoft account status.');
+  if (!response.ok) {
+    const detailText = toText(result?.details);
+    throw new Error(`${toText(result?.error) || 'Unable to load Microsoft account status.'}${detailText ? ` ${detailText}` : ''}`);
+  }
   return parseMicrosoftAccountResult(result);
 }
 

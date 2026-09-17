@@ -27,6 +27,7 @@
     },
     "files": [
       "src/**/*",
+      "dist/**/*",
       "build/**/*",
       "version.json",
       "package.json"

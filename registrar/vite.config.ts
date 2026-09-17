@@ -1187,6 +1187,7 @@ export default defineConfig(({ mode }) => {
     };
 
     return {
+      cacheDir: '.vite-cache',
       envDir: '..',
       server: {
         port: 3000,

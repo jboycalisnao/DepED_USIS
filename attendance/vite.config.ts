@@ -246,6 +246,7 @@ export default defineConfig(({ mode }) => {
     const attendanceEnv = loadEnv(mode, '.', '');
     const env = { ...rootEnv, ...attendanceEnv };
     return {
+      base: './',
       envDir: '..',
       server: {
         port: 3000,
