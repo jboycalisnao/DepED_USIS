@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
-import { fetchProfilePhotoFromDrive } from '../../common/server/googleDriveProfilePhotos.js';
+import { fetchProfilePhotoFromDrive } from '../lib/server/googleDriveProfilePhotos.js';
 
 const toText = (value: unknown) => String(value ?? '').trim();
 
@@ -10,8 +10,8 @@ const json = (res: VercelResponse, statusCode: number, payload: Record<string, u
 };
 
 const getSupabaseAdmin = () => {
-  const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+  const supabaseUrl = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').trim().replace(/^["']|["']$/g, '');
+  const serviceRoleKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim().replace(/^["']|["']$/g, '');
   if (!supabaseUrl || !serviceRoleKey) {
     throw new Error('Supabase service-role credentials are missing.');
   }
@@ -64,9 +64,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader('Cache-Control', 'private, max-age=300');
     res.send(photo.bytes);
   } catch (error: any) {
+    console.error('learner-profile-photo API error:', error);
     return json(res, 500, {
-      error: 'Unable to load learner profile picture.',
-      details: error?.message || String(error),
+      error: error?.message || 'Unable to load learner profile picture.',
+      details: error?.stack || error?.message || String(error),
     });
   }
 }
