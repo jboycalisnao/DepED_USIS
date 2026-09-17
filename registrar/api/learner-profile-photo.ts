@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getSupabaseAdmin } from './enrollment-email-shared.js';
-import { deleteProfilePhotoFromDrive, fetchProfilePhotoFromDrive, uploadProfilePhotoToDrive } from '../../common/server/googleDriveProfilePhotos.js';
-import { assertSquareImage } from '../../common/server/imageDimensions.js';
+import { deleteProfilePhotoFromDrive, fetchProfilePhotoFromDrive, uploadProfilePhotoToDrive } from '../lib/server/googleDriveProfilePhotos.js';
+import { assertSquareImage } from '../lib/server/imageDimensions.js';
 
 const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const MAX_FILE_BYTES = 2 * 1024 * 1024;
@@ -165,9 +165,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       profilePhotoUpdatedAt: updatedAt,
     });
   } catch (error: any) {
+    console.error('learner-profile-photo API error:', error);
     return json(res, 500, {
-      error: 'Unable to upload learner profile picture.',
-      details: error?.message || String(error),
+      error: error?.message || 'Unable to process learner profile picture.',
+      details: error?.stack || error?.message || String(error),
     });
   }
 }
