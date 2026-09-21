@@ -145,6 +145,7 @@ const learnerMicrosoftStatusPayload = (learner: any, exists?: boolean) => ({
   microsoftAccountStatus: toText(learner?.microsoft_account_status) || (toText(learner?.microsoft_upn) ? 'Active' : 'Not Linked'),
   microsoftCreatedAt: toText(learner?.microsoft_created_at),
   microsoftLastSyncedAt: toText(learner?.microsoft_last_synced_at),
+  password: toText(learner?.login_password_plain) || buildMicrosoftPassword(learner),
 });
 
 const updateLatestEnrollmentGuardianContact = (value: unknown, guardianContact: string) => {
@@ -342,13 +343,17 @@ export default defineConfig(({ mode }) => {
           const body = req.method === 'POST' ? await readRequestBody(req) : {};
           const learnerId = toText(req.method === 'POST' ? body.learnerId : requestUrl.searchParams.get('learnerId'));
           const lrn = toText(req.method === 'POST' ? body.lrn : requestUrl.searchParams.get('lrn'));
+          const shouldRefresh =
+            (req.method === 'GET' && requestUrl.searchParams.get('refresh') === 'true') ||
+            (req.method === 'POST' && (body.action === 'refresh-status' || body.refresh === true));
+
           if (!learnerId && !lrn) {
             res.statusCode = 400;
             res.setHeader('Content-Type', 'application/json');
             res.end(JSON.stringify({ ok: false, error: 'Learner Microsoft account lookup requires learner ID or LRN.' }));
             return;
           }
-          if (req.method === 'POST' && (!learnerId || !lrn)) {
+          if (req.method === 'POST' && !shouldRefresh && (!learnerId || !lrn)) {
             res.statusCode = 400;
             res.setHeader('Content-Type', 'application/json');
             res.end(JSON.stringify({ ok: false, error: 'Microsoft account creation requires learner ID and LRN.' }));
@@ -356,7 +361,7 @@ export default defineConfig(({ mode }) => {
           }
 
           const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
-          const selectColumns = 'id,lrn,first_name,middle_name,last_name,microsoft_user_id,microsoft_upn,microsoft_mail_nickname,microsoft_account_status,microsoft_created_at,microsoft_last_synced_at';
+          const selectColumns = 'id,lrn,first_name,middle_name,last_name,login_password_plain,microsoft_user_id,microsoft_upn,microsoft_mail_nickname,microsoft_account_status,microsoft_created_at,microsoft_last_synced_at';
           let query = supabaseAdmin.from(LEARNER_TABLE).select(selectColumns).limit(1);
           if (learnerId) query = query.eq('id', learnerId);
           if (lrn) query = query.eq('lrn', lrn);
@@ -370,6 +375,114 @@ export default defineConfig(({ mode }) => {
           }
 
           const learner = learnerResult.data as any;
+
+          if (shouldRefresh) {
+            const tenantId = process.env.AZURE_TENANT_ID || env.AZURE_TENANT_ID || '';
+            const clientId = process.env.AZURE_CLIENT_ID || env.AZURE_CLIENT_ID || '';
+            const clientSecret = process.env.AZURE_CLIENT_SECRET || env.AZURE_CLIENT_SECRET || '';
+            if (!tenantId || !clientId || !clientSecret) {
+              res.statusCode = 500;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ ok: false, error: 'Azure credentials are not configured on the server.' }));
+              return;
+            }
+
+            const localUserId = toText(learner.microsoft_user_id);
+            const localUpn = toText(learner.microsoft_upn);
+            const defaultUpn = buildMicrosoftUsername(learner);
+            const graphKey = localUserId || localUpn || defaultUpn;
+
+            const accessToken = await getMicrosoftAccessToken(tenantId, clientId, clientSecret);
+            const graphResponse = await fetch(`https://graph.microsoft.com/v1.0/users/${encodeURIComponent(graphKey)}?$select=id,userPrincipalName,accountEnabled`, {
+              headers: { Authorization: `Bearer ${accessToken}` },
+            });
+
+            const nowIso = new Date().toISOString();
+
+            if (graphResponse.status === 404) {
+              if (localUserId || localUpn) {
+                await supabaseAdmin.from(LEARNER_TABLE).update({
+                  microsoft_user_id: null,
+                  microsoft_upn: null,
+                  microsoft_account_status: 'Deleted',
+                  microsoft_last_synced_at: nowIso,
+                }).eq('id', learner.id);
+
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'application/json');
+                res.end(JSON.stringify({
+                  ok: true,
+                  exists: false,
+                  checkedLive: true,
+                  statusMessage: 'Microsoft account was not found in Microsoft 365 (it may have been deleted). Local status has been set to Deleted.',
+                  ...learnerMicrosoftStatusPayload({
+                    ...learner,
+                    microsoft_user_id: null,
+                    microsoft_upn: null,
+                    microsoft_account_status: 'Deleted',
+                    microsoft_last_synced_at: nowIso,
+                  }, false),
+                }));
+                return;
+              }
+
+              await supabaseAdmin.from(LEARNER_TABLE).update({
+                microsoft_account_status: 'Not Linked',
+                microsoft_last_synced_at: nowIso,
+              }).eq('id', learner.id);
+
+              res.statusCode = 200;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({
+                ok: true,
+                exists: false,
+                checkedLive: true,
+                statusMessage: 'No Microsoft account was found in Microsoft 365.',
+                ...learnerMicrosoftStatusPayload({
+                  ...learner,
+                  microsoft_account_status: 'Not Linked',
+                  microsoft_last_synced_at: nowIso,
+                }, false),
+              }));
+              return;
+            }
+
+            if (!graphResponse.ok) {
+              res.statusCode = 502;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ ok: false, error: 'Graph status check failed', details: await graphResponse.text() }));
+              return;
+            }
+
+            const graphJson = await graphResponse.json();
+            const graphUserId = toText(graphJson?.id || localUserId);
+            const graphUpn = toText(graphJson?.userPrincipalName || localUpn || defaultUpn);
+
+            await supabaseAdmin.from(LEARNER_TABLE).update({
+              microsoft_user_id: graphUserId || null,
+              microsoft_upn: graphUpn || null,
+              microsoft_account_status: 'Active',
+              microsoft_last_synced_at: nowIso,
+            }).eq('id', learner.id);
+
+            res.statusCode = 200;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({
+              ok: true,
+              exists: true,
+              checkedLive: true,
+              statusMessage: `Microsoft account is active and verified in Microsoft 365 (${graphUpn}).`,
+              ...learnerMicrosoftStatusPayload({
+                ...learner,
+                microsoft_user_id: graphUserId,
+                microsoft_upn: graphUpn,
+                microsoft_account_status: 'Active',
+                microsoft_last_synced_at: nowIso,
+              }, true),
+            }));
+            return;
+          }
+
           const existingUserId = toText(learner.microsoft_user_id);
           const existingUpn = toText(learner.microsoft_upn);
           if (req.method === 'GET' || existingUserId || existingUpn) {
@@ -404,12 +517,16 @@ export default defineConfig(({ mode }) => {
           const mailNickname = buildMailNickname(userPrincipalName);
           const temporaryPassword = buildMicrosoftPassword(learner);
           const displayName = [learner.first_name, learner.middle_name, learner.last_name].map(toText).filter(Boolean).join(' ') || toText(learner.lrn) || 'Learner';
+          const givenName = toText(learner.first_name);
+          const surname = toText(learner.last_name);
           const createUserResponse = await fetch('https://graph.microsoft.com/v1.0/users', {
             method: 'POST',
             headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
             body: JSON.stringify({
               accountEnabled: true,
               displayName,
+              givenName: givenName || undefined,
+              surname: surname || undefined,
               mailNickname,
               userPrincipalName,
               passwordProfile: { forceChangePasswordNextSignIn: false, password: temporaryPassword },

@@ -83,3 +83,56 @@
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
+
+/* Modal & Contained Variant */
+.usis-page-loader--modal,
+.usis-page-loader--contained {
+  position: relative;
+  inset: auto;
+  width: 100%;
+  height: 100%;
+  min-height: 280px;
+  background: transparent;
+  z-index: 10;
+  padding: 32px 16px;
+}
+
+.usis-page-loader--modal .usis-page-loader__spinner,
+.usis-page-loader--contained .usis-page-loader__spinner {
+  width: 136px;
+  height: 136px;
+}
+
+.usis-page-loader--modal .usis-page-loader__ring,
+.usis-page-loader--contained .usis-page-loader__ring {
+  border-width: 4px;
+}
+
+.usis-page-loader--modal .usis-page-loader__ring--red,
+.usis-page-loader--contained .usis-page-loader__ring--red {
+  inset: 8px;
+}
+
+.usis-page-loader--modal .usis-page-loader__ring--yellow,
+.usis-page-loader--contained .usis-page-loader__ring--yellow {
+  inset: 16px;
+}
+
+.usis-page-loader--modal .usis-page-loader__icon-wrap,
+.usis-page-loader--contained .usis-page-loader__icon-wrap {
+  width: 70px;
+  height: 70px;
+}
+
+.usis-page-loader--modal .usis-page-loader__icon-wrap img,
+.usis-page-loader--contained .usis-page-loader__icon-wrap img {
+  width: 50px;
+  height: 50px;
+}
+
+.usis-page-loader--modal .usis-page-loader__text,
+.usis-page-loader--contained .usis-page-loader__text {
+  font-size: 13px;
+  color: #243a60;
+  font-weight: 600;
+}

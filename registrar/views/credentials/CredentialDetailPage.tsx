@@ -12,7 +12,7 @@ export default function CredentialDetailPage() {
   const [feedback, setFeedback] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const [confirmModal, setConfirmModal] = useState<{
-    action: null | 'reset' | 'delete';
+    action: null | 'reset' | 'delete' | 'toggle-login';
     message: string;
     title: string;
   }>({ action: null, message: '', title: '' });
@@ -79,6 +79,8 @@ If you been having trouble in accessing your account, you can go to help.leonnhs
           action: 'reset-password',
           learnerId: learner.id,
           newPassword: nextPassword,
+          givenName: learner.firstName || '',
+          surname: learner.lastName || '',
         }),
       });
 
@@ -146,6 +148,42 @@ If you been having trouble in accessing your account, you can go to help.leonnhs
     });
   };
 
+  const isLoginDisabled =
+    (learner?.loginStatus || '').trim().toLowerCase() === 'inactive' ||
+    (learner?.loginStatus || '').trim().toLowerCase() === 'disabled';
+  const isLoginActive = !isLoginDisabled;
+
+  const promptToggleLoginStatus = () => {
+    if (!learner) return;
+    setConfirmModal({
+      action: 'toggle-login',
+      title: isLoginActive ? 'Disable USIS Login Credentials' : 'Enable USIS Login Credentials',
+      message: isLoginActive
+        ? `Disable USIS login credentials for ${learner.lastName}, ${learner.firstName}? The learner will be prevented from signing into the portal.`
+        : `Enable USIS login credentials for ${learner.lastName}, ${learner.firstName}? The learner will be permitted to access portal services.`,
+    });
+  };
+
+  const performToggleLoginStatus = async () => {
+    if (!learner) return;
+    const targetStatus = isLoginActive ? 'Inactive' : 'Active';
+    setIsBusy(true);
+    try {
+      const localResult = await updateLearner(learner.id, { loginStatus: targetStatus });
+      if (localResult?.error) {
+        setFeedback(`Failed to update login status: ${localResult.error}`);
+        return;
+      }
+      setFeedback(
+        targetStatus === 'Inactive'
+          ? 'USIS login credentials have been disabled.'
+          : 'USIS login credentials have been enabled.'
+      );
+    } finally {
+      setIsBusy(false);
+    }
+  };
+
   if (!learner) {
     return (
       <section className="registrar-credential-detail">
@@ -178,6 +216,15 @@ If you been having trouble in accessing your account, you can go to help.leonnhs
           <button type="button" className="registrar-credentials-page__copy-cell" onClick={() => copyValue(learner.microsoftUpn || '', 'Microsoft Email')}>
             <span>Microsoft Email: {learner.microsoftUpn || 'Not Linked'}</span><span className="material-symbols-outlined">content_copy</span>
           </button>
+          <button
+            type="button"
+            className={`registrar-credentials-page__copy-cell ${!isLoginActive ? 'is-inactive' : ''}`}
+            onClick={promptToggleLoginStatus}
+            title={isLoginActive ? 'Click to disable USIS login credentials' : 'Click to enable USIS login credentials'}
+          >
+            <span>USIS Login: {isLoginActive ? 'Active' : 'Disabled'}</span>
+            <span className="material-symbols-outlined">{isLoginActive ? 'check_circle' : 'block'}</span>
+          </button>
         </div>
 
         <div className="registrar-credential-detail__actions">
@@ -186,6 +233,14 @@ If you been having trouble in accessing your account, you can go to help.leonnhs
           </button>
           <button type="button" className="primary-button" onClick={handleResetPortalAndMicrosoft} disabled={isBusy}>
             Reset Learner + Microsoft Password
+          </button>
+          <button
+            type="button"
+            className={isLoginActive ? 'secondary-button secondary-button--danger' : 'secondary-button'}
+            onClick={promptToggleLoginStatus}
+            disabled={isBusy}
+          >
+            {isLoginActive ? 'Disable USIS Login' : 'Enable USIS Login'}
           </button>
           <button type="button" className="secondary-button" onClick={handleDeleteMicrosoft} disabled={isBusy}>
             Delete Microsoft Account
@@ -198,8 +253,14 @@ If you been having trouble in accessing your account, you can go to help.leonnhs
         open={confirmModal.action !== null}
         title={confirmModal.title}
         message={confirmModal.message}
-        tone={confirmModal.action === 'delete' ? 'danger' : 'warning'}
-        confirmLabel={confirmModal.action === 'delete' ? 'Delete Account' : 'Reset Password'}
+        tone={confirmModal.action === 'delete' || (confirmModal.action === 'toggle-login' && isLoginActive) ? 'danger' : 'warning'}
+        confirmLabel={
+          confirmModal.action === 'delete'
+            ? 'Delete Account'
+            : confirmModal.action === 'toggle-login'
+            ? (isLoginActive ? 'Disable Credentials' : 'Enable Credentials')
+            : 'Reset Password'
+        }
         cancelLabel="Cancel"
         onClose={() => setConfirmModal({ action: null, message: '', title: '' })}
         onConfirm={() => {
@@ -207,6 +268,8 @@ If you been having trouble in accessing your account, you can go to help.leonnhs
             void performDeleteMicrosoft();
           } else if (confirmModal.action === 'reset') {
             void performResetPortalAndMicrosoft();
+          } else if (confirmModal.action === 'toggle-login') {
+            void performToggleLoginStatus();
           }
         }}
       />

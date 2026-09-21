@@ -9,6 +9,9 @@ export type LearnerMicrosoftAccountRecord = {
   microsoftLastSyncedAt: string;
   created?: boolean;
   temporaryPassword?: string;
+  password?: string;
+  statusMessage?: string;
+  checkedLive?: boolean;
 };
 
 const toText = (value: unknown) => String(value ?? '').trim();
@@ -24,6 +27,9 @@ const parseMicrosoftAccountResult = (value: any): LearnerMicrosoftAccountRecord 
   microsoftLastSyncedAt: toText(value?.microsoftLastSyncedAt),
   created: Boolean(value?.created),
   temporaryPassword: toText(value?.temporaryPassword),
+  password: toText(value?.password),
+  statusMessage: toText(value?.statusMessage),
+  checkedLive: Boolean(value?.checkedLive),
 });
 
 const readJson = async (response: Response) => {
@@ -36,10 +42,11 @@ const readJson = async (response: Response) => {
   }
 };
 
-export async function fetchLearnerMicrosoftAccount(input: { learnerId: string; lrn: string }) {
+export async function fetchLearnerMicrosoftAccount(input: { learnerId: string; lrn: string; refresh?: boolean }) {
   const params = new URLSearchParams();
   if (input.learnerId) params.set('learnerId', input.learnerId);
   if (input.lrn) params.set('lrn', input.lrn);
+  if (input.refresh) params.set('refresh', 'true');
   const response = await fetch(`/api/learner-microsoft-account?${params.toString()}`);
   const result = await readJson(response);
   if (!response.ok) {

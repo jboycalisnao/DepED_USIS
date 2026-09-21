@@ -1,6 +1,24 @@
 import { supabase } from '@deped-usis/shared-supabase';
+import { loadSrcyDomRecords } from './srcyDomService';
 
 export type SrcyMembershipStatus = 'Active' | 'Pending' | 'Inactive';
+
+export type SrcyMembershipTermInfo = {
+  termId: string;
+  domId: string;
+  domNumber?: string;
+  schoolYear?: string;
+  validFrom?: string;
+  validUntil?: string;
+  status: 'Active' | 'Pending' | 'Expired';
+  gradeLevel?: string;
+  section?: string;
+  councilRole?: string;
+  maabId?: string;
+  joinedAt?: string;
+  notes?: string;
+  updatedAt?: string;
+};
 
 export type SrcyMemberRecord = {
   id: string;
@@ -19,13 +37,16 @@ export type SrcyMemberRecord = {
   emergencyContact: string;
   joinedAt: string;
   notes: string;
+  membershipInfo: SrcyMembershipTermInfo[];
   schoolId: string;
   createdBy: string;
   createdAt: string;
   updatedAt: string;
 };
 
-export type SrcyMemberDraft = Omit<SrcyMemberRecord, 'id' | 'createdAt' | 'updatedAt'>;
+export type SrcyMemberDraft = Omit<SrcyMemberRecord, 'id' | 'createdAt' | 'updatedAt'> & {
+  membershipInfo?: SrcyMembershipTermInfo[];
+};
 
 const TABLE_NAME = 'srcy_memberships';
 const LOCAL_STORAGE_KEY = 'srcy_membership_records';
@@ -52,6 +73,20 @@ const normalizeStatus = (value: unknown): SrcyMembershipStatus => {
   return 'Active';
 };
 
+const parseMembershipInfo = (value: unknown): SrcyMembershipTermInfo[] => {
+  if (!value) return [];
+  if (Array.isArray(value)) return value;
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+};
+
 const mapRow = (row: any): SrcyMemberRecord => ({
   id: toText(row.id),
   learnerLrn: toText(row.learner_lrn),
@@ -69,6 +104,7 @@ const mapRow = (row: any): SrcyMemberRecord => ({
   emergencyContact: toText(row.emergency_contact),
   joinedAt: toText(row.joined_at),
   notes: toText(row.notes),
+  membershipInfo: parseMembershipInfo(row.membership_info || row.membershipInfo),
   schoolId: toText(row.school_id),
   createdBy: toText(row.created_by),
   createdAt: toText(row.created_at),
@@ -91,6 +127,7 @@ const toRow = (draft: SrcyMemberDraft) => ({
   emergency_contact: toText(draft.emergencyContact) || null,
   joined_at: toText(draft.joinedAt) || new Date().toISOString().slice(0, 10),
   notes: toText(draft.notes) || null,
+  membership_info: Array.isArray(draft.membershipInfo) ? draft.membershipInfo : [],
   school_id: toText(draft.schoolId) || null,
   created_by: toText(draft.createdBy) || null,
 });
@@ -99,7 +136,13 @@ const readLocalMembers = (): SrcyMemberRecord[] => {
   if (typeof window === 'undefined') return [];
   try {
     const parsed = JSON.parse(window.localStorage.getItem(LOCAL_STORAGE_KEY) || '[]');
-    return Array.isArray(parsed) ? parsed.map((row) => ({ ...row, membershipStatus: normalizeStatus(row.membershipStatus) })) : [];
+    return Array.isArray(parsed)
+      ? parsed.map((row) => ({
+          ...row,
+          membershipStatus: normalizeStatus(row.membershipStatus),
+          membershipInfo: parseMembershipInfo(row.membershipInfo),
+        }))
+      : [];
   } catch {
     return [];
   }
@@ -127,14 +170,103 @@ export async function loadSrcyMembers(): Promise<SrcyMemberRecord[]> {
   return (data || []).map(mapRow);
 }
 
+/**
+ * Creates or updates a member so that each student has STRICTLY ONE record in srcy_memberships.
+ * The active and historical terms are stored inside the `membership_info` JSON column.
+ */
 export async function createSrcyMember(draft: SrcyMemberDraft): Promise<SrcyMemberRecord> {
   if (!toText(draft.fullName)) throw new Error('Member name is required.');
   if (!toText(draft.learnerLrn)) throw new Error('Learner LRN is required.');
 
+  const lrn = toText(draft.learnerLrn);
   const nowIso = new Date().toISOString();
+
+  // Try to lookup DOM record details if domId is provided
+  let domDetails: {
+    domNumber?: string;
+    schoolYear?: string;
+    validFrom?: string;
+    validUntil?: string;
+    status?: 'Active' | 'Pending' | 'Expired';
+  } = {};
+
+  if (draft.domId) {
+    try {
+      const doms = await loadSrcyDomRecords();
+      const matched = doms.find((d) => d.id === draft.domId);
+      if (matched) {
+        domDetails = {
+          domNumber: matched.domNumber,
+          schoolYear: matched.schoolYear,
+          validFrom: matched.validFrom,
+          validUntil: matched.validUntil,
+          status: matched.status === 'Pending' ? 'Pending' : (matched.status === 'Active' ? 'Active' : 'Expired'),
+        };
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  const initialTerm: SrcyMembershipTermInfo = {
+    termId: `term-${Date.now()}`,
+    domId: draft.domId || '',
+    domNumber: domDetails.domNumber || '',
+    schoolYear: domDetails.schoolYear || '',
+    validFrom: domDetails.validFrom || '',
+    validUntil: domDetails.validUntil || '',
+    status: domDetails.status || 'Active',
+    gradeLevel: draft.gradeLevel || '',
+    section: draft.section || '',
+    councilRole: draft.councilRole || 'Member',
+    maabId: draft.maabId || '',
+    joinedAt: draft.joinedAt || nowIso.slice(0, 10),
+    notes: draft.notes || '',
+    updatedAt: nowIso,
+  };
+
+  // Check if member already exists (ensure one record only per member)
+  let existingMember: SrcyMemberRecord | null = null;
+  try {
+    const { data: existingData, error: findError } = await supabase
+      .from(TABLE_NAME)
+      .select('*')
+      .eq('learner_lrn', lrn)
+      .maybeSingle();
+
+    if (!findError && existingData) {
+      existingMember = mapRow(existingData);
+    }
+  } catch {
+    const local = readLocalMembers();
+    existingMember = local.find((m) => m.learnerLrn === lrn) || null;
+  }
+
+  if (existingMember) {
+    // Member already exists! Update their single record and append/update the term in JSON membership_info
+    const existingTerms = existingMember.membershipInfo || [];
+    const mergedTerms = [
+      initialTerm,
+      ...existingTerms.filter((t) => t.domId !== draft.domId),
+    ];
+
+    return updateSrcyMember(existingMember.id, {
+      ...draft,
+      membershipInfo: mergedTerms,
+    });
+  }
+
+  // Brand-new member: insert single record with membership_info JSON
+  const membershipInfo = [initialTerm];
+  const rowToInsert = {
+    ...toRow({ ...draft, membershipInfo }),
+    created_at: nowIso,
+    updated_at: nowIso,
+  };
+
   const { data, error } = await supabase
     .from(TABLE_NAME)
-    .insert([{ ...toRow(draft), created_at: nowIso, updated_at: nowIso }])
+    .insert([rowToInsert])
     .select('*')
     .single();
 
@@ -146,10 +278,11 @@ export async function createSrcyMember(draft: SrcyMemberDraft): Promise<SrcyMemb
       membershipStatus: normalizeStatus(draft.membershipStatus),
       id: `local-${Date.now()}`,
       joinedAt: draft.joinedAt || nowIso.slice(0, 10),
+      membershipInfo,
       createdAt: nowIso,
       updatedAt: nowIso,
     };
-    writeLocalMembers([...readLocalMembers(), fallbackRecord]);
+    writeLocalMembers([...readLocalMembers().filter((m) => m.learnerLrn !== lrn), fallbackRecord]);
     return fallbackRecord;
   }
 
@@ -185,6 +318,7 @@ export async function updateSrcyMember(id: string, updates: Partial<SrcyMemberDr
         ...r,
         ...updates,
         membershipStatus: updates.membershipStatus ? normalizeStatus(updates.membershipStatus) : r.membershipStatus,
+        membershipInfo: updates.membershipInfo !== undefined ? updates.membershipInfo : r.membershipInfo,
         updatedAt: nowIso,
       };
       return updatedRecord;
@@ -210,6 +344,9 @@ export async function updateSrcyMember(id: string, updates: Partial<SrcyMemberDr
   if (updates.emergencyContact !== undefined) patch.emergency_contact = toText(updates.emergencyContact) || null;
   if (updates.joinedAt !== undefined) patch.joined_at = toText(updates.joinedAt) || null;
   if (updates.notes !== undefined) patch.notes = toText(updates.notes) || null;
+  if (updates.membershipInfo !== undefined) {
+    patch.membership_info = Array.isArray(updates.membershipInfo) ? updates.membershipInfo : [];
+  }
 
   const { data, error } = await supabase
     .from(TABLE_NAME)
@@ -236,8 +373,30 @@ export async function deleteSrcyMember(id: string): Promise<void> {
   if (error) throw new Error(error.message || 'Unable to delete SRCY member.');
 }
 
+/**
+ * Loads a member's historical term records directly from their stored JSON membership_info.
+ * Falls back to legacy sibling records if membership_info has not yet been populated.
+ */
 export async function loadMemberHistory(member: SrcyMemberRecord): Promise<SrcyMemberRecord[]> {
   if (!member) return [];
+
+  // 1. Primary Source: If membershipInfo JSON has entries, synthesize term records directly from JSON
+  if (Array.isArray(member.membershipInfo) && member.membershipInfo.length > 0) {
+    return member.membershipInfo.map((term, idx) => ({
+      ...member,
+      id: term.termId || `${member.id}-term-${idx}`,
+      domId: term.domId,
+      gradeLevel: term.gradeLevel || member.gradeLevel,
+      section: term.section || member.section,
+      councilRole: term.councilRole || member.councilRole,
+      maabId: term.maabId || member.maabId,
+      membershipStatus: (term.status as SrcyMembershipStatus) || 'Active',
+      joinedAt: term.joinedAt || member.joinedAt,
+      notes: term.notes || member.notes,
+    }));
+  }
+
+  // 2. Legacy Fallback: Query matching rows by LRN or name
   const lrn = toText(member.learnerLrn);
   const name = toText(member.fullName).toLowerCase();
 
@@ -270,7 +429,6 @@ export async function loadMemberHistory(member: SrcyMemberRecord): Promise<SrcyM
     records.push(member);
   }
 
-  // Sort reverse-chronologically: latest joinedAt or createdAt first
   return records.sort((a, b) => {
     const timeA = new Date(a.joinedAt || a.createdAt || 0).getTime();
     const timeB = new Date(b.joinedAt || b.createdAt || 0).getTime();
@@ -279,8 +437,9 @@ export async function loadMemberHistory(member: SrcyMemberRecord): Promise<SrcyM
 }
 
 /**
- * Renews an existing inactive member by registering a new membership record attached to a new DOM batch.
- * This preserves the historical record with the old/expired DOM.
+ * Renews an existing inactive member by updating their single member record in place
+ * and recording the new term inside their `membership_info` JSON array.
+ * This guarantees STRICTLY ONE record per member while preserving historical DOM batches.
  */
 export async function renewSrcyMember(
   previousMember: SrcyMemberRecord,
@@ -294,26 +453,66 @@ export async function renewSrcyMember(
     notes?: string;
   }
 ): Promise<SrcyMemberRecord> {
-  const newMemberDraft: SrcyMemberDraft = {
-    learnerLrn: previousMember.learnerLrn,
-    fullName: previousMember.fullName,
+  const nowIso = new Date().toISOString();
+
+  // Load DOM details for the new renewal batch
+  let domDetails: {
+    domNumber?: string;
+    schoolYear?: string;
+    validFrom?: string;
+    validUntil?: string;
+    status?: 'Active' | 'Pending' | 'Expired';
+  } = {};
+
+  try {
+    const doms = await loadSrcyDomRecords();
+    const matched = doms.find((d) => d.id === renewal.domId);
+    if (matched) {
+      domDetails = {
+        domNumber: matched.domNumber,
+        schoolYear: matched.schoolYear,
+        validFrom: matched.validFrom,
+        validUntil: matched.validUntil,
+        status: matched.status === 'Pending' ? 'Pending' : (matched.status === 'Active' ? 'Active' : 'Expired'),
+      };
+    }
+  } catch {
+    // ignore
+  }
+
+  const renewalTerm: SrcyMembershipTermInfo = {
+    termId: `term-${Date.now()}`,
+    domId: renewal.domId,
+    domNumber: domDetails.domNumber || '',
+    schoolYear: domDetails.schoolYear || '',
+    validFrom: domDetails.validFrom || '',
+    validUntil: domDetails.validUntil || '',
+    status: domDetails.status || 'Active',
+    gradeLevel: renewal.gradeLevel ?? previousMember.gradeLevel,
+    section: renewal.section ?? previousMember.section,
+    councilRole: renewal.councilRole ?? previousMember.councilRole ?? 'Member',
+    maabId: renewal.maabId ?? previousMember.maabId,
+    joinedAt: renewal.joinedAt || nowIso.slice(0, 10),
+    notes: renewal.notes ?? previousMember.notes,
+    updatedAt: nowIso,
+  };
+
+  const existingTerms = previousMember.membershipInfo || [];
+  const updatedTerms = [
+    renewalTerm,
+    ...existingTerms.filter((t) => t.domId !== renewal.domId),
+  ];
+
+  // Update existing member record in place!
+  return updateSrcyMember(previousMember.id, {
     gradeLevel: renewal.gradeLevel ?? previousMember.gradeLevel,
     section: renewal.section ?? previousMember.section,
     councilRole: renewal.councilRole ?? previousMember.councilRole ?? 'Member',
     membershipStatus: 'Active',
     domId: renewal.domId,
     maabId: renewal.maabId ?? previousMember.maabId,
-    birthdate: previousMember.birthdate,
-    address: previousMember.address,
-    contactNo: previousMember.contactNo,
-    email: previousMember.email,
-    emergencyContact: previousMember.emergencyContact,
-    joinedAt: renewal.joinedAt || new Date().toISOString().slice(0, 10),
+    joinedAt: renewal.joinedAt || previousMember.joinedAt,
     notes: renewal.notes ?? previousMember.notes,
-    schoolId: previousMember.schoolId,
-    createdBy: previousMember.createdBy,
-  };
-
-  return createSrcyMember(newMemberDraft);
+    membershipInfo: updatedTerms,
+  });
 }
-

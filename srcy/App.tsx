@@ -13,11 +13,13 @@ import {
   storeSrcyAccess,
   type SrcyAccessRecord,
 } from './features/auth/services/srcyAccess';
+import { clearAllSrcySessionCache } from './features/members/services/srcyMemberDetailsCache';
 import { DashboardPage } from './features/dashboard/pages/DashboardPage';
 import { srcyNavItems } from './features/layout/nav/srcyNavItems';
 import { MembershipPage } from './features/members/pages/MembershipPage';
 import { MembershipListPage } from './features/members/pages/MembershipListPage';
 import { DomRecordsPage } from './features/members/pages/DomRecordsPage';
+import { TrainingsPage } from './features/trainings/pages/TrainingsPage';
 
 function SrcyShell() {
   const location = useLocation();
@@ -40,6 +42,7 @@ function SrcyShell() {
   };
 
   const executeLogout = () => {
+    clearAllSrcySessionCache();
     clearStoredSrcyAccess();
     setSession(null);
     setIsLogoutConfirmOpen(false);
@@ -113,6 +116,7 @@ function SrcyShell() {
                 <Route path="/memberships" element={session ? <MembershipPage session={session} /> : <Navigate to="/access" replace />} />
                 <Route path="/membership-list" element={session ? <MembershipListPage session={session} /> : <Navigate to="/access" replace />} />
                 <Route path="/dom-records" element={session ? <DomRecordsPage session={session} /> : <Navigate to="/access" replace />} />
+                <Route path="/trainings" element={session ? <TrainingsPage session={session} /> : <Navigate to="/access" replace />} />
                 <Route path="*" element={<Navigate to={session ? '/' : '/access'} replace />} />
               </Routes>
             </div>

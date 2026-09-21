@@ -1,4 +1,3 @@
-
 import { Student, Section, SchoolYear, EnrollmentStatus, GradeLevel } from '../types';
 
 export const normalizeSchoolYear = (value: string) => {
@@ -78,7 +77,6 @@ export const getActiveLearnersForYear = (
     const hasActiveSection = studentSid && activeSectionIds.has(studentSid);
     const hasMatchingSchoolYear = normalizeSchoolYear(l.schoolYear) === normalizeSchoolYear(activeSchoolYear.label);
     const hasMatchingEnrollmentHistory = Boolean(findLearnerEnrollmentForYear(l, activeSchoolYear.label));
-    
     return hasActiveSection || hasMatchingSchoolYear || hasMatchingEnrollmentHistory;
   });
 };
@@ -99,7 +97,6 @@ export const calculateEnrollmentComposition = (
     const g = placement.gradeLevel;
     if (!g) return;
     if (!Object.values(GradeLevel).includes(g as GradeLevel)) return;
-    
     const jhs = [GradeLevel.GRADE_7, GradeLevel.GRADE_8, GradeLevel.GRADE_9, GradeLevel.GRADE_10];
     const shs = [GradeLevel.GRADE_11, GradeLevel.GRADE_12];
     

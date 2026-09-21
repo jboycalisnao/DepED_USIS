@@ -21,6 +21,8 @@ import {
 import { MemberDetailsModal } from '../modals/MemberDetailsModal';
 import { MemberEditModal } from '../modals/MemberEditModal';
 import { MemberRenewModal } from '../modals/MemberRenewModal';
+import { MemberMisModal } from '../mis/MemberMisModal';
+import { invalidateMemberDetailsCache } from '../services/srcyMemberDetailsCache';
 import UsisPageLoader from '../../../../common/components/UsisPageLoader';
 import { UsisAlertModal } from '../../../../common/components/UsisAlertModal';
 
@@ -51,7 +53,7 @@ const groupByOptions: UsisSearchableSelectOption[] = [
 const getStatusClassName = (status: SrcyMembershipStatus) =>
   `srcy-status-chip srcy-status-chip--${status.toLowerCase()}`;
 
-export function MembershipListPage({ session: _session }: MembershipListPageProps) {
+export function MembershipListPage({ session }: MembershipListPageProps) {
   const navigate = useNavigate();
   const [members, setMembers] = useState<SrcyMemberRecord[]>([]);
   const [domBatches, setDomBatches] = useState<SrcyDomRecord[]>([]);
@@ -64,6 +66,7 @@ export function MembershipListPage({ session: _session }: MembershipListPageProp
 
   const [selectedMemberForDetails, setSelectedMemberForDetails] = useState<SrcyMemberRecord | null>(null);
   const [selectedMemberForEdit, setSelectedMemberForEdit] = useState<SrcyMemberRecord | null>(null);
+  const [selectedMemberForMis, setSelectedMemberForMis] = useState<SrcyMemberRecord | null>(null);
   const [renewingMember, setRenewingMember] = useState<SrcyMemberRecord | null>(null);
   const [memberToDelete, setMemberToDelete] = useState<SrcyMemberRecord | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -99,7 +102,12 @@ export function MembershipListPage({ session: _session }: MembershipListPageProp
     const counts = new Map<string, number>();
     members.forEach((m) => {
       const key = m.learnerLrn?.trim() || m.id;
-      counts.set(key, (counts.get(key) || 0) + 1);
+      const jsonTermsCount = Array.isArray(m.membershipInfo) ? m.membershipInfo.length : 0;
+      if (jsonTermsCount > 0) {
+        counts.set(key, jsonTermsCount);
+      } else {
+        counts.set(key, (counts.get(key) || 0) + 1);
+      }
     });
 
     // Sort latest first
@@ -393,6 +401,7 @@ export function MembershipListPage({ session: _session }: MembershipListPageProp
   const handleStatusChange = async (id: string, status: SrcyMembershipStatus) => {
     try {
       await updateSrcyMemberStatus(id, status);
+      invalidateMemberDetailsCache(id);
       setMembers((current) =>
         current.map((member) =>
           member.id === id ? { ...member, membershipStatus: status, updatedAt: new Date().toISOString() } : member,
@@ -407,6 +416,7 @@ export function MembershipListPage({ session: _session }: MembershipListPageProp
   };
 
   const handleMemberSaved = (updated: SrcyMemberRecord) => {
+    invalidateMemberDetailsCache(updated.id);
     setMembers((current) =>
       current.map((m) => (m.id === updated.id ? updated : m)).sort((a, b) => a.fullName.localeCompare(b.fullName))
     );
@@ -425,6 +435,7 @@ export function MembershipListPage({ session: _session }: MembershipListPageProp
     setIsDeleting(true);
     try {
       await deleteSrcyMember(memberToDelete.id);
+      invalidateMemberDetailsCache(memberToDelete.id);
       setMembers((current) => current.filter((m) => m.id !== memberToDelete.id));
       if (selectedMemberForDetails?.id === memberToDelete.id) {
         setSelectedMemberForDetails(null);
@@ -513,6 +524,15 @@ export function MembershipListPage({ session: _session }: MembershipListPageProp
             >
               <span className="material-symbols-outlined" aria-hidden="true">visibility</span>
               <span className="srcy-row-btn-label">View</span>
+            </button>
+            <button
+              type="button"
+              className="secondary-button srcy-row-action-btn srcy-row-action-btn--mis"
+              onClick={() => setSelectedMemberForMis(member)}
+              title="Generate Member Information Sheet (MIS)"
+            >
+              <span className="material-symbols-outlined" aria-hidden="true">assignment_ind</span>
+              <span className="srcy-row-btn-label">MIS</span>
             </button>
             {effectiveStatus === 'Inactive' ? (
               <button
@@ -791,12 +811,18 @@ export function MembershipListPage({ session: _session }: MembershipListPageProp
           setSelectedMemberForDetails(null);
           setRenewingMember(m);
         }}
+        onGenerateMis={(m) => {
+          setSelectedMemberForDetails(null);
+          setSelectedMemberForMis(m);
+        }}
       />
 
       <MemberRenewModal
         member={renewingMember}
         onClose={() => setRenewingMember(null)}
         onRenewed={(newMember) => {
+          if (renewingMember) invalidateMemberDetailsCache(renewingMember.id);
+          invalidateMemberDetailsCache(newMember.id);
           void refresh();
           setSelectedMemberForDetails(newMember);
           setAlert({
@@ -811,6 +837,12 @@ export function MembershipListPage({ session: _session }: MembershipListPageProp
         member={selectedMemberForEdit}
         onClose={() => setSelectedMemberForEdit(null)}
         onSaved={handleMemberSaved}
+      />
+
+      <MemberMisModal
+        member={selectedMemberForMis}
+        onClose={() => setSelectedMemberForMis(null)}
+        session={session}
       />
 
       <UsisAlertModal

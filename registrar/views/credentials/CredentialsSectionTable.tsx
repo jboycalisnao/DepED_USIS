@@ -116,10 +116,10 @@ export function CredentialsSectionTable({
                                 className={`registrar-credentials-page__status-tag ${isActive ? 'is-active' : 'is-inactive'}`}
                                 onClick={(event) => { event.stopPropagation(); onToggleLearnerStatus(learner); }}
                                 disabled={pendingStatusToggleLearnerId === learner.id}
-                                title="Toggle login status"
+                                title={isActive ? 'Click to disable USIS login credentials' : 'Click to enable USIS login credentials'}
                                 aria-label={`Set status to ${isActive ? 'Inactive' : 'Active'}`}
                               >
-                                {pendingStatusToggleLearnerId === learner.id ? 'Updating...' : statusText}
+                                {pendingStatusToggleLearnerId === learner.id ? 'Updating...' : (isActive ? 'Active' : 'Disabled')}
                               </button>
                             </td>
                             <td>

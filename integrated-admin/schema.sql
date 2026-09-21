@@ -886,7 +886,7 @@ create index if not exists idx_srcy_dom_status on srcy_dom_records(status);
 -- =========================================================
 create table if not exists srcy_memberships (
   id uuid primary key default gen_random_uuid(),
-  learner_lrn text not null,
+  learner_lrn text not null unique,
   full_name text not null,
   grade_level text,
   section text,
@@ -901,17 +901,97 @@ create table if not exists srcy_memberships (
   emergency_contact text,
   joined_at date not null default current_date,
   notes text,
+  membership_info jsonb not null default '[]'::jsonb,
   school_id text,
   created_by uuid references usis_core_coordinators(id) on update cascade on delete set null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
+-- Ensure column exists on already existing tables
+alter table if exists srcy_memberships
+  add column if not exists membership_info jsonb not null default '[]'::jsonb;
+
 create index if not exists idx_srcy_memberships_lrn on srcy_memberships(learner_lrn);
 create index if not exists idx_srcy_memberships_status on srcy_memberships(membership_status);
 create index if not exists idx_srcy_memberships_school on srcy_memberships(school_id);
 create index if not exists idx_srcy_memberships_dom_id on srcy_memberships(dom_id);
 create index if not exists idx_srcy_memberships_maab_id on srcy_memberships(maab_id);
+create index if not exists idx_srcy_memberships_info on srcy_memberships using gin (membership_info);
+
+do $$
+declare
+  r record;
+  merged_info jsonb;
+  canonical_id uuid;
+begin
+  for r in (
+    select learner_lrn, count(*)
+    from srcy_memberships
+    where learner_lrn is not null and learner_lrn != ''
+    group by learner_lrn
+    having count(*) > 1
+  ) loop
+    select id into canonical_id
+    from srcy_memberships
+    where learner_lrn = r.learner_lrn
+    order by joined_at desc, created_at desc
+    limit 1;
+
+    select coalesce(jsonb_agg(
+      jsonb_build_object(
+        'termId', m.id,
+        'domId', m.dom_id,
+        'domNumber', d.dom_number,
+        'schoolYear', d.school_year,
+        'validFrom', d.valid_from,
+        'validUntil', d.valid_until,
+        'gradeLevel', m.grade_level,
+        'section', m.section,
+        'councilRole', m.council_role,
+        'maabId', m.maab_id,
+        'status', case
+          when d.id is null then 'Expired'
+          when d.status = 'Expired' or d.status = 'Archived' then 'Expired'
+          when current_date > d.valid_until then 'Expired'
+          when current_date < d.valid_from or d.status = 'Pending' then 'Pending'
+          else 'Active'
+        end,
+        'joinedAt', m.joined_at,
+        'notes', m.notes
+      ) order by m.joined_at desc, m.created_at desc
+    ), '[]'::jsonb)
+    into merged_info
+    from srcy_memberships m
+    left join srcy_dom_records d on m.dom_id = d.id
+    where m.learner_lrn = r.learner_lrn;
+
+    update srcy_memberships
+    set membership_info = merged_info
+    where id = canonical_id;
+
+    update srcy_training_participants
+    set membership_id = canonical_id
+    where membership_id in (
+      select id from srcy_memberships
+      where learner_lrn = r.learner_lrn and id != canonical_id
+    );
+
+    delete from srcy_memberships
+    where learner_lrn = r.learner_lrn and id != canonical_id;
+  end loop;
+end $$;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'uq_srcy_memberships_lrn'
+  ) then
+    alter table srcy_memberships
+      add constraint uq_srcy_memberships_lrn unique (learner_lrn);
+  end if;
+end $$;
 
 -- =========================================================
 -- SRCY Membership DOM History View
@@ -942,6 +1022,45 @@ select
   end as dom_status
 from srcy_memberships m
 left join srcy_dom_records d on m.dom_id = d.id;
+
+-- =========================================================
+-- SRCY Council Trainings
+-- =========================================================
+create table if not exists srcy_trainings (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  description text,
+  training_date date not null,
+  validity_period text not null default '1 Year (Active Term)',
+  status text not null default 'Completed' check (status in ('Completed', 'Scheduled', 'In Progress', 'Archived')),
+  venue text,
+  facilitator text,
+  school_year text,
+  school_id text,
+  created_by uuid references usis_core_coordinators(id) on update cascade on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_srcy_trainings_date on srcy_trainings(training_date);
+create index if not exists idx_srcy_trainings_status on srcy_trainings(status);
+create index if not exists idx_srcy_trainings_sy on srcy_trainings(school_year);
+
+-- =========================================================
+-- SRCY Training Participants
+-- =========================================================
+create table if not exists srcy_training_participants (
+  id uuid primary key default gen_random_uuid(),
+  training_id uuid not null references srcy_trainings(id) on update cascade on delete cascade,
+  membership_id uuid not null references srcy_memberships(id) on update cascade on delete cascade,
+  participation_status text not null default 'Completed' check (participation_status in ('Completed', 'Attended', 'Eligible', 'Incomplete', 'Excused')),
+  remarks text,
+  created_at timestamptz not null default now(),
+  unique (training_id, membership_id)
+);
+
+create index if not exists idx_srcy_training_parts_training on srcy_training_participants(training_id);
+create index if not exists idx_srcy_training_parts_member on srcy_training_participants(membership_id);
 
 -- =========================================================
 -- Learner Portal Notifications
@@ -1218,6 +1337,11 @@ for each row execute function set_updated_at();
 drop trigger if exists trg_srcy_memberships_updated_at on srcy_memberships;
 create trigger trg_srcy_memberships_updated_at
 before update on srcy_memberships
+for each row execute function set_updated_at();
+
+drop trigger if exists trg_srcy_trainings_updated_at on srcy_trainings;
+create trigger trg_srcy_trainings_updated_at
+before update on srcy_trainings
 for each row execute function set_updated_at();
 
 drop trigger if exists trg_ia_learner_portal_notifications_updated_at on ia_learner_portal_notifications;

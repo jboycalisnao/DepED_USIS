@@ -6,6 +6,7 @@ export interface LearnerPortalAccessRecord {
   learnerName: string;
   username: string;
   loginStatus: string;
+  loginPassword?: string;
 }
 
 export const LEARNER_PORTAL_SESSION_KEY = 'usis_learner_portal_access';
@@ -125,6 +126,7 @@ export const resolveLearnerAccess = async (username: string, password: string) =
       learnerName,
       username: String(data.login_username || normalizedUsername),
       loginStatus,
+      loginPassword: String(data.login_password_plain || normalizedPassword).trim(),
     } satisfies LearnerPortalAccessRecord,
   };
 };

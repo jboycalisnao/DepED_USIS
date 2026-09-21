@@ -4,10 +4,10 @@ import TopCenterAlert from '../components/TopCenterAlert';
 import { getActiveLearnersForYear, calculateEnrollmentComposition, calculateGenderDemographics } from '../services/dashboardService';
 import { fetchPendingPublicEnrollmentSubmissionCount } from '../features/registrar/public-enrollment/services/publicEnrollmentSubmissions';
 import { useStore } from '../store';
-import { EnrollmentStatus } from '../types';
+import { EnrollmentStatus, isPreviousYearUnreturnedLearner, resolveEffectiveLearnerStatus, resolvePreviousSchoolYear } from '../types';
 
 const Dashboard: React.FC = () => {
-  const { learners, sections, activeSchoolYear, loading, refreshData, connectionError } = useStore();
+  const { learners, sections, schoolYears, activeSchoolYear, loading, refreshData, connectionError } = useStore();
   const [showConnectionAlert, setShowConnectionAlert] = useState(false);
   const [pendingSubmissionCount, setPendingSubmissionCount] = useState(0);
 
@@ -22,6 +22,11 @@ const Dashboard: React.FC = () => {
   const activeLearnersList = useMemo(
     () => getActiveLearnersForYear(learners, sections, activeSchoolYear),
     [learners, sections, activeSchoolYear],
+  );
+
+  const previousSchoolYearInfo = useMemo(
+    () => resolvePreviousSchoolYear(activeSchoolYear, schoolYears),
+    [activeSchoolYear, schoolYears],
   );
 
   useEffect(() => {
@@ -45,14 +50,42 @@ const Dashboard: React.FC = () => {
 
   const displayStats = useMemo(() => {
     const totalVal = activeLearnersList.length;
-    const withdrawnVal = activeLearnersList.filter((l) => l.status === EnrollmentStatus.WITHDRAWN).length;
+    // Graduated status counts all Grade 12 students from previous active school years that are not re-enrolled
+    // in the current active school year, plus any explicitly marked graduated learners from the database,
+    // even if they are not shown in the active UI sections.
+    const graduatedVal = learners.filter(
+      (l) => resolveEffectiveLearnerStatus(l, activeSchoolYear.label, sections, activeSchoolYear.id, schoolYears) === EnrollmentStatus.GRADUATED,
+    ).length;
+
+    // Previous learners count: learners in the previous school year that were not able to enroll back
+    // into the current active school year (excluding graduates who completed their schooling).
+    const previousUnenrolledVal = learners.filter(
+      (l) => isPreviousYearUnreturnedLearner(l, activeSchoolYear, sections, schoolYears),
+    ).length;
+
+    const inactiveVal = activeLearnersList.filter(
+      (l) => {
+        const eff = resolveEffectiveLearnerStatus(l, activeSchoolYear.label, sections, activeSchoolYear.id, schoolYears);
+        return (
+          eff === EnrollmentStatus.WITHDRAWN ||
+          eff === EnrollmentStatus.TRANSFER_OUT ||
+          eff === EnrollmentStatus.DROP_OUT ||
+          String(l.status || '').toLowerCase().includes('transfer') ||
+          String(l.status || '').toLowerCase().includes('drop')
+        );
+      },
+    ).length;
+
+    const previousSyLabel = previousSchoolYearInfo ? `SY ${previousSchoolYearInfo.label}` : 'Previous SY';
 
     return [
       { label: `Learners (SY ${activeSchoolYear.label})`, value: totalVal, icon: 'group', color: 'bg-primary' },
       { label: 'Pending Applications', value: pendingSubmissionCount, icon: 'hourglass_top', color: 'bg-accent' },
-      { label: 'Withdrawn/Dropped', value: withdrawnVal, icon: 'person_off', color: 'bg-slate-600' },
+      { label: 'Graduated Status', value: graduatedVal, icon: 'school', color: 'bg-indigo-700' },
+      { label: `Previous Learners (${previousSyLabel})`, value: previousUnenrolledVal, icon: 'person_cancel', color: 'bg-amber-700' },
+      { label: 'Transfer / Drop / Withdrawn', value: inactiveVal, icon: 'person_off', color: 'bg-slate-600' },
     ];
-  }, [activeLearnersList, activeSchoolYear, pendingSubmissionCount]);
+  }, [activeLearnersList, activeSchoolYear, learners, pendingSubmissionCount, previousSchoolYearInfo, schoolYears, sections]);
 
   const enrollmentData = useMemo(
     () => calculateEnrollmentComposition(activeLearnersList, sections, activeSchoolYear),

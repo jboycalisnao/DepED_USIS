@@ -174,6 +174,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const action = String(parsed.action || '').trim().toLowerCase();
     const learnerId = String(parsed.learnerId || '').trim();
     const displayName = String(parsed.displayName || '').trim();
+    const givenName = String(parsed.givenName || parsed.firstName || '').trim();
+    const surname = String(parsed.surname || parsed.lastName || '').trim();
     const mailNickname = String(parsed.mailNickname || '').trim();
     const userPrincipalName = String(parsed.userPrincipalName || '').trim();
     const temporaryPassword = String(parsed.temporaryPassword || '').trim();
@@ -183,7 +185,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (!learnerId) return json(res, 400, { error: 'learnerId is required.' });
       if (!supabaseAdmin) return json(res, 500, { error: 'Supabase service is required.' });
 
-      const learnerResult = await supabaseAdmin.from('registrar_learners').select('id,microsoft_user_id,microsoft_upn').eq('id', learnerId).maybeSingle();
+      const learnerResult = await supabaseAdmin.from('registrar_learners').select('id,first_name,last_name,microsoft_user_id,microsoft_upn').eq('id', learnerId).maybeSingle();
       if (learnerResult.error) return json(res, 502, { error: 'Failed to read learner record', details: learnerResult.error.message });
       if (!learnerResult.data) return json(res, 404, { error: 'Learner not found' });
 
@@ -194,10 +196,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (!newPassword) return json(res, 400, { error: 'newPassword is required for reset-password.' });
         if (!graphKey) return json(res, 409, { error: 'Learner has no linked Microsoft account.' });
         const accessToken = await getAccessToken(tenantId, clientId, clientSecret);
+        const patchGivenName = givenName || String(learnerResult.data.first_name || '').trim();
+        const patchSurname = surname || String(learnerResult.data.last_name || '').trim();
         const resetResponse = await fetch(`https://graph.microsoft.com/v1.0/users/${encodeURIComponent(graphKey)}`, {
           method: 'PATCH',
           headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ passwordProfile: { forceChangePasswordNextSignIn: false, password: newPassword } }),
+          body: JSON.stringify({
+            passwordProfile: { forceChangePasswordNextSignIn: false, password: newPassword },
+            ...(patchGivenName ? { givenName: patchGivenName } : {}),
+            ...(patchSurname ? { surname: patchSurname } : {}),
+          }),
         });
         if (!resetResponse.ok) return json(res, 502, { error: 'Microsoft password reset failed', details: await resetResponse.text() });
         await supabaseAdmin.from('registrar_learners').update({ microsoft_last_synced_at: nowIso, microsoft_account_status: 'Active' }).eq('id', learnerId);
@@ -222,8 +230,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return json(res, 400, { error: 'learnerId, displayName, mailNickname, userPrincipalName, and temporaryPassword are required.' });
     }
 
+    let existingLearnerData: any = null;
     if (supabaseAdmin) {
-      const existingLearnerResult = await supabaseAdmin.from('registrar_learners').select('id,microsoft_user_id,microsoft_upn').eq('id', learnerId).maybeSingle();
+      const existingLearnerResult = await supabaseAdmin.from('registrar_learners').select('id,first_name,last_name,microsoft_user_id,microsoft_upn').eq('id', learnerId).maybeSingle();
       if (existingLearnerResult.error) return json(res, 502, { error: 'Failed to read learner record', details: existingLearnerResult.error.message });
       if (!existingLearnerResult.data) return json(res, 404, { error: 'Learner not found' });
       if (existingLearnerResult.data.microsoft_user_id || existingLearnerResult.data.microsoft_upn) {
@@ -233,7 +242,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           userPrincipalName: existingLearnerResult.data.microsoft_upn,
         });
       }
+      existingLearnerData = existingLearnerResult.data;
     }
+
+    const resolvedGivenName = givenName || String(existingLearnerData?.first_name || '').trim();
+    const resolvedSurname = surname || String(existingLearnerData?.last_name || '').trim();
 
     const accessToken = await getAccessToken(tenantId, clientId, clientSecret);
     const createUserResponse = await fetch('https://graph.microsoft.com/v1.0/users', {
@@ -242,6 +255,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       body: JSON.stringify({
         accountEnabled: true,
         displayName,
+        givenName: resolvedGivenName || undefined,
+        surname: resolvedSurname || undefined,
         mailNickname,
         userPrincipalName,
         passwordProfile: { forceChangePasswordNextSignIn: false, password: temporaryPassword },

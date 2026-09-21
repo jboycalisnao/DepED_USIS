@@ -1,16 +1,19 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
+import UsisPageLoader from '../../../../common/components/UsisPageLoader';
 import {
   calculateAge,
-  loadMemberHistory,
   type SrcyMemberRecord,
 } from '../services/srcyMembershipService';
 import {
   getDomRecordStatusSummary,
   getMemberDomValiditySummary,
-  loadSrcyDomRecords,
   type SrcyDomRecord,
 } from '../services/srcyDomService';
+import {
+  fetchOrGetCachedMemberDetails,
+  getCachedMemberDetails,
+} from '../services/srcyMemberDetailsCache';
 
 type MemberDetailsModalProps = {
   member: SrcyMemberRecord | null;
@@ -18,6 +21,7 @@ type MemberDetailsModalProps = {
   onEdit: (member: SrcyMemberRecord) => void;
   onDelete: (member: SrcyMemberRecord) => void;
   onRenew?: (member: SrcyMemberRecord) => void;
+  onGenerateMis?: (member: SrcyMemberRecord) => void;
 };
 
 const formatDate = (dateStr: string) => {
@@ -41,28 +45,39 @@ export function MemberDetailsModal({
   onEdit,
   onDelete,
   onRenew,
+  onGenerateMis,
 }: MemberDetailsModalProps) {
+  const cachedInitial = member ? getCachedMemberDetails(member.id) : null;
   const [activeTab, setActiveTab] = useState<'profile' | 'history'>('profile');
-  const [domBatch, setDomBatch] = useState<SrcyDomRecord | null>(null);
-  const [allDoms, setAllDoms] = useState<SrcyDomRecord[]>([]);
-  const [history, setHistory] = useState<SrcyMemberRecord[]>([]);
-  const [isLoadingHistory, setIsLoadingHistory] = useState<boolean>(true);
+  const [domBatch, setDomBatch] = useState<SrcyDomRecord | null>(() => cachedInitial?.domBatch ?? null);
+  const [allDoms, setAllDoms] = useState<SrcyDomRecord[]>(() => cachedInitial?.allDoms ?? []);
+  const [history, setHistory] = useState<SrcyMemberRecord[]>(() => cachedInitial?.history ?? []);
+  const [isLoadingHistory, setIsLoadingHistory] = useState<boolean>(() => !cachedInitial);
 
   useEffect(() => {
     if (!member) {
       setDomBatch(null);
       setHistory([]);
+      setIsLoadingHistory(false);
+      return;
+    }
+
+    const cached = getCachedMemberDetails(member.id);
+    if (cached) {
+      setAllDoms(cached.allDoms);
+      setHistory(cached.history);
+      setDomBatch(cached.domBatch);
+      setIsLoadingHistory(false);
       return;
     }
 
     setIsLoadingHistory(true);
 
-    Promise.all([loadSrcyDomRecords(), loadMemberHistory(member)])
-      .then(([domList, historyList]) => {
-        setAllDoms(domList);
-        setHistory(historyList);
-        const found = domList.find((d) => d.id === member.domId);
-        setDomBatch(found || null);
+    fetchOrGetCachedMemberDetails(member)
+      .then((cachedRecord) => {
+        setAllDoms(cachedRecord.allDoms);
+        setHistory(cachedRecord.history);
+        setDomBatch(cachedRecord.domBatch);
       })
       .catch(() => {
         setAllDoms([]);
@@ -76,6 +91,28 @@ export function MemberDetailsModal({
   // Derive DOM details: DOM Number, Validity Date, and Status of the DOM
   const domHistoryList = useMemo(() => {
     if (!member) return [];
+
+    // Primary: If member has membershipInfo JSON format, read directly from it!
+    if (Array.isArray(member.membershipInfo) && member.membershipInfo.length > 0) {
+      return member.membershipInfo.map((term, index) => {
+        const matchingDom = term.domId ? allDoms.find((d) => d.id === term.domId) : null;
+        const domNum = term.domNumber || matchingDom?.domNumber || 'DOM Record';
+        const vf = term.validFrom || matchingDom?.validFrom || '';
+        const vu = term.validUntil || matchingDom?.validUntil || '';
+        const validityDate = vf && vu ? `${vf} to ${vu}` : (term.schoolYear ? `S.Y. ${term.schoolYear}` : 'No validity period');
+        const status = term.status || (matchingDom ? getDomRecordStatusSummary(matchingDom).status : 'Active');
+        const reason = matchingDom ? getDomRecordStatusSummary(matchingDom).reason : 'Recorded membership term';
+
+        return {
+          key: term.termId || `term-${term.domId}-${index}`,
+          domNumber: domNum,
+          validityDate,
+          status,
+          reason,
+          isCurrent: term.domId === member.domId,
+        };
+      });
+    }
 
     const seenDomKeys = new Set<string>();
     const items: {
@@ -196,7 +233,11 @@ export function MemberDetailsModal({
         </div>
 
         <div className="modal-dialog__body srcy-details-body">
-          <div className="srcy-details-meta-bar">
+          {isLoadingHistory ? (
+            <UsisPageLoader variant="modal" message="Loading member record..." />
+          ) : (
+            <>
+              <div className="srcy-details-meta-bar">
             <span className={statusClass} title={domSummary.reason}>{effectiveStatus}</span>
             <span className="srcy-details-meta-item">
               Council Role: <strong>{member.councilRole || 'Member'}</strong>
@@ -424,38 +465,59 @@ export function MemberDetailsModal({
               )}
             </div>
           )}
+            </>
+          )}
         </div>
 
         <div className="modal-dialog__actions">
-          {effectiveStatus === 'Inactive' && onRenew ? (
-            <button
-              type="button"
-              className="primary-button srcy-btn-renew"
-              onClick={() => onRenew(member)}
-            >
-              <span className="material-symbols-outlined" aria-hidden="true">autorenew</span>
-              Renew Member
+          {isLoadingHistory ? (
+            <button type="button" className="secondary-button" onClick={onClose}>
+              Close
             </button>
-          ) : null}
-          <button
-            type="button"
-            className="secondary-button srcy-btn-danger"
-            onClick={() => onDelete(member)}
-          >
-            <span className="material-symbols-outlined" aria-hidden="true">delete</span>
-            Delete
-          </button>
-          <button
-            type="button"
-            className="secondary-button"
-            onClick={() => onEdit(member)}
-          >
-            <span className="material-symbols-outlined" aria-hidden="true">edit</span>
-            Edit Member
-          </button>
-          <button type="button" className="primary-button" onClick={onClose}>
-            Close
-          </button>
+          ) : (
+            <>
+              {effectiveStatus === 'Inactive' && onRenew ? (
+                <button
+                  type="button"
+                  className="primary-button srcy-btn-renew"
+                  onClick={() => onRenew(member)}
+                >
+                  <span className="material-symbols-outlined" aria-hidden="true">autorenew</span>
+                  Renew Member
+                </button>
+              ) : null}
+              <button
+                type="button"
+                className="secondary-button srcy-btn-danger"
+                onClick={() => onDelete(member)}
+              >
+                <span className="material-symbols-outlined" aria-hidden="true">delete</span>
+                Delete
+              </button>
+              {onGenerateMis ? (
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={() => onGenerateMis(member)}
+                  title="Generate Member Information Sheet (MIS)"
+                >
+                  <span className="material-symbols-outlined" aria-hidden="true">assignment_ind</span>
+                  Generate MIS
+                </button>
+              ) : null}
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => onEdit(member)}
+              >
+                <span className="material-symbols-outlined" aria-hidden="true">edit</span>
+                Edit Member
+              </button>
+              <button type="button" className="primary-button" onClick={onClose}>
+                Close
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>,

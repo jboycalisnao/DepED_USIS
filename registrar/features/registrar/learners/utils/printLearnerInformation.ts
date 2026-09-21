@@ -1,4 +1,4 @@
-import { Section, Student } from '../../../../types';
+import { resolveEffectiveLearnerStatus, Section, Student } from '../../../../types';
 import { supabase } from '../../../../lib/supabase';
 import { buildLNHSPrintSheetHeader } from '../../shared/printSheetHeader';
 import { fetchRegistrarSignatories } from '../../shared/signatorySettings';
@@ -221,6 +221,7 @@ const buildPrintHtml = async ({ learners, schoolYearLabel, sections }: PrintLear
         latestSubmissionPayload && firstNonEmpty([latestSubmissionPayload.tags]),
       ]);
       const verificationCard = await buildVerificationCard(learner);
+      const effectiveStatus = resolveEffectiveLearnerStatus(learner, schoolYearLabel, sections);
 
       const enrollmentRecords = [
         ...(enrollmentSnapshot.currentEnrollment ? [enrollmentSnapshot.currentEnrollment] : []),
@@ -270,7 +271,7 @@ const buildPrintHtml = async ({ learners, schoolYearLabel, sections }: PrintLear
               <p><strong>Gender:</strong> ${escapeHtml(toText(learner.gender))}</p>
               <p><strong>Birth Date:</strong> ${escapeHtml(toText(learner.birthDate))}</p>
               <p><strong>Email:</strong> ${escapeHtml(toText(learner.email))}</p>
-              <p><strong>Status:</strong> ${escapeHtml(toText(learner.status))}</p>
+              <p><strong>Status:</strong> ${escapeHtml(toText(effectiveStatus))}</p>
               <p><strong>Extension Name:</strong> ${escapeHtml(toOptionalText(extensionName))}</p>
               <p><strong>Birth Certificate No.:</strong> ${escapeHtml(toOptionalText(birthCertificateNo))}</p>
               <p><strong>Place of Birth:</strong> ${escapeHtml(toOptionalText(placeOfBirth))}</p>
@@ -291,7 +292,7 @@ const buildPrintHtml = async ({ learners, schoolYearLabel, sections }: PrintLear
               <p><strong>Current Grade Level:</strong> ${escapeHtml(toText(grade))}</p>
               <p><strong>Current Section:</strong> ${escapeHtml(toText(section))}</p>
               <p><strong>Enrollment Date:</strong> ${escapeHtml(toText(latestEnrollment?.enrollmentDate))}</p>
-              <p><strong>Enrollment Status:</strong> ${escapeHtml(toText(latestEnrollment?.status || learner.status))}</p>
+              <p><strong>Enrollment Status:</strong> ${escapeHtml(toText(latestEnrollment?.status || effectiveStatus))}</p>
               <p><strong>Preferred Strand:</strong> ${escapeHtml(toOptionalText(strand))}</p>
               <p><strong>Semester:</strong> ${escapeHtml(toOptionalText(semester))}</p>
             </div>

@@ -1,13 +1,75 @@
-
 export enum EnrollmentStatus {
   ENROLLED = 'Enrolled',
   PENDING = 'Pending',
+  TRANSFER_OUT = 'Transfer Out',
+  DROP_OUT = 'Drop Out',
   WITHDRAWN = 'Withdrawn',
   GRADUATED = 'Graduated'
 }
 
 // Alias for newer parser logic
 export const LearnerStatus = EnrollmentStatus;
+
+export const LEARNER_STATUS_OPTIONS: EnrollmentStatus[] = [
+  EnrollmentStatus.ENROLLED,
+  EnrollmentStatus.TRANSFER_OUT,
+  EnrollmentStatus.DROP_OUT,
+  EnrollmentStatus.WITHDRAWN,
+  EnrollmentStatus.GRADUATED,
+];
+
+export const normalizeLearnerStatus = (status?: string | null): EnrollmentStatus => {
+  const raw = String(status || '').trim().toLowerCase();
+  if (raw === 'transfer out' || raw === 'transferred out' || raw === 'transfer_out') {
+    return EnrollmentStatus.TRANSFER_OUT;
+  }
+  if (raw === 'drop out' || raw === 'dropped out' || raw === 'drop_out' || raw === 'dropped') {
+    return EnrollmentStatus.DROP_OUT;
+  }
+  if (raw === 'withdrawn') {
+    return EnrollmentStatus.WITHDRAWN;
+  }
+  if (raw === 'graduated') {
+    return EnrollmentStatus.GRADUATED;
+  }
+  if (raw === 'pending') {
+    return EnrollmentStatus.PENDING;
+  }
+  return EnrollmentStatus.ENROLLED;
+};
+
+export const getLearnerStatusTone = (status?: string | null): 'enrolled' | 'transfer-out' | 'drop-out' | 'withdrawn' | 'graduated' | 'pending' => {
+  const normalized = normalizeLearnerStatus(status);
+  switch (normalized) {
+    case EnrollmentStatus.TRANSFER_OUT:
+      return 'transfer-out';
+    case EnrollmentStatus.DROP_OUT:
+      return 'drop-out';
+    case EnrollmentStatus.WITHDRAWN:
+      return 'withdrawn';
+    case EnrollmentStatus.GRADUATED:
+      return 'graduated';
+    case EnrollmentStatus.PENDING:
+      return 'pending';
+    case EnrollmentStatus.ENROLLED:
+    default:
+      return 'enrolled';
+  }
+};
+
+export {
+  normalizeSchoolYearKey,
+  parseSchoolYearStartYear,
+  resolveSchoolYearStartYear,
+  resolvePreviousSchoolYear,
+  isPreviousSchoolYear,
+  isGrade12,
+  findLearnerPreviousGrade12Record,
+  isPreviousYearGrade12Graduate,
+  resolveEffectiveLearnerStatus,
+  wasLearnerEnrolledInYear,
+  isPreviousYearUnreturnedLearner,
+} from './utils/learnerStatusResolver';
 
 export enum GradeLevel {
   KINDERGARTEN = 'Kindergarten',

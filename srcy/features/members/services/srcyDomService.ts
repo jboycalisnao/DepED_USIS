@@ -406,25 +406,109 @@ export async function deleteSrcyDomRecord(id: string): Promise<void> {
 export async function attachMembersToDom(domId: string, memberIds: string[]): Promise<void> {
   if (!memberIds.length) return;
 
-  const { error } = await supabase
-    .from('srcy_memberships')
-    .update({ dom_id: domId, updated_at: new Date().toISOString() })
-    .in('id', memberIds);
+  const nowIso = new Date().toISOString();
 
-  if (error) {
-    if (typeof window !== 'undefined') {
-      try {
-        const raw = window.localStorage.getItem('srcy_membership_records');
-        if (raw) {
-          const members: SrcyMemberRecord[] = JSON.parse(raw);
-          const next = members.map((m) =>
-            memberIds.includes(m.id) ? { ...m, domId, updatedAt: new Date().toISOString() } : m
-          );
-          window.localStorage.setItem('srcy_membership_records', JSON.stringify(next));
+  // Load target DOM batch details
+  let domRecord: SrcyDomRecord | null = null;
+  try {
+    const doms = await loadSrcyDomRecords();
+    domRecord = doms.find((d) => d.id === domId) || null;
+  } catch {
+    // ignore
+  }
+
+  try {
+    const { data: currentMembers } = await supabase
+      .from('srcy_memberships')
+      .select('*')
+      .in('id', memberIds);
+
+    if (currentMembers && Array.isArray(currentMembers)) {
+      for (const m of currentMembers) {
+        let existingTerms: any[] = [];
+        try {
+          existingTerms = Array.isArray(m.membership_info)
+            ? m.membership_info
+            : typeof m.membership_info === 'string'
+            ? JSON.parse(m.membership_info || '[]')
+            : [];
+        } catch {
+          existingTerms = [];
         }
-      } catch {
-        // ignore
+
+        const newTerm = {
+          termId: `term-${Date.now()}`,
+          domId,
+          domNumber: domRecord?.domNumber || '',
+          schoolYear: domRecord?.schoolYear || '',
+          validFrom: domRecord?.validFrom || '',
+          validUntil: domRecord?.validUntil || '',
+          status: domRecord?.status === 'Pending' ? 'Pending' : (domRecord?.status === 'Active' ? 'Active' : 'Expired'),
+          gradeLevel: m.grade_level || '',
+          section: m.section || '',
+          councilRole: m.council_role || 'Member',
+          maabId: m.maab_id || '',
+          joinedAt: m.joined_at || nowIso.slice(0, 10),
+          notes: m.notes || '',
+          updatedAt: nowIso,
+        };
+
+        const updatedTerms = [newTerm, ...existingTerms.filter((t: any) => t.domId !== domId)];
+
+        await supabase
+          .from('srcy_memberships')
+          .update({
+            dom_id: domId,
+            membership_info: updatedTerms,
+            updated_at: nowIso,
+          })
+          .eq('id', m.id);
       }
+    } else {
+      await supabase
+        .from('srcy_memberships')
+        .update({ dom_id: domId, updated_at: nowIso })
+        .in('id', memberIds);
+    }
+  } catch {
+    // Supabase fallback
+  }
+
+  if (typeof window !== 'undefined') {
+    try {
+      const raw = window.localStorage.getItem('srcy_membership_records');
+      if (raw) {
+        const members: SrcyMemberRecord[] = JSON.parse(raw);
+        const next = members.map((m) => {
+          if (!memberIds.includes(m.id)) return m;
+          const existingTerms = m.membershipInfo || [];
+          const newTerm = {
+            termId: `term-${Date.now()}`,
+            domId,
+            domNumber: domRecord?.domNumber || '',
+            schoolYear: domRecord?.schoolYear || '',
+            validFrom: domRecord?.validFrom || '',
+            validUntil: domRecord?.validUntil || '',
+            status: (domRecord?.status === 'Pending' ? 'Pending' : (domRecord?.status === 'Active' ? 'Active' : 'Expired')) as any,
+            gradeLevel: m.gradeLevel,
+            section: m.section,
+            councilRole: m.councilRole,
+            maabId: m.maabId,
+            joinedAt: m.joinedAt,
+            notes: m.notes,
+            updatedAt: nowIso,
+          };
+          return {
+            ...m,
+            domId,
+            membershipInfo: [newTerm, ...existingTerms.filter((t) => t.domId !== domId)],
+            updatedAt: nowIso,
+          };
+        });
+        window.localStorage.setItem('srcy_membership_records', JSON.stringify(next));
+      }
+    } catch {
+      // ignore
     }
   }
 }

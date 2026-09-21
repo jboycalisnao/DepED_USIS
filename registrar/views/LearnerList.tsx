@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '../store';
-import { EnrollmentRecord, GradeLevel, Student } from '../types';
+import { EnrollmentRecord, EnrollmentStatus, getLearnerStatusTone, GradeLevel, normalizeLearnerStatus, resolveEffectiveLearnerStatus, Student } from '../types';
 import { UsisSearchInput } from '../../common/components/ui/UsisSearchInput';
+import { UsisSearchableSelect, UsisSearchableSelectOption } from '../../common/components/ui/UsisSearchableSelect';
 import { matchesUsisLearnerSearch } from '../../common/utils/usisLearnerSearch';
 import ConfirmationModal from '../components/ConfirmationModal';
 import LearnerDetailsModal from '../components/LearnerDetailsModal';
@@ -9,10 +10,20 @@ import { openLearnerInformationPrintWindow } from '../features/registrar/learner
 import { openGradeLevelSectionListPrintWindow, openSectionListPrintWindow } from '../features/registrar/learners/utils/printSectionList';
 import { sendLearnerCredentialsViaWebhook } from '../features/registrar/learners/services/sendLearnerCredentialsEmail';
 import LearnerEditModal from './learners/LearnerEditModal';
+import LearnerStatusModal from './learners/LearnerStatusModal';
 import { getActiveLearnersForYear, getLearnerPlacementForYear } from '../services/dashboardService';
 import { resolveAdviserLinkedSections, groupLearnersByLinkedSection } from './adviser-learners/utils/adviserLearnerAccess';
 import { downloadAdviserSectionWorkbook } from './adviser-learners/utils/adviserLearnerWorkbook';
 import { loadAdviserLearnerSnapshot, saveAdviserLearnerSnapshot } from './adviser-learners/utils/adviserLearnerCache';
+
+const STATUS_FILTER_OPTIONS: UsisSearchableSelectOption[] = [
+  { label: 'All Statuses', value: 'ALL' },
+  { label: 'Enrolled', value: EnrollmentStatus.ENROLLED },
+  { label: 'Transfer Out', value: EnrollmentStatus.TRANSFER_OUT },
+  { label: 'Drop Out', value: EnrollmentStatus.DROP_OUT },
+  { label: 'Withdrawn', value: EnrollmentStatus.WITHDRAWN },
+  { label: 'Graduated', value: EnrollmentStatus.GRADUATED },
+];
 
 const LearnerList: React.FC = () => {
   const { learners, sections, activeSchoolYear, availableStrands, registrarAccess, removeLearner, clearSectionLearners, updateLearner, loading } = useStore();
@@ -25,8 +36,45 @@ const LearnerList: React.FC = () => {
   const [revealedPasswordLearnerId, setRevealedPasswordLearnerId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  const [statusChangingStudent, setStatusChangingStudent] = useState<Student | null>(null);
+  const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [sendingCredentialsStudent, setSendingCredentialsStudent] = useState<Student | null>(null);
+  const [confirmingLoginToggleStudent, setConfirmingLoginToggleStudent] = useState<{ student: Student; targetStatus: 'Active' | 'Inactive' } | null>(null);
+  const [isTogglingLogin, setIsTogglingLogin] = useState(false);
   const previousHasSearchQueryRef = useRef(false);
+
+  const promptToggleLoginStatus = (student: Student) => {
+    const isCurrentlyDisabled =
+      (student.loginStatus || '').trim().toLowerCase() === 'inactive' ||
+      (student.loginStatus || '').trim().toLowerCase() === 'disabled';
+    setConfirmingLoginToggleStudent({
+      student,
+      targetStatus: isCurrentlyDisabled ? 'Active' : 'Inactive',
+    });
+  };
+
+  const handleConfirmLoginToggle = async () => {
+    if (!confirmingLoginToggleStudent) return;
+    const { student, targetStatus } = confirmingLoginToggleStudent;
+    setIsTogglingLogin(true);
+    try {
+      const result = await updateLearner(student.id, { loginStatus: targetStatus });
+      if (result?.error) {
+        setFeedback(`Failed to update login credentials status: ${result.error}`);
+        return;
+      }
+      setFeedback(
+        targetStatus === 'Inactive'
+          ? `USIS login credentials disabled for ${student.lastName}, ${student.firstName}. The learner is now blocked from signing into the portal.`
+          : `USIS login credentials enabled for ${student.lastName}, ${student.firstName}.`
+      );
+    } catch (err: any) {
+      setFeedback(err?.message || 'Failed to update login status.');
+    } finally {
+      setIsTogglingLogin(false);
+      setConfirmingLoginToggleStudent(null);
+    }
+  };
 
   const isLocked = activeSchoolYear.isLocked;
   const isAdviserScopedAccess =
@@ -49,8 +97,16 @@ const LearnerList: React.FC = () => {
   const resolvePlacement = (student: Student) => getLearnerPlacementForYear(student, sections, activeSchoolYear);
 
   const activeLearnersForYear = useMemo(() => {
-    return baseActiveLearnersForYear.filter((learner) => matchesUsisLearnerSearch(learner, searchTerm));
-  }, [baseActiveLearnersForYear, searchTerm]);
+    return baseActiveLearnersForYear.filter((learner) => {
+      const matchesSearch = matchesUsisLearnerSearch(learner, searchTerm);
+      if (!matchesSearch) return false;
+      if (statusFilter !== 'ALL') {
+        const effectiveStatus = resolveEffectiveLearnerStatus(learner, activeSchoolYear.label, sections, activeSchoolYear.id);
+        return effectiveStatus === statusFilter;
+      }
+      return true;
+    });
+  }, [baseActiveLearnersForYear, searchTerm, statusFilter, activeSchoolYear.label, activeSchoolYear.id, sections]);
 
   const derivedHistory = useMemo(() => {
     if (!selectedStudent) return [];
@@ -317,6 +373,19 @@ const LearnerList: React.FC = () => {
               onChange={setSearchTerm}
               value={searchTerm}
             />
+            <div className="registrar-learners-page__status-filter-wrap">
+              <UsisSearchableSelect
+                ariaLabel="Filter by enrollment status"
+                label="Status"
+                floatingLabel
+                allowTyping={false}
+                forcePortalMenu
+                options={STATUS_FILTER_OPTIONS}
+                value={statusFilter}
+                onChange={(val) => setStatusFilter(val || 'ALL')}
+                placeholder="All Statuses"
+              />
+            </div>
             <div className="registrar-learners-page__meta-box">
               <span className="registrar-learners-page__meta-label">Active Registry</span>
               <span className="registrar-learners-page__meta-value">{baseActiveLearnersForYear.length}</span>
@@ -421,6 +490,7 @@ const LearnerList: React.FC = () => {
                                       <th>Username</th>
                                       {!isAdviserScopedAccess ? <th>Password</th> : null}
                                       <th>Login</th>
+                                      <th>Status</th>
                                       <th className="align-center">Sex</th>
                                       <th className="align-right">Actions</th>
                                     </tr>
@@ -432,7 +502,7 @@ const LearnerList: React.FC = () => {
                                       return (
                                         <React.Fragment key={gender}>
                                           <tr className="registrar-learners-page__gender-row">
-                                            <td colSpan={isAdviserScopedAccess ? 6 : 7}>
+                                            <td colSpan={isAdviserScopedAccess ? 7 : 8}>
                                               <span>{gender} - {students.length}</span>
                                             </td>
                                           </tr>
@@ -440,7 +510,14 @@ const LearnerList: React.FC = () => {
                                             <tr key={student.id}>
                                               <td className="mono">{student.lrn}</td>
                                               <td>
-                                                <div className="name">{student.lastName}, {student.firstName} {student.middleName || ''}</div>
+                                                <button
+                                                  type="button"
+                                                  className="registrar-learners-page__name-btn"
+                                                  onClick={() => setSelectedStudent(student)}
+                                                  title="View Learner Record"
+                                                >
+                                                  {student.lastName}, {student.firstName} {student.middleName || ''}
+                                                </button>
                                               </td>
                                               <td>{student.loginUsername || 'Not Set'}</td>
                                               {!isAdviserScopedAccess ? (
@@ -452,12 +529,75 @@ const LearnerList: React.FC = () => {
                                                     : 'Not Set'}
                                                 </td>
                                               ) : null}
-                                              <td><span className="login-state">{student.loginStatus || 'Active'}</span></td>
+                                              <td>
+                                                {(() => {
+                                                  const isLoginDisabled =
+                                                    (student.loginStatus || '').trim().toLowerCase() === 'inactive' ||
+                                                    (student.loginStatus || '').trim().toLowerCase() === 'disabled';
+                                                  const isLoginActive = !isLoginDisabled;
+                                                  return !isAdviserScopedAccess ? (
+                                                    <button
+                                                      type="button"
+                                                      className={`login-state-badge ${isLoginActive ? 'is-active' : 'is-disabled'}`}
+                                                      onClick={() => promptToggleLoginStatus(student)}
+                                                      title={isLoginActive ? 'Click to disable USIS login credentials' : 'Click to enable USIS login credentials'}
+                                                    >
+                                                      <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>
+                                                        {isLoginActive ? 'check_circle' : 'block'}
+                                                      </span>
+                                                      {isLoginActive ? 'Active' : 'Disabled'}
+                                                    </button>
+                                                  ) : (
+                                                    <span className={`login-state-badge ${isLoginActive ? 'is-active' : 'is-disabled'}`}>
+                                                      <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>
+                                                        {isLoginActive ? 'check_circle' : 'block'}
+                                                      </span>
+                                                      {isLoginActive ? 'Active' : 'Disabled'}
+                                                    </span>
+                                                  );
+                                                })()}
+                                              </td>
+                                              <td>
+                                                {(() => {
+                                                  const effectiveStatus = resolveEffectiveLearnerStatus(student, activeSchoolYear.label, sections, activeSchoolYear.id);
+                                                  return (
+                                                    <span className={`status-badge status-badge--${getLearnerStatusTone(effectiveStatus)}`}>
+                                                      {effectiveStatus}
+                                                    </span>
+                                                  );
+                                                })()}
+                                              </td>
                                               <td className="align-center">
                                                 <span className={`gender-badge ${student.gender === 'Male' ? 'male' : 'female'}`}>{student.gender}</span>
                                               </td>
                                               <td className="align-right">
                                                 <div className="row-actions">
+                                                  <button
+                                                    onClick={() => setStatusChangingStudent(student)}
+                                                    className="icon-btn"
+                                                    title="Change Status (Transfer Out, Drop Out, Enrolled)"
+                                                  >
+                                                    <span className="material-symbols-outlined">published_with_changes</span>
+                                                  </button>
+                                                  {!isAdviserScopedAccess ? (
+                                                    (() => {
+                                                      const isLoginDisabled =
+                                                        (student.loginStatus || '').trim().toLowerCase() === 'inactive' ||
+                                                        (student.loginStatus || '').trim().toLowerCase() === 'disabled';
+                                                      const isLoginActive = !isLoginDisabled;
+                                                      return (
+                                                        <button
+                                                          onClick={() => promptToggleLoginStatus(student)}
+                                                          className={`icon-btn ${!isLoginActive ? 'icon-btn--disabled-login' : ''}`}
+                                                          title={isLoginActive ? 'Disable USIS Login Credentials' : 'Enable USIS Login Credentials'}
+                                                        >
+                                                          <span className="material-symbols-outlined">
+                                                            {isLoginActive ? 'lock_person' : 'lock_open'}
+                                                          </span>
+                                                        </button>
+                                                      );
+                                                    })()
+                                                  ) : null}
                                                   {!isAdviserScopedAccess ? (
                                                     <button
                                                       onClick={() => setRevealedPasswordLearnerId((current) => (current === student.id ? null : student.id))}
@@ -565,7 +705,27 @@ const LearnerList: React.FC = () => {
         </>
       ) : null}
 
-      <LearnerDetailsModal student={selectedStudent} history={derivedHistory} onClose={() => setSelectedStudent(null)} />
+      <LearnerDetailsModal
+        student={selectedStudent}
+        history={derivedHistory}
+        activeSchoolYearLabel={activeSchoolYear.label}
+        onClose={() => setSelectedStudent(null)}
+        onChangeStatus={(student) => setStatusChangingStudent(student)}
+        onToggleLoginStatus={!isAdviserScopedAccess ? (student) => promptToggleLoginStatus(student) : undefined}
+      />
+      <LearnerStatusModal
+        isOpen={!!statusChangingStudent}
+        student={statusChangingStudent}
+        activeSchoolYearLabel={activeSchoolYear.label}
+        sectionName={
+          sections.find((s) => String(s.id).trim() === String(statusChangingStudent?.sectionId || '').trim())?.name
+        }
+        loading={loading}
+        onClose={() => setStatusChangingStudent(null)}
+        onSubmit={updateLearner}
+        onSuccess={(message) => setFeedback(message)}
+        onError={(message) => setFeedback(message)}
+      />
       <LearnerEditModal
         student={editingStudent}
         activeSchoolYearLabel={activeSchoolYear.label}
@@ -577,31 +737,56 @@ const LearnerList: React.FC = () => {
         onSubmit={updateLearner}
       />
       {!isAdviserScopedAccess ? (
-        <ConfirmationModal
-          isOpen={!!sendingCredentialsStudent}
-          type="accent"
-          title="Send Credentials Email"
-          message={`Send login credentials to ${sendingCredentialsStudent?.lastName}, ${sendingCredentialsStudent?.firstName}? This will use ${sendingCredentialsStudent?.email || sendingCredentialsStudent?.microsoftUpn || 'the learner email address on record'}.`}
-          onConfirm={async () => {
-            if (!sendingCredentialsStudent) return;
-            try {
-              const section = sections.find((entry) => String(entry.id || '').trim() === String(sendingCredentialsStudent.sectionId || '').trim());
-              const result = await sendLearnerCredentialsViaWebhook({
-                learner: sendingCredentialsStudent,
-                schoolId: String(registrarAccess?.schoolId || '302522').trim(),
-                schoolYearLabel: activeSchoolYear.label,
-                sectionLabel: section ? `${section.name}${section.strand ? ` [${section.strand}]` : ''}` : 'Unassigned',
-              });
-              setFeedback(result?.message || 'Learner credentials email sent.');
-            } catch (error: any) {
-              setFeedback(error?.message || 'Unable to send learner credentials email.');
-            } finally {
-              setSendingCredentialsStudent(null);
+        <>
+          <ConfirmationModal
+            isOpen={!!confirmingLoginToggleStudent}
+            type={confirmingLoginToggleStudent?.targetStatus === 'Inactive' ? 'danger' : 'primary'}
+            title={
+              confirmingLoginToggleStudent?.targetStatus === 'Inactive'
+                ? 'Disable USIS Login Credentials'
+                : 'Enable USIS Login Credentials'
             }
-          }}
-          onCancel={() => setSendingCredentialsStudent(null)}
-          isLoading={loading}
-        />
+            message={
+              confirmingLoginToggleStudent?.targetStatus === 'Inactive'
+                ? `Are you sure you want to disable USIS login credentials for ${confirmingLoginToggleStudent?.student.lastName}, ${confirmingLoginToggleStudent?.student.firstName} (LRN: ${confirmingLoginToggleStudent?.student.lrn})? The learner will be prevented from signing into the USIS Learner Portal and USIS Election System until re-enabled.`
+                : `Enable USIS login credentials for ${confirmingLoginToggleStudent?.student.lastName}, ${confirmingLoginToggleStudent?.student.firstName} (LRN: ${confirmingLoginToggleStudent?.student.lrn})? The learner will be permitted to access the Learner Portal and associated USIS services.`
+            }
+            confirmLabel={
+              confirmingLoginToggleStudent?.targetStatus === 'Inactive'
+                ? 'Disable Credentials'
+                : 'Enable Credentials'
+            }
+            cancelLabel="Cancel"
+            isLoading={isTogglingLogin}
+            onConfirm={handleConfirmLoginToggle}
+            onCancel={() => setConfirmingLoginToggleStudent(null)}
+          />
+          <ConfirmationModal
+            isOpen={!!sendingCredentialsStudent}
+            type="accent"
+            title="Send Credentials Email"
+            message={`Send login credentials to ${sendingCredentialsStudent?.lastName}, ${sendingCredentialsStudent?.firstName}? This will use ${sendingCredentialsStudent?.email || sendingCredentialsStudent?.microsoftUpn || 'the learner email address on record'}.`}
+            onConfirm={async () => {
+              if (!sendingCredentialsStudent) return;
+              try {
+                const section = sections.find((entry) => String(entry.id || '').trim() === String(sendingCredentialsStudent.sectionId || '').trim());
+                const result = await sendLearnerCredentialsViaWebhook({
+                  learner: sendingCredentialsStudent,
+                  schoolId: String(registrarAccess?.schoolId || '302522').trim(),
+                  schoolYearLabel: activeSchoolYear.label,
+                  sectionLabel: section ? `${section.name}${section.strand ? ` [${section.strand}]` : ''}` : 'Unassigned',
+                });
+                setFeedback(result?.message || 'Learner credentials email sent.');
+              } catch (error: any) {
+                setFeedback(error?.message || 'Unable to send learner credentials email.');
+              } finally {
+                setSendingCredentialsStudent(null);
+              }
+            }}
+            onCancel={() => setSendingCredentialsStudent(null)}
+            isLoading={loading}
+          />
+        </>
       ) : null}
       <ConfirmationModal
         isOpen={!!feedback}

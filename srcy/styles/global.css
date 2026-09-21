@@ -65,6 +65,9 @@ body {
 .srcy-page-intro {
   display: grid;
   gap: 8px;
+  max-width: none;
+  padding-left: 0;
+  padding-right: 0;
 }
 
 .srcy-identity-panel__content {
@@ -1643,5 +1646,160 @@ body {
 .srcy-maab-control--complete .srcy-maab-slot__digit {
   color: #166534;
 }
+
+/* =========================================================
+   Council Trainings & Certification Styles
+   ========================================================= */
+
+.srcy-training-modal {
+  width: min(720px, 95vw);
+}
+
+.srcy-training-form-body {
+  padding: 20px;
+}
+
+.srcy-training-main-table {
+  min-width: 880px;
+}
+
+.srcy-training-code {
+  display: inline-block;
+  font-family: var(--deped-font);
+  background: #f1f5f9;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: var(--usis-helper-size);
+  color: var(--deped-blue);
+  font-weight: 600;
+}
+
+.srcy-training-preset-wrap {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.srcy-training-presets {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.srcy-training-preset-btn {
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: var(--deped-text, #111827);
+  border-radius: 4px;
+  padding: 3px 9px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 120ms ease;
+}
+
+.srcy-training-preset-btn:hover {
+  background: #f0f7ff;
+  border-color: var(--deped-blue, #0038a8);
+  color: var(--deped-blue, #0038a8);
+}
+
+.srcy-training-preset-btn--active {
+  background: var(--deped-blue, #0038a8);
+  border-color: var(--deped-blue, #0038a8);
+  color: #ffffff;
+}
+
+.srcy-training-preset-btn--active:hover {
+  background: #002c84;
+  color: #ffffff;
+}
+
+.srcy-status-chip--completed {
+  background: #f0fdf4;
+  color: #166534;
+  border-color: rgba(22, 101, 52, 0.22);
+}
+
+.srcy-status-chip--scheduled {
+  background: #fefce8;
+  color: #854d0e;
+  border-color: rgba(133, 77, 14, 0.22);
+}
+
+.srcy-status-chip--in_progress,
+.srcy-status-chip--in-progress {
+  background: #eff6ff;
+  color: #1e40af;
+  border-color: rgba(30, 64, 175, 0.22);
+}
+
+.srcy-status-chip--archived {
+  background: #f1f5f9;
+  color: #64748b;
+  border-color: rgba(100, 116, 139, 0.22);
+}
+
+/* Training Validity Configuration Box */
+.srcy-validity-config-box {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: #f8fafc;
+  padding: 14px 16px;
+  border-radius: var(--deped-radius, 12px);
+  border: 1px solid var(--deped-border, #cbd5e1);
+}
+
+.srcy-validity-config-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.srcy-validity-toggle-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: var(--usis-helper-size, 13px);
+  font-weight: 700;
+  color: var(--deped-ink, #0f172a);
+}
+
+.srcy-validity-toggle-input {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--deped-blue, #0038a8);
+}
+
+.srcy-validity-state-badge {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--deped-muted, #4b5563);
+}
+
+.srcy-validity-state-badge--active {
+  color: var(--deped-blue, #0038a8);
+}
+
+.srcy-validity-permanent-hint {
+  font-size: 12px;
+  color: var(--deped-muted, #4b5563);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.srcy-validity-permanent-hint .material-symbols-outlined {
+  font-size: 18px;
+  color: var(--deped-blue, #0038a8);
+}
+
 
 

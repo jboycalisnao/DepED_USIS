@@ -291,6 +291,8 @@ export default defineConfig(({ mode }) => {
             const action = String(parsed.action || '').trim().toLowerCase();
             const learnerId = String(parsed.learnerId || '').trim();
             const displayName = String(parsed.displayName || '').trim();
+            const givenName = String(parsed.givenName || parsed.firstName || '').trim();
+            const surname = String(parsed.surname || parsed.lastName || '').trim();
             const mailNickname = String(parsed.mailNickname || '').trim();
             const userPrincipalName = String(parsed.userPrincipalName || '').trim();
             const temporaryPassword = String(parsed.temporaryPassword || '').trim();
@@ -312,7 +314,7 @@ export default defineConfig(({ mode }) => {
 
               const learnerResult = await supabaseAdmin
                 .from('registrar_learners')
-                .select('id,microsoft_user_id,microsoft_upn')
+                .select('id,first_name,last_name,microsoft_user_id,microsoft_upn')
                 .eq('id', learnerId)
                 .maybeSingle();
               if (learnerResult.error) {
@@ -345,6 +347,8 @@ export default defineConfig(({ mode }) => {
                   return;
                 }
                 const accessToken = await getAccessToken();
+                const patchGivenName = givenName || String(learnerResult.data.first_name || '').trim();
+                const patchSurname = surname || String(learnerResult.data.last_name || '').trim();
                 const resetResponse = await fetch(`https://graph.microsoft.com/v1.0/users/${encodeURIComponent(graphKey)}`, {
                   method: 'PATCH',
                   headers: {
@@ -356,6 +360,8 @@ export default defineConfig(({ mode }) => {
                       forceChangePasswordNextSignIn: false,
                       password: newPassword,
                     },
+                    ...(patchGivenName ? { givenName: patchGivenName } : {}),
+                    ...(patchSurname ? { surname: patchSurname } : {}),
                   }),
                 });
                 if (!resetResponse.ok) {
@@ -412,10 +418,11 @@ export default defineConfig(({ mode }) => {
               return;
             }
 
+            let existingLearnerData: any = null;
             if (supabaseAdmin) {
               const existingLearnerResult = await supabaseAdmin
                 .from('registrar_learners')
-                .select('id,microsoft_user_id,microsoft_upn')
+                .select('id,first_name,last_name,microsoft_user_id,microsoft_upn')
                 .eq('id', learnerId)
                 .maybeSingle();
 
@@ -441,7 +448,11 @@ export default defineConfig(({ mode }) => {
                 }));
                 return;
               }
+              existingLearnerData = existingLearnerResult.data;
             }
+
+            const resolvedGivenName = givenName || String(existingLearnerData?.first_name || '').trim();
+            const resolvedSurname = surname || String(existingLearnerData?.last_name || '').trim();
 
             const accessToken = await getAccessToken();
             const createUserResponse = await fetch('https://graph.microsoft.com/v1.0/users', {
@@ -453,6 +464,8 @@ export default defineConfig(({ mode }) => {
               body: JSON.stringify({
                 accountEnabled: true,
                 displayName,
+                givenName: resolvedGivenName || undefined,
+                surname: resolvedSurname || undefined,
                 mailNickname,
                 userPrincipalName,
                 passwordProfile: {

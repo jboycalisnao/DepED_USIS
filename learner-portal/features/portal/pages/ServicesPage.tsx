@@ -41,45 +41,70 @@ export function ServicesPage({ session }: { session: LearnerPortalAccessRecord }
     <section className="section-shell">
       <div className="portal-panel learner-tab-panel">
         <header className="portal-panel__header learner-tab-header">
-          <h2>Services</h2>
-          <p>Select a learner service to open its dedicated page.</p>
+          <h2>Services Guide</h2>
+          <p>Browse available learner services in order and select any service to open its page.</p>
         </header>
       </div>
 
-      <div className="learner-services-grid" role="list" aria-label="Learner services">
-        {learnerServicesCatalog.map((card) => (
-          card.isDisabled ? (
+      <div className="learner-services-list" role="list" aria-label="Learner services guide">
+        {learnerServicesCatalog.map((card, index) => {
+          const orderNumber = String(index + 1).padStart(2, '0');
+          return card.isDisabled ? (
             <div
               key={card.path}
-              className="learner-services-card learner-services-card--link learner-services-card--disabled"
+              className="learner-services-card learner-services-card--horizontal learner-services-card--disabled"
               role="listitem"
               aria-disabled="true"
             >
-              <div className="learner-services-card__top" aria-hidden="true" />
-              <div className="learner-services-card__body">
-                <div className="learner-services-card__icon-wrap" aria-hidden="true">
-                  <img src={usisIcon} alt="" className="learner-services-card__icon" />
+              <div className="learner-services-card__order" aria-hidden="true">
+                <span className="learner-services-card__order-number">{orderNumber}</span>
+              </div>
+              <div className="learner-services-card__icon-wrap" aria-hidden="true">
+                <img src={usisIcon} alt="" className="learner-services-card__icon" />
+              </div>
+              <div className="learner-services-card__content">
+                <div className="learner-services-card__title-row">
+                  <h3>{card.title}</h3>
+                  {card.disabledMessage ? (
+                    <span className="learner-services-card__disabled-note">{card.disabledMessage}</span>
+                  ) : null}
                 </div>
-                <h3>{card.title}</h3>
                 <p>{card.description}</p>
+              </div>
+              <div className="learner-services-card__action-wrap">
                 <span className="learner-services-card__action">{card.actionLabel}</span>
-                {card.disabledMessage ? <span className="learner-services-card__disabled-note">{card.disabledMessage}</span> : null}
               </div>
             </div>
           ) : (
-            <Link key={card.path} to={card.path} className="learner-services-card learner-services-card--link" role="listitem">
-              <div className="learner-services-card__top" aria-hidden="true" />
-              <div className="learner-services-card__body">
-                <div className="learner-services-card__icon-wrap" aria-hidden="true">
-                  <img src={usisIcon} alt="" className="learner-services-card__icon" />
+            <Link
+              key={card.path}
+              to={card.path}
+              className="learner-services-card learner-services-card--horizontal learner-services-card--link"
+              role="listitem"
+            >
+              <div className="learner-services-card__order" aria-hidden="true">
+                <span className="learner-services-card__order-number">{orderNumber}</span>
+              </div>
+              <div className="learner-services-card__icon-wrap" aria-hidden="true">
+                <img src={usisIcon} alt="" className="learner-services-card__icon" />
+              </div>
+              <div className="learner-services-card__content">
+                <div className="learner-services-card__title-row">
+                  <h3>{card.title}</h3>
                 </div>
-                <h3>{card.title}</h3>
                 <p>{card.description}</p>
-                <span className="learner-services-card__action">{card.actionLabel}</span>
+              </div>
+              <div className="learner-services-card__action-wrap">
+                <span className="learner-services-card__action">
+                  {card.actionLabel}
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <polyline points="9 18 15 12 9 6" />
+                  </svg>
+                </span>
               </div>
             </Link>
-          )
-        ))}
+          );
+        })}
       </div>
     </section>
   );

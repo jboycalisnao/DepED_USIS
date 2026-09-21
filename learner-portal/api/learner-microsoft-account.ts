@@ -132,6 +132,7 @@ const readLearner = async (supabaseAdmin: ReturnType<typeof createClient>, learn
     'first_name',
     'middle_name',
     'last_name',
+    'login_password_plain',
     'microsoft_user_id',
     'microsoft_upn',
     'microsoft_mail_nickname',
@@ -156,6 +157,7 @@ const learnerStatusPayload = (learner: any, exists?: boolean) => ({
   microsoftAccountStatus: toText(learner?.microsoft_account_status) || (toText(learner?.microsoft_upn) ? 'Active' : 'Not Linked'),
   microsoftCreatedAt: toText(learner?.microsoft_created_at),
   microsoftLastSyncedAt: toText(learner?.microsoft_last_synced_at),
+  password: toText(learner?.login_password_plain) || buildPolicyPassword(learner),
 });
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -167,14 +169,109 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const requestData = req.method === 'GET' ? req.query : readBody(req);
     const learnerId = toText((requestData as any).learnerId);
     const lrn = toText((requestData as any).lrn);
+    const shouldRefresh = toText((requestData as any).refresh) === 'true' || toText((requestData as any).action) === 'refresh-status';
+
     if (!learnerId && !lrn) return json(res, 400, { ok: false, error: 'Learner Microsoft account lookup requires learner ID or LRN.' });
-    if (req.method === 'POST' && (!learnerId || !lrn)) {
+    if (req.method === 'POST' && !shouldRefresh && (!learnerId || !lrn)) {
       return json(res, 400, { ok: false, error: 'Microsoft account creation requires learner ID and LRN.' });
     }
 
-    const supabaseClient = req.method === 'GET' ? getSupabaseReader() : getSupabaseAdmin();
+    const supabaseClient = (req.method === 'GET' && !shouldRefresh) ? getSupabaseReader() : getSupabaseAdmin();
     const learner = await readLearner(supabaseClient, learnerId, lrn);
     if (!learner) return json(res, 404, { ok: false, error: 'Learner not found.' });
+
+    if (shouldRefresh) {
+      const tenantId = toText(process.env.AZURE_TENANT_ID);
+      const clientId = toText(process.env.AZURE_CLIENT_ID);
+      const clientSecret = toText(process.env.AZURE_CLIENT_SECRET);
+      if (!tenantId || !clientId || !clientSecret) {
+        return json(res, 500, { ok: false, error: 'Azure credentials are not configured on the server.' });
+      }
+
+      const localUserId = toText(learner.microsoft_user_id);
+      const localUpn = toText(learner.microsoft_upn);
+      const defaultUpn = buildMicrosoftUsername(learner);
+      const graphKey = localUserId || localUpn || defaultUpn;
+
+      const accessToken = await getAccessToken(tenantId, clientId, clientSecret);
+      const graphResponse = await fetch(`https://graph.microsoft.com/v1.0/users/${encodeURIComponent(graphKey)}?$select=id,userPrincipalName,accountEnabled`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+
+      const nowIso = new Date().toISOString();
+      const adminClient = getSupabaseAdmin();
+
+      if (graphResponse.status === 404) {
+        if (localUserId || localUpn) {
+          await adminClient.from(LEARNER_TABLE).update({
+            microsoft_user_id: null,
+            microsoft_upn: null,
+            microsoft_account_status: 'Deleted',
+            microsoft_last_synced_at: nowIso,
+          }).eq('id', learner.id);
+
+          return json(res, 200, {
+            ok: true,
+            exists: false,
+            checkedLive: true,
+            statusMessage: 'Microsoft account was not found in Microsoft 365 (it may have been deleted). Local status has been set to Deleted.',
+            ...learnerStatusPayload({
+              ...learner,
+              microsoft_user_id: null,
+              microsoft_upn: null,
+              microsoft_account_status: 'Deleted',
+              microsoft_last_synced_at: nowIso,
+            }, false),
+          });
+        }
+
+        await adminClient.from(LEARNER_TABLE).update({
+          microsoft_account_status: 'Not Linked',
+          microsoft_last_synced_at: nowIso,
+        }).eq('id', learner.id);
+
+        return json(res, 200, {
+          ok: true,
+          exists: false,
+          checkedLive: true,
+          statusMessage: 'No Microsoft account was found in Microsoft 365.',
+          ...learnerStatusPayload({
+            ...learner,
+            microsoft_account_status: 'Not Linked',
+            microsoft_last_synced_at: nowIso,
+          }, false),
+        });
+      }
+
+      if (!graphResponse.ok) {
+        return json(res, 502, { ok: false, error: 'Graph status check failed', details: await graphResponse.text() });
+      }
+
+      const graphJson = await graphResponse.json();
+      const graphUserId = toText(graphJson?.id || localUserId);
+      const graphUpn = toText(graphJson?.userPrincipalName || localUpn || defaultUpn);
+
+      await adminClient.from(LEARNER_TABLE).update({
+        microsoft_user_id: graphUserId || null,
+        microsoft_upn: graphUpn || null,
+        microsoft_account_status: 'Active',
+        microsoft_last_synced_at: nowIso,
+      }).eq('id', learner.id);
+
+      return json(res, 200, {
+        ok: true,
+        exists: true,
+        checkedLive: true,
+        statusMessage: `Microsoft account is active and verified in Microsoft 365 (${graphUpn}).`,
+        ...learnerStatusPayload({
+          ...learner,
+          microsoft_user_id: graphUserId,
+          microsoft_upn: graphUpn,
+          microsoft_account_status: 'Active',
+          microsoft_last_synced_at: nowIso,
+        }, true),
+      });
+    }
 
     const existingUserId = toText(learner.microsoft_user_id);
     const existingUpn = toText(learner.microsoft_upn);
@@ -202,6 +299,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const mailNickname = buildMailNickname(userPrincipalName);
     const temporaryPassword = buildPolicyPassword(learner);
     const displayName = [learner.first_name, learner.middle_name, learner.last_name].map(toText).filter(Boolean).join(' ');
+    const givenName = toText(learner.first_name);
+    const surname = toText(learner.last_name);
 
     const createUserResponse = await fetch('https://graph.microsoft.com/v1.0/users', {
       method: 'POST',
@@ -209,6 +308,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       body: JSON.stringify({
         accountEnabled: true,
         displayName: displayName || toText(learner.lrn) || 'Learner',
+        givenName: givenName || undefined,
+        surname: surname || undefined,
         mailNickname,
         userPrincipalName,
         passwordProfile: { forceChangePasswordNextSignIn: false, password: temporaryPassword },

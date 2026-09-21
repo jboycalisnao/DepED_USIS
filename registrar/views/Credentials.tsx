@@ -148,7 +148,15 @@ const Credentials: React.FC = () => {
       const response = await fetch('/api/microsoft-users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ learnerId: learner.id, displayName, mailNickname, userPrincipalName, temporaryPassword }),
+        body: JSON.stringify({
+          learnerId: learner.id,
+          displayName,
+          givenName: learner.firstName || '',
+          surname: learner.lastName || '',
+          mailNickname,
+          userPrincipalName,
+          temporaryPassword,
+        }),
       });
       const raw = await response.text();
       const result = raw ? JSON.parse(raw) : {};
@@ -187,12 +195,17 @@ const Credentials: React.FC = () => {
 
   const toggleLearnerStatus = async (learner: Student) => {
     const currentStatus = String(learner.loginStatus || 'Active').trim().toLowerCase();
-    const nextStatus = currentStatus === 'active' ? 'Inactive' : 'Active';
+    const isCurrentlyActive = currentStatus === 'active';
+    const nextStatus = isCurrentlyActive ? 'Inactive' : 'Active';
     setPendingStatusToggleLearnerId(learner.id);
     try {
       const result = await updateLearner(learner.id, { loginStatus: nextStatus });
       if (result?.error) return setFeedback(`Failed to update login status: ${result.error}`);
-      setFeedback(`Login status updated to ${nextStatus} for ${learner.lastName}, ${learner.firstName}.`);
+      setFeedback(
+        nextStatus === 'Inactive'
+          ? `USIS login credentials disabled for ${learner.lastName}, ${learner.firstName}.`
+          : `USIS login credentials enabled for ${learner.lastName}, ${learner.firstName}.`
+      );
     } catch {
       setFeedback('Unable to update login status right now.');
     } finally {

@@ -1,20 +1,36 @@
 import React, { useMemo } from 'react';
-import { EnrollmentRecord, Student } from '../types';
+import { EnrollmentRecord, getLearnerStatusTone, resolveEffectiveLearnerStatus, Student } from '../types';
 import { normalizeLearnerTags } from '../utils/learnerTags';
 
 interface LearnerDetailsModalProps {
   student: Student | null;
   history: EnrollmentRecord[];
+  activeSchoolYearLabel?: string;
   onClose: () => void;
+  onChangeStatus?: (student: Student) => void;
+  onToggleLoginStatus?: (student: Student) => void;
 }
 
-const LearnerDetailsModal: React.FC<LearnerDetailsModalProps> = ({ student, history, onClose }) => {
+const LearnerDetailsModal: React.FC<LearnerDetailsModalProps> = ({
+  student,
+  history,
+  activeSchoolYearLabel = '',
+  onClose,
+  onChangeStatus,
+  onToggleLoginStatus,
+}) => {
   const learnerTags = useMemo(() => {
     if (!student) return [];
     return normalizeLearnerTags(student.tags);
   }, [student]);
 
   if (!student) return null;
+
+  const effectiveStatus = resolveEffectiveLearnerStatus(student, activeSchoolYearLabel);
+  const isLoginDisabled =
+    (student.loginStatus || '').trim().toLowerCase() === 'inactive' ||
+    (student.loginStatus || '').trim().toLowerCase() === 'disabled';
+  const isLoginActive = !isLoginDisabled;
 
   return (
     <div className="modal-overlay modal-overlay--high" role="presentation">
@@ -30,7 +46,12 @@ const LearnerDetailsModal: React.FC<LearnerDetailsModalProps> = ({ student, hist
             <div className="modal-record__meta">
               <span>LRN {student.lrn}</span>
               <span>{student.gender}</span>
-              <span>{student.status}</span>
+              <span className={`status-badge status-badge--${getLearnerStatusTone(effectiveStatus)}`}>
+                {effectiveStatus}
+              </span>
+              <span className={`status-badge status-badge--${isLoginActive ? 'enrolled' : 'withdrawn'}`}>
+                Login: {isLoginActive ? 'Active' : 'Disabled'}
+              </span>
             </div>
           </div>
           <button type="button" className="modal-dialog__close" onClick={onClose} aria-label="Close learner record">
@@ -100,6 +121,36 @@ const LearnerDetailsModal: React.FC<LearnerDetailsModalProps> = ({ student, hist
         </div>
 
         <footer className="modal-dialog__actions">
+          {onChangeStatus ? (
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => {
+                onClose();
+                onChangeStatus(student);
+              }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '18px', verticalAlign: 'middle', marginRight: '4px' }}>
+                published_with_changes
+              </span>
+              Change Status
+            </button>
+          ) : null}
+          {onToggleLoginStatus ? (
+            <button
+              type="button"
+              className={isLoginActive ? 'secondary-button' : 'primary-button'}
+              onClick={() => {
+                onClose();
+                onToggleLoginStatus(student);
+              }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '18px', verticalAlign: 'middle', marginRight: '4px' }}>
+                {isLoginActive ? 'lock_person' : 'lock_open'}
+              </span>
+              {isLoginActive ? 'Disable Login Credentials' : 'Enable Login Credentials'}
+            </button>
+          ) : null}
           <button type="button" onClick={() => window.print()}>Generate Dossier</button>
           <button type="button" className="modal-dialog__blue" onClick={onClose}>Close Record</button>
         </footer>

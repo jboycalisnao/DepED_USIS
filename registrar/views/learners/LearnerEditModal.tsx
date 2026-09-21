@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import ConfirmationModal from '../../components/ConfirmationModal';
 import { SearchableSelect } from '../../components/ui/SearchableSelect';
 import type { Student } from '../../types';
+import { EnrollmentStatus } from '../../types';
 import { supabase } from '../../lib/supabase';
 import { formatLearnerTags, normalizeLearnerTags, parseLearnerTagsInput } from '../../utils/learnerTags';
 import {
@@ -57,6 +58,8 @@ type LearnerModalDraft = {
   preferredModality: string;
   deviceAccess: string;
   hasInternet: string;
+  status: string;
+  loginStatus: string;
 };
 
 type Props = {
@@ -182,6 +185,11 @@ const buildDraft = (student: Student, activeSchoolYearLabel: string, latestSubmi
     preferredModality: firstNonEmpty(submissionPayload.preferredModality, payload.preferredModality, modalityOptions[0]),
     deviceAccess: firstNonEmpty(submissionPayload.deviceAccess, payload.deviceAccess, deviceOptions[0]),
     hasInternet: firstNonEmpty(submissionPayload.hasInternet, payload.hasInternet, 'Yes'),
+    status: firstNonEmpty(student.status, submissionPayload.status, payload.status, EnrollmentStatus.ENROLLED),
+    loginStatus: (() => {
+      const raw = String(student.loginStatus || '').trim().toLowerCase();
+      return raw === 'inactive' || raw === 'disabled' ? 'Inactive' : 'Active';
+    })(),
   };
 };
 
@@ -609,6 +617,18 @@ export default function LearnerEditModal({ student, activeSchoolYearLabel, stran
               <h3>Enrollment Context</h3>
               <div className="floating-field-grid">
                 <InputField label="School ID" value={draft.schoolId} onChange={(value) => applyDraftChange((current) => ({ ...current, schoolId: value }))} readOnly />
+                <SelectField
+                  label="Enrollment Status"
+                  value={draft.status}
+                  onChange={(value) => applyDraftChange((current) => ({ ...current, status: value }))}
+                  options={['Enrolled', 'Transfer Out', 'Drop Out', 'Withdrawn', 'Graduated']}
+                />
+                <SelectField
+                  label="USIS Login Credentials"
+                  value={draft.loginStatus || 'Active'}
+                  onChange={(value) => applyDraftChange((current) => ({ ...current, loginStatus: value }))}
+                  options={['Active', 'Inactive']}
+                />
                 <InputField label="School Year" value={draft.schoolYear} onChange={(value) => applyDraftChange((current) => ({ ...current, schoolYear: value }))} />
                 <SearchableSelect
                   label="Edit School Year Scope"
@@ -737,6 +757,7 @@ export default function LearnerEditModal({ student, activeSchoolYearLabel, stran
                       gradeLevel: selectedSection?.gradeLevel || latestDraft.gradeToEnroll || entry?.gradeLevel || latestDraft.lastGradeLevel || '',
                       section: selectedSection?.name || entry?.section || '',
                       submissionPayload,
+                      status: latestDraft.status || entry?.status || student.status || EnrollmentStatus.ENROLLED,
                     };
                 })
                 : [];
@@ -748,13 +769,15 @@ export default function LearnerEditModal({ student, activeSchoolYearLabel, stran
                   gradeLevel: selectedSection?.gradeLevel || latestDraft.gradeToEnroll || latestDraft.lastGradeLevel || '',
                   section: selectedSection?.name || '',
                   enrollmentDate: new Date().toISOString(),
-                  status: 'Information Updated',
+                  status: (latestDraft.status as any) || EnrollmentStatus.ENROLLED,
                   submissionPayload,
                 });
               }
 
               const result = await onSubmit(student.id, {
                 lrn: latestDraft.lrn.trim(),
+                status: (latestDraft.status as any) || student.status || EnrollmentStatus.ENROLLED,
+                loginStatus: latestDraft.loginStatus === 'Inactive' ? 'Inactive' : 'Active',
                 firstName: latestDraft.firstName.trim(),
                 lastName: latestDraft.lastName.trim(),
                 middleName: latestDraft.middleName.trim(),

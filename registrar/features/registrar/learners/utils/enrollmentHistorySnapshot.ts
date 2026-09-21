@@ -1,5 +1,5 @@
 import { supabase } from '../../../../lib/supabase';
-import { Student } from '../../../../types';
+import { isGrade12, isPreviousSchoolYear, Student } from '../../../../types';
 
 export type EnrollmentHistoryItem = {
   id: string;
@@ -81,10 +81,20 @@ const toHistoryItem = (entry: unknown, source: EnrollmentHistoryItem['source']):
   };
 };
 
-const resolveCurrentStatus = (currentEnrollment: EnrollmentHistoryItem | null, history: EnrollmentHistoryItem[]) => {
+const resolveCurrentStatus = (
+  currentEnrollment: EnrollmentHistoryItem | null,
+  history: EnrollmentHistoryItem[],
+  activeSchoolYearLabel = '',
+) => {
   if (currentEnrollment?.status) return currentEnrollment.status;
   if (history.length === 0) return 'No Enrollment Record';
   const latest = history[0];
+  if (isGrade12(latest.gradeLevel) && isPreviousSchoolYear(latest.schoolYear, activeSchoolYearLabel)) {
+    const rawStatus = toText(latest.status).toLowerCase();
+    if (rawStatus !== 'transfer out' && rawStatus !== 'drop out' && rawStatus !== 'withdrawn') {
+      return 'Graduated';
+    }
+  }
   return latest.status || 'Enrolled';
 };
 
@@ -210,6 +220,10 @@ export async function fetchLearnerEnrollmentSnapshot(
   return {
     history,
     currentEnrollment,
-    currentStatus: resolveCurrentStatus(currentEnrollment, history),
+    currentStatus: resolveCurrentStatus(
+      currentEnrollment,
+      history,
+      toText(activeSchoolYearResult.data?.label) || toText(fallbackSchoolYearLabel),
+    ),
   };
 }
