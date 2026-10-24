@@ -249,7 +249,8 @@ export default defineConfig(({ mode }) => {
       base: './',
       envDir: '..',
       server: {
-        port: 3000,
+        port: 3003,
+        strictPort: false,
         host: '0.0.0.0',
       },
       plugins: [react(), smsNotificationDevProxy(), emailNotificationDevProxy(env)],

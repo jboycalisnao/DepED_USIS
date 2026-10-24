@@ -267,7 +267,7 @@ export const useSettings = () => {
         if (result.error) throw result.error;
         if (!active) return;
 
-        const row = (result.data as AttendanceSettingsRow | AttendanceSettingsLegacyRow | null) || null;
+        const row = (result.data as unknown as AttendanceSettingsRow | AttendanceSettingsLegacyRow | null) || null;
         setClassDayConfig(normalizeAttendanceClassDays(row?.class_day_config));
         setNoClassDates(normalizeAttendanceNoClassDates(row?.no_class_dates));
         if (row?.schedule_config) {
@@ -278,10 +278,11 @@ export const useSettings = () => {
           });
         }
 
-        if ('sms_settings' in (row || {}) && row?.sms_settings) {
+        const smsSettingsVal = (row as AttendanceSettingsRow | null)?.sms_settings;
+        if (smsSettingsVal) {
           setSmsSettings({
-            apiKey: String(row.sms_settings.apiKey || '').trim(),
-            messageTemplate: normalizeSmsMessageTemplate(row.sms_settings.messageTemplate),
+            apiKey: String(smsSettingsVal.apiKey || '').trim(),
+            messageTemplate: normalizeSmsMessageTemplate(smsSettingsVal.messageTemplate),
           });
         }
 

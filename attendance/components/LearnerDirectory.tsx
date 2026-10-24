@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Learner } from '../types';
+import { Learner, SchoolYearOption } from '../types';
 import ConfirmationModal from './ConfirmationModal';
 import UsisInlineLoader from './ui/UsisInlineLoader';
 import LearnerRegistrationModal from './modals/LearnerRegistrationModal';
@@ -28,6 +28,9 @@ interface LearnerDirectoryProps {
   fetchedCount: number;
   hasCachedRoster: boolean;
   lastSyncedAt: string;
+  schoolYears?: SchoolYearOption[];
+  selectedSchoolYearId?: string;
+  onSchoolYearChange?: (schoolYearId: string) => void;
 }
 
 const naturalSort = (a: string, b: string) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
@@ -171,6 +174,9 @@ const LearnerDirectory: React.FC<LearnerDirectoryProps> = ({
   fetchedCount,
   hasCachedRoster,
   lastSyncedAt,
+  schoolYears = [],
+  selectedSchoolYearId = '',
+  onSchoolYearChange,
 }) => {
   const [listSearchQuery, setListSearchQuery] = useState('');
   const [unlinkId, setUnlinkId] = useState<string | null>(null);
@@ -279,6 +285,29 @@ const LearnerDirectory: React.FC<LearnerDirectoryProps> = ({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {schoolYears && schoolYears.length > 0 && (
+            <div className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-2.5 py-1.5 shadow-sm">
+              <span className="material-symbols-outlined text-[15px] leading-none text-gray-500" aria-hidden="true">
+                calendar_today
+              </span>
+              <label htmlFor="learner-directory-sy" className="sr-only">
+                Filter School Year
+              </label>
+              <select
+                id="learner-directory-sy"
+                value={selectedSchoolYearId || 'all'}
+                onChange={(e) => onSchoolYearChange?.(e.target.value)}
+                className="cursor-pointer border-none bg-transparent pr-1 text-[11px] font-bold text-gray-700 outline-none"
+              >
+                <option value="all">All School Years ({rosterLearners.length})</option>
+                {schoolYears.map((sy) => (
+                  <option key={sy.id} value={sy.id}>
+                    {sy.label}{sy.is_active ? ' (Active)' : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <button
             type="button"
             onClick={() => setIsRegisterOpen(true)}

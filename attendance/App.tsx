@@ -104,6 +104,7 @@ function App() {
   } = useSmsNotificationQueue();
   const {
     learners,
+    allLearners,
     isLoading,
     isSyncing,
     fetchedCount,
@@ -240,7 +241,8 @@ function App() {
     setActiveRfid(scannedUid);
     setConflictWarning(null);
 
-    const owner = learners.find(l => {
+    const roster = allLearners.length > 0 ? allLearners : learners;
+    const owner = roster.find(l => {
       const dbUid = normalizeRfidValue(l.rfid);
       const localUid = normalizeRfidValue(uidMappings[l.id]);
       return dbUid === scannedUid || localUid === scannedUid;
@@ -250,7 +252,7 @@ function App() {
       setConflictWarning(`Tag assigned to: ${owner.last_name}, ${owner.first_name}`);
     }
     window.setTimeout(() => setScanFlash(false), 500);
-  }, [learners, uidMappings]);
+  }, [allLearners, learners, uidMappings]);
 
   useEffect(() => {
     if (isKioskRoute) return;
@@ -273,9 +275,10 @@ function App() {
 
   useEffect(() => {
     if (!selectedLearnerId) return;
-    if (learners.some((learner) => learner.id === selectedLearnerId)) return;
+    const roster = allLearners.length > 0 ? allLearners : learners;
+    if (roster.some((learner) => learner.id === selectedLearnerId)) return;
     setSelectedLearnerId(null);
-  }, [learners, selectedLearnerId]);
+  }, [allLearners, learners, selectedLearnerId]);
 
   const clearIdleTimer = (index: number) => {
     if (idleTimers.current[index]) {
@@ -333,7 +336,8 @@ function App() {
       }
 
       if (isKioskRoute) {
-          const learner = learners.find(l => {
+        const roster = allLearners.length > 0 ? allLearners : learners;
+        const learner = roster.find(l => {
           const dbUid = normalizeRfidValue(l.rfid);
           const localUid = normalizeRfidValue(uidMappings[l.id]);
           return dbUid === scannedUid || localUid === scannedUid;
@@ -486,7 +490,8 @@ function App() {
       }
 
       if (isKioskRoute) {
-        const learner = learners.find(l => {
+        const roster = allLearners.length > 0 ? allLearners : learners;
+        const learner = roster.find(l => {
           const dbUid = normalizeRfidValue(l.rfid);
           const localUid = normalizeRfidValue(uidMappings[l.id]);
           return dbUid === scannedUid || localUid === scannedUid;
@@ -617,6 +622,14 @@ function App() {
     setTimeout(() => setScanFlash(false), 400);
   };
 
+  const handleRegisterLearner = useCallback(async (payload: { learnerId: string; rfid?: string }) => {
+    const result = await registerLearner(payload);
+    if (result.ok && payload.rfid) {
+      addMapping(payload.learnerId, payload.rfid);
+    }
+    return result;
+  }, [addMapping, registerLearner]);
+
   const handleUnlinkMapping = async (learnerId: string) => {
     const result = await clearLearnerRfid(learnerId);
     if (!result.ok) {
@@ -634,7 +647,7 @@ function App() {
     [searchQuery, learners, uidMappings, getFiltered]
   );
 
-  const selectedLearner = learners.find(l => l.id === selectedLearnerId) || null;
+  const selectedLearner = (allLearners.length > 0 ? allLearners : learners).find(l => l.id === selectedLearnerId) || null;
   const profileInitials = String(access?.displayName || '')
     .trim()
     .split(/\s+/)
@@ -950,7 +963,10 @@ function App() {
                       <div className="lg:col-span-8 space-y-6">
                         <LearnerDirectory
                           learners={filteredLearners}
-                          rosterLearners={learners}
+                          rosterLearners={allLearners.length > 0 ? allLearners : learners}
+                          schoolYears={schoolYears}
+                          selectedSchoolYearId={selectedSchoolYearId}
+                          onSchoolYearChange={setSelectedSchoolYearId}
                           activeRfid={activeRfid}
                           uidMappings={uidMappings}
                           selectedId={selectedLearnerId}
@@ -958,7 +974,7 @@ function App() {
                           onUnlink={handleUnlinkMapping}
                           onReaderValueChange={handleRegistrarRfidCapture}
                           onLoadRoster={() => void loadLearners()}
-                          onRegisterLearner={registerLearner}
+                          onRegisterLearner={handleRegisterLearner}
                           onRegistrationModalOpenChange={setIsLearnerRegistrationOpen}
                           isLoading={isLoading}
                           isSearching={searchQuery.trim().length > 0}

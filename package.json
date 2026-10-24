@@ -23,6 +23,7 @@
     "packages/*"
   ],
   "scripts": {
+    "dev": "npm run dev:attendance",
     "dev:attendance": "npm run dev --workspace ./attendance",
     "dev:attendance-kiosk-shell": "npm run dev --workspace ./attendance-kiosk-shell",
     "dev:coordinator": "npm run dev --workspace ./coordinator",

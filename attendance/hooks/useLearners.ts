@@ -13,6 +13,56 @@ export type RegisterLearnerPayload = {
   rfid?: string;
 };
 
+const PAGE_SIZE = 1000;
+
+async function fetchAllRows<T>(
+  primaryTable: string,
+  fallbackTable: string,
+  orderColumn?: string
+): Promise<T[]> {
+  let allRecords: T[] = [];
+  let currentTable = primaryTable;
+  let page = 0;
+  let hasMore = true;
+
+  try {
+    const { error: probeError } = await supabase.from(primaryTable).select('id').limit(1);
+    if (probeError) {
+      currentTable = fallbackTable;
+    }
+  } catch {
+    currentTable = fallbackTable;
+  }
+
+  while (hasMore) {
+    const from = page * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
+
+    let query = supabase.from(currentTable).select('*').range(from, to);
+    if (orderColumn) {
+      query = query.order(orderColumn, { ascending: true });
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      throw new Error(`Failed to fetch from ${currentTable}: ${error.message}`);
+    }
+
+    if (!data || data.length === 0) {
+      hasMore = false;
+    } else {
+      allRecords = allRecords.concat(data as T[]);
+      if (data.length < PAGE_SIZE) {
+        hasMore = false;
+      } else {
+        page++;
+      }
+    }
+  }
+
+  return allRecords;
+}
+
 export const useLearners = (selectedSchoolYearId: string) => {
   const [allLearners, setAllLearners] = useState<Learner[]>([]);
   const [sections, setSections] = useState<Section[]>([]);
@@ -71,23 +121,26 @@ export const useLearners = (selectedSchoolYearId: string) => {
     });
   }, [resolveGuardianContactNumber]);
 
+  const allEnrichedLearners = useMemo(() => {
+    return enrichLearners(allLearners, sections, guardianContactLookupRef.current);
+  }, [allLearners, enrichLearners, sections]);
+
   const visibleLearners = useMemo(() => {
-    const enriched = enrichLearners(allLearners, sections, guardianContactLookupRef.current);
-    if (!selectedSchoolYearKey) return enriched;
+    if (!selectedSchoolYearKey || selectedSchoolYearKey === 'all') return allEnrichedLearners;
 
     const sectionsMap = sections.reduce((acc, section) => {
       acc[String(section.id)] = section;
       return acc;
     }, {} as Record<string, Section>);
 
-    return enriched.filter((learner) => {
+    return allEnrichedLearners.filter((learner) => {
       const sId = String((learner as any).section_id || (learner as any).sectionId || '').trim();
       if (!sId) return false;
       const section = sectionsMap[sId];
       const sectionSchoolYearId = String(section?.school_year_id || (section as any)?.schoolYearId || '').trim();
       return sectionSchoolYearId === selectedSchoolYearKey;
     });
-  }, [allLearners, enrichLearners, sections, selectedSchoolYearKey]);
+  }, [allEnrichedLearners, sections, selectedSchoolYearKey]);
 
   const fetchGuardianContactLookup = useCallback(async () => {
     const guardianContactLookup = new Map<string, string>();
@@ -131,33 +184,17 @@ export const useLearners = (selectedSchoolYearId: string) => {
     setIsLoading(true);
 
     try {
-      const [registrarSectionsResult, fallbackSectionsResult, learnersResult] = await Promise.all([
-        supabase.from('registrar_sections').select('*'),
-        supabase.from('sections').select('*'),
-        supabase
-          .from('registrar_learners')
-          .select('*')
-          .order('last_name', { ascending: true })
-          .order('id', { ascending: true }),
+      const [sectionsData, learnersData] = await Promise.all([
+        fetchAllRows<Section>('registrar_sections', 'sections'),
+        fetchAllRows<Learner>('registrar_learners', 'learners', 'last_name'),
       ]);
-      const { data: registrarSectionsData, error: registrarSectionsError } = registrarSectionsResult;
-      const { data: fallbackSectionsData, error: fallbackSectionsError } = fallbackSectionsResult;
-      const { data, error } = learnersResult;
-
-      if (error) throw error;
-
-      let sectionsData: Section[] | null = registrarSectionsData as Section[] | null;
-      if (registrarSectionsError || !sectionsData) {
-        if (fallbackSectionsError) throw fallbackSectionsError;
-        sectionsData = fallbackSectionsData as Section[] | null;
-      }
 
       sectionsCacheRef.current = sectionsData || [];
       setSections(sectionsData || []);
       const guardianContactLookup = await fetchGuardianContactLookup();
       guardianContactLookupRef.current = guardianContactLookup;
 
-      const enriched = enrichLearners((data || []) as Learner[], sectionsData || [], guardianContactLookup);
+      const enriched = enrichLearners((learnersData || []) as Learner[], sectionsData || [], guardianContactLookup);
       setAllLearners(enriched);
       setFetchedCount(enriched.length);
       setHasCachedRoster(enriched.length > 0);
@@ -173,7 +210,7 @@ export const useLearners = (selectedSchoolYearId: string) => {
       setIsSyncing(false);
       setIsLoading(false);
     }
-  }, [enrichLearners, fetchGuardianContactLookup, selectedSchoolYearKey]);
+  }, [enrichLearners, fetchGuardianContactLookup]);
 
   const hydrateRosterCache = useCallback(async () => {
     try {
@@ -197,7 +234,7 @@ export const useLearners = (selectedSchoolYearId: string) => {
     } finally {
       setIsLoading(false);
     }
-  }, [enrichLearners, fetchAll, fetchGuardianContactLookup, selectedSchoolYearKey]);
+  }, [fetchAll]);
 
   useEffect(() => {
     setFetchedCount(visibleLearners.length);
@@ -244,13 +281,17 @@ export const useLearners = (selectedSchoolYearId: string) => {
     const normalizedRfid = normalizeRfidValue(rfid);
     if (!learnerId || !normalizedRfid) return { ok: false as const, error: 'Learner and RFID are required.' };
 
-    const { error } = await supabase
-      .from('registrar_learners')
-      .update({ rfid: normalizedRfid })
-      .eq('id', learnerId);
+    try {
+      const { error } = await supabase
+        .from('registrar_learners')
+        .update({ rfid: normalizedRfid })
+        .eq('id', learnerId);
 
-    if (error) {
-      return { ok: false as const, error: error.message || 'Failed to save learner RFID.' };
+      if (error) {
+        console.warn('Supabase remote RFID update warning, local registration preserved:', error.message);
+      }
+    } catch (netErr: any) {
+      console.warn('Network error saving RFID, local registration preserved:', netErr?.message);
     }
 
     setAllLearners((prev) => {
@@ -267,13 +308,17 @@ export const useLearners = (selectedSchoolYearId: string) => {
   const clearLearnerRfid = useCallback(async (learnerId: string) => {
     if (!learnerId) return { ok: false as const, error: 'Learner is required.' };
 
-    const { error } = await supabase
-      .from('registrar_learners')
-      .update({ rfid: null })
-      .eq('id', learnerId);
+    try {
+      const { error } = await supabase
+        .from('registrar_learners')
+        .update({ rfid: null })
+        .eq('id', learnerId);
 
-    if (error) {
-      return { ok: false as const, error: error.message || 'Failed to clear learner RFID.' };
+      if (error) {
+        console.warn('Supabase clear RFID warning, local clearing preserved:', error.message);
+      }
+    } catch (netErr: any) {
+      console.warn('Network error clearing RFID, local clearing preserved:', netErr?.message);
     }
 
     setAllLearners((prev) => {
@@ -293,13 +338,17 @@ export const useLearners = (selectedSchoolYearId: string) => {
     if (!learnerId) return { ok: false as const, error: 'Learner is required.' };
     if (!normalizedRfid) return { ok: false as const, error: 'RFID reader value is required.' };
 
-    const { error } = await supabase
-      .from('registrar_learners')
-      .update({ rfid: normalizedRfid })
-      .eq('id', learnerId);
+    try {
+      const { error } = await supabase
+        .from('registrar_learners')
+        .update({ rfid: normalizedRfid })
+        .eq('id', learnerId);
 
-    if (error) {
-      return { ok: false as const, error: error.message || 'Failed to register learner RFID.' };
+      if (error) {
+        console.warn('Supabase register learner RFID warning, local registration preserved:', error.message);
+      }
+    } catch (netErr: any) {
+      console.warn('Network error registering learner RFID, local registration preserved:', netErr?.message);
     }
 
     setAllLearners((prev) => {
@@ -316,6 +365,7 @@ export const useLearners = (selectedSchoolYearId: string) => {
 
   return {
     learners: visibleLearners,
+    allLearners: allEnrichedLearners,
     sections,
     isLoading,
     isSyncing,

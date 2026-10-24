@@ -15,6 +15,7 @@ This means:
 
 - full shared schema reference: `database.schema.sql`
 - election-focused schema reference: `election/schema.sql`
+- satellite integration & read-only cache guide: `docs/learners-and-sections-read-cache-guide.md`
 - contributor and naming rules: `AGENTS.md`
 
 ## Active App Mapping
