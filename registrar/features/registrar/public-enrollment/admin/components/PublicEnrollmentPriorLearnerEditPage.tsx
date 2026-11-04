@@ -9,6 +9,7 @@ import { logEnrollmentBandwidthEstimate } from '../../utils/enrollmentBandwidthL
 import { deviceOptions, gradeLevelOptions, learnerCategoryOptions, modalityOptions, religionOptions, semesterOptions, studentTypeOptions } from '../../data/enrollmentOptions';
 import EnrollmentDraftFormSections from '../../shared/EnrollmentDraftFormSections';
 import { normalizeLearnerType } from '../../shared/learnerType';
+import { getLearnerStatusTone, isGrade12 } from '../../../../../types';
 import { publishEnrollmentKioskState } from '../../kiosk/enrollmentKioskSync';
 
 const SAME_SCHOOL_LABEL = 'Same School';
@@ -28,7 +29,7 @@ function normalizeSchoolYear(value: string) {
   const raw = String(value || '').trim();
   if (!raw) return '';
   const normalized = raw.replace(/^sy\s*/i, '').replace(/\s+/g, ' ');
-  const match = normalized.match(/(20\d{2})\s*[-–]\s*(20\d{2})/);
+  const match = normalized.match(/(20\d{2})\s*[-–/]?\s*(20\d{2})/);
   if (match) return `${match[1]}-${match[2]}`;
   return normalized.toLowerCase();
 }
@@ -112,6 +113,11 @@ export default function PublicEnrollmentPriorLearnerEditPage() {
   const [resolvedSchoolId, setResolvedSchoolId] = useState(schoolId);
   const [latestPriorSchoolYear, setLatestPriorSchoolYear] = useState('');
   const [latestPriorGradeLevel, setLatestPriorGradeLevel] = useState('');
+  const [isGraduateStudent, setIsGraduateStudent] = useState(false);
+  const [latestPriorSection, setLatestPriorSection] = useState('');
+  const [latestPriorTrack, setLatestPriorTrack] = useState('');
+  const [latestPriorStrand, setLatestPriorStrand] = useState('');
+  const [latestPriorSchool, setLatestPriorSchool] = useState('');
   const [isTaggingReEnroll, setIsTaggingReEnroll] = useState(false);
   const [deletingHistoryId, setDeletingHistoryId] = useState('');
   const [focusedSection, setFocusedSection] = useState<'enrollmentContext' | 'learnerInfo' | 'addressInfo' | 'guardianInfo' | null>(null);
@@ -140,44 +146,171 @@ export default function PublicEnrollmentPriorLearnerEditPage() {
       try {
         const { data, error: learnerError } = await supabase
           .from('registrar_learners')
-          .select('id,school_id,lrn,first_name,middle_name,last_name,birth_date,gender,address,contact_number,guardian_name,father_name,mother_name,email')
+          .select('*')
           .eq('id', learnerId)
           .maybeSingle();
         if (learnerError || !data) throw new Error('Learner record not found.');
+
+        let linkedSection: any = null;
+        if ((data as any).section_id) {
+          const { data: secData } = await supabase
+            .from('registrar_sections')
+            .select('*')
+            .eq('id', (data as any).section_id)
+            .maybeSingle();
+          linkedSection = secData;
+        }
 
         const { data: learnerHistoryRows } = await supabase
           .from('registrar_enrollment_history')
           .select('id,school_year,grade_level,section,status,submission_payload,enrollment_date,created_at')
           .eq('learner_id', String((data as any).id || learnerId));
-        const priorEntries = (learnerHistoryRows || [])
-          .map((entry: any) => ({
+
+        const allRawHistory: any[] = [];
+        (learnerHistoryRows || []).forEach((entry: any) => {
+          allRawHistory.push({
+            id: String(entry?.id || crypto.randomUUID()),
             schoolYear: String(entry?.school_year || '').trim(),
             gradeLevel: String(entry?.grade_level || '').trim(),
             section: String(entry?.section || '').trim(),
+            status: String(entry?.status || '').trim(),
             submissionPayload: entry?.submission_payload && typeof entry.submission_payload === 'object' ? entry.submission_payload : {},
+            enrolledAt: String(entry?.enrollment_date || entry?.created_at || '').trim(),
             sortAt: new Date(String(entry?.enrollment_date || entry?.created_at || 0)).getTime(),
-          }))
-          .filter((entry: any) => {
-            const sy = String(entry?.schoolYear || '').trim();
+          });
+        });
+
+        if (Array.isArray((data as any).enrollment_history)) {
+          (data as any).enrollment_history.forEach((entry: any) => {
+            const sy = String(entry?.schoolYear || entry?.school_year || '').trim();
+            if (!sy) return;
+            const exists = allRawHistory.some(
+              (h) => normalizeSchoolYear(h.schoolYear) === normalizeSchoolYear(sy) &&
+                     h.gradeLevel === String(entry?.gradeLevel || entry?.grade_level || '').trim()
+            );
+            if (!exists) {
+              allRawHistory.push({
+                id: String(entry?.id || crypto.randomUUID()),
+                schoolYear: sy,
+                gradeLevel: String(entry?.gradeLevel || entry?.grade_level || '').trim(),
+                section: String(entry?.section || '').trim(),
+                status: String(entry?.status || '').trim(),
+                submissionPayload: entry?.submissionPayload && typeof entry.submissionPayload === 'object' ? entry.submissionPayload : {},
+                enrolledAt: String(entry?.enrollmentDate || entry?.enrollment_date || '').trim(),
+                sortAt: new Date(String(entry?.enrollmentDate || entry?.enrollment_date || 0)).getTime(),
+              });
+            }
+          });
+        }
+
+        if (linkedSection) {
+          const secSy = String(linkedSection.school_year_id || linkedSection.schoolYearId || '').trim();
+          const exists = allRawHistory.some((h) => normalizeSchoolYear(h.schoolYear) === normalizeSchoolYear(secSy));
+          if (!exists && secSy) {
+            allRawHistory.push({
+              id: String(linkedSection.id || crypto.randomUUID()),
+              schoolYear: normalizeSchoolYear(secSy),
+              gradeLevel: String(linkedSection.grade_level || linkedSection.gradeLevel || '').trim(),
+              section: String(linkedSection.name || '').trim(),
+              status: String((data as any).status || 'Enrolled').trim(),
+              submissionPayload: {},
+              enrolledAt: String((data as any).created_at || '').trim(),
+              sortAt: new Date(String((data as any).created_at || 0)).getTime(),
+            });
+          }
+        }
+
+        // Deduplicate any records that share the same normalized school year and grade level / section
+        const uniqueHistoryMap = new Map<string, any>();
+        allRawHistory.forEach((entry) => {
+          const syKey = normalizeSchoolYear(entry.schoolYear);
+          const gradeKey = String(entry.gradeLevel || '').trim().toLowerCase();
+          const secKey = String(entry.section || '').trim().toLowerCase();
+          const dedupKey = `${syKey}_${gradeKey}_${secKey}`;
+          if (!uniqueHistoryMap.has(dedupKey)) {
+            uniqueHistoryMap.set(dedupKey, entry);
+          } else {
+            const existing = uniqueHistoryMap.get(dedupKey);
+            if (!existing.section && entry.section) existing.section = entry.section;
+            if (!existing.gradeLevel && entry.gradeLevel) existing.gradeLevel = entry.gradeLevel;
+            if (entry.sortAt && (!existing.sortAt || entry.sortAt < existing.sortAt)) {
+              existing.enrolledAt = entry.enrolledAt;
+              existing.sortAt = entry.sortAt;
+            }
+          }
+        });
+        const deduplicatedRawHistory = Array.from(uniqueHistoryMap.values());
+
+        const priorEntries = deduplicatedRawHistory
+          .filter((entry) => {
+            const sy = String(entry.schoolYear || '').trim();
             if (!sy) return false;
             return !activeSchoolYearLabel || normalizeSchoolYear(sy) !== normalizeSchoolYear(activeSchoolYearLabel);
           })
-          .sort((a: any, b: any) => a.sortAt - b.sortAt);
+          .sort((a, b) => a.sortAt - b.sortAt);
+
         const latestPriorEntry = priorEntries[priorEntries.length - 1] || {};
         const sourcePayload = (latestPriorEntry as any).submissionPayload || {};
         const sourceSchoolToEnroll = String(sourcePayload.schoolToEnroll || '').trim();
         const sourcePreviousSchool = String(sourcePayload.previousSchool || '').trim();
 
         const nextSchoolId = String((data as any).school_id || schoolId);
+        const rawStatus = String((data as any).status || '').trim().toLowerCase();
+        const hasExplicitOtherStatus =
+          rawStatus === 'transfer out' ||
+          rawStatus === 'transferred out' ||
+          rawStatus === 'drop out' ||
+          rawStatus === 'dropped out' ||
+          rawStatus === 'withdrawn';
+
+        const isGraduate =
+          !hasExplicitOtherStatus &&
+          (rawStatus === 'graduated' ||
+            isGrade12(String((latestPriorEntry as any).gradeLevel || '')) ||
+            isGrade12(String((data as any).last_grade_level || '')) ||
+            isGrade12(String(linkedSection?.grade_level || linkedSection?.gradeLevel || '')) ||
+            allRawHistory.some((entry: any) =>
+              isGrade12(String(entry?.gradeLevel || '')) &&
+              (!activeSchoolYearLabel || normalizeSchoolYear(String(entry?.schoolYear || '')) !== normalizeSchoolYear(activeSchoolYearLabel))
+            ));
+
+        const resolvedPriorSection = String(
+          (latestPriorEntry as any).section ||
+          linkedSection?.name ||
+          (data as any).section ||
+          sourcePayload.section ||
+          ''
+        ).trim();
+
+        const resolvedPriorTrack = String(
+          sourcePayload.track ||
+          (data as any).track ||
+          (isGrade12((latestPriorEntry as any).gradeLevel) ? 'Academic Track' : '')
+        ).trim();
+
+        const resolvedPriorStrand = String(
+          sourcePayload.strand ||
+          linkedSection?.strand ||
+          (data as any).strand ||
+          ''
+        ).trim();
+
+        const resolvedPriorSchool = String(
+          sourceSchoolToEnroll ||
+          sourcePreviousSchool ||
+          (data as any).previous_school ||
+          'Leon National High School'
+        ).trim();
+
         const mappedDraft = {
           ...emptyDraft(nextSchoolId),
           ...sourcePayload,
-          studentType: normalizeLearnerType(String(sourcePayload.studentType || 'Continuing Learner')) || 'Continuing Learner',
+          studentType: isGraduate ? 'Graduate Student' : normalizeLearnerType(String(sourcePayload.studentType || 'Continuing Learner')) || 'Continuing Learner',
           learnerCategory: SAME_SCHOOL_LABEL,
           schoolId: nextSchoolId,
           schoolYear: String(activeSchoolYearLabel || (latestPriorEntry as any).schoolYear || ''),
-          schoolToEnroll: sourceSchoolToEnroll,
-          previousSchool: sourcePreviousSchool || sourceSchoolToEnroll,
+          schoolToEnroll: sourceSchoolToEnroll || resolvedPriorSchool,
+          previousSchool: sourcePreviousSchool || resolvedPriorSchool,
           lrn: String((data as any).lrn || ''),
           email: String((data as any).email || sourcePayload.email || ''),
           lastName: String((data as any).last_name || sourcePayload.lastName || ''),
@@ -186,7 +319,7 @@ export default function PublicEnrollmentPriorLearnerEditPage() {
           birthDate: String((data as any).birth_date || sourcePayload.birthDate || ''),
           gender: String((data as any).gender || sourcePayload.gender || 'Male'),
           currentAddress: String((data as any).address || sourcePayload.currentAddress || ''),
-          permanentAddress: String(sourcePayload.permanentAddress || ''),
+          permanentAddress: String(sourcePayload.permanentAddress || (data as any).address || ''),
           learnerContact: String((data as any).contact_number || sourcePayload.learnerContact || ''),
           guardianName: String((data as any).guardian_name || sourcePayload.guardianName || ''),
           guardianContact: String(sourcePayload.guardianContact || ''),
@@ -194,25 +327,33 @@ export default function PublicEnrollmentPriorLearnerEditPage() {
           fatherContact: String(sourcePayload.fatherContact || ''),
           motherName: String((data as any).mother_name || sourcePayload.motherName || ''),
           motherContact: String(sourcePayload.motherContact || ''),
-          gradeToEnroll: String((latestPriorEntry as any).gradeLevel || sourcePayload.gradeToEnroll || ''),
+          lastGradeLevel: isGraduate ? 'Grade 12' : String(sourcePayload.lastGradeLevel || (latestPriorEntry as any).gradeLevel || ''),
+          gradeToEnroll: isGraduate ? '' : String((latestPriorEntry as any).gradeLevel || sourcePayload.gradeToEnroll || ''),
+          track: resolvedPriorTrack || sourcePayload.track || '',
+          strand: resolvedPriorStrand || sourcePayload.strand || '',
         };
 
         if (cancelled) return;
         setResolvedLearnerId(String((data as any).id || learnerId));
         setResolvedSchoolId(nextSchoolId);
         setLatestPriorSchoolYear(String((latestPriorEntry as any).schoolYear || '').trim());
-        setLatestPriorGradeLevel(String((latestPriorEntry as any).gradeLevel || '').trim());
+        setLatestPriorGradeLevel(String((latestPriorEntry as any).gradeLevel || (isGraduate ? 'Grade 12' : '')).trim());
+        setLatestPriorSection(resolvedPriorSection);
+        setLatestPriorTrack(resolvedPriorTrack);
+        setLatestPriorStrand(resolvedPriorStrand);
+        setLatestPriorSchool(resolvedPriorSchool);
+        setIsGraduateStudent(isGraduate);
         setEnrollmentHistoryRows(
-          (learnerHistoryRows || [])
+          deduplicatedRawHistory
+            .sort((a, b) => (b.sortAt || 0) - (a.sortAt || 0))
             .map((entry: any) => ({
-              id: String(entry?.id || crypto.randomUUID()),
-              schoolYear: String(entry?.school_year || '').trim(),
-              gradeLevel: String(entry?.grade_level || '').trim(),
-              section: String(entry?.section || '').trim(),
-              status: String(entry?.status || '').trim(),
-              enrolledAt: String(entry?.enrollment_date || entry?.created_at || '').trim(),
+              id: entry.id,
+              schoolYear: entry.schoolYear,
+              gradeLevel: entry.gradeLevel,
+              section: entry.section,
+              status: isGraduate && isGrade12(entry.gradeLevel) ? 'Graduated' : entry.status,
+              enrolledAt: entry.enrolledAt,
             }))
-            .sort((a, b) => new Date(b.enrolledAt || 0).getTime() - new Date(a.enrolledAt || 0).getTime()),
         );
         setDraft(mappedDraft);
         publishEnrollmentKioskState({
@@ -225,6 +366,8 @@ export default function PublicEnrollmentPriorLearnerEditPage() {
             latestSchoolYear: String((latestPriorEntry as any).schoolYear || '').trim(),
             latestGradeLevel: String((latestPriorEntry as any).gradeLevel || '').trim(),
             latestSection: String((latestPriorEntry as any).section || '').trim(),
+            status: isGraduate ? 'Graduated' : String((data as any).status || ''),
+            isGraduate,
           },
         });
       } catch (e: any) {
@@ -334,6 +477,10 @@ export default function PublicEnrollmentPriorLearnerEditPage() {
   }, [draft.lastGradeLevel, draft.learnerCategory]);
 
   const tagForReEnroll = async () => {
+    if (isGraduateStudent) {
+      alert('High school graduates who completed Grade 12 in a previous school year cannot be re-enrolled in basic education.');
+      return;
+    }
     setIsTaggingReEnroll(true);
     try {
       const { data: activeYearRow } = await supabase
@@ -480,19 +627,261 @@ export default function PublicEnrollmentPriorLearnerEditPage() {
   if (isLoading) return <UsisPageLoader message="Loading learner editor..." />;
   if (error && !draft.lrn && !draft.firstName && !draft.lastName) return <section className="portal-panel registrar-public-enrollment-submissions"><div className="portal-panel__body"><p>{error}</p><button type="button" className="secondary-button" onClick={() => navigate('/enroll')}>Back</button></div></section>;
 
+  if (isGraduateStudent) {
+    return (
+      <section className="portal-panel registrar-public-enrollment-submissions">
+        <div className="portal-panel__header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+          <div>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+              <span className="status-badge status-badge--graduated">Graduated</span>
+              <span style={{ fontSize: 13, color: 'var(--deped-muted)', fontWeight: 600 }}>Archived Academic Record</span>
+            </div>
+            <h2>Previous-Year Learner Record (Graduated)</h2>
+            <p>Showing verified academic and personal records from completed School Year {latestPriorSchoolYear || 'previous S.Y.'}.</p>
+          </div>
+          <div style={{ display: 'inline-flex', gap: 10 }}>
+            <button type="button" className="secondary-button" onClick={() => navigate('/enroll')}>
+              Back to Submissions
+            </button>
+          </div>
+        </div>
+
+        <div className="portal-panel__body" style={{ display: 'grid', gap: 18 }}>
+          <div
+            className="notice-box"
+            style={{
+              background: '#faf5ff',
+              borderColor: '#d8b4fe',
+              color: '#581c87',
+              padding: '16px 20px',
+              borderRadius: 12,
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: 12,
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: 24, color: '#7e22ce' }}>school</span>
+            <div>
+              <strong style={{ display: 'block', fontSize: 15, marginBottom: 4 }}>
+                Graduate Student - Basic Education Re-enrollment Not Allowed
+              </strong>
+              <span style={{ fontSize: 13, lineHeight: 1.5, display: 'block' }}>
+                This learner completed Grade 12 in School Year {latestPriorSchoolYear || 'previous S.Y.'} and is classified as a Graduate Student. High school graduates are not allowed to be enrolled in the basic education enrollment form. Re-enroll editing is disabled for graduated records. Please contact the Registrar for credentials, transcripts (SF10), or diploma certifications.
+              </span>
+            </div>
+          </div>
+
+          <div
+            className="form-grid"
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+              gap: 16,
+            }}
+          >
+            {/* Card 1: Completed Academic Placement */}
+            <div className="table-card" style={{ padding: 16, borderRadius: 12 }}>
+              <div style={{ fontWeight: 700, color: 'var(--deped-blue)', marginBottom: 12, borderBottom: '1px solid var(--line)', paddingBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 18 }}>history_edu</span>
+                Completed Academic Record
+              </div>
+              <div style={{ display: 'grid', gap: 10, fontSize: 13 }}>
+                <div>
+                  <span style={{ color: 'var(--deped-muted)', display: 'block', fontSize: 11, fontWeight: 700, textTransform: 'uppercase' }}>Completed School Year</span>
+                  <strong style={{ fontSize: 14 }}>{latestPriorSchoolYear || '--'}</strong>
+                </div>
+                <div>
+                  <span style={{ color: 'var(--deped-muted)', display: 'block', fontSize: 11, fontWeight: 700, textTransform: 'uppercase' }}>Completed Grade Level</span>
+                  <strong style={{ fontSize: 14 }}>{latestPriorGradeLevel || 'Grade 12'}</strong>
+                </div>
+                <div>
+                  <span style={{ color: 'var(--deped-muted)', display: 'block', fontSize: 11, fontWeight: 700, textTransform: 'uppercase' }}>Section</span>
+                  <strong style={{ fontSize: 14 }}>{latestPriorSection || '--'}</strong>
+                </div>
+                {(latestPriorTrack || latestPriorStrand) && (
+                  <div>
+                    <span style={{ color: 'var(--deped-muted)', display: 'block', fontSize: 11, fontWeight: 700, textTransform: 'uppercase' }}>Senior High Track & Strand</span>
+                    <strong style={{ fontSize: 14 }}>{[latestPriorTrack, latestPriorStrand].filter(Boolean).join(' - ')}</strong>
+                  </div>
+                )}
+                <div>
+                  <span style={{ color: 'var(--deped-muted)', display: 'block', fontSize: 11, fontWeight: 700, textTransform: 'uppercase' }}>School Attended</span>
+                  <span style={{ fontSize: 13 }}>{latestPriorSchool || 'Leon National High School'}</span>
+                </div>
+                <div>
+                  <span style={{ color: 'var(--deped-muted)', display: 'block', fontSize: 11, fontWeight: 700, textTransform: 'uppercase' }}>Current Status</span>
+                  <span className="status-badge status-badge--graduated">Graduated</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Card 2: Learner Profile */}
+            <div className="table-card" style={{ padding: 16, borderRadius: 12 }}>
+              <div style={{ fontWeight: 700, color: 'var(--deped-blue)', marginBottom: 12, borderBottom: '1px solid var(--line)', paddingBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 18 }}>person</span>
+                Learner Profile
+              </div>
+              <div style={{ display: 'grid', gap: 10, fontSize: 13 }}>
+                <div>
+                  <span style={{ color: 'var(--deped-muted)', display: 'block', fontSize: 11, fontWeight: 700, textTransform: 'uppercase' }}>Learner Reference Number (LRN)</span>
+                  <strong style={{ fontSize: 14, fontFamily: 'monospace' }}>{draft.lrn || '--'}</strong>
+                </div>
+                <div>
+                  <span style={{ color: 'var(--deped-muted)', display: 'block', fontSize: 11, fontWeight: 700, textTransform: 'uppercase' }}>Full Name</span>
+                  <strong style={{ fontSize: 14 }}>
+                    {[draft.lastName, draft.firstName, draft.middleName].filter(Boolean).join(', ')}
+                  </strong>
+                </div>
+                <div>
+                  <span style={{ color: 'var(--deped-muted)', display: 'block', fontSize: 11, fontWeight: 700, textTransform: 'uppercase' }}>Sex</span>
+                  <span style={{ fontSize: 13 }}>{draft.gender || '--'}</span>
+                </div>
+                <div>
+                  <span style={{ color: 'var(--deped-muted)', display: 'block', fontSize: 11, fontWeight: 700, textTransform: 'uppercase' }}>Birth Date</span>
+                  <span style={{ fontSize: 13 }}>{draft.birthDate || '--'}</span>
+                </div>
+                <div>
+                  <span style={{ color: 'var(--deped-muted)', display: 'block', fontSize: 11, fontWeight: 700, textTransform: 'uppercase' }}>Contact Number</span>
+                  <span style={{ fontSize: 13 }}>{draft.learnerContact || '--'}</span>
+                </div>
+                <div>
+                  <span style={{ color: 'var(--deped-muted)', display: 'block', fontSize: 11, fontWeight: 700, textTransform: 'uppercase' }}>Email</span>
+                  <span style={{ fontSize: 13 }}>{draft.email || '--'}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Card 3: Address & Residence */}
+            <div className="table-card" style={{ padding: 16, borderRadius: 12 }}>
+              <div style={{ fontWeight: 700, color: 'var(--deped-blue)', marginBottom: 12, borderBottom: '1px solid var(--line)', paddingBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 18 }}>home</span>
+                Residence Information
+              </div>
+              <div style={{ display: 'grid', gap: 10, fontSize: 13 }}>
+                <div>
+                  <span style={{ color: 'var(--deped-muted)', display: 'block', fontSize: 11, fontWeight: 700, textTransform: 'uppercase' }}>Current Address</span>
+                  <span style={{ fontSize: 13 }}>{draft.currentAddress || 'Local Resident'}</span>
+                </div>
+                <div>
+                  <span style={{ color: 'var(--deped-muted)', display: 'block', fontSize: 11, fontWeight: 700, textTransform: 'uppercase' }}>Permanent Address</span>
+                  <span style={{ fontSize: 13 }}>{draft.permanentAddress || draft.currentAddress || 'Same as current'}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Card 4: Parent & Guardian Details */}
+            <div className="table-card" style={{ padding: 16, borderRadius: 12 }}>
+              <div style={{ fontWeight: 700, color: 'var(--deped-blue)', marginBottom: 12, borderBottom: '1px solid var(--line)', paddingBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 18 }}>family_restroom</span>
+                Family & Guardian Information
+              </div>
+              <div style={{ display: 'grid', gap: 10, fontSize: 13 }}>
+                <div>
+                  <span style={{ color: 'var(--deped-muted)', display: 'block', fontSize: 11, fontWeight: 700, textTransform: 'uppercase' }}>Father's Name</span>
+                  <span style={{ fontSize: 13 }}>{draft.fatherName || '--'}</span>
+                </div>
+                <div>
+                  <span style={{ color: 'var(--deped-muted)', display: 'block', fontSize: 11, fontWeight: 700, textTransform: 'uppercase' }}>Mother's Name</span>
+                  <span style={{ fontSize: 13 }}>{draft.motherName || '--'}</span>
+                </div>
+                <div>
+                  <span style={{ color: 'var(--deped-muted)', display: 'block', fontSize: 11, fontWeight: 700, textTransform: 'uppercase' }}>Guardian's Name</span>
+                  <span style={{ fontSize: 13 }}>{draft.guardianName || '--'}</span>
+                </div>
+                <div>
+                  <span style={{ color: 'var(--deped-muted)', display: 'block', fontSize: 11, fontWeight: 700, textTransform: 'uppercase' }}>Guardian Contact</span>
+                  <span style={{ fontSize: 13 }}>{draft.guardianContact || draft.fatherContact || draft.motherContact || '--'}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 5: Complete Enrollment History Table */}
+          <section className="table-card" aria-label="Learner enrollment history">
+            <div
+              style={{
+                padding: '12px 16px',
+                fontWeight: 700,
+                color: 'var(--deped-blue)',
+                borderBottom: '1px solid var(--line)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}
+            >
+              <span>Complete Historical Enrollment Records</span>
+              <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--deped-muted)' }}>
+                {enrollmentHistoryRows.length} entry(ies)
+              </span>
+            </div>
+            {enrollmentHistoryRows.length ? (
+              <table className="usis-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>School Year</th>
+                    <th>Grade Level</th>
+                    <th>Section</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {enrollmentHistoryRows.map((row) => (
+                    <tr key={row.id}>
+                      <td>{formatDateTime(row.enrolledAt)}</td>
+                      <td>{row.schoolYear || '--'}</td>
+                      <td>{row.gradeLevel || '--'}</td>
+                      <td>{row.section || '--'}</td>
+                      <td>
+                        <span className={`status-badge status-badge--${getLearnerStatusTone(row.status)}`}>
+                          {row.status || '--'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <div style={{ padding: 14, color: 'var(--deped-muted)', fontSize: 13 }}>
+                No enrollment history rows found for this learner.
+              </div>
+            )}
+          </section>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+            <button type="button" className="secondary-button" onClick={() => navigate('/enroll')}>
+              Back to Submissions
+            </button>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="portal-panel registrar-public-enrollment-submissions">
       <div className="portal-panel__header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
         <div><h2>Edit Previous-Year Learner Record</h2><p>Update learner details from historical enrollment record.</p></div>
         <div style={{ display: 'inline-flex', gap: 10 }}>
-          <button type="button" className="secondary-button" onClick={tagForReEnroll} disabled={isTaggingReEnroll || isSaving}>
-            {isTaggingReEnroll ? 'Tagging...' : 'Tag for Re-enroll'}
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={tagForReEnroll}
+            disabled={isTaggingReEnroll || isSaving || isGraduateStudent}
+            title={isGraduateStudent ? 'Re-enrollment not permitted for Grade 12 graduates' : undefined}
+          >
+            {isTaggingReEnroll ? 'Tagging...' : isGraduateStudent ? 'Graduate (Re-enroll Blocked)' : 'Tag for Re-enroll'}
           </button>
           <button type="button" className="secondary-button" onClick={() => navigate('/enroll')}>Back to Submissions</button>
         </div>
       </div>
       <div className="portal-panel__body" style={{ display: 'grid', gap: 18 }}>
         {error ? <div className="notice-box" style={{ color: 'var(--deped-red)' }}>{error}</div> : null}
+        {isGraduateStudent ? (
+          <div className="notice-box" style={{ background: '#faf5ff', borderColor: '#d8b4fe', color: '#581c87', padding: '14px 18px', borderRadius: 8, fontSize: '13px', lineHeight: 1.5 }}>
+            <strong>Graduate Student Detected:</strong> Learner completed Grade 12 in School Year {latestPriorSchoolYear || 'previous S.Y.'} and is classified as a Graduate Student. High school graduates are not allowed to be enrolled in the basic education enrollment form. Please contact the Registrar for credentials or transcript requests.
+          </div>
+        ) : null}
         <EnrollmentDraftFormSections
           draft={draft}
           onFieldChange={(name, value) => updateField(name, value)}

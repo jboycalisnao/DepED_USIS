@@ -45,7 +45,7 @@ import UsisPageLoader from '../../../../common/components/UsisPageLoader';
 import { EnrollmentAnnouncementsModal } from '../../../../common/components/enrollment/EnrollmentAnnouncementsModal';
 import { useEnrollmentAnnouncements } from '../../portal/hooks/useEnrollmentAnnouncements';
 import { buildDuplicateEnrollmentSubmissionMessage, findDuplicateEnrollmentSubmission } from '../services/publicEnrollmentSubmissions';
-import { fetchEnrollmentSchoolYear } from '../../../lib/enrollmentSchoolYear';
+import { fetchEnrollmentSchoolYear, fetchRegistrarActiveSchoolYear } from '../../../lib/enrollmentSchoolYear';
 
   const gradeLevelOrder = gradeLevelOptions.map((level) => ({ label: level, value: Number(level.replace(/\D/g, '')) }));
   const SHS_GRADES = new Set(['Grade 11', 'Grade 12']);
@@ -67,7 +67,28 @@ type LrnLookupState =
   | { status: 'invalid'; message: string }
   | { status: 'duplicate'; message: string }
   | { status: 'matched'; message: string }
+  | { status: 'graduated'; message: string }
   | { status: 'not_found'; message: string };
+
+const isGrade12 = (gradeLevel?: string | null): boolean => {
+  const raw = String(gradeLevel || '').trim().toLowerCase();
+  if (!raw) return false;
+  return (
+    raw === 'grade 12' ||
+    raw === 'grade12' ||
+    raw === '12' ||
+    raw === 'g12' ||
+    /\b(?:g|grade|gr\.?)\s*12\b/i.test(raw) ||
+    /^12\s*[-–—]/.test(raw)
+  );
+};
+
+const isEnrollmentFormBypassEnabled = () =>
+  import.meta.env.VITE_ALLOW_PORTAL_GATE_BYPASS === 'true' ||
+  import.meta.env.VITE_ALLOW_GATE_BYPASS === 'true' ||
+  import.meta.env.VITE_ALLOW_ENROLLMENT_FORM_BYPASS === 'true' ||
+  import.meta.env.VITE_ALLOW_ENROLLMENT_BYPASS === 'true' ||
+  import.meta.env.VITE_ALLOW_ATTENDANCE_BYPASS === 'true';
 
 export function EnrollmentFormPage() {
   const navigate = useNavigate();
@@ -90,6 +111,7 @@ export function EnrollmentFormPage() {
   const [currentBarangays, setCurrentBarangays] = useState<PsgcLocation[]>([]);
   const [modalNotice, setModalNotice] = useState<{ type: 'success' | 'error' | 'info'; title: string; message: string } | null>(null);
   const [showEnrollmentAdvisory, setShowEnrollmentAdvisory] = useState(true);
+  const [activeSchoolYear, setActiveSchoolYear] = useState('');
   const { announcements, isLoading: areAnnouncementsLoading } = useEnrollmentAnnouncements();
   const [permanentAddress, setPermanentAddress] = useState<AddressSelection>(initialAddressSelection);
   const [currentAddress, setCurrentAddress] = useState<AddressSelection>(initialAddressSelection);
@@ -118,6 +140,11 @@ export function EnrollmentFormPage() {
     const loadFormAvailability = async () => {
       setIsFormAvailabilityLoading(true);
       try {
+        if (isEnrollmentFormBypassEnabled()) {
+          setIsFormEnabled(true);
+          return;
+        }
+
         const { data: scheduleData, error: scheduleError } = await supabase
           .from('registrar_enrollment_form_schedule')
           .select('*')
@@ -182,7 +209,11 @@ export function EnrollmentFormPage() {
     const loadActiveSchoolYear = async () => {
       setIsSchoolYearLoading(true);
       try {
-        const resolvedSchoolYear = await fetchEnrollmentSchoolYear();
+        const [registrarActiveYear, resolvedSchoolYear] = await Promise.all([
+          fetchRegistrarActiveSchoolYear(),
+          fetchEnrollmentSchoolYear(),
+        ]);
+        setActiveSchoolYear(registrarActiveYear || resolvedSchoolYear.label || '');
         const defaultPreviousSchoolYear = buildPreviousSchoolYearOptions(resolvedSchoolYear.label, 1)[0]?.label || '';
         setDraft((current) => ({
           ...current,
@@ -200,6 +231,11 @@ export function EnrollmentFormPage() {
 
   useEffect(() => {
     const loadPortalGate = async () => {
+      if (isEnrollmentFormBypassEnabled()) {
+        setIsEnrollmentPortalBlocked(false);
+        return;
+      }
+
       try {
         const { data, error } = await supabase
           .from('ia_portal_controls')
@@ -263,7 +299,7 @@ export function EnrollmentFormPage() {
         const [{ data, error }, duplicateSubmission] = await Promise.all([
           supabase
             .from('registrar_learners')
-            .select('id,lrn,first_name,last_name,middle_name,birth_date,gender,address,contact_number,guardian_name,father_name,mother_name,is_4ps,email,enrollment_history')
+            .select('id,lrn,first_name,last_name,middle_name,birth_date,gender,address,contact_number,guardian_name,father_name,mother_name,is_4ps,email,status,last_grade_level,previous_school_year,school_year,enrollment_history')
             .eq('lrn', normalizedLrn)
             .maybeSingle(),
           draft.schoolYear ? findDuplicateEnrollmentSubmission(normalizedLrn, draft.schoolYear) : Promise.resolve(null),
@@ -305,29 +341,85 @@ export function EnrollmentFormPage() {
         }
 
         const learnerId = String((data as any).id || '').trim();
-        const { data: latestHistoryRow } = learnerId
+        const { data: historyRows } = learnerId
           ? await supabase
               .from('registrar_enrollment_history')
-              .select('school_year,grade_level,submission_payload,enrollment_date,created_at')
+              .select('id,school_year,grade_level,section,status,submission_payload,enrollment_date,created_at')
               .eq('learner_id', learnerId)
               .order('enrollment_date', { ascending: false, nullsFirst: false })
               .order('created_at', { ascending: false })
-              .limit(1)
-              .maybeSingle()
-          : { data: null as any };
+          : { data: [] as any[] };
 
+        const historyList = Array.isArray(historyRows) ? historyRows : [];
+        const latestHistoryRow = historyList[0] || null;
         const enrollmentHistory = Array.isArray((data as any).enrollment_history) ? ([...(data as any).enrollment_history] as Array<any>) : [];
         const latestEnrollmentLegacy = enrollmentHistory
           .filter((entry) => entry && typeof entry === 'object')
           .sort((a, b) => new Date(String(b.enrollmentDate || b.created_at || 0)).getTime() - new Date(String(a.enrollmentDate || a.created_at || 0)).getTime())[0];
-        const latestSchoolYear = String((latestHistoryRow as any)?.school_year || latestEnrollmentLegacy?.schoolYear || '').trim();
-        const latestGradeLevel = String((latestHistoryRow as any)?.grade_level || latestEnrollmentLegacy?.gradeLevel || '').trim();
+        const latestSchoolYear = String((latestHistoryRow as any)?.school_year || latestEnrollmentLegacy?.schoolYear || (data as any)?.previous_school_year || (data as any)?.school_year || '').trim();
+        const latestGradeLevel = String((latestHistoryRow as any)?.grade_level || latestEnrollmentLegacy?.gradeLevel || (data as any)?.last_grade_level || '').trim();
         const nextGradeLevel = getNextGradeLevel(latestGradeLevel);
         const submissionPayload = (latestHistoryRow as any)?.submission_payload && typeof (latestHistoryRow as any).submission_payload === 'object'
           ? (latestHistoryRow as any).submission_payload
           : latestEnrollmentLegacy?.submissionPayload && typeof latestEnrollmentLegacy.submissionPayload === 'object'
             ? latestEnrollmentLegacy.submissionPayload
           : {};
+
+        const isPreviousGrade12Graduate =
+          isGrade12(latestGradeLevel) ||
+          isGrade12((data as any)?.last_grade_level) ||
+          String((data as any)?.status || '').trim().toLowerCase() === 'graduated' ||
+          historyList.some((row: any) => isGrade12(row?.grade_level)) ||
+          enrollmentHistory.some((entry: any) => isGrade12(entry?.gradeLevel || entry?.grade_level));
+
+        if (isPreviousGrade12Graduate) {
+          setDraft((current) => ({
+            ...current,
+            lrn: normalizedLrn,
+            studentType: 'Graduate Student',
+            learnerCategory: SAME_SCHOOL_LABEL,
+            previousSchool: LEON_NHS_NAME,
+            previousSchoolYear: latestSchoolYear || current.previousSchoolYear,
+            lastGradeLevel: 'Grade 12',
+            gradeToEnroll: '',
+            email: String((data as any).email || submissionPayload.email || current.email || ''),
+            firstName: String(data.first_name || submissionPayload.firstName || current.firstName || ''),
+            lastName: String(data.last_name || submissionPayload.lastName || current.lastName || ''),
+            middleName: String(data.middle_name || submissionPayload.middleName || current.middleName || ''),
+            birthDate: data.birth_date ? String(data.birth_date) : String(submissionPayload.birthDate || current.birthDate || ''),
+            height: String(submissionPayload.height || current.height || ''),
+            weight: String(submissionPayload.weight || current.weight || ''),
+            gender: String(data.gender || submissionPayload.gender || current.gender || ''),
+            placeOfBirth: String(submissionPayload.placeOfBirth || current.placeOfBirth || ''),
+            motherTongue: String(submissionPayload.motherTongue || current.motherTongue || ''),
+            religion: String(submissionPayload.religion || current.religion || ''),
+            learnerContact: String((data as any).contact_number || submissionPayload.learnerContact || current.learnerContact || ''),
+            guardianName: String(data.guardian_name || submissionPayload.guardianName || current.guardianName || ''),
+            fatherName: String(data.father_name || submissionPayload.fatherName || current.fatherName || ''),
+            motherName: String(data.mother_name || submissionPayload.motherName || current.motherName || ''),
+            fatherContact: String(submissionPayload.fatherContact || current.fatherContact || ''),
+            motherContact: String(submissionPayload.motherContact || current.motherContact || ''),
+            guardianContact: String(submissionPayload.guardianContact || current.guardianContact || ''),
+            is4Ps: data.is_4ps ? 'Yes' : String(submissionPayload.is4Ps || current.is4Ps || ''),
+            fourPsHouseholdId: String(submissionPayload.fourPsHouseholdId || current.fourPsHouseholdId || ''),
+            currentAddress: String((data as any).address || submissionPayload.currentAddress || current.currentAddress || ''),
+            permanentAddress: String(submissionPayload.permanentAddress || current.permanentAddress || ''),
+            hasSpedNeed: String(submissionPayload.hasSpedNeed || current.hasSpedNeed || 'No'),
+            preferredModality: String(submissionPayload.preferredModality || current.preferredModality || ''),
+            deviceAccess: String(submissionPayload.deviceAccess || current.deviceAccess || ''),
+            hasInternet: String(submissionPayload.hasInternet || current.hasInternet || ''),
+          }));
+          setLrnLookupState({
+            status: 'graduated',
+            message: `Graduate Student: Learner completed Grade 12 in School Year ${latestSchoolYear || 'previous S.Y.'}. Basic education re-enrollment is not permitted.`,
+          });
+          setModalNotice({
+            type: 'error',
+            title: 'Graduate Student Notice',
+            message: `Learner with LRN ${normalizedLrn} is recorded in the registrar's enrollment history as having completed Grade 12 in School Year ${latestSchoolYear || 'previous S.Y.'} and is classified as a Graduate Student. High school graduates are not allowed to be enrolled in the basic education enrollment form. Please contact the Registrar for graduation records or credential requests.`,
+          });
+          return;
+        }
 
         setDraft((current) => ({
           ...current,
@@ -618,6 +710,7 @@ export function EnrollmentFormPage() {
   const updateField = (name: keyof EnrollmentDraft, value: string | boolean) => setDraft((current) => ({ ...current, [name]: value }));
 
   const availableGradeToEnrollOptions = useMemo(() => {
+    if (draft.studentType === 'Graduate Student' || lrnLookupState.status === 'graduated') return [];
     const lastGrade = gradeLevelOrder.find((grade) => grade.label === draft.lastGradeLevel);
     return gradeLevelOptions.filter((grade) => {
       if (draft.studentType === 'Continuing Student' && draft.learnerCategory === SAME_SCHOOL_LABEL && grade === 'Grade 7') return false;
@@ -647,7 +740,7 @@ export function EnrollmentFormPage() {
     if (draft.track === TECHPRO_TRACK_LABEL) return [{ value: TECHPRO_STRAND_LABEL, label: TECHPRO_STRAND_LABEL }];
     return ACADEMIC_TRACK_STRANDS;
   }, [isSeniorHighTargetGrade, draft.track]);
-  const isLrnResolved = lrnLookupState.status === 'matched' || lrnLookupState.status === 'not_found';
+  const isLrnResolved = lrnLookupState.status === 'matched' || lrnLookupState.status === 'not_found' || lrnLookupState.status === 'graduated';
   const isFormLockedByLrn = !isLrnResolved;
 
   useEffect(() => {
@@ -682,6 +775,14 @@ export function EnrollmentFormPage() {
     setModalNotice(null);
     if (isFormLockedByLrn) {
       setModalNotice({ type: 'error', title: 'Validation Notice', message: 'Please enter and validate a 12-digit LRN before continuing.' });
+      return;
+    }
+    if (lrnLookupState.status === 'graduated' || draft.studentType === 'Graduate Student') {
+      setModalNotice({
+        type: 'error',
+        title: 'Enrollment Not Allowed',
+        message: 'Graduate students who completed Grade 12 in a previous school year cannot be enrolled in the enrollment form.',
+      });
       return;
     }
     if (lrnLookupState.status === 'duplicate') return;
@@ -830,7 +931,7 @@ export function EnrollmentFormPage() {
                 <h3>LRN Validation</h3>
                 <div className="floating-field-grid">
                   <TextField
-                    label={lrnLookupState.status === 'checking' ? 'Learner Reference Number (LRN) - Checking...' : 'Learner Reference Number (LRN)'}
+                    label={lrnLookupState.status === 'checking' ? 'Learner Reference Number (12-Digit LRN) - Checking...' : 'Learner Reference Number (12-Digit LRN)'}
                     value={draft.lrn}
                     onChange={(value) => updateField('lrn', digitsOnly(value).slice(0, 12))}
                     inputMode="numeric"
@@ -847,20 +948,39 @@ export function EnrollmentFormPage() {
                     color:
                       lrnLookupState.status === 'matched'
                         ? 'var(--deped-blue)'
-                        : lrnLookupState.status === 'invalid'
+                        : lrnLookupState.status === 'graduated' || lrnLookupState.status === 'invalid' || lrnLookupState.status === 'duplicate'
                           ? 'var(--deped-red)'
-                          : lrnLookupState.status === 'duplicate'
-                            ? 'var(--deped-red)'
                           : 'var(--deped-muted)',
                     fontSize: '13px',
-                    fontWeight: lrnLookupState.status === 'matched' ? 700 : 400,
+                    fontWeight: lrnLookupState.status === 'matched' || lrnLookupState.status === 'graduated' ? 700 : 400,
                   }}
                 >
                   {lrnLookupState.status === 'duplicate' ? 'Duplicate submission detected.' : lrnLookupState.message}
                 </p>
+                {lrnLookupState.status === 'graduated' ? (
+                  <div
+                    style={{
+                      padding: '12px 14px',
+                      borderRadius: '0.375rem',
+                      background: '#fff5f5',
+                      border: '1px solid #fecaca',
+                      borderLeft: '4px solid var(--deped-red)',
+                      display: 'grid',
+                      gap: 4,
+                      marginTop: 8,
+                    }}
+                  >
+                    <strong style={{ color: 'var(--deped-red)', fontSize: '13px' }}>
+                      Enrollment Not Allowed — Graduate Student Detected
+                    </strong>
+                    <span style={{ color: 'var(--deped-ink)', fontSize: '13px', lineHeight: 1.5 }}>
+                      According to the registrar&apos;s enrollment history, this learner completed Grade 12 in School Year {draft.previousSchoolYear || 'previous S.Y.'} and is classified as a Graduate Student. High school graduates are not allowed to be enrolled in the basic education enrollment form. Please contact the Registrar for credentials or transcript requests.
+                    </span>
+                  </div>
+                ) : null}
               </section>
               <fieldset
-                disabled={isFormLockedByLrn}
+                disabled={isFormLockedByLrn || lrnLookupState.status === 'graduated' || draft.studentType === 'Graduate Student'}
                 style={{
                   border: 0,
                   margin: 0,
@@ -874,7 +994,7 @@ export function EnrollmentFormPage() {
                 <h3>1. Enrollment Context</h3>
                 <div className="floating-field-grid">
                   <TextField label="School Year" value={draft.schoolYear} onChange={() => {}} disabled />
-                  <SelectField label="Student Type" value={draft.studentType} onChange={(value) => updateField('studentType', value)} options={studentTypeOptions as unknown as string[]} disabled={lrnLookupState.status === 'matched'} />
+                  <SelectField label="Student Type" value={draft.studentType} onChange={(value) => updateField('studentType', value)} options={studentTypeOptions as unknown as string[]} disabled={lrnLookupState.status === 'matched' || lrnLookupState.status === 'graduated'} />
                   <SelectField
                     label="Learner Category"
                     value={draft.learnerCategory}
@@ -1055,7 +1175,17 @@ export function EnrollmentFormPage() {
                 </div>
               </section>
               <div className="form-actions">
-                <button type="submit" className="primary-button" disabled={isSubmitting}>{isSubmitting ? 'Submitting' : 'Next'}</button>
+                <button
+                    type="submit"
+                    className="primary-button"
+                    disabled={isSubmitting || isFormLockedByLrn || lrnLookupState.status === 'graduated' || draft.studentType === 'Graduate Student'}
+                  >
+                    {draft.studentType === 'Graduate Student' || lrnLookupState.status === 'graduated'
+                      ? 'Enrollment Not Allowed (Graduate Student)'
+                      : isSubmitting
+                        ? 'Submitting'
+                        : 'Next'}
+                  </button>
               </div>
               </fieldset>
             </form>
@@ -1089,12 +1219,22 @@ export function EnrollmentFormPage() {
           <div className="modal-backdrop" />
           <div className="alert-modal alert-modal--warning" role="dialog" aria-modal="true" aria-labelledby="enrollment-advisory-title">
             <div className="alert-modal__content enrollment-advisory">
-              <h3 id="enrollment-advisory-title">Important Enrollment Advisory</h3>
+              <div className="enrollment-advisory__header">
+                {activeSchoolYear ? (
+                  <p className="enrollment-advisory__eyebrow">
+                    School Year {activeSchoolYear}
+                  </p>
+                ) : null}
+                <h3 id="enrollment-advisory-title">Important Enrollment Advisory</h3>
+              </div>
               <p>
-                Filling out and submitting this online form <strong className="enrollment-advisory__highlight">DOES NOT mean you are already enrolled</strong>.
+                Filling out and submitting this online form{activeSchoolYear ? ` for School Year ${activeSchoolYear}` : ''}{' '}
+                <strong className="enrollment-advisory__highlight">DOES NOT mean you are already enrolled</strong>.
               </p>
               <p>
-                You still need to <strong className="enrollment-advisory__highlight">submit the required documents on your scheduled date</strong> at the school.
+                You still need to{' '}
+                <strong className="enrollment-advisory__highlight">submit the required documents on your scheduled date</strong>{' '}
+                at the school.
               </p>
             </div>
             <div className="alert-modal__actions">

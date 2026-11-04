@@ -1,4 +1,4 @@
-import React, { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePublicEnrollmentSubmissions } from '../../hooks/usePublicEnrollmentSubmissions';
 import { useStore } from '../../../../../store';
@@ -36,6 +36,9 @@ import {
   studentTypeOptions,
 } from '../../data/enrollmentOptions';
 import { resolveAdviserLinkedSections } from '../../../../../views/adviser-learners/utils/adviserLearnerAccess';
+import { getActiveLearnersForYear } from '../../../../../services/dashboardService';
+import { createLearnerSearchMatcher } from '../../../../../../common/utils/usisLearnerSearch';
+import { EnrollmentStatus, getLearnerStatusTone, resolveEffectiveLearnerStatus } from '../../../../../types';
 import '../../../../../styles/publicEnrollment.css';
 
 const SAME_SCHOOL_LABEL = 'Same School';
@@ -281,7 +284,7 @@ const appendSubmissionAudit = (payload: EnrollmentDraft, entry: Omit<SubmissionA
 
 export default function PublicEnrollmentSubmissionsPage() {
   const navigate = useNavigate();
-  const { registrarAccess, refreshData, availableStrands, activeSchoolYear, sections } = useStore();
+  const { registrarAccess, refreshData, availableStrands, activeSchoolYear, sections, learners, schoolYears } = useStore();
   const schoolId = registrarAccess?.schoolId || '302522';
   const submissionsScopeKey = registrarAccess?.schoolUuid || schoolId;
   const activeSchoolYearId = String(activeSchoolYear?.id || '').trim();
@@ -324,7 +327,21 @@ export default function PublicEnrollmentSubmissionsPage() {
     () => readPublicEnrollmentUiState(submissionsScopeKey, effectiveSchoolYearLabel),
     [submissionsScopeKey, effectiveSchoolYearLabel]
   );
-  const [query, setQuery] = useState(() => restoredUiState?.query || '');
+  const [searchInput, setSearchInput] = useState(() => restoredUiState?.query || '');
+  const [query, setQuery] = useState(searchInput);
+  const deferredQuery = useDeferredValue(query);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setQuery(searchInput);
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
+  const [gradeRowLimits, setGradeRowLimits] = useState<Record<string, number>>({});
+  useEffect(() => {
+    setGradeRowLimits({});
+  }, [deferredQuery]);
   const [actionError, setActionError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [editingSubmission, setEditingSubmission] = useState<PublicEnrollmentSubmission | null>(null);
@@ -336,8 +353,39 @@ export default function PublicEnrollmentSubmissionsPage() {
   const [isEnrolling, setIsEnrolling] = useState(false);
   const [enrollError, setEnrollError] = useState<string | null>(null);
   const [topAlert, setTopAlert] = useState<{ title: string; message: string } | null>(null);
-  const [existingLearnerLrns, setExistingLearnerLrns] = useState<Set<string>>(new Set());
+  const [syncedLearnerLrns, setSyncedLearnerLrns] = useState<Set<string>>(new Set());
+
+  const storeActiveLearnerLrns = useMemo(() => {
+    const set = new Set<string>();
+    const activeLearners = getActiveLearnersForYear(learners, sections, activeSchoolYear);
+    activeLearners.forEach((learner) => {
+      const lrn = String(learner.lrn || '').trim();
+      if (lrn) set.add(lrn);
+    });
+
+    const activeNorm = normalizeSchoolYear(effectiveSchoolYearLabel);
+    (learners || []).forEach((learner) => {
+      const lrn = String(learner.lrn || '').trim();
+      if (!lrn || set.has(lrn)) return;
+      if (String(learner.status || '').trim().toLowerCase() === 'enrolled') {
+        const sid = String(learner.sectionId || '').trim();
+        const sec = sections.find((s) => String(s.id).trim() === sid);
+        if (sec && (sec.schoolYearId === activeSchoolYearId || normalizeSchoolYear(sec.schoolYearId) === activeNorm)) {
+          set.add(lrn);
+        }
+      }
+    });
+
+    return set;
+  }, [learners, sections, activeSchoolYear, activeSchoolYearId, effectiveSchoolYearLabel]);
+
+  const existingLearnerLrns = useMemo(() => {
+    const merged = new Set(storeActiveLearnerLrns);
+    syncedLearnerLrns.forEach((lrn) => merged.add(lrn));
+    return merged;
+  }, [storeActiveLearnerLrns, syncedLearnerLrns]);
   const [collapsedGrades, setCollapsedGrades] = useState<Record<string, boolean>>(() => restoredUiState?.collapsedGrades || {});
+  const previousHasSearchQueryRef = useRef(Boolean(restoredUiState?.query?.trim()));
   const [pendingDeleteSubmissionId, setPendingDeleteSubmissionId] = useState<string | null>(null);
   const [isDeletingSubmission, setIsDeletingSubmission] = useState(false);
   const [draftEditor, setDraftEditor] = useState<EnrollmentDraft>(() => emptyDraft(schoolId));
@@ -370,7 +418,7 @@ export default function PublicEnrollmentSubmissionsPage() {
   }, [adviserGradeSet, activeYearNormalized, deferredSubmissions, isAdviserScopedAccess]);
 
   const filtered = useMemo(() => {
-    const normalized = query.trim().toLowerCase();
+    const normalized = deferredQuery.trim().toLowerCase();
     if (!normalized) return activeSchoolYearSubmissions;
     return activeSchoolYearSubmissions.filter((row) => {
       const fullName = [row.last_name, row.first_name, row.middle_name].filter(Boolean).join(' ').toLowerCase();
@@ -378,11 +426,21 @@ export default function PublicEnrollmentSubmissionsPage() {
       const grade = (row.grade_to_enroll || '').toLowerCase();
       return fullName.includes(normalized) || lrn.includes(normalized) || grade.includes(normalized);
     });
-  }, [query, activeSchoolYearSubmissions]);
+  }, [deferredQuery, activeSchoolYearSubmissions]);
 
   const syncLearnerStatusByLrn = useCallback(async (lrn: string) => {
     const trimmedLrn = String(lrn || '').trim();
     if (!trimmedLrn) return false;
+
+    // Check in-memory active learners first (0ms)
+    if (storeActiveLearnerLrns.has(trimmedLrn)) {
+      setSyncedLearnerLrns((current) => {
+        const next = new Set(current);
+        next.add(trimmedLrn);
+        return next;
+      });
+      return true;
+    }
 
     const { data: learnerRow, error } = await supabase
       .from('registrar_learners')
@@ -397,19 +455,26 @@ export default function PublicEnrollmentSubmissionsPage() {
     let isExistingLearner = false;
 
     if (learnerSectionId) {
-      const { data: sectionRow } = await supabase
-        .from('registrar_sections')
-        .select('id,school_year_id')
-        .eq('id', learnerSectionId)
-        .maybeSingle();
+      const sec = sections.find((s) => String(s.id).trim() === learnerSectionId);
+      if (sec) {
+        isExistingLearner =
+          sec.schoolYearId === activeSchoolYearId ||
+          normalizeSchoolYear(sec.schoolYearId) === normalizeSchoolYear(effectiveSchoolYearLabel);
+      } else {
+        const { data: sectionRow } = await supabase
+          .from('registrar_sections')
+          .select('id,school_year_id')
+          .eq('id', learnerSectionId)
+          .maybeSingle();
 
-      const sectionSchoolYearId = String((sectionRow as any)?.school_year_id || '').trim();
-      isExistingLearner = Boolean(activeSchoolYearId && sectionSchoolYearId && sectionSchoolYearId === activeSchoolYearId);
+        const sectionSchoolYearId = String((sectionRow as any)?.school_year_id || '').trim();
+        isExistingLearner = Boolean(activeSchoolYearId && sectionSchoolYearId && sectionSchoolYearId === activeSchoolYearId);
+      }
     } else if (statusValue === 'enrolled') {
       isExistingLearner = true;
     }
 
-    setExistingLearnerLrns((current) => {
+    setSyncedLearnerLrns((current) => {
       const next = new Set(current);
       if (isExistingLearner) next.add(trimmedLrn);
       else next.delete(trimmedLrn);
@@ -417,105 +482,27 @@ export default function PublicEnrollmentSubmissionsPage() {
     });
 
     return isExistingLearner;
-  }, [activeSchoolYearId]);
+  }, [activeSchoolYearId, effectiveSchoolYearLabel, sections, storeActiveLearnerLrns]);
 
   const refreshAllSubmissionStatuses = useCallback(async () => {
     setIsStatusRefreshing(true);
     setActionError(null);
     try {
-      const refreshedRows = await refresh({ silent: true });
-      const sourceRows = Array.isArray(refreshedRows) && refreshedRows.length ? refreshedRows : activeSchoolYearSubmissions;
-      const lrns = Array.from(
-        new Set(
-          sourceRows
-            .map((row) => String(row.lrn || row.payload?.lrn || '').trim())
-            .filter(Boolean)
-        )
-      );
+      await Promise.all([
+        refresh({ silent: true }),
+        refreshData(),
+      ]);
 
-      if (!lrns.length) {
-        setTopAlert({
-          title: 'Status Refresh',
-          message: 'No learner LRNs were found in the current submissions list.',
-        });
-        return;
-      }
-
-      const learnerRowsByLrn = new Map<string, { lrn: string; section_id: string | null; status: string | null }>();
-      const sectionIds = new Set<string>();
-
-      for (const batch of chunkArray(lrns, STATUS_REFRESH_BATCH_SIZE)) {
-        const { data: learnerRows, error: learnerError } = await supabase
-          .from('registrar_learners')
-          .select('lrn,section_id,status')
-          .in('lrn', batch);
-
-        if (learnerError) throw learnerError;
-
-        for (const learnerRow of (learnerRows || []) as Array<{ lrn?: string; section_id?: string | null; status?: string | null }>) {
-          const learnerLrn = String(learnerRow?.lrn || '').trim();
-          if (!learnerLrn) continue;
-          learnerRowsByLrn.set(learnerLrn, {
-            lrn: learnerLrn,
-            section_id: String(learnerRow?.section_id || '').trim() || null,
-            status: String(learnerRow?.status || '').trim() || null,
-          });
-
-          const learnerSectionId = String(learnerRow?.section_id || '').trim();
-          if (learnerSectionId) {
-            sectionIds.add(learnerSectionId);
-          }
-        }
-      }
-
-      const sectionYearMap = new Map<string, string>();
-      if (sectionIds.size) {
-        const { data: sectionRows, error: sectionError } = await supabase
-          .from('registrar_sections')
-          .select('id,school_year_id')
-          .in('id', Array.from(sectionIds));
-
-        if (sectionError) throw sectionError;
-
-        for (const sectionRow of (sectionRows || []) as Array<{ id?: string; school_year_id?: string | null }>) {
-          const sectionId = String(sectionRow?.id || '').trim();
-          if (!sectionId) continue;
-          sectionYearMap.set(sectionId, String(sectionRow?.school_year_id || '').trim());
-        }
-      }
-
-      const nextExistingLearnerLrns = new Set<string>();
-      for (const lrn of lrns) {
-        const learnerRow = learnerRowsByLrn.get(lrn);
-        if (!learnerRow) continue;
-
-        const statusValue = String(learnerRow.status || '').trim().toLowerCase();
-        const learnerSectionId = String(learnerRow.section_id || '').trim();
-        let isExistingLearner = false;
-
-        if (learnerSectionId) {
-          const sectionSchoolYearId = sectionYearMap.get(learnerSectionId) || '';
-          isExistingLearner = Boolean(activeSchoolYearId && sectionSchoolYearId && sectionSchoolYearId === activeSchoolYearId);
-        } else if (statusValue === 'enrolled') {
-          isExistingLearner = true;
-        }
-
-        if (isExistingLearner) {
-          nextExistingLearnerLrns.add(lrn);
-        }
-      }
-
-      setExistingLearnerLrns(nextExistingLearnerLrns);
       setTopAlert({
         title: 'Status Refresh',
-        message: `Submission statuses were refreshed for ${lrns.length} learner${lrns.length === 1 ? '' : 's'}.`,
+        message: 'Submission and learner statuses were refreshed from the local registry.',
       });
     } catch (error: any) {
       setActionError(error?.message || 'Unable to refresh submission statuses.');
     } finally {
       setIsStatusRefreshing(false);
     }
-  }, [activeSchoolYearSubmissions, activeSchoolYearId, refresh]);
+  }, [refresh, refreshData]);
 
   useEffect(() => {
     if (!errorMessage) return;
@@ -532,131 +519,82 @@ export default function PublicEnrollmentSubmissionsPage() {
     setTopAlert({ title: 'Enrollment Issue', message: enrollError });
   }, [enrollError]);
 
+  const sectionMap = useMemo(() => {
+    const map = new Map<string, { name: string; gradeLevel: string; schoolYearId: string }>();
+    (sections || []).forEach((sec) => {
+      map.set(String(sec.id).trim(), {
+        name: String(sec.name || '').trim(),
+        gradeLevel: String(sec.gradeLevel || '').trim(),
+        schoolYearId: String(sec.schoolYearId || '').trim(),
+      });
+    });
+    return map;
+  }, [sections]);
+
+  const schoolYearMap = useMemo(() => {
+    const map = new Map<string, string>();
+    (schoolYears || []).forEach((sy) => {
+      map.set(String(sy.id).trim(), String(sy.label).trim());
+    });
+    return map;
+  }, [schoolYears]);
+
   useEffect(() => {
-    let cancelled = false;
-    const run = async () => {
-      const lookup = priorLearnerLookup.trim();
-      if (lookup.length < 1) {
-        if (!cancelled) setPriorYearLearners([]);
-        return;
-      }
-      let queryBuilder = supabase
-        .from('registrar_learners')
-        .select('id,lrn,first_name,middle_name,last_name,section_id')
-        .order('last_name', { ascending: true })
-        .limit(80)
-        .or(`lrn.ilike.%${lookup}%,first_name.ilike.%${lookup}%,last_name.ilike.%${lookup}%,middle_name.ilike.%${lookup}%`);
+    const lookup = priorLearnerLookup.trim();
+    if (lookup.length < 1) {
+      setPriorYearLearners([]);
+      return;
+    }
 
-      const { data, error } = await queryBuilder;
-      if (cancelled || error || !data) return;
+    // Fast in-memory search from local registry (0ms)
+    const matcher = createLearnerSearchMatcher(lookup);
+    const matched = (learners || [])
+      .filter((l) => matcher(l))
+      .slice(0, 80);
 
-      const sectionIds = Array.from(
-        new Set(
-          (data as any[])
-            .map((row) => String(row.section_id || '').trim())
-            .filter(Boolean),
-        ),
-      );
+    const mapped: PriorYearLearner[] = [];
+    for (const row of matched) {
+      const historyEntries = Array.isArray(row.enrollments) ? row.enrollments : [];
+      const allYearEntries = [...historyEntries]
+        .sort((a, b) => new Date(String(a.enrollmentDate || 0)).getTime() - new Date(String(b.enrollmentDate || 0)).getTime())
+        .map((entry) => ({
+          schoolYear: String(entry.schoolYear || '').trim(),
+          gradeLevel: String(entry.gradeLevel || '').trim(),
+          section: String(entry.section || '').trim(),
+        }))
+        .filter((entry) => Boolean(entry.schoolYear));
 
-      const sectionMap = new Map<string, { name: string; gradeLevel: string; schoolYearId: string }>();
-      const schoolYearMap = new Map<string, string>();
+      const linkedSection = sectionMap.get(String(row.sectionId || '').trim());
+      const linkedSchoolYearLabel = linkedSection ? schoolYearMap.get(linkedSection.schoolYearId) || '' : '';
+      if (!allYearEntries.length && !linkedSchoolYearLabel && !row.schoolYear) continue;
 
-      if (sectionIds.length > 0) {
-        const { data: sectionRows } = await supabase
-          .from('registrar_sections')
-          .select('id,name,grade_level,school_year_id')
-          .in('id', sectionIds);
+      const latestEntry =
+        allYearEntries[allYearEntries.length - 1] ||
+        {
+          schoolYear: linkedSchoolYearLabel || row.schoolYear || '',
+          gradeLevel: linkedSection?.gradeLevel || '',
+          section: linkedSection?.name || '',
+        };
 
-        const schoolYearIds = Array.from(
-          new Set(
-            (sectionRows || [])
-              .map((row: any) => String(row.school_year_id || '').trim())
-              .filter(Boolean),
-          ),
-        );
+      const fullName = [row.lastName, row.firstName, row.middleName].filter(Boolean).join(', ').replace(/\s+,/g, ',');
+      const effectiveStatus = resolveEffectiveLearnerStatus(row, effectiveSchoolYearLabel, sections, activeSchoolYearId, schoolYears);
+      const isGraduate = effectiveStatus === EnrollmentStatus.GRADUATED;
 
-        if (schoolYearIds.length > 0) {
-          const { data: schoolYearRows } = await supabase
-            .from('registrar_school_years')
-            .select('id,label')
-            .in('id', schoolYearIds);
+      mapped.push({
+        id: String(row.id || ''),
+        lrn: String(row.lrn || '').trim(),
+        fullName: fullName || '--',
+        latestSchoolYear: String(latestEntry.schoolYear || '').trim(),
+        latestGradeLevel: String(latestEntry.gradeLevel || '').trim(),
+        latestSection: String(latestEntry.section || '').trim(),
+        status: effectiveStatus,
+        statusTone: getLearnerStatusTone(effectiveStatus),
+        isGraduate,
+      });
+    }
 
-          for (const row of schoolYearRows || []) {
-            schoolYearMap.set(String((row as any).id || ''), String((row as any).label || '').trim());
-          }
-        }
-
-        for (const row of sectionRows || []) {
-          sectionMap.set(String((row as any).id || ''), {
-            name: String((row as any).name || '').trim(),
-            gradeLevel: String((row as any).grade_level || '').trim(),
-            schoolYearId: String((row as any).school_year_id || '').trim(),
-          });
-        }
-      }
-
-      const learnerIds = (data as any[]).map((row) => String(row.id || '').trim()).filter(Boolean);
-      const { data: historyRows } = learnerIds.length
-        ? await supabase
-            .from('registrar_enrollment_history')
-            .select('learner_id,school_year,grade_level,section,enrollment_date,created_at')
-            .in('learner_id', learnerIds)
-        : { data: [] as any[] };
-
-      const historyByLearnerId = new Map<string, any[]>();
-      for (const historyRow of historyRows || []) {
-        const learnerId = String((historyRow as any).learner_id || '').trim();
-        if (!learnerId) continue;
-        const current = historyByLearnerId.get(learnerId) || [];
-        current.push(historyRow);
-        historyByLearnerId.set(learnerId, current);
-      }
-
-      const mapped: PriorYearLearner[] = [];
-      for (const row of data as any[]) {
-        const allYearEntries = [...(historyByLearnerId.get(String(row.id || '').trim()) || [])]
-          .sort(
-            (a, b) =>
-              new Date(String((a as any).enrollment_date || (a as any).created_at || 0)).getTime() -
-              new Date(String((b as any).enrollment_date || (b as any).created_at || 0)).getTime(),
-          )
-          .map((entry: any) => ({
-            schoolYear: String(entry?.school_year || '').trim(),
-            gradeLevel: String(entry?.grade_level || '').trim(),
-            section: String(entry?.section || '').trim(),
-          }))
-          .filter((entry: any) => Boolean(entry.schoolYear));
-
-        const linkedSection = sectionMap.get(String(row.section_id || '').trim());
-        const linkedSchoolYearLabel = linkedSection ? schoolYearMap.get(linkedSection.schoolYearId) || '' : '';
-        if (!allYearEntries.length && !linkedSchoolYearLabel) continue;
-
-        const latestEntry =
-          allYearEntries[allYearEntries.length - 1] ||
-          {
-            schoolYear: linkedSchoolYearLabel,
-            gradeLevel: linkedSection?.gradeLevel || '',
-            section: linkedSection?.name || '',
-          };
-        const fullName = [row.last_name, row.first_name, row.middle_name].filter(Boolean).join(', ').replace(/\s+,/g, ',');
-        mapped.push({
-          id: String(row.id || ''),
-          lrn: String(row.lrn || '').trim(),
-          fullName: fullName || '--',
-          latestSchoolYear: String(latestEntry.schoolYear || '').trim(),
-          latestGradeLevel: String(latestEntry.gradeLevel || '').trim(),
-          latestSection: String(latestEntry.section || '').trim(),
-        });
-      }
-      if (!cancelled) setPriorYearLearners(mapped);
-    };
-
-    const timer = window.setTimeout(run, 250);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-    };
-  }, [priorLearnerLookup, effectiveSchoolYearLabel]);
+    setPriorYearLearners(mapped);
+  }, [priorLearnerLookup, learners, sectionMap, schoolYearMap]);
 
   const selectedPriorLearner = useMemo(
     () => priorYearLearners.find((learner) => learner.id === selectedPriorLearnerId) || null,
@@ -734,6 +672,37 @@ export default function PublicEnrollmentSubmissionsPage() {
   );
 
   useEffect(() => {
+    const trimmedQuery = deferredQuery.trim();
+    const hasSearchQuery = trimmedQuery.length > 0;
+
+    if (hasSearchQuery) {
+      // Auto-expand all matching grade levels when searching so results are immediately visible
+      setCollapsedGrades((current) => {
+        const next = { ...current };
+        groupedByGrade.forEach(([grade, gradeRows]) => {
+          if (gradeRows && gradeRows.length > 0) {
+            next[grade] = false;
+          }
+        });
+        return next;
+      });
+      previousHasSearchQueryRef.current = true;
+      return;
+    }
+
+    if (previousHasSearchQueryRef.current) {
+      // When search query is cleared, collapse back to standard overview
+      setCollapsedGrades((current) => {
+        const next = { ...current };
+        groupedByGrade.forEach(([grade]) => {
+          next[grade] = true;
+        });
+        return next;
+      });
+      previousHasSearchQueryRef.current = false;
+      return;
+    }
+
     setCollapsedGrades((current) => {
       const next = { ...current };
       groupedByGrade.forEach(([grade]) => {
@@ -741,11 +710,11 @@ export default function PublicEnrollmentSubmissionsPage() {
       });
       return next;
     });
-  }, [groupedByGrade]);
+  }, [groupedByGrade, deferredQuery]);
 
   useEffect(() => {
     writePublicEnrollmentUiState(submissionsScopeKey, effectiveSchoolYearLabel, {
-      query,
+      query: deferredQuery,
       collapsedGrades,
       selectedPrintGrade,
     });
@@ -754,7 +723,14 @@ export default function PublicEnrollmentSubmissionsPage() {
   const priorYearLearnerOptions = useMemo(() => {
     return priorYearLearners.map((row) => ({
       value: row.id,
-      label: `${row.fullName} | ${row.lrn || 'No LRN'} | ${row.latestSchoolYear || '--'} ${row.latestGradeLevel ? `| ${row.latestGradeLevel}` : ''}`,
+      label: `${row.fullName} (${row.lrn || 'No LRN'})`,
+      fullName: row.fullName,
+      lrn: row.lrn || 'No LRN',
+      schoolYear: row.latestSchoolYear || undefined,
+      gradeLevel: row.latestGradeLevel || undefined,
+      section: row.latestSection || undefined,
+      status: row.status || undefined,
+      statusTone: row.statusTone || undefined,
     }));
   }, [priorYearLearners]);
 
@@ -1722,7 +1698,7 @@ export default function PublicEnrollmentSubmissionsPage() {
         <div className="form-grid" style={{ gridTemplateColumns: 'minmax(240px, 1fr) auto auto auto auto auto', alignItems: 'stretch' }}>
           <label className="floating-field">
             <div className="floating-field__control">
-              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder=" " />
+              <input value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder=" " />
               <span>Search name / LRN / grade</span>
             </div>
           </label>
@@ -1743,7 +1719,7 @@ export default function PublicEnrollmentSubmissionsPage() {
           />
           <div className="status-badge" style={{ minHeight: 56, display: 'flex', alignItems: 'center' }}>
             {selectedPriorLearner
-              ? `Kiosk learner: ${selectedPriorLearner.fullName}`
+              ? `Kiosk learner: ${selectedPriorLearner.fullName}${selectedPriorLearner.isGraduate ? ' (Graduated)' : ''}`
               : `Learner records found: ${priorYearLearners.length}`}
           </div>
         </div>
@@ -1751,7 +1727,10 @@ export default function PublicEnrollmentSubmissionsPage() {
         {isLoading && !filtered.length ? (
           <div className="table-card"><table className="usis-table"><tbody><tr><td>Loading submissions...</td></tr></tbody></table></div>
         ) : groupedByGrade.length ? (
-    groupedByGrade.map(([grade, rows]) => (
+    groupedByGrade.map(([grade, rows]) => {
+      const visibleLimit = gradeRowLimits[grade] || 40;
+      const visibleRows = rows.slice(0, visibleLimit);
+      return (
       <div key={grade} className="table-card">
         <button
           type="button"
@@ -1780,6 +1759,7 @@ export default function PublicEnrollmentSubmissionsPage() {
                 </span>
               </button>
               {!collapsedGrades[grade] && (
+              <>
               <table className="usis-table">
                 <thead>
                   <tr>
@@ -1792,7 +1772,7 @@ export default function PublicEnrollmentSubmissionsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((row) => {
+                  {visibleRows.map((row) => {
                     const displayName = [row.last_name, row.first_name, row.middle_name].filter(Boolean).join(', ') || '--';
                     const rowLrn = (row.lrn || row.payload?.lrn || '').trim();
                     const rowSchoolYear = (row.school_year || row.payload?.schoolYear || '').trim();
@@ -1935,9 +1915,26 @@ export default function PublicEnrollmentSubmissionsPage() {
                   })}
                 </tbody>
               </table>
+              {rows.length > visibleRows.length && (
+                <div style={{ padding: '10px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', borderTop: '1px solid #e2e8f0' }}>
+                  <span style={{ fontSize: 13, color: '#64748b' }}>
+                    Showing {visibleRows.length} of {rows.length} submissions in {grade}
+                  </span>
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={() => setGradeRowLimits((current) => ({ ...current, [grade]: (current[grade] || 40) + 100 }))}
+                    style={{ minHeight: 32, fontSize: 13, padding: '0 12px' }}
+                  >
+                    Show more ({rows.length - visibleRows.length} remaining)
+                  </button>
+                </div>
+              )}
+              </>
               )}
             </div>
-          ))
+      );
+    })
         ) : (
           <div className="table-card"><table className="usis-table"><tbody><tr><td>No submissions found.</td></tr></tbody></table></div>
         )}

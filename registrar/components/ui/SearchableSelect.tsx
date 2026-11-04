@@ -4,6 +4,16 @@ import { createPortal } from 'react-dom';
 export interface SearchableSelectOption {
   label: string;
   value: string;
+  fullName?: string;
+  lrn?: string;
+  schoolYear?: string;
+  gradeLevel?: string;
+  section?: string;
+  subLabel?: string;
+  badge?: string;
+  status?: string;
+  statusTone?: 'enrolled' | 'transfer-out' | 'drop-out' | 'withdrawn' | 'graduated' | 'pending';
+  renderOption?: (option: SearchableSelectOption) => React.ReactNode;
 }
 
 interface SearchableSelectProps {
@@ -20,6 +30,7 @@ interface SearchableSelectProps {
   serverSearch?: boolean;
   showLabel?: boolean;
   value: string;
+  renderOption?: (option: SearchableSelectOption) => React.ReactNode;
 }
 
 export function SearchableSelect({
@@ -36,6 +47,7 @@ export function SearchableSelect({
   serverSearch = false,
   showLabel = true,
   value,
+  renderOption,
 }: SearchableSelectProps) {
   const [query, setQuery] = useState('');
   const [isOpen, setIsOpen] = useState(false);
@@ -52,7 +64,14 @@ export function SearchableSelect({
       return [];
     }
     if (!normalizedQuery || serverSearch) return options;
-    return options.filter((option) => option.label.toLowerCase().includes(normalizedQuery));
+    return options.filter((option) => {
+      if (option.label.toLowerCase().includes(normalizedQuery)) return true;
+      if (option.fullName && option.fullName.toLowerCase().includes(normalizedQuery)) return true;
+      if (option.lrn && option.lrn.toLowerCase().includes(normalizedQuery)) return true;
+      if (option.schoolYear && option.schoolYear.toLowerCase().includes(normalizedQuery)) return true;
+      if (option.gradeLevel && option.gradeLevel.toLowerCase().includes(normalizedQuery)) return true;
+      return false;
+    });
   }, [minQueryLength, options, query, requireQueryBeforeOptions, serverSearch]);
 
   useEffect(() => {
@@ -125,7 +144,7 @@ export function SearchableSelect({
         filteredOptions.map((option) => (
           <button
             aria-selected={option.value === value}
-            className="searchable-select__option"
+            className={`searchable-select__option${option.value === value ? ' searchable-select__option--selected' : ''}`}
             key={option.value}
             onMouseDown={(event) => {
               event.preventDefault();
@@ -135,7 +154,45 @@ export function SearchableSelect({
             onClick={() => selectOption(option.value)}
             type="button"
           >
-            {option.label}
+            {option.renderOption
+              ? option.renderOption(option)
+              : renderOption
+              ? renderOption(option)
+              : option.fullName || option.lrn
+              ? (
+                <div className="searchable-select__option-card">
+                  <div className="searchable-select__option-main">
+                    <span className="searchable-select__option-name">{option.fullName || option.label}</span>
+                    {option.value === value && (
+                      <span className="material-symbols-outlined searchable-select__option-check" aria-hidden="true">check</span>
+                    )}
+                  </div>
+                  <div className="searchable-select__option-meta">
+                    {option.lrn && (
+                      <span className="searchable-select__option-pill searchable-select__option-pill--lrn">
+                        <span className="searchable-select__option-pill-label">LRN</span>
+                        <span className="searchable-select__option-pill-value">{option.lrn}</span>
+                      </span>
+                    )}
+                    {option.schoolYear && (
+                      <span className="searchable-select__option-pill searchable-select__option-pill--sy">
+                        SY {option.schoolYear}
+                      </span>
+                    )}
+                    {option.gradeLevel && (
+                      <span className="searchable-select__option-pill searchable-select__option-pill--grade">
+                        {option.gradeLevel}{option.section ? ` • ${option.section}` : ''}
+                      </span>
+                    )}
+                    {option.status && (
+                      <span className={`searchable-select__option-pill searchable-select__option-pill--status searchable-select__option-pill--status-${option.statusTone || 'graduated'}`}>
+                        {option.status}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )
+              : option.label}
           </button>
         ))
       ) : (

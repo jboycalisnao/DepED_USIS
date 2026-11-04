@@ -25,6 +25,24 @@
     <link rel="icon" type="image/png" href="/common/assets/USIS_Icon.png?v=20260514b" />
     <link rel="shortcut icon" href="/common/assets/USIS_Icon.png?v=20260514b" />
     <link rel="apple-touch-icon" href="/common/assets/USIS_Icon.png?v=20260514b" />
+    <script>
+      // Suppress unhandled errors from injected third-party browser extensions (e.g., 200.js)
+      window.addEventListener('unhandledrejection', function (event) {
+        var reason = event && event.reason;
+        var msg = String(reason && (reason.stack || reason.message || reason) || '');
+        if (msg.indexOf('200.js') !== -1 || msg.indexOf('M_ID') !== -1) {
+          event.preventDefault();
+        }
+      });
+      window.addEventListener('error', function (event) {
+        var filename = String(event && event.filename || '');
+        var msg = String(event && event.message || '');
+        if (filename.indexOf('200.js') !== -1 || msg.indexOf('M_ID') !== -1) {
+          event.preventDefault();
+        }
+      });
+    </script>
+
   </head>
   <body>
     <div id="root"></div>

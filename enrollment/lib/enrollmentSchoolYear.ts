@@ -59,3 +59,23 @@ export async function fetchEnrollmentSchoolYear(): Promise<EnrollmentSchoolYearR
 
   return emptyResolution;
 }
+
+export async function fetchRegistrarActiveSchoolYear(): Promise<string> {
+  try {
+    const { data, error } = await supabase
+      .from('registrar_school_years')
+      .select('label')
+      .eq('is_active', true)
+      .limit(1)
+      .maybeSingle();
+
+    if (!error && data?.label) {
+      return String(data.label).trim();
+    }
+  } catch {
+    // Fail-soft: fallback to enrollment school year resolution
+  }
+
+  const fallback = await fetchEnrollmentSchoolYear();
+  return fallback.label || '';
+}

@@ -20,10 +20,15 @@ export const getLearnerPlacementForYear = (
   sections: Section[],
   activeSchoolYear: SchoolYear,
 ) => {
+  const targetYearNormalized = normalizeSchoolYear(activeSchoolYear.label);
   const studentSid = String(learner.sectionId || '').trim();
   const currentSection = sections.find((section) => String(section.id).trim() === studentSid);
 
-  if (currentSection && currentSection.schoolYearId === activeSchoolYear.id) {
+  if (
+    currentSection &&
+    (currentSection.schoolYearId === activeSchoolYear.id ||
+      normalizeSchoolYear(currentSection.schoolYearId) === targetYearNormalized)
+  ) {
     return {
       gradeLevel: currentSection.gradeLevel,
       sectionLabel: `${currentSection.name}${currentSection.strand ? ` [${currentSection.strand}]` : ''}`,
@@ -37,7 +42,9 @@ export const getLearnerPlacementForYear = (
     const historySectionName = String(historyEntry.section || '').trim();
     const historyGradeLevel = String(historyEntry.gradeLevel || '').trim();
     const matchingSection = sections.find((section) => {
-      const sameYear = section.schoolYearId === activeSchoolYear.id;
+      const sameYear =
+        section.schoolYearId === activeSchoolYear.id ||
+        normalizeSchoolYear(section.schoolYearId) === targetYearNormalized;
       const sameName = historySectionName && section.name.toLowerCase() === historySectionName.toLowerCase();
       const sameGrade = !historyGradeLevel || section.gradeLevel === historyGradeLevel;
       return sameYear && sameName && sameGrade;
@@ -66,16 +73,17 @@ export const getActiveLearnersForYear = (
   sections: Section[],
   activeSchoolYear: SchoolYear
 ) => {
+  const targetYearNormalized = normalizeSchoolYear(activeSchoolYear.label);
   const activeSectionIds = new Set(
     sections
-      .filter(s => s.schoolYearId === activeSchoolYear.id)
+      .filter(s => s.schoolYearId === activeSchoolYear.id || normalizeSchoolYear(s.schoolYearId) === targetYearNormalized)
       .map(s => s.id)
   );
 
   return learners.filter(l => {
     const studentSid = String(l.sectionId || '').trim();
     const hasActiveSection = studentSid && activeSectionIds.has(studentSid);
-    const hasMatchingSchoolYear = normalizeSchoolYear(l.schoolYear) === normalizeSchoolYear(activeSchoolYear.label);
+    const hasMatchingSchoolYear = normalizeSchoolYear(l.schoolYear) === targetYearNormalized;
     const hasMatchingEnrollmentHistory = Boolean(findLearnerEnrollmentForYear(l, activeSchoolYear.label));
     return hasActiveSection || hasMatchingSchoolYear || hasMatchingEnrollmentHistory;
   });

@@ -7,6 +7,9 @@ export type EnrollmentKioskSelectedLearner = {
   latestSchoolYear: string;
   latestGradeLevel: string;
   latestSection: string;
+  status?: string;
+  statusTone?: 'enrolled' | 'transfer-out' | 'drop-out' | 'withdrawn' | 'graduated' | 'pending';
+  isGraduate?: boolean;
 };
 
 export type EnrollmentKioskState = {

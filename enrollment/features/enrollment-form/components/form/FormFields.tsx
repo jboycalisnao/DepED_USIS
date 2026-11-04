@@ -22,30 +22,62 @@ export function TextField({ label, value, onChange, onFocus, required = false, i
   const rawValue = String(value || '');
   const normalizedValue = digitGuideLength ? rawValue.replace(/\D/g, '').slice(0, digitGuideLength) : rawValue;
   const hasValue = Boolean(normalizedValue.trim());
-  const guideValue = digitGuideLength ? '0'.repeat(digitGuideLength) : '';
+  const remainingCount = digitGuideLength ? Math.max(0, digitGuideLength - normalizedValue.length) : 0;
+
+  if (digitGuideLength) {
+    return (
+      <label className="floating-field">
+        <div
+          className="floating-field__control floating-field__control--guided"
+          data-has-value={hasValue ? 'true' : 'false'}
+          data-disabled={disabled ? 'true' : 'false'}
+        >
+          <input
+            value={normalizedValue}
+            onFocus={onFocus}
+            onChange={(event) => {
+              const digits = event.target.value.replace(/\D/g, '').slice(0, digitGuideLength);
+              onChange(digits);
+            }}
+            placeholder=" "
+            required={required}
+            inputMode="numeric"
+            maxLength={digitGuideLength}
+            pattern="[0-9]*"
+            type="text"
+            disabled={disabled}
+            className="floating-field__guided-input"
+          />
+          <div className="floating-field__guided-overlay" aria-hidden="true">
+            <span className="floating-field__guided-typed">{normalizedValue}</span>
+            <span className="floating-field__guided-remaining">{'0'.repeat(remainingCount)}</span>
+          </div>
+          <span>{label}</span>
+        </div>
+      </label>
+    );
+  }
 
   return (
     <label className="floating-field">
       <div
-        className={digitGuideLength ? 'floating-field__control floating-field__control--guided' : 'floating-field__control'}
+        className="floating-field__control"
         data-has-value={hasValue ? 'true' : 'false'}
         data-disabled={disabled ? 'true' : 'false'}
       >
         <input
           value={normalizedValue}
-          onFocus={() => {
-            onFocus?.();
-          }}
+          onFocus={onFocus}
           onChange={(event) => {
             const nextValue = event.target.value;
-            onChange(digitGuideLength ? nextValue.replace(/\D/g, '').slice(0, digitGuideLength) : shouldPreserveCase ? nextValue : nextValue.toUpperCase());
+            onChange(shouldPreserveCase ? nextValue : nextValue.toUpperCase());
           }}
-          placeholder={digitGuideLength ? guideValue : ' '}
+          placeholder=" "
           required={required}
-          inputMode={digitGuideLength ? 'numeric' : inputMode}
-          maxLength={digitGuideLength ?? maxLength}
-          pattern={digitGuideLength ? '[0-9]*' : pattern}
-          type={digitGuideLength ? 'text' : type}
+          inputMode={inputMode}
+          maxLength={maxLength}
+          pattern={pattern}
+          type={type}
           disabled={disabled}
         />
         <span>{label}</span>

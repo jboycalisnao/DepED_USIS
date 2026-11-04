@@ -2,6 +2,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { EnrollmentAnnouncementsModal } from '../../../../common/components/enrollment/EnrollmentAnnouncementsModal';
 import { useEnrollmentAnnouncements } from '../hooks/useEnrollmentAnnouncements';
+import { fetchRegistrarActiveSchoolYear } from '../../../lib/enrollmentSchoolYear';
 
 type ConfirmationState = {
   submissionReferenceId?: string;
@@ -11,6 +12,7 @@ type ConfirmationState = {
 
 export function SubmissionConfirmationPage() {
   const [showEnrollmentAdvisory, setShowEnrollmentAdvisory] = useState(true);
+  const [activeSchoolYear, setActiveSchoolYear] = useState('');
   const [showAnnouncementsModal, setShowAnnouncementsModal] = useState(false);
   const [shouldOpenAnnouncementsModal, setShouldOpenAnnouncementsModal] = useState(false);
   const { announcements, isLoading: areAnnouncementsLoading } = useEnrollmentAnnouncements();
@@ -20,6 +22,16 @@ export function SubmissionConfirmationPage() {
   const lrn = String(state.lrn || '').trim();
   const fullName = String(state.fullName || '').trim();
   const hasEnrollmentAnnouncements = announcements.length > 0;
+
+  useEffect(() => {
+    let isMounted = true;
+    void fetchRegistrarActiveSchoolYear().then((sy) => {
+      if (isMounted && sy) setActiveSchoolYear(sy);
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!shouldOpenAnnouncementsModal || showEnrollmentAdvisory || areAnnouncementsLoading) return;
@@ -123,12 +135,22 @@ export function SubmissionConfirmationPage() {
           <div className="modal-backdrop" />
           <div className="alert-modal alert-modal--warning" role="dialog" aria-modal="true" aria-labelledby="confirmation-advisory-title">
             <div className="alert-modal__content enrollment-advisory">
-              <h3 id="confirmation-advisory-title">Important Enrollment Advisory</h3>
+              <div className="enrollment-advisory__header">
+                {activeSchoolYear ? (
+                  <p className="enrollment-advisory__eyebrow">
+                    School Year {activeSchoolYear}
+                  </p>
+                ) : null}
+                <h3 id="confirmation-advisory-title">Important Enrollment Advisory</h3>
+              </div>
               <p>
-                Filling out and submitting this online form <strong className="enrollment-advisory__highlight">DOES NOT mean you are already enrolled</strong>.
+                Filling out and submitting this online form{activeSchoolYear ? ` for School Year ${activeSchoolYear}` : ''}{' '}
+                <strong className="enrollment-advisory__highlight">DOES NOT mean you are already enrolled</strong>.
               </p>
               <p>
-                You still need to <strong className="enrollment-advisory__highlight">submit the required documents on your scheduled date</strong> at the school.
+                You still need to{' '}
+                <strong className="enrollment-advisory__highlight">submit the required documents on your scheduled date</strong>{' '}
+                at the school.
               </p>
             </div>
             <div className="alert-modal__actions">

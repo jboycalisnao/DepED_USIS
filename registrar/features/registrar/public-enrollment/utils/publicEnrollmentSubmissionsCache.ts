@@ -136,6 +136,13 @@ export const peekPublicEnrollmentSubmissionsSnapshot = (
     const snapshot = memorySnapshots.get(key);
     if (snapshot) return snapshot;
   }
+  const legacy = readLegacyLocalSnapshot(scopeKey, schoolYearLabel);
+  if (legacy) {
+    for (const key of keys) {
+      memorySnapshots.set(key, legacy);
+    }
+    return legacy;
+  }
   return null;
 };
 
@@ -180,8 +187,8 @@ export const writePublicEnrollmentSubmissionsSnapshot = async (
 
   for (const key of keys) {
     memorySnapshots.set(key, payload);
-    await writeIndexedSnapshot(key, payload);
   }
+  await writeIndexedSnapshot(primaryKey, payload);
   return payload;
 };
 

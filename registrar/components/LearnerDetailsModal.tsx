@@ -1,11 +1,13 @@
 import React, { useMemo } from 'react';
-import { EnrollmentRecord, getLearnerStatusTone, resolveEffectiveLearnerStatus, Student } from '../types';
+import { EnrollmentRecord, getLearnerStatusTone, resolveEffectiveLearnerStatus, Section, Student } from '../types';
 import { normalizeLearnerTags } from '../utils/learnerTags';
 
 interface LearnerDetailsModalProps {
   student: Student | null;
   history: EnrollmentRecord[];
   activeSchoolYearLabel?: string;
+  sections?: Section[];
+  activeSchoolYearId?: string;
   onClose: () => void;
   onChangeStatus?: (student: Student) => void;
   onToggleLoginStatus?: (student: Student) => void;
@@ -15,6 +17,8 @@ const LearnerDetailsModal: React.FC<LearnerDetailsModalProps> = ({
   student,
   history,
   activeSchoolYearLabel = '',
+  sections,
+  activeSchoolYearId,
   onClose,
   onChangeStatus,
   onToggleLoginStatus,
@@ -26,7 +30,7 @@ const LearnerDetailsModal: React.FC<LearnerDetailsModalProps> = ({
 
   if (!student) return null;
 
-  const effectiveStatus = resolveEffectiveLearnerStatus(student, activeSchoolYearLabel);
+  const effectiveStatus = resolveEffectiveLearnerStatus(student, activeSchoolYearLabel, sections, activeSchoolYearId);
   const isLoginDisabled =
     (student.loginStatus || '').trim().toLowerCase() === 'inactive' ||
     (student.loginStatus || '').trim().toLowerCase() === 'disabled';

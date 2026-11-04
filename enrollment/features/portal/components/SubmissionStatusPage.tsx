@@ -49,7 +49,7 @@ export function SubmissionStatusPage() {
     !hasCurrentSchoolYearSection;
   const currentStatusNote = result
     ? currentStatusLabel === 'graduated'
-      ? 'You completed Grade 12 in a previous school year. Please enroll online for the current active school year.'
+      ? 'You completed Grade 12 in a previous school year. Basic education re-enrollment is not permitted for graduated learners. Please contact the registrar for graduation credentials or transcript assistance.'
       : currentStatusLabel === 'previous learner'
         ? 'You have a previous enrollment record, but no section is assigned for the current school year.'
       : currentStatusLabel === 'submission received'

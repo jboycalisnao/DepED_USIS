@@ -217,6 +217,22 @@
   gap: 10px;
 }
 
+.enrollment-advisory__header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.enrollment-advisory__eyebrow {
+  margin: 0;
+  color: var(--deped-blue);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.25;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
 .enrollment-advisory p {
   margin: 0;
   color: var(--deped-ink);

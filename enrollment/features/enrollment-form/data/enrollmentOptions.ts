@@ -1,6 +1,7 @@
 export const studentTypeOptions = [
   'New Student',
   'Continuing Student',
+  'Graduate Student',
   'Transferee Student',
   'Balik Aral',
   'Repeater',

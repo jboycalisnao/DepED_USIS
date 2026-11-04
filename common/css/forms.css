@@ -248,11 +248,55 @@
   transform: translateY(0) scale(0.82);
 }
 
+.floating-field__control--guided > span {
+  top: 9px !important;
+  transform: translateY(0) scale(0.82) !important;
+  color: var(--deped-blue);
+  font-weight: 600;
+}
+
 .floating-field__control--guided:focus-within > span,
 .floating-field__control--guided[data-has-value="true"] > span {
   top: 9px;
   transform: translateY(0) scale(0.82);
   color: var(--deped-blue);
+}
+
+.floating-field__guided-input {
+  width: 100%;
+  min-height: 64px;
+  padding: 24px 16px 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
+  font-size: 17px !important;
+  font-weight: 600 !important;
+  line-height: 1.35 !important;
+  letter-spacing: 2.5px !important;
+  color: transparent !important;
+  background: transparent !important;
+  caret-color: var(--deped-ink) !important;
+  position: relative;
+  z-index: 2;
+  font-variant-numeric: tabular-nums !important;
+  cursor: text;
+}
+
+.floating-field__guided-overlay {
+  position: absolute;
+  top: 24px;
+  left: 16px;
+  right: 16px;
+  height: 24px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: 2.5px;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  z-index: 1;
+  white-space: pre;
+  display: flex;
+  align-items: center;
 }
 
 .floating-field__control--guided[data-disabled="true"] > span {
@@ -801,7 +845,7 @@
   position: fixed;
   z-index: 2147483646;
   height: auto;
-  max-height: 240px;
+  max-height: 320px;
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -847,6 +891,134 @@
 
 .searchable-select__option:last-child {
   border-bottom: 0;
+}
+
+.searchable-select__option:hover {
+  background: #f0f6ff;
+  border-left: 3px solid var(--deped-blue, #002c6c);
+}
+
+.searchable-select__option--selected {
+  background: #eff6ff;
+  border-left: 3px solid var(--deped-blue, #002c6c);
+}
+
+.searchable-select__option-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  text-align: left;
+}
+
+.searchable-select__option-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.searchable-select__option-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--deped-ink, #1e293b);
+  line-height: 1.3;
+}
+
+.searchable-select__option:hover .searchable-select__option-name {
+  color: var(--deped-blue, #002c6c);
+}
+
+.searchable-select__option-check {
+  font-size: 18px;
+  color: var(--deped-blue, #002c6c);
+  flex-shrink: 0;
+}
+
+.searchable-select__option-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.searchable-select__option-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 3px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--deped-line, #e2e8f0);
+  background: #f8fafc;
+  color: #475569;
+}
+
+.searchable-select__option-pill--lrn {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  background: #f1f5f9;
+  color: #1e293b;
+  border-color: #cbd5e1;
+}
+
+.searchable-select__option-pill-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  color: #64748b;
+  font-weight: 700;
+}
+
+.searchable-select__option-pill-value {
+  letter-spacing: 0.3px;
+}
+
+.searchable-select__option-pill--sy {
+  background: #f0fdf4;
+  color: #166534;
+  border-color: #bbf7d0;
+}
+
+.searchable-select__option-pill--grade {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-color: #bfdbfe;
+}
+
+.searchable-select__option-pill--status {
+  text-transform: capitalize;
+}
+
+.searchable-select__option-pill--status-graduated {
+  background: #faf5ff;
+  color: #7e22ce;
+  border-color: #e9d5ff;
+}
+
+.searchable-select__option-pill--status-enrolled {
+  background: #f0fdf4;
+  color: #166534;
+  border-color: #bbf7d0;
+}
+
+.searchable-select__option-pill--status-transfer-out {
+  background: #fff7ed;
+  color: #c2410c;
+  border-color: #fed7aa;
+}
+
+.searchable-select__option-pill--status-drop-out,
+.searchable-select__option-pill--status-withdrawn {
+  background: #fef2f2;
+  color: #b91c1c;
+  border-color: #fecaca;
+}
+
+.searchable-select__option-pill--status-pending {
+  background: #fffbeb;
+  color: #b45309;
+  border-color: #fde68a;
 }
 
 .searchable-select__empty {

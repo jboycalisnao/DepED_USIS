@@ -7,7 +7,7 @@ export const normalizeSchoolYearKey = (value?: string | null): string => {
   const raw = String(value || '').trim();
   if (!raw) return '';
   const normalized = raw.replace(/^sy\s*/i, '').replace(/\s+/g, ' ');
-  const match = normalized.match(/(20\d{2})\s*-\s*(20\d{2})/);
+  const match = normalized.match(/(20\d{2})\s*[-–/]?\s*(20\d{2})/);
   if (match) return `${match[1]}-${match[2]}`.toLowerCase();
   return normalized.toLowerCase();
 };
@@ -18,12 +18,25 @@ export const normalizeSchoolYearKey = (value?: string | null): string => {
 export const parseSchoolYearStartYear = (value?: string | null): number => {
   const raw = String(value || '').trim();
   if (!raw) return 0;
-  // matches 2024-2025 or 2024
-  const match4 = raw.match(/\b(20\d{2})\b/);
-  if (match4) return parseInt(match4[1], 10);
-  // matches sy2425 or 2425
-  const match2 = raw.match(/sy?(\d{2})(\d{2})/i);
-  if (match2) return 2000 + parseInt(match2[1], 10);
+
+  // 1. Full 4-digit range like "2024-2025", "sy20242025", "sy2024-2025"
+  const matchFullRange = raw.match(/(?:sy)?\s*(20\d{2})\s*[-–/]?\s*(20\d{2})/i);
+  if (matchFullRange) {
+    return parseInt(matchFullRange[1], 10);
+  }
+
+  // 2. 2-digit range like "sy2425", "24-25"
+  const matchShortRange = raw.match(/^sy?(\d{2})\s*[-–/]?\s*(\d{2})$/i);
+  if (matchShortRange) {
+    return 2000 + parseInt(matchShortRange[1], 10);
+  }
+
+  // 3. Standalone 4-digit year like "2024" or "sy2024"
+  const match4 = raw.match(/(?:^|[^0-9])(20\d{2})(?:[^0-9]|$)/);
+  if (match4) {
+    return parseInt(match4[1], 10);
+  }
+
   return 0;
 };
 
@@ -247,8 +260,12 @@ export const resolveEffectiveLearnerStatus = (
 ): EnrollmentStatus => {
   const rawStatus = normalizeLearnerStatus(learner.status);
 
-  // Preserve explicit Transfer Out and Drop Out if explicitly assigned
-  if (rawStatus === EnrollmentStatus.TRANSFER_OUT || rawStatus === EnrollmentStatus.DROP_OUT) {
+  // Preserve explicit non-enrolled status if explicitly assigned (e.g. transfer out, drop out, withdrawn)
+  if (
+    rawStatus === EnrollmentStatus.TRANSFER_OUT ||
+    rawStatus === EnrollmentStatus.DROP_OUT ||
+    rawStatus === EnrollmentStatus.WITHDRAWN
+  ) {
     return rawStatus;
   }
 

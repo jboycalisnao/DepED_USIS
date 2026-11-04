@@ -1,9 +1,9 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '../store';
-import { EnrollmentRecord, EnrollmentStatus, getLearnerStatusTone, GradeLevel, normalizeLearnerStatus, resolveEffectiveLearnerStatus, Student } from '../types';
+import { EnrollmentRecord, EnrollmentStatus, getLearnerStatusTone, GradeLevel, normalizeLearnerStatus, resolveEffectiveLearnerStatus, SchoolYear, Student } from '../types';
 import { UsisSearchInput } from '../../common/components/ui/UsisSearchInput';
 import { UsisSearchableSelect, UsisSearchableSelectOption } from '../../common/components/ui/UsisSearchableSelect';
-import { matchesUsisLearnerSearch } from '../../common/utils/usisLearnerSearch';
+import { buildUsisLearnerSearchText, createLearnerSearchMatcher, matchesUsisLearnerSearch } from '../../common/utils/usisLearnerSearch';
 import ConfirmationModal from '../components/ConfirmationModal';
 import LearnerDetailsModal from '../components/LearnerDetailsModal';
 import { openLearnerInformationPrintWindow } from '../features/registrar/learners/utils/printLearnerInformation';
@@ -11,7 +11,7 @@ import { openGradeLevelSectionListPrintWindow, openSectionListPrintWindow } from
 import { sendLearnerCredentialsViaWebhook } from '../features/registrar/learners/services/sendLearnerCredentialsEmail';
 import LearnerEditModal from './learners/LearnerEditModal';
 import LearnerStatusModal from './learners/LearnerStatusModal';
-import { getActiveLearnersForYear, getLearnerPlacementForYear } from '../services/dashboardService';
+import { getActiveLearnersForYear, getLearnerPlacementForYear, normalizeSchoolYear } from '../services/dashboardService';
 import { resolveAdviserLinkedSections, groupLearnersByLinkedSection } from './adviser-learners/utils/adviserLearnerAccess';
 import { downloadAdviserSectionWorkbook } from './adviser-learners/utils/adviserLearnerWorkbook';
 import { loadAdviserLearnerSnapshot, saveAdviserLearnerSnapshot } from './adviser-learners/utils/adviserLearnerCache';
@@ -26,8 +26,21 @@ const STATUS_FILTER_OPTIONS: UsisSearchableSelectOption[] = [
 ];
 
 const LearnerList: React.FC = () => {
-  const { learners, sections, activeSchoolYear, availableStrands, registrarAccess, removeLearner, clearSectionLearners, updateLearner, loading } = useStore();
+  const { learners, sections, schoolYears, activeSchoolYear, availableStrands, registrarAccess, removeLearner, clearSectionLearners, updateLearner, loading } = useStore();
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+  const deferredSearchTerm = useDeferredValue(debouncedSearchTerm);
+
+  useEffect(() => {
+    if (!searchTerm.trim()) {
+      setDebouncedSearchTerm('');
+      return;
+    }
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [deletingStudent, setDeletingStudent] = useState<Student | null>(null);
   const [clearingSection, setClearingSection] = useState<{ name: string; id: string } | null>(null);
@@ -38,6 +51,117 @@ const LearnerList: React.FC = () => {
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [statusChangingStudent, setStatusChangingStudent] = useState<Student | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [selectedSchoolYearId, setSelectedSchoolYearId] = useState<string>('');
+  const effectiveSchoolYearId = selectedSchoolYearId || activeSchoolYear.id;
+
+  const schoolYearOptions = useMemo<UsisSearchableSelectOption[]>(() => {
+    const list: SchoolYear[] = [...(schoolYears || [])];
+    const knownLabels = new Set(list.map((sy) => normalizeSchoolYear(sy.label)));
+    const knownIds = new Set(list.map((sy) => sy.id));
+
+    if (activeSchoolYear && !knownIds.has(activeSchoolYear.id)) {
+      list.push(activeSchoolYear);
+      knownLabels.add(normalizeSchoolYear(activeSchoolYear.label));
+      knownIds.add(activeSchoolYear.id);
+    }
+
+    sections.forEach((sec) => {
+      if (sec.schoolYearId) {
+        const norm = normalizeSchoolYear(sec.schoolYearId);
+        if (norm && !knownLabels.has(norm) && !knownIds.has(sec.schoolYearId)) {
+          const derivedLabel = sec.schoolYearId.startsWith('sy')
+            ? sec.schoolYearId.replace('sy', '').replace(/(\d{2})(\d{2})/, '20$1-20$2')
+            : sec.schoolYearId;
+          list.push({
+            id: sec.schoolYearId,
+            label: derivedLabel,
+            isActive: false,
+            isLocked: true,
+          });
+          knownLabels.add(norm);
+          knownIds.add(sec.schoolYearId);
+        }
+      }
+    });
+
+    learners.forEach((l) => {
+      if (l.schoolYear) {
+        const norm = normalizeSchoolYear(l.schoolYear);
+        if (norm && !knownLabels.has(norm)) {
+          list.push({
+            id: `sy_${norm.replace(/[^0-9]/g, '')}`,
+            label: l.schoolYear,
+            isActive: false,
+            isLocked: true,
+          });
+          knownLabels.add(norm);
+        }
+      }
+      (l.enrollments || []).forEach((e) => {
+        if (e.schoolYear) {
+          const norm = normalizeSchoolYear(e.schoolYear);
+          if (norm && !knownLabels.has(norm)) {
+            list.push({
+              id: `sy_${norm.replace(/[^0-9]/g, '')}`,
+              label: e.schoolYear,
+              isActive: false,
+              isLocked: true,
+            });
+            knownLabels.add(norm);
+          }
+        }
+      });
+    });
+
+    return list
+      .sort((a, b) => b.label.localeCompare(a.label))
+      .map((sy) => {
+        const isActive =
+          sy.id === activeSchoolYear.id ||
+          normalizeSchoolYear(sy.label) === normalizeSchoolYear(activeSchoolYear.label);
+        return {
+          label: isActive ? `${sy.label} (Active)` : sy.label,
+          value: sy.id,
+        };
+      });
+  }, [schoolYears, activeSchoolYear, sections, learners]);
+
+  const selectedSchoolYear: SchoolYear = useMemo(() => {
+    const found = (schoolYears || []).find(
+      (sy) =>
+        sy.id === effectiveSchoolYearId ||
+        normalizeSchoolYear(sy.label) === normalizeSchoolYear(effectiveSchoolYearId),
+    );
+    if (found) {
+      return {
+        ...found,
+        isLocked: found.id === activeSchoolYear.id ? activeSchoolYear.isLocked : (found.isLocked ?? true),
+      };
+    }
+
+    if (
+      activeSchoolYear &&
+      (activeSchoolYear.id === effectiveSchoolYearId ||
+        normalizeSchoolYear(activeSchoolYear.label) === normalizeSchoolYear(effectiveSchoolYearId))
+    ) {
+      return activeSchoolYear;
+    }
+
+    const optionMatch = schoolYearOptions.find((opt) => opt.value === effectiveSchoolYearId);
+    const cleanLabel = optionMatch ? optionMatch.label.replace(' (Active)', '') : effectiveSchoolYearId;
+
+    return {
+      id: effectiveSchoolYearId,
+      label: cleanLabel,
+      isActive: false,
+      isLocked: true,
+    };
+  }, [schoolYears, effectiveSchoolYearId, activeSchoolYear, schoolYearOptions]);
+
+  useEffect(() => {
+    setExpandedGrades(new Set());
+    setExpandedSections(new Set());
+  }, [selectedSchoolYearId]);
   const [sendingCredentialsStudent, setSendingCredentialsStudent] = useState<Student | null>(null);
   const [confirmingLoginToggleStudent, setConfirmingLoginToggleStudent] = useState<{ student: Student; targetStatus: 'Active' | 'Inactive' } | null>(null);
   const [isTogglingLogin, setIsTogglingLogin] = useState(false);
@@ -76,7 +200,7 @@ const LearnerList: React.FC = () => {
     }
   };
 
-  const isLocked = activeSchoolYear.isLocked;
+  const isLocked = selectedSchoolYear.isLocked;
   const isAdviserScopedAccess =
     registrarAccess?.coordinatorRole === 'school_usis_coordinator' &&
     resolveAdviserLinkedSections(
@@ -92,21 +216,46 @@ const LearnerList: React.FC = () => {
     activeSchoolYear,
   );
 
-  const baseActiveLearnersForYear = useMemo(() => getActiveLearnersForYear(learners, sections, activeSchoolYear), [learners, sections, activeSchoolYear]);
+  const baseActiveLearnersForYear = useMemo(
+    () => getActiveLearnersForYear(learners, sections, selectedSchoolYear),
+    [learners, sections, selectedSchoolYear],
+  );
 
-  const resolvePlacement = (student: Student) => getLearnerPlacementForYear(student, sections, activeSchoolYear);
+  const resolvePlacement = (student: Student) => getLearnerPlacementForYear(student, sections, selectedSchoolYear);
+
+  const learnerSearchMap = useMemo(() => {
+    const map = new Map<string, string>();
+    baseActiveLearnersForYear.forEach((learner) => {
+      map.set(learner.id, buildUsisLearnerSearchText(learner));
+    });
+    return map;
+  }, [baseActiveLearnersForYear]);
 
   const activeLearnersForYear = useMemo(() => {
+    const query = deferredSearchTerm.trim();
+    if (!query && statusFilter === 'ALL') {
+      return baseActiveLearnersForYear;
+    }
+
+    const matcher = query ? createLearnerSearchMatcher(query) : null;
+
     return baseActiveLearnersForYear.filter((learner) => {
-      const matchesSearch = matchesUsisLearnerSearch(learner, searchTerm);
-      if (!matchesSearch) return false;
+      if (matcher) {
+        const indexedText = learnerSearchMap.get(learner.id);
+        if (!matcher(learner, indexedText)) return false;
+      }
       if (statusFilter !== 'ALL') {
-        const effectiveStatus = resolveEffectiveLearnerStatus(learner, activeSchoolYear.label, sections, activeSchoolYear.id);
+        const effectiveStatus = resolveEffectiveLearnerStatus(
+          learner,
+          selectedSchoolYear.label,
+          sections,
+          selectedSchoolYear.id,
+        );
         return effectiveStatus === statusFilter;
       }
       return true;
     });
-  }, [baseActiveLearnersForYear, searchTerm, statusFilter, activeSchoolYear.label, activeSchoolYear.id, sections]);
+  }, [baseActiveLearnersForYear, deferredSearchTerm, learnerSearchMap, statusFilter, selectedSchoolYear, sections]);
 
   const derivedHistory = useMemo(() => {
     if (!selectedStudent) return [];
@@ -175,7 +324,7 @@ const LearnerList: React.FC = () => {
     });
 
     return groups;
-  }, [activeLearnersForYear, sections, activeSchoolYear]);
+  }, [activeLearnersForYear, sections, selectedSchoolYear]);
 
   const adviserSectionGroups = useMemo(() => {
     if (!isAdviserScopedAccess) return [];
@@ -216,7 +365,7 @@ const LearnerList: React.FC = () => {
     }
   };
 
-  const hasSearchQuery = searchTerm.trim().length > 0;
+  const hasSearchQuery = deferredSearchTerm.trim().length > 0;
 
   useEffect(() => {
     if (isAdviserScopedAccess) {
@@ -233,20 +382,39 @@ const LearnerList: React.FC = () => {
     }
 
     if (hasSearchQuery) {
+      const trimmedQuery = deferredSearchTerm.trim();
       const nextGrades = new Set<string>();
       const nextSections = new Set<string>();
 
-      Object.entries(groupedData).forEach(([grade, sectionsByGrade]) => {
-        const hasMatchingStudents = Object.values(sectionsByGrade).some((entry) => entry.students.length > 0);
-        if (!hasMatchingStudents) return;
+      let totalMatchingStudents = 0;
+      let totalMatchingSections = 0;
 
-        nextGrades.add(grade);
+      Object.entries(groupedData).forEach(([grade, sectionsByGrade]) => {
+        let gradeHasStudents = false;
         Object.entries(sectionsByGrade).forEach(([sectionName, entry]) => {
           if (entry.students.length > 0) {
-            nextSections.add(grade + sectionName);
+            gradeHasStudents = true;
+            totalMatchingStudents += entry.students.length;
+            totalMatchingSections += 1;
           }
         });
+        if (gradeHasStudents) {
+          nextGrades.add(grade);
+        }
       });
+
+      // Auto-expand individual section tables only when query has at least 2 characters
+      // AND total matches across all sections are bounded (<= 60 students or <= 8 sections).
+      // For broad queries or 1st letter typing, only grades expand so the DOM and search field never freeze.
+      if (trimmedQuery.length >= 2 && (totalMatchingStudents <= 60 || totalMatchingSections <= 8)) {
+        Object.entries(groupedData).forEach(([grade, sectionsByGrade]) => {
+          Object.entries(sectionsByGrade).forEach(([sectionName, entry]) => {
+            if (entry.students.length > 0) {
+              nextSections.add(grade + sectionName);
+            }
+          });
+        });
+      }
 
       setExpandedGrades(nextGrades);
       setExpandedSections(nextSections);
@@ -259,7 +427,7 @@ const LearnerList: React.FC = () => {
       setExpandedSections(new Set());
     }
     previousHasSearchQueryRef.current = false;
-  }, [groupedData, hasSearchQuery, isAdviserScopedAccess, visibleGroupedData]);
+  }, [deferredSearchTerm, groupedData, hasSearchQuery, isAdviserScopedAccess, visibleGroupedData]);
 
   useEffect(() => {
     if (!isAdviserScopedAccess) return;
@@ -330,7 +498,7 @@ const LearnerList: React.FC = () => {
 
     const ok = openGradeLevelSectionListPrintWindow({
       gradeLevel: grade,
-      schoolYearLabel: activeSchoolYear.label,
+      schoolYearLabel: selectedSchoolYear.label,
       sections: gradeSections,
     });
     if (!ok) setFeedback('Popup blocked. Allow popups for this site to print the grade-level section list.');
@@ -375,6 +543,19 @@ const LearnerList: React.FC = () => {
             />
             <div className="registrar-learners-page__status-filter-wrap">
               <UsisSearchableSelect
+                ariaLabel="Filter by school year"
+                label="School Year"
+                floatingLabel
+                allowTyping={false}
+                forcePortalMenu
+                options={schoolYearOptions}
+                value={effectiveSchoolYearId}
+                onChange={(val) => setSelectedSchoolYearId(val || activeSchoolYear.id)}
+                placeholder="Select School Year"
+              />
+            </div>
+            <div className="registrar-learners-page__status-filter-wrap">
+              <UsisSearchableSelect
                 ariaLabel="Filter by enrollment status"
                 label="Status"
                 floatingLabel
@@ -387,7 +568,9 @@ const LearnerList: React.FC = () => {
               />
             </div>
             <div className="registrar-learners-page__meta-box">
-              <span className="registrar-learners-page__meta-label">Active Registry</span>
+              <span className="registrar-learners-page__meta-label">
+                {selectedSchoolYear.id === activeSchoolYear.id ? 'Active Registry' : `Filtered (SY ${selectedSchoolYear.label})`}
+              </span>
               <span className="registrar-learners-page__meta-value">{baseActiveLearnersForYear.length}</span>
             </div>
           </>
@@ -467,7 +650,7 @@ const LearnerList: React.FC = () => {
                                     const ok = openSectionListPrintWindow({
                                       gradeLevel: grade,
                                       learners: data.students,
-                                      schoolYearLabel: activeSchoolYear.label,
+                                      schoolYearLabel: selectedSchoolYear.label,
                                       section: sectionForPrint,
                                     });
                                     if (!ok) setFeedback('Popup blocked. Allow popups for this site to print the section list.');
@@ -559,7 +742,7 @@ const LearnerList: React.FC = () => {
                                               </td>
                                               <td>
                                                 {(() => {
-                                                  const effectiveStatus = resolveEffectiveLearnerStatus(student, activeSchoolYear.label, sections, activeSchoolYear.id);
+                                                  const effectiveStatus = resolveEffectiveLearnerStatus(student, selectedSchoolYear.label, sections, selectedSchoolYear.id);
                                                   return (
                                                     <span className={`status-badge status-badge--${getLearnerStatusTone(effectiveStatus)}`}>
                                                       {effectiveStatus}
@@ -708,7 +891,9 @@ const LearnerList: React.FC = () => {
       <LearnerDetailsModal
         student={selectedStudent}
         history={derivedHistory}
-        activeSchoolYearLabel={activeSchoolYear.label}
+        activeSchoolYearLabel={selectedSchoolYear.label}
+        sections={sections}
+        activeSchoolYearId={selectedSchoolYear.id}
         onClose={() => setSelectedStudent(null)}
         onChangeStatus={(student) => setStatusChangingStudent(student)}
         onToggleLoginStatus={!isAdviserScopedAccess ? (student) => promptToggleLoginStatus(student) : undefined}
@@ -716,7 +901,7 @@ const LearnerList: React.FC = () => {
       <LearnerStatusModal
         isOpen={!!statusChangingStudent}
         student={statusChangingStudent}
-        activeSchoolYearLabel={activeSchoolYear.label}
+        activeSchoolYearLabel={selectedSchoolYear.label}
         sectionName={
           sections.find((s) => String(s.id).trim() === String(statusChangingStudent?.sectionId || '').trim())?.name
         }
@@ -728,7 +913,7 @@ const LearnerList: React.FC = () => {
       />
       <LearnerEditModal
         student={editingStudent}
-        activeSchoolYearLabel={activeSchoolYear.label}
+        activeSchoolYearLabel={selectedSchoolYear.label}
         strandOptions={availableStrands.map((strand) => strand.acronym).filter(Boolean)}
         loading={loading}
         onClose={() => setEditingStudent(null)}
@@ -773,7 +958,7 @@ const LearnerList: React.FC = () => {
                 const result = await sendLearnerCredentialsViaWebhook({
                   learner: sendingCredentialsStudent,
                   schoolId: String(registrarAccess?.schoolId || '302522').trim(),
-                  schoolYearLabel: activeSchoolYear.label,
+                  schoolYearLabel: selectedSchoolYear.label,
                   sectionLabel: section ? `${section.name}${section.strand ? ` [${section.strand}]` : ''}` : 'Unassigned',
                 });
                 setFeedback(result?.message || 'Learner credentials email sent.');

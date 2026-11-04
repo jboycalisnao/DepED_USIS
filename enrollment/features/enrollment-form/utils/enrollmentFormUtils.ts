@@ -210,6 +210,9 @@ export const validateCommonFields = (
   draft: EnrollmentDraft,
   gradeLevelOrder: Array<{ label: string; value: number }>
 ): string | null => {
+  if (draft.studentType === 'Graduate Student') {
+    return 'Graduate students who completed Grade 12 in the previous school year are not eligible to enroll in basic education.';
+  }
   const trimmedLrn = draft.lrn.trim();
   if (trimmedLrn && !/^\d{12}$/.test(trimmedLrn)) return 'Learner Reference Number (LRN) must be exactly 12 digits.';
   const trimmedBirthCert = draft.birthCertificateNo.trim();

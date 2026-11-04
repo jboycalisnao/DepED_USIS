@@ -17,7 +17,17 @@ interface UsisPortalGateProps {
 
 export function UsisPortalGate({ moduleKey }: UsisPortalGateProps) {
   const [config, setConfig] = useState<PortalGateConfig | null>(null);
-  const allowPortalGateBypass = import.meta.env.VITE_ALLOW_PORTAL_GATE_BYPASS === 'true';
+  const allowPortalGateBypass =
+    import.meta.env.VITE_ALLOW_PORTAL_GATE_BYPASS === 'true' ||
+    import.meta.env.VITE_ALLOW_GATE_BYPASS === 'true' ||
+    Boolean(
+      moduleKey &&
+        (import.meta.env[`VITE_ALLOW_${moduleKey.toUpperCase().replace(/[^A-Z0-9]/g, '_')}_BYPASS`] === 'true' ||
+          (moduleKey === 'attendance' && import.meta.env.VITE_ALLOW_ATTENDANCE_BYPASS === 'true') ||
+          (moduleKey === 'enrollment' &&
+            (import.meta.env.VITE_ALLOW_ENROLLMENT_BYPASS === 'true' ||
+              import.meta.env.VITE_ALLOW_ENROLLMENT_FORM_BYPASS === 'true'))),
+    );
   const iconName = String(config?.icon_name || 'construction').trim() || 'construction';
 
   useEffect(() => {
