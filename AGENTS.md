@@ -20,9 +20,12 @@ DepED USIS is planned as a **monorepo-style school systems repository** that con
 - `election/` - election management system
 - `sp-portal/` - special program admissions and application portal
 - `srcy/` - Senior Red Cross Youth Council hub for SRCY membership tracking
+- `spta/` - School Parents-Teachers Association portal and finance tracker
+- `scc-portal/` - School Coordinating Council portal for clubs, organizations, and digital service requests
 - `registrar/` - registrar and learner information system
 - `repository/` - school academic repository for academic postings and reference content
 - `support/` - school learner support subsystem for guidance, clinic, child protection, and related learner-support services
+- `school-portal-mobile/` - React Native / Expo mobile application for learner self-service, report cards, RFID attendance, and biometric passkeys
 
 These are currently the active modules already present in the repository.
 

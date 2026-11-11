@@ -1,0 +1,36 @@
+{
+  "expo": {
+    "name": "USIS School Portal",
+    "slug": "usis-school-portal",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "gov.deped.usis.schoolportal"
+    },
+    "android": {
+      "package": "gov.deped.usis.schoolportal",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-font",
+      "expo-status-bar",
+      "expo-secure-store",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Allow DepED USIS to authenticate using Face ID or Biometrics."
+        }
+      ]
+    ]
+  }
+}

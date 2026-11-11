@@ -7,7 +7,8 @@ type Props = {
   onToggleManySelected: (ids: string[], selected: boolean) => void;
   onToggleSelected: (id: string) => void;
   moduleAccessMap: Record<string, UsisModuleKey[]>;
-  onDeactivate: (record: TeachingNonTeachingCredentialRecord) => void;
+  onDelete: (record: TeachingNonTeachingCredentialRecord) => void;
+  onToggleActive: (record: TeachingNonTeachingCredentialRecord) => void;
   onEdit: (record: TeachingNonTeachingCredentialRecord) => void;
   onManageModules: (record: TeachingNonTeachingCredentialRecord) => void;
   selectedAccountIds: string[];
@@ -56,7 +57,8 @@ function SelectCheckbox({
 
 export function TeachingNonTeachingCredentialList({
   moduleAccessMap,
-  onDeactivate,
+  onDelete,
+  onToggleActive,
   onEdit,
   onManageModules,
   onToggleManySelected,
@@ -164,6 +166,7 @@ export function TeachingNonTeachingCredentialList({
                                   className="registry-icon-btn"
                                   onClick={() => onManageModules(row)}
                                   aria-label="Manage module access"
+                                  title="Manage Module Access"
                                 >
                                   <span className="material-symbols-outlined">apps</span>
                                 </button>
@@ -172,14 +175,27 @@ export function TeachingNonTeachingCredentialList({
                                   className="registry-icon-btn registry-icon-btn--primary"
                                   onClick={() => onEdit(row)}
                                   aria-label="Edit account"
+                                  title="Edit Account"
                                 >
                                   <span className="material-symbols-outlined">edit</span>
                                 </button>
                                 <button
                                   type="button"
+                                  className="registry-icon-btn"
+                                  onClick={() => onToggleActive(row)}
+                                  aria-label={row.isActive ? 'Deactivate account' : 'Activate account'}
+                                  title={row.isActive ? 'Deactivate Account' : 'Activate Account'}
+                                >
+                                  <span className="material-symbols-outlined">
+                                    {row.isActive ? 'person_off' : 'person_check'}
+                                  </span>
+                                </button>
+                                <button
+                                  type="button"
                                   className="registry-icon-btn registry-icon-btn--danger"
-                                  onClick={() => onDeactivate(row)}
-                                  aria-label="Deactivate account"
+                                  onClick={() => onDelete(row)}
+                                  aria-label="Delete account"
+                                  title="Delete Account"
                                 >
                                   <span className="material-symbols-outlined">delete</span>
                                 </button>

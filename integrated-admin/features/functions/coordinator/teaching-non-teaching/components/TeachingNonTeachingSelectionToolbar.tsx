@@ -5,6 +5,7 @@ type Props = {
   onClearSelection: () => void;
   onBulkModuleAccess: () => void;
   onBulkEditDetails: () => void;
+  onBulkDelete: () => void;
 };
 
 export function TeachingNonTeachingSelectionToolbar({
@@ -14,6 +15,7 @@ export function TeachingNonTeachingSelectionToolbar({
   onClearSelection,
   onBulkModuleAccess,
   onBulkEditDetails,
+  onBulkDelete,
 }: Props) {
   return (
     <div className="registry-selection-toolbar">
@@ -53,6 +55,15 @@ export function TeachingNonTeachingSelectionToolbar({
           disabled={selectedCount === 0}
         >
           Bulk Edit Details
+        </button>
+        <button
+          type="button"
+          className="secondary-button"
+          onClick={onBulkDelete}
+          disabled={selectedCount === 0}
+          style={selectedCount > 0 ? { color: '#b42318', borderColor: 'rgba(180, 35, 24, 0.35)' } : undefined}
+        >
+          Delete Selected
         </button>
       </div>
     </div>

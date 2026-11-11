@@ -18,6 +18,7 @@ import { TeachingNonTeachingCredentialPrintModal } from '../teaching-non-teachin
 import { TeachingNonTeachingModuleAccessModal } from '../teaching-non-teaching/components/TeachingNonTeachingModuleAccessModal';
 import { TeachingNonTeachingSelectionToolbar } from '../teaching-non-teaching/components/TeachingNonTeachingSelectionToolbar';
 import {
+  activateTeachingNonTeachingCredential,
   deactivateTeachingNonTeachingCredential,
   deleteTeachingNonTeachingCredential,
   loadCoordinatorDepartments,
@@ -47,6 +48,8 @@ export function TeachingNonTeachingCredentialsPage() {
   const [bulkModuleAccessOpen, setBulkModuleAccessOpen] = useState(false);
   const [bulkEditOpen, setBulkEditOpen] = useState(false);
   const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
+  const [deleteTargetRecord, setDeleteTargetRecord] =
+    useState<TeachingNonTeachingCredentialRecord | null>(null);
   const [printModalOpen, setPrintModalOpen] = useState(false);
   const [printScope, setPrintScope] = useState<'all' | 'department'>('all');
   const [printDepartmentId, setPrintDepartmentId] = useState('');
@@ -282,6 +285,35 @@ export function TeachingNonTeachingCredentialsPage() {
     }
   };
 
+  const handleConfirmSingleDelete = async () => {
+    if (!deleteTargetRecord) return;
+    const target = deleteTargetRecord;
+    setIsSubmitting(true);
+    setActionLoadingMessage(`Deleting ${target.name}...`);
+    try {
+      await deleteTeachingNonTeachingCredential(target.id);
+      setNotice(`Deleted ${target.name} (${target.username}).`);
+      setStatusAlert({
+        title: 'Account Deleted',
+        message: `${target.name} (${target.username}) has been permanently deleted from the coordinator registry.`,
+        tone: 'success',
+      });
+      setDeleteTargetRecord(null);
+      clearSelection();
+      await refresh();
+    } catch (nextError: any) {
+      setError(nextError?.message || 'Unable to delete account.');
+      setStatusAlert({
+        title: 'Delete Failed',
+        message: nextError?.message || 'Unable to delete account.',
+        tone: 'danger',
+      });
+    } finally {
+      setActionLoadingMessage('');
+      setIsSubmitting(false);
+    }
+  };
+
   const handlePrintCredentials = () => {
     const printableRows = resolvePrintableRows();
     if (printScope === 'department' && !printDepartmentId) {
@@ -371,25 +403,40 @@ export function TeachingNonTeachingCredentialsPage() {
               onClearSelection={clearSelection}
               onBulkModuleAccess={openBulkModuleAccess}
               onBulkEditDetails={openBulkEdit}
+              onBulkDelete={() => setBulkDeleteConfirmOpen(true)}
             />
 
             <div className="registry-list">
               <TeachingNonTeachingCredentialList
                 moduleAccessMap={moduleAccessMap}
                 onToggleManySelected={toggleManySelected}
-                onDeactivate={async (row) => {
+                onDelete={(row) => setDeleteTargetRecord(row)}
+                onToggleActive={async (row) => {
+                  const nextActive = !row.isActive;
                   setIsSubmitting(true);
-                  setActionLoadingMessage('Applying coordinator changes...');
+                  setActionLoadingMessage(
+                    nextActive ? 'Activating coordinator account...' : 'Deactivating coordinator account...',
+                  );
                   try {
-                    await deactivateTeachingNonTeachingCredential(row.id);
-                    setNotice('Credential deactivated.');
-                    setStatusAlert({ title: 'Credential Deactivated', message: 'Account was deactivated successfully.', tone: 'success' });
+                    if (nextActive) {
+                      await activateTeachingNonTeachingCredential(row.id);
+                    } else {
+                      await deactivateTeachingNonTeachingCredential(row.id);
+                    }
+                    setNotice(nextActive ? 'Credential activated.' : 'Credential deactivated.');
+                    setStatusAlert({
+                      title: nextActive ? 'Credential Activated' : 'Credential Deactivated',
+                      message: nextActive
+                        ? 'Account was activated successfully.'
+                        : 'Account was deactivated successfully.',
+                      tone: 'success',
+                    });
                     await refresh();
                   } catch (nextError: any) {
-                    setError(nextError?.message || 'Unable to deactivate credential.');
+                    setError(nextError?.message || 'Unable to update credential status.');
                     setStatusAlert({
-                      title: 'Deactivate Failed',
-                      message: nextError?.message || 'Unable to deactivate credential.',
+                      title: nextActive ? 'Activate Failed' : 'Deactivate Failed',
+                      message: nextError?.message || 'Unable to update credential status.',
                       tone: 'danger',
                     });
                   } finally {
@@ -701,6 +748,20 @@ export function TeachingNonTeachingCredentialsPage() {
           }}
         />
       ) : null}
+
+      <UsisAlertModal
+        open={Boolean(deleteTargetRecord)}
+        title="Delete Coordinator Account"
+        message={
+          deleteTargetRecord
+            ? `Permanently delete ${deleteTargetRecord.name} (${deleteTargetRecord.username}) from the coordinator registry? This will also remove linked department and module access records.`
+            : ''
+        }
+        tone="danger"
+        confirmLabel={isSubmitting ? 'Deleting...' : 'Delete'}
+        onConfirm={isSubmitting ? undefined : handleConfirmSingleDelete}
+        onClose={() => setDeleteTargetRecord(null)}
+      />
 
       <UsisAlertModal
         open={bulkDeleteConfirmOpen}

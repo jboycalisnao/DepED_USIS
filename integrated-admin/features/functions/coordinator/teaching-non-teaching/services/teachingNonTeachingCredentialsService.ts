@@ -275,6 +275,11 @@ export const deactivateTeachingNonTeachingCredential = async (id: string) => {
   if (error) throw new Error(error.message || 'Unable to deactivate credential.');
 };
 
+export const activateTeachingNonTeachingCredential = async (id: string) => {
+  const { error } = await supabase.from('usis_core_coordinators').update({ is_active: true }).eq('id', id);
+  if (error) throw new Error(error.message || 'Unable to activate credential.');
+};
+
 export const deleteTeachingNonTeachingCredential = async (id: string) => {
   const credentialId = toText(id);
   if (!credentialId) throw new Error('Missing credential id.');

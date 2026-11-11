@@ -19,6 +19,7 @@ export const moduleOptions: Array<{ key: UsisModuleKey; label: string }> = [
   { key: 'learner_portal', label: 'Learner Portal' },
   { key: 'help_admin', label: 'Help Desk Admin' },
   { key: 'support', label: 'Support' },
+  { key: 'scc_portal', label: 'SCC Portal' },
 ];
 
 type ModuleAccessMap = Record<string, UsisModuleKey[]>;

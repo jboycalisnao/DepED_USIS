@@ -992,7 +992,7 @@ function App() {
                   element={
                     <AttendanceLogs
                       logs={attendanceLogs}
-                      learners={learners}
+                      learners={allLearners.length > 0 ? allLearners : learners}
                       scheduleConfig={scheduleConfig}
                       onDelete={deleteRecord}
                       onAddManualRecord={addManualAttendanceRecord}

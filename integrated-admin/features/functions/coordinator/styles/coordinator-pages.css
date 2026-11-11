@@ -620,7 +620,7 @@
 }
 
 .ia-learner-credentials__toolbar {
-  --ia-learner-credentials-toolbar-height: 50px;
+  --ia-learner-credentials-toolbar-height: 64px;
   display: grid;
   grid-template-columns: minmax(240px, 280px) minmax(0, 1fr) auto;
   gap: 10px;
@@ -636,6 +636,14 @@
   width: 100%;
 }
 
+.ia-learner-credentials__school-year-select .searchable-select--floating,
+.ia-learner-credentials__school-year-select .searchable-select--floating .floating-field__control,
+.ia-learner-credentials__school-year-select .searchable-select--floating .floating-field__control input {
+  min-height: var(--ia-learner-credentials-toolbar-height);
+  height: var(--ia-learner-credentials-toolbar-height);
+  box-sizing: border-box;
+}
+
 .ia-learner-credentials__toolbar-actions {
   display: inline-flex;
   align-items: stretch;
@@ -644,16 +652,21 @@
   flex-wrap: wrap;
 }
 
-.ia-learner-credentials__grade-rep-button {
+.ia-learner-credentials__grade-rep-button,
+.ia-learner-credentials__toolbar .ia-learner-credentials__grade-rep-button,
+.integrated-admin-function .ia-learner-credentials__toolbar .ia-learner-credentials__grade-rep-button {
   min-height: var(--ia-learner-credentials-toolbar-height);
   height: var(--ia-learner-credentials-toolbar-height);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   white-space: nowrap;
+  box-sizing: border-box;
 }
 
-.ia-learner-credentials__refresh-button {
+.ia-learner-credentials__refresh-button,
+.ia-learner-credentials__toolbar .ia-learner-credentials__refresh-button,
+.integrated-admin-function .ia-learner-credentials__toolbar .ia-learner-credentials__refresh-button {
   min-height: var(--ia-learner-credentials-toolbar-height);
   height: var(--ia-learner-credentials-toolbar-height);
   display: inline-flex;
@@ -661,6 +674,7 @@
   justify-content: center;
   white-space: nowrap;
   gap: 8px;
+  box-sizing: border-box;
 }
 
 .ia-learner-credentials__modal-tabs {
@@ -1029,9 +1043,11 @@
   }
 }
 
+.ia-learner-credentials__directory-search .floating-field__control,
 .ia-learner-credentials__directory-search .floating-field__control input {
   min-height: var(--ia-learner-credentials-toolbar-height);
   height: var(--ia-learner-credentials-toolbar-height);
+  box-sizing: border-box;
   border-radius: 0.375rem;
   font-size: 16px;
   line-height: 1.4;

@@ -657,7 +657,11 @@ values
   ('ia.election.candidates', 'Candidates', 'Election', true, 30),
   ('ia.election.voters', 'Voters', 'Election', true, 40),
   ('ia.election.organization', 'Organization', 'Election', true, 50),
-  ('ia.election.settings', 'Settings', 'Election', true, 60)
+  ('ia.election.settings', 'Settings', 'Election', true, 60),
+  ('ia.scc.dashboard', 'Dashboard', 'SCC', true, 10),
+  ('ia.scc.service_requests', 'Service Requests', 'SCC', true, 20),
+  ('ia.scc.organizations', 'Organizations & Rosters', 'SCC', true, 30),
+  ('ia.scc.google_accounts', 'Google Accounts', 'SCC', true, 40)
 on conflict (page_key) do update
 set
   page_label = excluded.page_label,
@@ -857,7 +861,8 @@ create index if not exists idx_ia_portal_controls_mode on ia_portal_controls(mod
 
 insert into ia_portal_controls (module_key, module_label, is_enabled, mode, preset_key, title_text, body_text, icon_name)
 values
-  ('srcy', 'SRCY Hub', false, 'maintenance', 'maintenance', 'SRCY Hub Under Maintenance', 'The SRCY Hub is temporarily unavailable. Please check back shortly.', 'volunteer_activism')
+  ('srcy', 'SRCY Hub', false, 'maintenance', 'maintenance', 'SRCY Hub Under Maintenance', 'The SRCY Hub is temporarily unavailable. Please check back shortly.', 'volunteer_activism'),
+  ('scc_portal', 'SCC Portal', false, 'maintenance', 'maintenance', 'SCC Portal Under Maintenance', 'The School Coordinating Council Portal is temporarily unavailable. Please check back shortly.', 'diversity_3')
 on conflict (module_key) do nothing;
 
 -- =========================================================
@@ -1409,5 +1414,100 @@ left join lateral (
 ) m on true
 where p.is_published = true
 order by p.sort_order asc, p.created_at desc;
+
+-- =========================================================
+-- School Coordinating Council (SCC) Admin Tables
+-- =========================================================
+create table if not exists scc_organizations (
+  id text primary key,
+  school_id text not null default '302522',
+  name text not null,
+  acronym text not null,
+  category text not null default 'Student Organization',
+  adviser_name text not null default '',
+  adviser_email text not null default '',
+  adviser_contact text,
+  description text,
+  official_email text,
+  status text not null default 'active' check (status in ('active', 'inactive', 'pending')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists scc_officers (
+  id text primary key,
+  organization_id text not null references scc_organizations(id) on delete cascade,
+  lrn text,
+  full_name text not null,
+  position text not null,
+  grade_level text not null,
+  section text,
+  email text,
+  contact_number text,
+  term_year text not null default '2026-2027',
+  is_authorized_signatory boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists scc_service_requests (
+  id text primary key,
+  tracking_number text not null unique,
+  organization_id text not null references scc_organizations(id) on delete cascade,
+  organization_name text not null,
+  organization_acronym text not null,
+  requester_account_id text not null,
+  requester_name text not null,
+  requester_position text not null,
+  service_key text not null,
+  service_title text not null,
+  title text not null,
+  justification text not null,
+  priority text not null default 'normal' check (priority in ('normal', 'high', 'urgent')),
+  status text not null default 'pending' check (status in ('pending', 'under_review', 'approved', 'provisioned', 'rejected')),
+  adviser_endorsement boolean not null default true,
+  details jsonb not null default '{}'::jsonb,
+  provisioned_data jsonb,
+  reviewer_remarks text,
+  reviewed_by text,
+  reviewed_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists scc_digital_services (
+  key text primary key,
+  title text not null,
+  subtitle text not null,
+  category text not null,
+  description text not null,
+  requirements text[] not null default '{}',
+  sla_turnaround text not null,
+  icon text not null,
+  is_active boolean not null default true,
+  sample_deliverable text not null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_scc_org_school on scc_organizations(school_id);
+create index if not exists idx_scc_officers_org on scc_officers(organization_id);
+create index if not exists idx_scc_req_org on scc_service_requests(organization_id);
+create index if not exists idx_scc_req_status on scc_service_requests(status);
+create index if not exists idx_scc_req_tracking on scc_service_requests(tracking_number);
+
+drop trigger if exists trg_scc_organizations_updated_at on scc_organizations;
+create trigger trg_scc_organizations_updated_at
+before update on scc_organizations
+for each row execute function set_updated_at();
+
+drop trigger if exists trg_scc_officers_updated_at on scc_officers;
+create trigger trg_scc_officers_updated_at
+before update on scc_officers
+for each row execute function set_updated_at();
+
+drop trigger if exists trg_scc_service_requests_updated_at on scc_service_requests;
+create trigger trg_scc_service_requests_updated_at
+before update on scc_service_requests
+for each row execute function set_updated_at();
 
 commit;

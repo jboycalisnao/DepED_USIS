@@ -11,7 +11,8 @@ export type UsisModuleKey =
   | 'spta'
   | 'learner_portal'
   | 'help_admin'
-  | 'support';
+  | 'support'
+  | 'scc_portal';
 
 const STORAGE_KEY = 'usis_coordinator_module_access_map';
 const IA_PAGE_STORAGE_KEY = 'usis_coordinator_ia_page_access_map';
@@ -22,7 +23,7 @@ type IaPageAccessMap = Record<string, string[]>;
 const MODULE_ACCESS_TABLE = 'coordinator_module_access';
 const IA_PAGE_ACCESS_TABLE = 'coordinator_account_ia_page_access';
 const IA_PAGE_CATALOG_TABLE = 'coordinator_ia_pages';
-const MODULE_KEYS: UsisModuleKey[] = ['coordinator', 'ia', 'registrar', 'attendance', 'election', 'sp_portal', 'srcy', 'spta', 'learner_portal', 'help_admin', 'support'];
+const MODULE_KEYS: UsisModuleKey[] = ['coordinator', 'ia', 'registrar', 'attendance', 'election', 'sp_portal', 'srcy', 'spta', 'learner_portal', 'help_admin', 'support', 'scc_portal'];
 
 const parseModuleAccessMap = (raw: string | null): ModuleAccessMap => {
   if (!raw) return {};
@@ -249,6 +250,10 @@ export const loadIaPageCatalogFromSupabase = async (): Promise<Array<{ group: st
       { group: 'Election', key: 'ia.election.voters', label: 'Voters' },
       { group: 'Election', key: 'ia.election.organization', label: 'Organization' },
       { group: 'Election', key: 'ia.election.settings', label: 'Settings' },
+      { group: 'SCC', key: 'ia.scc.dashboard', label: 'Dashboard' },
+      { group: 'SCC', key: 'ia.scc.service_requests', label: 'Service Requests' },
+      { group: 'SCC', key: 'ia.scc.organizations', label: 'Organizations & Rosters' },
+      { group: 'SCC', key: 'ia.scc.google_accounts', label: 'Google Accounts' },
     ];
   }
 
@@ -278,6 +283,18 @@ export const loadIaPageCatalogFromSupabase = async (): Promise<Array<{ group: st
   }
   if (!catalog.some((entry) => entry.key === 'ia.election.settings')) {
     catalog.push({ group: 'Election', key: 'ia.election.settings', label: 'Settings' });
+  }
+  if (!catalog.some((entry) => entry.key === 'ia.scc.dashboard')) {
+    catalog.push({ group: 'SCC', key: 'ia.scc.dashboard', label: 'Dashboard' });
+  }
+  if (!catalog.some((entry) => entry.key === 'ia.scc.service_requests')) {
+    catalog.push({ group: 'SCC', key: 'ia.scc.service_requests', label: 'Service Requests' });
+  }
+  if (!catalog.some((entry) => entry.key === 'ia.scc.organizations')) {
+    catalog.push({ group: 'SCC', key: 'ia.scc.organizations', label: 'Organizations & Rosters' });
+  }
+  if (!catalog.some((entry) => entry.key === 'ia.scc.google_accounts')) {
+    catalog.push({ group: 'SCC', key: 'ia.scc.google_accounts', label: 'Google Accounts' });
   }
 
   return catalog;

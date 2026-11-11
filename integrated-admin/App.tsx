@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { UsisUnifiedHeader } from '../common/header/UsisUnifiedHeader';
 import { UsisGlobalFooter } from '../common/footer/UsisGlobalFooter';
 import UsisPageLoader from '../common/components/UsisPageLoader';
@@ -38,6 +38,11 @@ import { LearnerPortalImportantDatesPage } from './features/functions/portal-con
 import { ElectionFunctionPage } from './features/functions/election/ElectionFunctionPage';
 import { ElectionAdminConsolePage } from './features/functions/election/ElectionAdminConsolePage';
 import { HelpDeskTicketsPage } from './features/functions/help-desk/pages/HelpDeskTicketsPage';
+import { SccFunctionPage } from './features/functions/scc/SccFunctionPage';
+import { SccAdminDashboardPage } from './features/functions/scc/pages/SccAdminDashboardPage';
+import { SccServiceRequestsAdminPage } from './features/functions/scc/pages/SccServiceRequestsAdminPage';
+import { SccOrganizationsAdminPage } from './features/functions/scc/pages/SccOrganizationsAdminPage';
+import { SccGoogleAccountsAdminPage } from './features/functions/scc/pages/SccGoogleAccountsAdminPage';
 import { resolveCoordinatorDepartmentAccess } from '../common/auth/coordinatorDepartmentAccess';
 import { loadCoordinatorIaPageAccessMapFromSupabase, loadCoordinatorModuleAccessMapFromSupabase } from '../common/auth/moduleAccess';
 
@@ -64,33 +69,192 @@ const iaPathToPageKey: Record<string, string> = {
   '/functions/election/voters': 'ia.election.voters',
   '/functions/election/organization': 'ia.election.organization',
   '/functions/election/settings': 'ia.election.settings',
+  '/functions/scc/dashboard': 'ia.scc.dashboard',
+  '/functions/scc/requests': 'ia.scc.service_requests',
+  '/functions/scc/organizations': 'ia.scc.organizations',
+  '/functions/scc/google-accounts': 'ia.scc.google_accounts',
 };
+
+function parseSystemRole(rawRole: string): {
+  label: string;
+  scopeText: string;
+  tone: 'blue' | 'purple' | 'green';
+} {
+  const normalized = String(rawRole || '').trim().toLowerCase();
+
+  const acronyms: Record<string, string> = {
+    usis: 'USIS',
+    ict: 'ICT',
+    id: 'ID',
+    it: 'IT',
+    spta: 'SPTA',
+    srcy: 'SRCY',
+    deped: 'DepEd',
+  };
+
+  if (!normalized || normalized === 'school_usis_coordinator') {
+    return {
+      label: 'School USIS Coordinator',
+      scopeText: 'School Access Authority',
+      tone: 'blue',
+    };
+  }
+
+  if (normalized === 'system_admin' || normalized === 'superadmin' || normalized === 'super_admin') {
+    return {
+      label: 'System Administrator',
+      scopeText: 'Full System Authority',
+      tone: 'purple',
+    };
+  }
+
+  if (normalized === 'division_usis_coordinator' || normalized === 'division_coordinator') {
+    return {
+      label: 'Division USIS Coordinator',
+      scopeText: 'Division Access Authority',
+      tone: 'blue',
+    };
+  }
+
+  if (normalized === 'regional_usis_coordinator' || normalized === 'regional_coordinator') {
+    return {
+      label: 'Regional USIS Coordinator',
+      scopeText: 'Regional Access Authority',
+      tone: 'blue',
+    };
+  }
+
+  if (normalized === 'school_coordinator') {
+    return {
+      label: 'School Coordinator',
+      scopeText: 'School Access Authority',
+      tone: 'blue',
+    };
+  }
+
+  const words = normalized
+    .split(/[-_]+/)
+    .map((word) => acronyms[word] || (word.charAt(0).toUpperCase() + word.slice(1)));
+
+  return {
+    label: words.join(' '),
+    scopeText: 'Access Scope Authority',
+    tone: 'blue',
+  };
+}
 
 function IntegratedAdminOverview({
   session,
 }: {
   session: IntegratedAdminAccessRecord;
 }) {
+  const roleInfo = parseSystemRole(session.role);
+
   return (
     <section className="section-shell integrated-admin-workspace">
-      <article className="portal-panel">
-        <div className="portal-panel__header">
-          <h2>Integrated Admin Workspace</h2>
-          <p>Signed in as {session.coordinatorName}.</p>
+      <article className="ia-workspace-card">
+        {/* Institutional Tri-Color Accent Stripe */}
+        <div className="ia-workspace-card__top-bar">
+          <div className="ia-workspace-card__top-bar-blue" />
+          <div className="ia-workspace-card__top-bar-red" />
+          <div className="ia-workspace-card__top-bar-yellow" />
         </div>
-        <div className="portal-panel__body">
-          <p>
-            This subsystem is connected to coordinator credentials and ready for module-level configuration work.
+
+        {/* Card Header */}
+        <header className="ia-workspace-card__header">
+          <div className="ia-workspace-card__title-group">
+            <h2>Integrated Admin Workspace</h2>
+            <p>Signed in as <strong>{session.coordinatorName}</strong></p>
+          </div>
+          <div className="ia-workspace-card__badge">
+            <span className="ia-workspace-card__badge-dot" />
+            <span>Connected • Active</span>
+          </div>
+        </header>
+
+        {/* Card Body */}
+        <div className="ia-workspace-card__body">
+          <p className="ia-workspace-card__lead">
+            This subsystem is connected to coordinator credentials and ready for module-level configuration work, registry maintenance, and portal controls.
           </p>
-          <p>
-            <strong>Role:</strong> {session.role}
-          </p>
-          <p>
-            <strong>School:</strong> {session.schoolName}
-          </p>
-          <p>
-            Open <strong>Coordinator Portal Functions</strong> to manage credentials and registry inside IA.
-          </p>
+
+          {/* Institutional Metadata Grid */}
+          <div className="ia-workspace-card__grid">
+            <div className="ia-workspace-card__grid-item">
+              <span className="ia-workspace-card__grid-label">Coordinator</span>
+              <span className="ia-workspace-card__grid-value">{session.coordinatorName}</span>
+              <span className="ia-workspace-card__grid-sub">Authenticated Operator</span>
+            </div>
+
+            <div className="ia-workspace-card__grid-item">
+              <span className="ia-workspace-card__grid-label">System Role</span>
+              <div className="ia-workspace-card__grid-value">
+                <span className={`ia-role-pill ia-role-pill--${roleInfo.tone}`}>
+                  <span className="ia-role-pill__dot" />
+                  <span>{roleInfo.label}</span>
+                </span>
+              </div>
+              <span className="ia-workspace-card__grid-sub">{roleInfo.scopeText}</span>
+            </div>
+
+            <div className="ia-workspace-card__grid-item">
+              <span className="ia-workspace-card__grid-label">School / Entity</span>
+              <span className="ia-workspace-card__grid-value">{session.schoolName}</span>
+              <span className="ia-workspace-card__grid-sub">Target Administrative Scope</span>
+            </div>
+
+            <div className="ia-workspace-card__grid-item">
+              <span className="ia-workspace-card__grid-label">Subsystem Status</span>
+              <span className="ia-workspace-card__grid-value" style={{ color: '#027a48' }}>
+                Operational
+              </span>
+              <span className="ia-workspace-card__grid-sub">Ready for Configuration</span>
+            </div>
+          </div>
+
+          {/* Quick Functions Action Navigation */}
+          <h3 className="ia-workspace-card__actions-header">Coordinator Portal Functions</h3>
+          <div className="ia-workspace-card__actions-grid">
+            <Link to="/functions/coordinator/teaching-non-teaching" className="ia-workspace-card__action-link">
+              <div className="ia-workspace-card__action-title">
+                <span>Teaching & Non-Teaching</span>
+                <span className="ia-workspace-card__action-arrow">→</span>
+              </div>
+              <span className="ia-workspace-card__action-desc">
+                Manage coordinator and personnel credential records
+              </span>
+            </Link>
+
+            <Link to="/functions/coordinator/learner-credentials" className="ia-workspace-card__action-link">
+              <div className="ia-workspace-card__action-title">
+                <span>Learner-based Credentials</span>
+                <span className="ia-workspace-card__action-arrow">→</span>
+              </div>
+              <span className="ia-workspace-card__action-desc">
+                Issue and manage student portal passwords and credentials
+              </span>
+            </Link>
+
+            <Link to="/functions/coordinator/departments" className="ia-workspace-card__action-link">
+              <div className="ia-workspace-card__action-title">
+                <span>Departments Registry</span>
+                <span className="ia-workspace-card__action-arrow">→</span>
+              </div>
+              <span className="ia-workspace-card__action-desc">
+                Organize school departments, assignments, and personnel
+              </span>
+            </Link>
+
+            <Link to="/functions/portal-controls" className="ia-workspace-card__action-link">
+              <div className="ia-workspace-card__action-title">
+                <span>Portal Controls</span>
+                <span className="ia-workspace-card__action-arrow">→</span>
+              </div>
+              <span className="ia-workspace-card__action-desc">
+                Configure module maintenance gates and announcements
+              </span>
+            </Link>
+          </div>
         </div>
       </article>
     </section>
@@ -157,6 +321,17 @@ const iaNavItems: UsisSideNavItem[] = [
       { path: '/functions/election/voters', label: 'Voters', icon: 'groups' },
       { path: '/functions/election/organization', label: 'Organization', icon: 'account_tree' },
       { path: '/functions/election/settings', label: 'Settings', icon: 'settings' },
+    ],
+  },
+  {
+    path: '/functions/scc',
+    label: 'SCC',
+    icon: 'diversity_3',
+    children: [
+      { path: '/functions/scc/dashboard', label: 'Dashboard', icon: 'dashboard' },
+      { path: '/functions/scc/requests', label: 'Service Requests', icon: 'inbox' },
+      { path: '/functions/scc/organizations', label: 'Organizations & Rosters', icon: 'groups' },
+      { path: '/functions/scc/google-accounts', label: 'Google Accounts', icon: 'manage_accounts' },
     ],
   },
 ];
@@ -444,6 +619,13 @@ function IntegratedAdminShell() {
                         <Route path="voters" element={<ElectionAdminConsolePage tab="voters" />} />
                         <Route path="organization" element={<ElectionAdminConsolePage tab="organization" />} />
                         <Route path="settings" element={<ElectionAdminConsolePage tab="settings" />} />
+                      </Route>
+                      <Route path="/functions/scc" element={<SccFunctionPage />}>
+                        <Route index element={<Navigate to="dashboard" replace />} />
+                        <Route path="dashboard" element={<SccAdminDashboardPage coordinatorName={session.coordinatorName} />} />
+                        <Route path="requests" element={<SccServiceRequestsAdminPage coordinatorName={session.coordinatorName} />} />
+                        <Route path="organizations" element={<SccOrganizationsAdminPage />} />
+                        <Route path="google-accounts" element={<SccGoogleAccountsAdminPage />} />
                       </Route>
                       <Route path="*" element={<Navigate to="/" replace />} />
                     </Routes>

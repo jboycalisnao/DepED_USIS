@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { supabase } from '@deped-usis/shared-supabase';
 import {
   AttendanceDailySummaryRow,
   AttendanceMonthlySummaryRow,
@@ -188,15 +189,15 @@ const buildDailyRowsFromLogs = (records: AttendanceRecord[]) => {
     });
 };
 
-const buildMonthlyRowsFromDailyRows = (dailyRows: AttendanceDailySummaryRow[], learners: Learner[]) => {
-  const learnerMap = new Map<string, Learner>();
-  learners.forEach((learner) => learnerMap.set(String(learner.id), learner));
-
+const buildMonthlyRowsFromDailyRows = (
+  dailyRows: AttendanceDailySummaryRow[],
+  learnerLookup: Map<string, Learner>,
+) => {
   const monthlyMap = new Map<string, AttendanceMonthlySummaryRow>();
   dailyRows.forEach((row) => {
     const monthKey = String(row.attendanceDate || '').slice(0, 7);
     if (!monthKey) return;
-    const learner = learnerMap.get(String(row.learnerId));
+    const learner = learnerLookup.get(String(row.learnerId || '').trim());
     const sectionName = learner?.section_name || 'No Section';
     const gradeLevel = learner?.grade_level || 'Unknown';
     const key = `${monthKey}|${sectionName}|${gradeLevel}`;
@@ -275,8 +276,118 @@ const AttendanceRecordsBrowser: React.FC<Props> = ({
   const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set());
   const [deleteTarget, setDeleteTarget] = useState<AttendanceRecord | null>(null);
   const [loadedRecords, setLoadedRecords] = useState<AttendanceRecord[] | null>(null);
+  const [fallbackLearnersByKey, setFallbackLearnersByKey] = useState<Record<string, Learner>>({});
   const canDelete = typeof onDelete === 'function';
   const effectiveLogs = loadRecordsByRange ? (loadedRecords || logs) : logs;
+
+  const learnerMap = useMemo(() => {
+    const map = new Map<string, Learner>();
+    const register = (key: string | null | undefined, learner: Learner) => {
+      const clean = String(key || '').trim();
+      if (clean && !map.has(clean)) {
+        map.set(clean, learner);
+      }
+    };
+    learners.forEach((learner) => {
+      register(learner.id, learner);
+      register(learner.lrn, learner);
+    });
+    Object.entries(fallbackLearnersByKey).forEach(([key, learner]) => {
+      register(key, learner);
+      register(learner.id, learner);
+      register(learner.lrn, learner);
+    });
+    return map;
+  }, [fallbackLearnersByKey, learners]);
+
+  const attemptedLookupIdsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    const missingIds = Array.from(
+      new Set(
+        effectiveLogs
+          .map((record) => String(record.learnerId || '').trim())
+          .filter((id) => id && !learnerMap.has(id) && !attemptedLookupIdsRef.current.has(id)),
+      ),
+    );
+    if (missingIds.length === 0) return;
+    missingIds.forEach((id) => attemptedLookupIdsRef.current.add(id));
+
+    let cancelled = false;
+    void (async () => {
+      const resolved: Record<string, Learner> = {};
+
+      const resolveFromTable = async (table: 'registrar_learners' | 'learners') => {
+        const { data: byIdRows } = await supabase
+          .from(table)
+          .select('id,lrn,first_name,middle_name,last_name,section_id')
+          .in('id', missingIds);
+
+        const remainingAfterId = missingIds.filter(
+          (id) => !(byIdRows || []).some((row: any) => String(row?.id || '') === id),
+        );
+
+        const { data: byLrnRows } =
+          remainingAfterId.length > 0
+            ? await supabase
+                .from(table)
+                .select('id,lrn,first_name,middle_name,last_name,section_id')
+                .in('lrn', remainingAfterId)
+            : { data: [] as any[] };
+
+        const combined = [...(byIdRows || []), ...(byLrnRows || [])];
+        combined.forEach((row: any) => {
+          const item = row as Learner;
+          const idKey = String(row?.id || '').trim();
+          const lrnKey = String(row?.lrn || '').trim();
+          if (idKey) resolved[idKey] = item;
+          if (lrnKey) resolved[lrnKey] = item;
+        });
+      };
+
+      try {
+        await resolveFromTable('registrar_learners');
+      } catch {
+        try {
+          await resolveFromTable('learners');
+        } catch {
+          // ignore if unavailable
+        }
+      }
+
+      const stillMissing = missingIds.filter((id) => !resolved[id]);
+      if (stillMissing.length > 0) {
+        try {
+          const { data: pubRows } = await supabase
+            .from('registrar_public_enrollment_submissions')
+            .select('id,lrn,first_name,middle_name,last_name,payload')
+            .in('lrn', stillMissing);
+          (pubRows || []).forEach((row: any) => {
+            const payload = row?.payload || {};
+            const lrnKey = String(row?.lrn || payload?.lrn || '').trim();
+            if (!lrnKey) return;
+            resolved[lrnKey] = {
+              id: lrnKey,
+              lrn: lrnKey,
+              first_name: String(row?.first_name || payload?.first_name || payload?.firstName || '').trim() || null,
+              middle_name: String(row?.middle_name || payload?.middle_name || payload?.middleName || '').trim() || null,
+              last_name: String(row?.last_name || payload?.last_name || payload?.lastName || '').trim() || null,
+            } as Learner;
+          });
+        } catch {
+          // ignore
+        }
+      }
+
+      if (!cancelled && Object.keys(resolved).length > 0) {
+        setFallbackLearnersByKey((prev) => ({ ...prev, ...resolved }));
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [effectiveLogs, learnerMap]);
 
   const loadRecords = async (fromDate: string, toDate: string) => {
     if (!loadRecordsByRange) {
@@ -346,7 +457,10 @@ const AttendanceRecordsBrowser: React.FC<Props> = ({
     return output;
   }, [effectiveLogs]);
 
-  const monthlyRows = useMemo(() => buildMonthlyRowsFromDailyRows(buildDailyRowsFromLogs(effectiveLogs), learners), [effectiveLogs, learners]);
+  const monthlyRows = useMemo(
+    () => buildMonthlyRowsFromDailyRows(buildDailyRowsFromLogs(effectiveLogs), learnerMap),
+    [effectiveLogs, learnerMap],
+  );
 
   const monthGroups = useMemo<MonthGroup[]>(() => {
     const groupMap = new Map<string, AttendanceMonthlySummaryRow[]>();
@@ -473,12 +587,6 @@ const AttendanceRecordsBrowser: React.FC<Props> = ({
     await onDelete(deleteTarget);
     setDeleteTarget(null);
   };
-
-  const learnerMap = useMemo(() => {
-    const map = new Map<string, Learner>();
-    learners.forEach((learner) => map.set(String(learner.id), learner));
-    return map;
-  }, [learners]);
 
   return (
     <section className="section-card attendance-records-page__history">
@@ -615,12 +723,18 @@ const AttendanceRecordsBrowser: React.FC<Props> = ({
                                       </thead>
                                       <tbody>
                                         {dayRawRecords.map((record) => {
-                                          const learner = learnerMap.get(record.learnerId);
+                                          const lookupKey = String(record.learnerId || '').trim();
+                                          const learner = learnerMap.get(lookupKey);
+                                          const learnerDisplayName = learner
+                                            ? [learner.last_name, learner.first_name].filter(Boolean).join(', ') ||
+                                              learner.lrn ||
+                                              `Removed Learner (${lookupKey})`
+                                            : `Removed Learner (${lookupKey})`;
                                           const isLate = isAttendanceRecordLate(record, learner, scheduleConfig);
                                           return (
                                             <tr key={record.id}>
                                               <td>
-                                                <strong>{learner ? `${learner.last_name}, ${learner.first_name}` : record.learnerId}</strong>
+                                                <strong>{learnerDisplayName}</strong>
                                               </td>
                                               <td>
                                                 <div className="attendance-records-page__type-cell">
@@ -628,7 +742,15 @@ const AttendanceRecordsBrowser: React.FC<Props> = ({
                                                   {isLate ? <span className="attendance-records-page__late-pill">Late</span> : null}
                                                 </div>
                                               </td>
-                                              <td>{new Date(record.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</td>
+                                              <td>
+                                                {new Date(record.timestamp).toLocaleTimeString('en-US', {
+                                                  timeZone: 'Asia/Manila',
+                                                  hour: '2-digit',
+                                                  minute: '2-digit',
+                                                  second: '2-digit',
+                                                  hour12: true,
+                                                })}
+                                              </td>
                                               <td>
                                                 <div className="attendance-records-page__status-cell">
                                                   <span className={`attendance-records-page__sync-pill ${record.synced ? 'is-synced' : 'is-pending'}`}>
