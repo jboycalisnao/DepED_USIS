@@ -276,6 +276,9 @@ export function sanitizeRequest(req: SccServiceRequest): SccServiceRequest {
     if (details.requestedMailboxAlias) {
       details.requestedMailboxAlias = details.requestedMailboxAlias.replace(/\.leon$/i, '');
     }
+    if (details.notificationEmail) {
+      details.notificationEmail = sanitizeEmail(details.notificationEmail).trim().toLowerCase();
+    }
     if (Array.isArray(details.targetUsernames)) {
       details.targetUsernames = details.targetUsernames.map((u) => sanitizeEmail(u));
     }
@@ -381,16 +384,36 @@ export function saveStoredRequests(reqs: SccServiceRequest[]): void {
   }
 }
 
+function isRegistrarClubOrOrgCategory(category?: string | null): boolean {
+  const norm = String(category || '').trim().toLowerCase();
+  return (
+    norm === 'club' ||
+    norm === 'organization' ||
+    norm.includes('club') ||
+    norm.includes('organization') ||
+    norm.includes('government')
+  );
+}
+
+function extractTagPlainDescription(description?: string | null): string {
+  const raw = String(description || '');
+  const idx = raw.indexOf(REUSABLE_TAG_POSITIONS_MARKER);
+  return (idx === -1 ? raw : raw.slice(0, idx)).trim();
+}
+
 // Supabase-first operations with storage fallback
 export async function fetchSccOrganizations(): Promise<SccOrganization[]> {
   try {
-    const { data, error } = await supabase
-      .from(SCC_TABLES.ORGANIZATIONS)
-      .select('*')
-      .order('name', { ascending: true });
+    const [orgRes, tagsRes] = await Promise.all([
+      supabase.from(SCC_TABLES.ORGANIZATIONS).select('*').order('name', { ascending: true }),
+      supabase
+        .from('registrar_tags')
+        .select('id, label, category, description, is_active')
+        .order('label', { ascending: true }),
+    ]);
 
-    if (!error && Array.isArray(data) && data.length > 0) {
-      const mapped = data.map((d: any) => ({
+    if (!orgRes.error && Array.isArray(orgRes.data)) {
+      let orgs: SccOrganization[] = orgRes.data.map((d: any) => ({
         id: d.id,
         schoolId: d.school_id || '302522',
         name: d.name,
@@ -403,8 +426,60 @@ export async function fetchSccOrganizations(): Promise<SccOrganization[]> {
         officialEmail: sanitizeEmail(d.official_email),
         status: d.status || 'active',
       }));
-      saveStoredOrganizations(mapped);
-      return mapped;
+
+      if (!tagsRes.error && Array.isArray(tagsRes.data)) {
+        const activeClubOrgTags = tagsRes.data.filter(
+          (tag: any) =>
+            tag?.is_active !== false &&
+            Boolean(String(tag?.label || '').trim()) &&
+            isRegistrarClubOrOrgCategory(tag?.category),
+        );
+
+        const matchedOrgIds = new Set<string>();
+        const syncedOrgs: SccOrganization[] = [];
+
+        for (const tag of activeClubOrgTags) {
+          const tagId = String(tag.id || '').trim();
+          const tagLabel = String(tag.label || '').trim();
+          const tagAcronym = tagLabel.toUpperCase();
+          const normLabel = normalizeOrgToken(tagLabel);
+          const plainDesc = extractTagPlainDescription(tag.description);
+          const normDesc = normalizeOrgToken(plainDesc);
+
+          const matched = orgs.find((o) => {
+            if (matchedOrgIds.has(o.id)) return false;
+            if (tagId && o.id === `org-tag-${tagId}`) return true;
+            if (normLabel && normalizeOrgToken(o.acronym) === normLabel) return true;
+            if (normLabel && normalizeOrgToken(o.name) === normLabel) return true;
+            if (normDesc && normalizeOrgToken(o.name) === normDesc) return true;
+            return false;
+          });
+
+          if (matched) {
+            matchedOrgIds.add(matched.id);
+            syncedOrgs.push(matched);
+          } else {
+            syncedOrgs.push({
+              id: `org-tag-${tagId || normLabel || Date.now()}`,
+              schoolId: '302522',
+              name: plainDesc || tagLabel,
+              acronym: tagAcronym,
+              category: toTitleCase(String(tag.category || 'Club')),
+              adviserName: '',
+              adviserEmail: '',
+              adviserContact: '',
+              description: plainDesc || `Active ${String(tag.category || 'organization').toLowerCase()} (${tagAcronym}) synced from Registrar.`,
+              officialEmail: '',
+              status: 'active',
+            });
+          }
+        }
+
+        orgs = syncedOrgs.sort((a, b) => a.name.localeCompare(b.name));
+      }
+
+      saveStoredOrganizations(orgs);
+      return orgs;
     }
   } catch (err) {
     console.info('Supabase scc_organizations not yet reachable, falling back to local dataset.', err);
@@ -549,6 +624,7 @@ function doesTagMatchOrg(rawTag: string, orgPart: string, targetAcronym?: string
 
   // Common recognized aliases
   if (normAcronym === 'srcy' && normPart.includes('redcross')) return true;
+  if (normAcronym === 'rcy' && normPart.includes('redcross')) return true;
   if (normAcronym === 'scexplorers' && normPart.includes('science')) return true;
   if (normAcronym === 'mwg' && normPart.includes('math')) return true;
   if (normAcronym === 'yeso' && normPart.includes('yeso')) return true;
@@ -702,6 +778,11 @@ export async function fetchSccOfficers(
           (secInfo?.schoolYearId === 'sy20262027' ? '2026-2027' : '2026-2027');
 
         const rank = getOfficerHierarchyRank(position, customHierarchy);
+        const personalEmail = sanitizeEmail(row.email || '').trim().toLowerCase();
+        const m365Email = sanitizeEmail(row.microsoft_upn || '').trim().toLowerCase();
+        const primaryEmail = m365Email || personalEmail;
+        const secondaryEmail =
+          personalEmail && personalEmail !== primaryEmail ? personalEmail : undefined;
 
         return {
           id: String(row.id),
@@ -716,7 +797,8 @@ export async function fetchSccOfficers(
           position,
           gradeLevel,
           section: sectionName,
-          email: sanitizeEmail(row.microsoft_upn || row.email || ''),
+          email: primaryEmail,
+          secondaryEmail,
           contactNumber: String(row.contact_number || ''),
           termYear,
           isAuthorizedSignatory: isSignatoryPosition(position, rank),
@@ -762,6 +844,40 @@ export async function fetchSccOfficers(
   return sortOfficersByHierarchy(filtered, customHierarchy);
 }
 
+const VALID_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export function isValidSccEmail(value?: string | null): boolean {
+  return Boolean(value && VALID_EMAIL_RE.test(value.trim()));
+}
+
+/**
+ * Resolves the organization president's default notification email from the officer roster.
+ * Prefers personal email (secondaryEmail) over institutional UPN when both are present.
+ */
+export function resolvePresidentNotificationEmail(officers: SccOfficer[]): {
+  email: string;
+  presidentName: string;
+} {
+  const presidentOfficers = officers.filter((off) => {
+    const norm = (off.position || '').toLowerCase();
+    return norm.includes('president') && !norm.includes('vice');
+  });
+
+  for (const off of presidentOfficers) {
+    const candidate = [off.secondaryEmail, off.email]
+      .map((val) => sanitizeEmail(val || '').trim().toLowerCase())
+      .find((val) => VALID_EMAIL_RE.test(val));
+    if (candidate) {
+      return { email: candidate, presidentName: off.fullName };
+    }
+  }
+
+  return {
+    email: '',
+    presidentName: presidentOfficers[0]?.fullName || '',
+  };
+}
+
 export async function addSccOfficer(officer: Omit<SccOfficer, 'id'>): Promise<SccOfficer> {
   const newId = `off-${Date.now()}`;
   const newOfficer: SccOfficer = {
@@ -794,6 +910,41 @@ export async function addSccOfficer(officer: Omit<SccOfficer, 'id'>): Promise<Sc
   return newOfficer;
 }
 
+function mapDbServiceRequest(d: any): SccServiceRequest {
+  return sanitizeRequest({
+    id: d.id,
+    trackingNumber: d.tracking_number,
+    organizationId: d.organization_id,
+    organizationName: d.organization_name,
+    organizationAcronym: d.organization_acronym,
+    requesterAccountId: d.requester_account_id,
+    requesterName: d.requester_name,
+    requesterPosition: d.requester_position,
+    serviceKey: d.service_key,
+    serviceTitle: d.service_title,
+    title: d.title,
+    justification: d.justification,
+    priority: d.priority || 'normal',
+    status: d.status || 'pending',
+    adviserEndorsement: Boolean(d.adviser_endorsement),
+    createdAt: d.created_at,
+    updatedAt: d.updated_at,
+    details:
+      typeof d.details === 'object' && d.details !== null
+        ? d.details
+        : JSON.parse(d.details || '{}'),
+    provisionedData:
+      typeof d.provisioned_data === 'object' && d.provisioned_data !== null
+        ? d.provisioned_data
+        : d.provisioned_data
+          ? JSON.parse(d.provisioned_data)
+          : undefined,
+    reviewerRemarks: d.reviewer_remarks,
+    reviewedBy: d.reviewed_by,
+    reviewedAt: d.reviewed_at,
+  });
+}
+
 export async function fetchSccRequests(organizationId?: string): Promise<SccServiceRequest[]> {
   try {
     let query = supabase
@@ -806,38 +957,11 @@ export async function fetchSccRequests(organizationId?: string): Promise<SccServ
     }
 
     const { data, error } = await query;
-    if (!error && Array.isArray(data) && data.length > 0) {
-      const mapped: SccServiceRequest[] = data.map((d: any) =>
-        sanitizeRequest({
-          id: d.id,
-          trackingNumber: d.tracking_number,
-          organizationId: d.organization_id,
-          organizationName: d.organization_name,
-          organizationAcronym: d.organization_acronym,
-          requesterAccountId: d.requester_account_id,
-          requesterName: d.requester_name,
-          requesterPosition: d.requester_position,
-          serviceKey: d.service_key,
-          serviceTitle: d.service_title,
-          title: d.title,
-          justification: d.justification,
-          priority: d.priority || 'normal',
-          status: d.status || 'pending',
-          adviserEndorsement: Boolean(d.adviser_endorsement),
-          createdAt: d.created_at,
-          updatedAt: d.updated_at,
-          details: typeof d.details === 'object' ? d.details : JSON.parse(d.details || '{}'),
-          provisionedData:
-            typeof d.provisioned_data === 'object'
-              ? d.provisioned_data
-              : d.provisioned_data
-                ? JSON.parse(d.provisioned_data)
-                : undefined,
-          reviewerRemarks: d.reviewer_remarks,
-          reviewedBy: d.reviewed_by,
-          reviewedAt: d.reviewed_at,
-        }),
-      );
+    if (!error && Array.isArray(data)) {
+      const mapped: SccServiceRequest[] = data.map(mapDbServiceRequest);
+      if (!organizationId) {
+        saveStoredRequests(mapped);
+      }
       return mapped;
     }
   } catch (err) {
@@ -1056,9 +1180,83 @@ export async function checkSccMailboxAvailability(
   };
 }
 
+async function ensureSccOrganizationInDatabase(
+  organizationId: string,
+  organizationName: string,
+  organizationAcronym: string,
+): Promise<void> {
+  const { data: existingOrg, error: lookupError } = await supabase
+    .from(SCC_TABLES.ORGANIZATIONS)
+    .select('id')
+    .eq('id', organizationId)
+    .maybeSingle();
+
+  if (lookupError) {
+    throw new Error(`Unable to verify organization record in database: ${lookupError.message}`);
+  }
+  if (existingOrg?.id) {
+    return;
+  }
+
+  const localMatch = getStoredOrganizations().find(
+    (o) =>
+      o.id === organizationId ||
+      o.acronym.toLowerCase() === organizationAcronym.toLowerCase(),
+  );
+
+  const { error: upsertError } = await supabase.from(SCC_TABLES.ORGANIZATIONS).upsert(
+    [
+      {
+        id: organizationId,
+        school_id: localMatch?.schoolId || '302522',
+        name: localMatch?.name || organizationName,
+        acronym: (localMatch?.acronym || organizationAcronym).toUpperCase(),
+        category: localMatch?.category || 'Student Organization',
+        adviser_name: localMatch?.adviserName || '',
+        adviser_email: localMatch?.adviserEmail || '',
+        adviser_contact: localMatch?.adviserContact || null,
+        description:
+          localMatch?.description ||
+          `Recognized organization (${organizationAcronym}) in Leon National High School.`,
+        official_email: localMatch?.officialEmail || null,
+        status: 'active',
+      },
+    ],
+    { onConflict: 'id', ignoreDuplicates: true },
+  );
+
+  if (upsertError) {
+    throw new Error(`Unable to register organization in database: ${upsertError.message}`);
+  }
+}
+
+async function getNextTrackingSequence(year: number): Promise<number> {
+  const prefix = `SCC-${year}-`;
+  const { data, error } = await supabase
+    .from(SCC_TABLES.SERVICE_REQUESTS)
+    .select('tracking_number')
+    .ilike('tracking_number', `${prefix}%`);
+
+  if (error) {
+    throw new Error(`Unable to query request tracking sequence: ${error.message}`);
+  }
+
+  let maxSeq = 0;
+  for (const row of data || []) {
+    const raw = String((row as { tracking_number?: string }).tracking_number || '');
+    const suffix = raw.startsWith(prefix) ? raw.slice(prefix.length) : '';
+    const parsed = Number.parseInt(suffix, 10);
+    if (Number.isFinite(parsed) && parsed > maxSeq) {
+      maxSeq = parsed;
+    }
+  }
+  return maxSeq + 1;
+}
+
 export async function createSccRequest(
   payload: Omit<SccServiceRequest, 'id' | 'trackingNumber' | 'createdAt' | 'updatedAt' | 'status'>,
 ): Promise<SccServiceRequest> {
+  let normalizedPayload = payload;
   if (payload.serviceKey === 'email_account') {
     const check = await checkSccMailboxAvailability(payload.details?.requestedMailboxAlias || '');
     if (!check.alias) {
@@ -1067,52 +1265,84 @@ export async function createSccRequest(
     if (!check.available) {
       throw new Error(formatEmailAlreadyRegisteredMessage(check.email, check.registeredTo));
     }
+    const cleanNotificationEmail = sanitizeEmail(payload.details?.notificationEmail || '')
+      .trim()
+      .toLowerCase();
+    if (!isValidSccEmail(cleanNotificationEmail)) {
+      throw new Error('Please provide a valid notification email address.');
+    }
+    normalizedPayload = {
+      ...payload,
+      details: {
+        ...payload.details,
+        notificationEmail: cleanNotificationEmail,
+      },
+    };
   }
 
-  const currentRequests = getStoredRequests();
-  const nextNum = String(currentRequests.length + 1).padStart(4, '0');
-  const trackingNumber = `SCC-2026-${nextNum}`;
-  const now = new Date().toISOString();
-  const id = `req-${Date.now()}`;
+  await ensureSccOrganizationInDatabase(
+    normalizedPayload.organizationId,
+    normalizedPayload.organizationName,
+    normalizedPayload.organizationAcronym,
+  );
 
-  const newRequest: SccServiceRequest = {
-    ...payload,
-    id,
-    trackingNumber,
-    status: 'pending',
-    createdAt: now,
-    updatedAt: now,
-  };
+  const year = new Date().getFullYear();
+  let nextSeq = await getNextTrackingSequence(year);
+  let savedRow: any = null;
+  let lastError: any = null;
 
-  try {
-    const { error } = await supabase.from(SCC_TABLES.SERVICE_REQUESTS).insert({
-      id,
-      tracking_number: trackingNumber,
-      organization_id: newRequest.organizationId,
-      organization_name: newRequest.organizationName,
-      organization_acronym: newRequest.organizationAcronym,
-      requester_account_id: newRequest.requesterAccountId,
-      requester_name: newRequest.requesterName,
-      requester_position: newRequest.requesterPosition,
-      service_key: newRequest.serviceKey,
-      service_title: newRequest.serviceTitle,
-      title: newRequest.title,
-      justification: newRequest.justification,
-      priority: newRequest.priority,
-      status: 'pending',
-      adviser_endorsement: newRequest.adviserEndorsement,
-      details: newRequest.details,
-      created_at: now,
-      updated_at: now,
-    });
-    if (error) console.warn('Supabase create request error, saving locally:', error);
-  } catch (e) {
-    console.warn('Network error creating request in Supabase:', e);
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const trackingNumber = `SCC-${year}-${String(nextSeq + attempt).padStart(4, '0')}`;
+    const now = new Date().toISOString();
+    const id = `req-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+
+    const { data, error } = await supabase
+      .from(SCC_TABLES.SERVICE_REQUESTS)
+      .insert({
+        id,
+        tracking_number: trackingNumber,
+        organization_id: normalizedPayload.organizationId,
+        organization_name: normalizedPayload.organizationName,
+        organization_acronym: normalizedPayload.organizationAcronym,
+        requester_account_id: normalizedPayload.requesterAccountId,
+        requester_name: normalizedPayload.requesterName,
+        requester_position: normalizedPayload.requesterPosition,
+        service_key: normalizedPayload.serviceKey,
+        service_title: normalizedPayload.serviceTitle,
+        title: normalizedPayload.title,
+        justification: normalizedPayload.justification,
+        priority: normalizedPayload.priority,
+        status: 'pending',
+        adviser_endorsement: normalizedPayload.adviserEndorsement,
+        details: normalizedPayload.details,
+        created_at: now,
+        updated_at: now,
+      })
+      .select('*')
+      .single();
+
+    if (!error && data) {
+      savedRow = data;
+      break;
+    }
+
+    lastError = error;
+    if (error?.code === '23505') {
+      continue;
+    }
+    break;
   }
 
-  const all = [newRequest, ...currentRequests];
-  saveStoredRequests(all);
-  return newRequest;
+  if (!savedRow) {
+    throw new Error(
+      `Failed to save service request to database${lastError?.message ? `: ${lastError.message}` : '.'}`,
+    );
+  }
+
+  const savedRequest = mapDbServiceRequest(savedRow);
+  const currentRequests = getStoredRequests().filter((r) => r.id !== savedRequest.id);
+  saveStoredRequests([savedRequest, ...currentRequests]);
+  return savedRequest;
 }
 
 export async function updateSccRequestStatus(

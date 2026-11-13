@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { SccServiceRequest } from '../../../types';
+import { downloadSccEmailRequestPdf } from '../utils/sccEmailRequestPdf';
 
 interface ViewServiceRequestModalProps {
   request: SccServiceRequest | null;
@@ -8,7 +9,20 @@ interface ViewServiceRequestModalProps {
 }
 
 export function ViewServiceRequestModal({ request, onClose }: ViewServiceRequestModalProps) {
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+
   if (!request) return null;
+
+  const isEmailRequest = request.serviceKey === 'email_account';
+
+  const handleDownloadPdf = async () => {
+    try {
+      setIsDownloadingPdf(true);
+      await downloadSccEmailRequestPdf(request);
+    } finally {
+      setIsDownloadingPdf(false);
+    }
+  };
 
   const getStatusBadge = (status: SccServiceRequest['status']) => {
     switch (status) {
@@ -35,6 +49,21 @@ export function ViewServiceRequestModal({ request, onClose }: ViewServiceRequest
         label: 'Requested Mailbox',
         value: `${d.requestedMailboxAlias}@leonnhs.edu.ph`,
         mono: true,
+      });
+    }
+    if (request.serviceKey === 'email_account' && d.notificationEmail) {
+      specs.push({
+        label: 'Notification Email',
+        value: d.notificationEmail,
+        mono: true,
+      });
+    }
+    if (request.serviceKey === 'email_account') {
+      specs.push({
+        label: 'Leon NHS Data Privacy Terms',
+        value: d.dataPrivacyAccepted
+          ? `Signed by ${d.dataPrivacySignatory || request.requesterName}`
+          : 'Awaiting Physical Signature on Form',
       });
     }
     if (request.serviceKey === 'cloud_storage' && d.storageCapacity) {
@@ -181,11 +210,22 @@ export function ViewServiceRequestModal({ request, onClose }: ViewServiceRequest
               </div>
               <div className="modal-record__field">
                 <span>Adviser Endorsement</span>
-                <strong className="scc-endorsement-status" style={{ marginTop: '6px' }}>
-                  <span className="material-symbols-outlined scc-check-icon" aria-hidden="true">
+                <strong
+                  className={`scc-endorsement-status ${
+                    request.adviserEndorsement
+                      ? 'scc-endorsement-status--certified'
+                      : 'scc-endorsement-status--pending'
+                  }`}
+                >
+                  <span
+                    className="material-symbols-outlined scc-endorsement-status__icon"
+                    aria-hidden="true"
+                  >
                     {request.adviserEndorsement ? 'check_circle' : 'schedule'}
                   </span>
-                  {request.adviserEndorsement ? 'Certified Endorsed' : 'Pending Endorsement'}
+                  <span className="scc-endorsement-status__text">
+                    {request.adviserEndorsement ? 'Certified Endorsed' : 'Pending Endorsement'}
+                  </span>
                 </strong>
               </div>
             </div>
@@ -236,9 +276,19 @@ export function ViewServiceRequestModal({ request, onClose }: ViewServiceRequest
         </div>
 
         <div className="modal-dialog__actions">
-          <button type="button" onClick={onClose}>
+          <button type="button" onClick={onClose} disabled={isDownloadingPdf}>
             Close
           </button>
+          {isEmailRequest ? (
+            <button
+              type="button"
+              className="modal-dialog__blue"
+              onClick={handleDownloadPdf}
+              disabled={isDownloadingPdf}
+            >
+              {isDownloadingPdf ? 'Generating PDF...' : 'Download Request Form (PDF)'}
+            </button>
+          ) : null}
         </div>
       </div>
     </div>,

@@ -1,5 +1,10 @@
 # Attendance Kiosk Shell Changelog
 
+## 0.1.1 - 2026-11-11
+
+- Synced and bundled the updated Attendance web build with historical learner name resolution (matching by ID, LRN, and Supabase registry fallback across school years) and explicit 12-hour `Asia/Manila` timestamps.
+- Cleaned `attendance-kiosk-shell/dist` before syncing `attendance/dist` in `scripts/sync-version.cjs` to avoid stale asset bundles.
+
 ## 0.1.0 - Initial Kiosk Shell Edition
 
 - Added Electron wrapper for the Attendance kiosk route.

@@ -208,9 +208,9 @@ const emailNotificationDevProxy = (env: Record<string, string>) => ({
           password,
           from,
           to: recipients,
-          subject: `[DepED USIS Attendance] ${stationName} serial device disconnected`,
+          subject: `[Leon NHS USIS Attendance] ${stationName} serial device disconnected`,
           text: [
-            'DepED USIS Attendance Kiosk Alert',
+            'Leon NHS USIS Attendance Kiosk Alert',
             '',
             `Station: ${stationName}`,
             `Status: ${status}`,

@@ -232,6 +232,7 @@ export function SccCreateGoogleUserModal({
             replyTo: selectedOrg?.adviserEmail || undefined,
             subject: mail.subject,
             text: mail.text,
+            html: mail.html,
           });
           notificationSummary = { sentTo: mailRes.sentTo, ccSent: mailRes.ccSent };
         } catch (notifyErr: any) {
@@ -509,8 +510,8 @@ export function SccCreateGoogleUserModal({
                 <OfficerNotificationBox
                   title={
                     selectedOrg
-                      ? `Send account credentials via Google SMTP to ${selectedOrg.acronym} registered officers`
-                      : 'Send account credentials via Google SMTP'
+                      ? `Send account credentials via email to ${selectedOrg.acronym} registered officers`
+                      : 'Send account credentials via email'
                   }
                   smtpStatus={notify.smtpStatus}
                   recipients={notify.recipients}

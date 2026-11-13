@@ -2,9 +2,9 @@
 
 ## Project Identity
 
-This repository is the main codebase for **DepED USIS - Unified School Information System**.
+This repository is the main codebase for **Leon NHS - USIS - Unified School Information System**.
 
-DepED USIS is planned as a **monorepo-style school systems repository** that contains multiple modules in separate subfolders while sharing one unified backend and common development standards.
+Leon NHS - USIS is planned as a **monorepo-style school systems repository** that contains multiple modules in separate subfolders while sharing one unified backend and common development standards.
 
 ## Current Module Inventory
 
@@ -22,6 +22,7 @@ DepED USIS is planned as a **monorepo-style school systems repository** that con
 - `srcy/` - Senior Red Cross Youth Council hub for SRCY membership tracking
 - `spta/` - School Parents-Teachers Association portal and finance tracker
 - `scc-portal/` - School Coordinating Council portal for clubs, organizations, and digital service requests
+- `email-queing/` - centralized transactional email gateway and queuing console for `@leonnhs.edu.ph` notifications
 - `registrar/` - registrar and learner information system
 - `repository/` - school academic repository for academic postings and reference content
 - `support/` - school learner support subsystem for guidance, clinic, child protection, and related learner-support services
@@ -44,7 +45,7 @@ Additional guidance for `deped-web-kit/`:
 - use Helvetica for web interface text inside the kit while keeping official DepEd logo typography guidance distinct
 - keep the DepEd logo and favicon proportional and unstretched
 - maintain visible padding around masthead, navigation, page intros, and major content blocks
-- for DepEd USIS forms, define keyboard flow deliberately; when speed matters, use explicit tab-index logic instead of leaving critical form order ambiguous
+- for Leon NHS - USIS forms, define keyboard flow deliberately; when speed matters, use explicit tab-index logic instead of leaving critical form order ambiguous
 - use Tailwind CSS with PostCSS for shared DepED-Web-Kit layout and documentation components, while keeping focused custom CSS only where interactive widget behavior still needs tighter control
 - keep interface typography within the shared USIS cap unless explicitly overridden: `24px` maximum for titles, `16px` maximum for regular body text, and `13px` maximum for subtitles, helper text, labels, and similar supporting text
 - whenever DepED-Web-Kit rules, components, behaviors, or standards change, update `deped-web-kit/public/usis-ai-reference.txt` so the deployed public AI reference remains aligned with the current system
@@ -75,7 +76,7 @@ Favicon rule for USIS subsystems:
 
 ## Shared Backend Rule
 
-All DepED USIS modules should connect to the same shared backend configuration where appropriate, especially for:
+All Leon NHS - USIS modules should connect to the same shared backend configuration where appropriate, especially for:
 
 - Supabase project connection
 - auth-related configuration
@@ -105,7 +106,7 @@ Registrar webhook source note:
 
 ## Database Naming Rule
 
-All Supabase tables for DepED USIS should be named according to the module or app that owns them.
+All Supabase tables for Leon NHS - USIS should be named according to the module or app that owns them.
 
 Required convention:
 

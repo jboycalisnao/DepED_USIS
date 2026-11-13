@@ -178,6 +178,7 @@ export function SccManageGoogleUserModal({
               replyTo: linkedOrg?.adviserEmail || undefined,
               subject: mail.subject,
               text: mail.text,
+              html: mail.html,
             });
             notificationSummary = { sentTo: mailRes.sentTo, ccSent: mailRes.ccSent };
           } catch (notifyErr: any) {
@@ -255,7 +256,8 @@ export function SccManageGoogleUserModal({
           </button>
         </div>
 
-        <form className="modal-dialog__body ia-scc-modal__body" onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit}>
+          <div className="modal-dialog__body ia-scc-modal__body">
           {errorMsg ? (
             <div className="ia-scc-alert ia-scc-alert--danger" role="alert">
               <span className="material-symbols-outlined" aria-hidden="true">error</span>
@@ -305,8 +307,8 @@ export function SccManageGoogleUserModal({
               <OfficerNotificationBox
                 title={
                   linkedOrg
-                    ? `Notify ${linkedOrg.acronym} registered officers of password reset via Google SMTP`
-                    : 'Notify officers of password reset via Google SMTP'
+                    ? `Notify ${linkedOrg.acronym} registered officers of password reset via email`
+                    : 'Notify officers of password reset via email'
                 }
                 smtpStatus={notify.smtpStatus}
                 recipients={notify.recipients}
@@ -425,6 +427,7 @@ export function SccManageGoogleUserModal({
               </label>
             </div>
           )}
+          </div>
 
           <div className="modal-dialog__actions ia-scc-modal__actions">
             <button type="button" className="secondary-btn" onClick={onClose} disabled={isSubmitting}>

@@ -50,6 +50,7 @@ export interface SccOfficer {
   gradeLevel: string;
   section: string;
   email: string;
+  secondaryEmail?: string;
   contactNumber: string;
   termYear: string;
   isAuthorizedSignatory: boolean;
@@ -104,6 +105,10 @@ export interface SccServiceRequest {
   updatedAt: string;
   details: {
     requestedMailboxAlias?: string;
+    notificationEmail?: string;
+    dataPrivacyAccepted?: boolean;
+    dataPrivacySignatory?: string;
+    dataPrivacySignedAt?: string;
     targetUsernames?: string[];
     storageCapacity?: string;
     eventTitle?: string;

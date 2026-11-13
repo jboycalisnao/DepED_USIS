@@ -83,8 +83,9 @@ export function SccOrganizationsAdminPage() {
           <div>
             <h3>Recognized Organizations & Registrar Officer Rosters</h3>
             <p>
-              Manage accredited clubs, teacher advisers, official <code>@leonnhs.edu.ph</code>{' '}
-              mailboxes, and inspect live Registrar-tagged learners ordered by hierarchy.
+              Synced with active Club & Organization tags from the Registrar Tagging Registry.
+              Manage teacher advisers, official <code>@leonnhs.edu.ph</code> mailboxes, and live
+              Registrar-tagged officer rosters ordered by hierarchy.
             </p>
           </div>
           <div className="ia-scc-inline-tags">
@@ -309,7 +310,7 @@ export function SccOrganizationsAdminPage() {
           setNotifyNotice({
             open: true,
             title: 'Officer Notification Sent',
-            message: `Sent via Google SMTP to: ${sentTo.join(', ')}${
+            message: `Sent email notification to: ${sentTo.join(', ')}${
               ccSent.length > 0 ? ` (CC: ${ccSent.join(', ')})` : ''
             }.`,
           });

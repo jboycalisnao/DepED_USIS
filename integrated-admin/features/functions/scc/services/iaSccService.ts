@@ -1,4 +1,5 @@
 import { supabase } from '@deped-usis/shared-supabase';
+import { verifyAuthenticatedCoordinatorPassword } from '../../../auth/services/integratedAdminAccess';
 import type {
   IaMailboxAvailabilityResult,
   IaSccAdviserCandidate,
@@ -355,6 +356,7 @@ function doesTagMatchOrg(rawTag: string, orgPart: string, targetAcronym?: string
   if (normAcronym && (normPart === normAcronym || normTag.startsWith(normAcronym))) return true;
   if (normName && (normPart === normName || normName.includes(normPart))) return true;
   if (normAcronym === 'srcy' && normPart.includes('redcross')) return true;
+  if (normAcronym === 'rcy' && normPart.includes('redcross')) return true;
   if (normAcronym === 'scexplorers' && normPart.includes('science')) return true;
   if (normAcronym === 'mwg' && normPart.includes('math')) return true;
   if (normAcronym === 'yeso' && normPart.includes('yeso')) return true;
@@ -467,34 +469,134 @@ function writeLocalRequests(requests: IaSccServiceRequest[]) {
   }
 }
 
+function isRegistrarClubOrOrgCategory(category?: string | null): boolean {
+  const norm = String(category || '').trim().toLowerCase();
+  return (
+    norm === 'club' ||
+    norm === 'organization' ||
+    norm.includes('club') ||
+    norm.includes('organization') ||
+    norm.includes('government')
+  );
+}
+
+function extractTagPlainDescription(description?: string | null): string {
+  const raw = String(description || '');
+  const idx = raw.indexOf(REUSABLE_TAG_POSITIONS_MARKER);
+  return (idx === -1 ? raw : raw.slice(0, idx)).trim();
+}
+
 export async function loadIaSccOrganizations(): Promise<IaSccOrganization[]> {
   let orgs: IaSccOrganization[] = [];
-  try {
-    const { data, error } = await supabase
-      .from(SCC_TABLES.ORGANIZATIONS)
-      .select('*')
-      .order('name', { ascending: true });
+  let loadedFromSupabase = false;
 
-    if (!error && Array.isArray(data) && data.length > 0) {
-      orgs = data.map((d: any) => ({
-        id: String(d.id),
-        schoolId: String(d.school_id || '302522'),
-        name: String(d.name || ''),
-        acronym: String(d.acronym || ''),
-        category: String(d.category || 'Student Organization'),
-        adviserName: String(d.adviser_name || ''),
-        adviserEmail: String(d.adviser_email || '').trim().toLowerCase(),
-        adviserContact: String(d.adviser_contact || ''),
-        description: String(d.description || ''),
-        officialEmail: sanitizeEmail(d.official_email),
-        status: (d.status || 'active') as IaSccOrganization['status'],
-      }));
-      writeLocalOrganizations(orgs);
-    } else {
-      orgs = readLocalOrganizations();
-    }
-  } catch {
+  const [orgRes, tagsRes] = await Promise.all([
+    supabase.from(SCC_TABLES.ORGANIZATIONS).select('*').order('name', { ascending: true }),
+    supabase
+      .from('registrar_tags')
+      .select('id, label, category, description, color, is_active')
+      .order('label', { ascending: true }),
+  ]);
+
+  if (!orgRes.error && Array.isArray(orgRes.data)) {
+    loadedFromSupabase = true;
+    orgs = orgRes.data.map((d: any) => ({
+      id: String(d.id),
+      schoolId: String(d.school_id || '302522'),
+      name: String(d.name || ''),
+      acronym: String(d.acronym || ''),
+      category: String(d.category || 'Student Organization'),
+      adviserName: String(d.adviser_name || ''),
+      adviserEmail: String(d.adviser_email || '').trim().toLowerCase(),
+      adviserContact: String(d.adviser_contact || ''),
+      description: String(d.description || ''),
+      officialEmail: sanitizeEmail(d.official_email),
+      status: (d.status || 'active') as IaSccOrganization['status'],
+    }));
+  } else {
     orgs = readLocalOrganizations();
+  }
+
+  // Reconcile organizations directly with active Club & Organization tags from Registrar
+  if (!tagsRes.error && Array.isArray(tagsRes.data)) {
+    const activeClubOrgTags = tagsRes.data.filter(
+      (tag: any) =>
+        tag?.is_active !== false &&
+        Boolean(String(tag?.label || '').trim()) &&
+        isRegistrarClubOrOrgCategory(tag?.category),
+    );
+
+    const matchedOrgIds = new Set<string>();
+    const syncedOrgs: IaSccOrganization[] = [];
+    const newDbRows: Array<Record<string, unknown>> = [];
+
+    for (const tag of activeClubOrgTags) {
+      const tagId = String(tag.id || '').trim();
+      const tagLabel = String(tag.label || '').trim();
+      const tagAcronym = tagLabel.toUpperCase();
+      const normLabel = normalizeOrgToken(tagLabel);
+      const plainDesc = extractTagPlainDescription(tag.description);
+      const normDesc = normalizeOrgToken(plainDesc);
+
+      const matched = orgs.find((o) => {
+        if (matchedOrgIds.has(o.id)) return false;
+        if (tagId && o.id === `org-tag-${tagId}`) return true;
+        if (normLabel && normalizeOrgToken(o.acronym) === normLabel) return true;
+        if (normLabel && normalizeOrgToken(o.name) === normLabel) return true;
+        if (normDesc && normalizeOrgToken(o.name) === normDesc) return true;
+        return false;
+      });
+
+      if (matched) {
+        matchedOrgIds.add(matched.id);
+        syncedOrgs.push(matched);
+      } else {
+        const synthesized: IaSccOrganization = {
+          id: `org-tag-${tagId || normLabel || Date.now()}`,
+          schoolId: '302522',
+          name: plainDesc || tagLabel,
+          acronym: tagAcronym,
+          category: toTitleCase(String(tag.category || 'Club')),
+          adviserName: '',
+          adviserEmail: '',
+          adviserContact: '',
+          description: plainDesc
+            ? `${plainDesc} (${tagAcronym}) synced from active Registrar tag.`
+            : `Active ${String(tag.category || 'organization').toLowerCase()} (${tagAcronym}) synced from Registrar.`,
+          officialEmail: '',
+          status: 'active',
+        };
+        syncedOrgs.push(synthesized);
+        newDbRows.push({
+          id: synthesized.id,
+          school_id: synthesized.schoolId,
+          name: synthesized.name,
+          acronym: synthesized.acronym,
+          category: synthesized.category,
+          adviser_name: synthesized.adviserName,
+          adviser_email: synthesized.adviserEmail,
+          adviser_contact: null,
+          description: synthesized.description,
+          official_email: null,
+          status: 'active',
+        });
+      }
+    }
+
+    if (newDbRows.length > 0) {
+      try {
+        await supabase
+          .from(SCC_TABLES.ORGANIZATIONS)
+          .upsert(newDbRows, { onConflict: 'id', ignoreDuplicates: true });
+      } catch {
+        // non-blocking sync
+      }
+    }
+
+    orgs = syncedOrgs.sort((a, b) => a.name.localeCompare(b.name));
+    writeLocalOrganizations(orgs);
+  } else if (loadedFromSupabase) {
+    writeLocalOrganizations(orgs);
   }
 
   // Enrich organizations with live Registrar tagged + manual officer counts & active request counts
@@ -603,7 +705,7 @@ export async function loadIaSccRequests(): Promise<IaSccServiceRequest[]> {
       .select('*')
       .order('created_at', { ascending: false });
 
-    if (!error && Array.isArray(data) && data.length > 0) {
+    if (!error && Array.isArray(data)) {
       const mapped = data.map((d: any) =>
         sanitizeRequest({
           id: d.id,
@@ -707,6 +809,106 @@ export async function reviewIaSccRequest(
   }
 
   return updated;
+}
+
+export function resolveRequestAssociatedEmail(request: IaSccServiceRequest): string {
+  const provisionedEmail = sanitizeEmail(request.provisionedData?.assignedEmail || '')
+    .trim()
+    .toLowerCase();
+  if (provisionedEmail && provisionedEmail.includes('@')) {
+    return provisionedEmail;
+  }
+
+  if (request.serviceKey === 'email_account' && request.status === 'provisioned') {
+    const alias = (request.details?.requestedMailboxAlias || '')
+      .trim()
+      .toLowerCase()
+      .replace(/\.leon$/i, '')
+      .replace(/@.*$/, '');
+    if (alias) {
+      return `${alias}@leonnhs.edu.ph`;
+    }
+  }
+
+  return '';
+}
+
+export async function deleteIaSccRequest(params: {
+  request: IaSccServiceRequest;
+  coordinatorPassword: string;
+}): Promise<{
+  deletedRequestId: string;
+  deletedEmail?: string;
+  removedFromGoogleAdmin: boolean;
+}> {
+  const { request, coordinatorPassword } = params;
+
+  const authCheck = await verifyAuthenticatedCoordinatorPassword(coordinatorPassword);
+  if (!authCheck.ok) {
+    throw new Error(authCheck.error);
+  }
+
+  const associatedEmail = resolveRequestAssociatedEmail(request);
+  let removedFromGoogleAdmin = false;
+
+  if (associatedEmail) {
+    if (associatedEmail.endsWith('@leonnhs.edu.ph')) {
+      try {
+        await deleteGoogleWorkspaceUser(associatedEmail);
+        removedFromGoogleAdmin = true;
+      } catch (googleErr: any) {
+        const msg = String(googleErr?.message || '');
+        const isNotFound = /404|not\s*found|does\s*not\s*exist|resource\s*not\s*found/i.test(msg);
+        if (!isNotFound) {
+          throw new Error(
+            `Unable to delete associated Google Workspace account (${associatedEmail}): ${msg}`,
+          );
+        }
+      }
+    }
+
+    // Clear linked official_email from organization records in Supabase and local cache
+    const now = new Date().toISOString();
+    try {
+      await supabase
+        .from(SCC_TABLES.ORGANIZATIONS)
+        .update({ official_email: null, updated_at: now })
+        .ilike('official_email', associatedEmail);
+    } catch {
+      // handled below in local cache sync
+    }
+
+    const orgs = readLocalOrganizations();
+    let orgChanged = false;
+    const nextOrgs = orgs.map((org) => {
+      if ((org.officialEmail || '').trim().toLowerCase() === associatedEmail) {
+        orgChanged = true;
+        return { ...org, officialEmail: '' };
+      }
+      return org;
+    });
+    if (orgChanged) {
+      writeLocalOrganizations(nextOrgs);
+    }
+  }
+
+  const { error: deleteErr } = await supabase
+    .from(SCC_TABLES.SERVICE_REQUESTS)
+    .delete()
+    .eq('id', request.id);
+
+  if (deleteErr) {
+    throw new Error(`Unable to delete service request record: ${deleteErr.message}`);
+  }
+
+  const remaining = readLocalRequests().filter((item) => item.id !== request.id);
+  writeLocalRequests(remaining);
+
+  return {
+    deletedRequestId: request.id,
+    deletedEmail: associatedEmail || undefined,
+    removedFromGoogleAdmin,
+  };
 }
 
 async function fetchAllTaggedRegistrarLearners(): Promise<any[]> {
@@ -1465,10 +1667,10 @@ export async function fetchSmtpNotificationStatus(): Promise<SccSmtpStatus> {
       return {
         ok: true,
         configured: Boolean(data.configured),
-        host: String(data.host || 'smtp.gmail.com'),
+        host: String(data.host || 'smtp-relay.gmail.com'),
         port: Number(data.port || 587),
         from: String(data.from || ''),
-        fromName: String(data.fromName || 'DepED USIS Integrated Admin (SCC)'),
+        fromName: String(data.fromName || 'Leon NHS USIS Integrated Admin (SCC)'),
         missing: Array.isArray(data.missing) ? data.missing.map(String) : [],
       };
     }
@@ -1478,11 +1680,75 @@ export async function fetchSmtpNotificationStatus(): Promise<SccSmtpStatus> {
   return {
     ok: false,
     configured: false,
-    host: 'smtp.gmail.com',
+    host: 'smtp-relay.gmail.com',
     port: 587,
     from: '',
-    fromName: 'DepED USIS Integrated Admin (SCC)',
+    fromName: 'Leon NHS USIS Integrated Admin (SCC)',
     missing: ['Unable to reach /api/scc-send-notification'],
+  };
+}
+
+export type EmailTermsAgreementAttachmentPayload = {
+  trackingNumber?: string;
+  organizationName: string;
+  organizationAcronym?: string;
+  emailAddress: string;
+  requesterName: string;
+  requesterPosition?: string;
+  adviserName?: string;
+  adviserEndorsed?: boolean;
+  approvedBy?: string;
+  statusLabel?: string;
+};
+
+const BULK_EMAIL_QUEUE_INTERVAL_MS = 1000;
+
+const delayMs = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+async function dispatchSingleNotificationRequest(params: {
+  to: string[];
+  cc: string[];
+  replyTo?: string;
+  subject: string;
+  text: string;
+  html?: string;
+  termsAgreement?: EmailTermsAgreementAttachmentPayload;
+  relayTest?: {
+    host?: string;
+    port?: number;
+    requireAuth?: boolean;
+  };
+}): Promise<SccNotificationResult & { port?: number }> {
+  const response = await fetch('/api/scc-send-notification', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      to: params.to,
+      cc: params.cc,
+      replyTo: params.replyTo,
+      subject: params.subject,
+      text: params.text,
+      html: params.html,
+      termsAgreement: params.termsAgreement,
+      relayTest: params.relayTest,
+    }),
+  });
+
+  const data = await response.json().catch(() => null);
+  if (!response.ok || !data?.ok) {
+    throw new Error(
+      data?.error ||
+        `Email notification endpoint returned HTTP ${response.status}.`,
+    );
+  }
+
+  return {
+    ok: true,
+    host: data.host,
+    port: typeof data.port === 'number' ? data.port : undefined,
+    from: data.from,
+    sentTo: Array.isArray(data.sentTo) ? data.sentTo : params.to,
+    ccSent: Array.isArray(data.ccSent) ? data.ccSent : params.cc,
   };
 }
 
@@ -1492,7 +1758,19 @@ export async function sendOfficerEmailNotification(params: {
   replyTo?: string;
   subject: string;
   text: string;
-}): Promise<SccNotificationResult> {
+  html?: string;
+  termsAgreement?: EmailTermsAgreementAttachmentPayload;
+  relayTest?: {
+    host?: string;
+    port?: number;
+    requireAuth?: boolean;
+  };
+  onProgress?: (progress: {
+    sent: number;
+    total: number;
+    currentRecipient: string;
+  }) => void;
+}): Promise<SccNotificationResult & { port?: number }> {
   const cleanTo = Array.from(
     new Set(
       params.to
@@ -1512,32 +1790,94 @@ export async function sendOfficerEmailNotification(params: {
     throw new Error('No valid registered officer email addresses selected.');
   }
 
-  const response = await fetch('/api/scc-send-notification', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+  if (cleanTo.length === 1) {
+    params.onProgress?.({
+      sent: 0,
+      total: 1,
+      currentRecipient: cleanTo[0],
+    });
+    const single = await dispatchSingleNotificationRequest({
       to: cleanTo,
       cc: cleanCc,
       replyTo: params.replyTo,
       subject: params.subject,
       text: params.text,
-    }),
-  });
+      html: params.html,
+      termsAgreement: params.termsAgreement,
+      relayTest: params.relayTest,
+    });
+    params.onProgress?.({
+      sent: 1,
+      total: 1,
+      currentRecipient: cleanTo[0],
+    });
+    return single;
+  }
 
-  const data = await response.json().catch(() => null);
-  if (!response.ok || !data?.ok) {
+  // Bulk send: queue sequentially and send one email every 1 second
+  const deliveredTo: string[] = [];
+  const ccDelivered = new Set<string>();
+  const failures: Array<{ email: string; message: string }> = [];
+  let lastResult: (SccNotificationResult & { port?: number }) | null = null;
+
+  for (let i = 0; i < cleanTo.length; i++) {
+    const recipient = cleanTo[i];
+    if (i > 0) {
+      await delayMs(BULK_EMAIL_QUEUE_INTERVAL_MS);
+    }
+
+    params.onProgress?.({
+      sent: i,
+      total: cleanTo.length,
+      currentRecipient: recipient,
+    });
+
+    try {
+      const res = await dispatchSingleNotificationRequest({
+        to: [recipient],
+        cc: i === 0 ? cleanCc : [],
+        replyTo: params.replyTo,
+        subject: params.subject,
+        text: params.text,
+        html: params.html,
+        termsAgreement: params.termsAgreement,
+        relayTest: params.relayTest,
+      });
+      lastResult = res;
+      deliveredTo.push(...res.sentTo);
+      res.ccSent.forEach((addr) => ccDelivered.add(addr));
+    } catch (err: any) {
+      failures.push({
+        email: recipient,
+        message: err?.message || 'Delivery failed.',
+      });
+    }
+
+    params.onProgress?.({
+      sent: i + 1,
+      total: cleanTo.length,
+      currentRecipient: recipient,
+    });
+  }
+
+  if (deliveredTo.length === 0) {
+    throw new Error(failures[0]?.message || 'Unable to send queued notification emails.');
+  }
+
+  if (failures.length > 0) {
+    const failedList = failures.map((f) => `${f.email} (${f.message})`).join('; ');
     throw new Error(
-      data?.error ||
-        `Google SMTP notification endpoint returned HTTP ${response.status}.`,
+      `Sent to ${deliveredTo.join(', ')}, but ${failures.length} queued email(s) failed: ${failedList}`,
     );
   }
 
   return {
     ok: true,
-    host: data.host,
-    from: data.from,
-    sentTo: Array.isArray(data.sentTo) ? data.sentTo : cleanTo,
-    ccSent: Array.isArray(data.ccSent) ? data.ccSent : cleanCc,
+    host: lastResult?.host,
+    port: lastResult?.port,
+    from: lastResult?.from,
+    sentTo: Array.from(new Set(deliveredTo)),
+    ccSent: Array.from(ccDelivered),
   };
 }
 

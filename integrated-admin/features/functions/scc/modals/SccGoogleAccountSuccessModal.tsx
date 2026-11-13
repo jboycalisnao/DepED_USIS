@@ -101,7 +101,7 @@ export function SccGoogleAccountSuccessModal({
 
           {info.notificationSummary ? (
             <div className="modal-record__field">
-              <span>Officer Notification (Google SMTP)</span>
+              <span>Officer Email Notification</span>
               {info.notificationSummary.error ? (
                 <strong style={{ color: '#b42318' }}>
                   Failed: {info.notificationSummary.error}

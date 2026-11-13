@@ -26,6 +26,7 @@ type SccRequestActionModalProps = {
   organizations?: IaSccOrganization[];
   onClose: () => void;
   onUpdated: (updated: IaSccServiceRequest) => void;
+  onRequestDelete?: (request: IaSccServiceRequest) => void;
   onGoogleSuccess?: (info: SccGoogleAccountSuccessInfo) => void;
   onNotifyOutcome?: (outcome: {
     statusLabel: string;
@@ -51,6 +52,7 @@ export function SccRequestActionModal({
   organizations = [],
   onClose,
   onUpdated,
+  onRequestDelete,
   onGoogleSuccess,
   onNotifyOutcome,
 }: SccRequestActionModalProps) {
@@ -83,6 +85,7 @@ export function SccRequestActionModal({
     organizationAcronym: request?.organizationAcronym,
     organizationName: request?.organizationName,
     adviserEmail: matchedOrg?.adviserEmail,
+    preferredEmail: request?.details?.notificationEmail,
     enabled: Boolean(request),
     defaultChecked: true,
   });
@@ -171,12 +174,35 @@ export function SccRequestActionModal({
         driveFolderUrl: params.driveFolderUrl,
         setupInstructions: params.setupInstructions,
       });
+      const isEmailProvisioned =
+        request.serviceKey === 'email_account' && params.nextStatus === 'provisioned';
+      const fallbackRequestedEmail = `${(
+        request.details?.requestedMailboxAlias || request.organizationAcronym.toLowerCase()
+      )
+        .replace(/\.leon$/i, '')
+        .replace(/@.*$/, '')}@leonnhs.edu.ph`;
+
       const res = await sendOfficerEmailNotification({
         to: notify.effectiveTo,
         cc: notify.effectiveCc,
         replyTo: matchedOrg?.adviserEmail || undefined,
         subject: mail.subject,
         text: mail.text,
+        html: mail.html,
+        termsAgreement: isEmailProvisioned
+          ? {
+              trackingNumber: request.trackingNumber,
+              organizationName: request.organizationName,
+              organizationAcronym: request.organizationAcronym,
+              emailAddress: params.assignedEmail || fallbackRequestedEmail,
+              requesterName: request.requesterName,
+              requesterPosition: request.requesterPosition,
+              adviserName: matchedOrg?.adviserName || '',
+              adviserEndorsed: request.adviserEndorsement,
+              approvedBy: reviewerName,
+              statusLabel: 'Provisioned',
+            }
+          : undefined,
       });
       return { sentTo: res.sentTo, ccSent: res.ccSent };
     } catch (notifyErr: any) {
@@ -213,6 +239,50 @@ export function SccRequestActionModal({
       }
     } catch (err: any) {
       setErrorMsg(err?.message || 'Unable to update request status.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleResendProvisioningEmail = async () => {
+    if (!notify.smtpStatus?.configured) {
+      setErrorMsg('Email notification service is not configured on the server.');
+      return;
+    }
+    if (!notify.notifyEnabled) {
+      notify.setNotifyEnabled(true);
+    }
+    if (notify.effectiveTo.length === 0) {
+      setErrorMsg('Please select or enter at least one recipient email address above.');
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      setErrorMsg(null);
+      const summary = await dispatchStatusNotification({
+        nextStatus: 'provisioned',
+        remarks:
+          request.reviewerRemarks || 'Approved and provisioned via Integrated Admin SCC Desk.',
+        assignedEmail: request.provisionedData?.assignedEmail,
+        tempPassword: request.provisionedData?.tempPassword,
+        driveFolderUrl: request.provisionedData?.driveFolderUrl,
+        setupInstructions: request.provisionedData?.setupInstructions,
+      });
+      if (!summary) {
+        setErrorMsg('Please enable officer notification and select at least one recipient.');
+        return;
+      }
+      onClose();
+      onNotifyOutcome?.({
+        statusLabel: 'Provisioned (Resent)',
+        trackingNumber: request.trackingNumber,
+        sentTo: summary.sentTo,
+        ccSent: summary.ccSent,
+        error: summary.error,
+      });
+    } catch (err: any) {
+      setErrorMsg(err?.message || 'Unable to resend provisioning email.');
     } finally {
       setIsSubmitting(false);
     }
@@ -370,7 +440,8 @@ export function SccRequestActionModal({
           </button>
         </div>
 
-        <form className="modal-dialog__body ia-scc-modal__body" onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit}>
+          <div className="modal-dialog__body ia-scc-modal__body">
           {errorMsg ? (
             <div className="ia-scc-alert ia-scc-alert--danger" role="alert">
               <span className="material-symbols-outlined" aria-hidden="true">error</span>
@@ -411,6 +482,12 @@ export function SccRequestActionModal({
               <p className="ia-scc-detail-spec">
                 <strong>Requested Mailbox:</strong>{' '}
                 <code>{request.details.requestedMailboxAlias}@leonnhs.edu.ph</code>
+              </p>
+            ) : null}
+            {request.details?.notificationEmail ? (
+              <p className="ia-scc-detail-spec">
+                <strong>Notification Email:</strong>{' '}
+                <code>{request.details.notificationEmail}</code>
               </p>
             ) : null}
             {request.details?.storageCapacity ? (
@@ -570,9 +647,13 @@ export function SccRequestActionModal({
             </div>
           ) : null}
 
-          {request.status !== 'provisioned' && request.status !== 'rejected' ? (
+          {request.status !== 'rejected' ? (
             <OfficerNotificationBox
-              title={`Notify ${request.organizationAcronym} registered officers via Google SMTP`}
+              title={
+                request.status === 'provisioned'
+                  ? `Resend provisioning email to ${request.organizationAcronym} officers`
+                  : `Notify ${request.organizationAcronym} registered officers via email`
+              }
               smtpStatus={notify.smtpStatus}
               recipients={notify.recipients}
               allOfficersCount={notify.allOfficersCount}
@@ -590,6 +671,7 @@ export function SccRequestActionModal({
               onManualEmailChange={notify.setManualEmail}
             />
           ) : null}
+          </div>
 
           <div className="modal-dialog__actions ia-scc-modal__actions">
             {activeMode === 'view' ? (
@@ -597,62 +679,88 @@ export function SccRequestActionModal({
                 <button type="button" className="secondary-btn" onClick={onClose}>
                   Close
                 </button>
-                {request.status !== 'provisioned' && request.status !== 'rejected' ? (
-                  <div className="ia-scc-action-row">
-                    {request.status === 'pending' ? (
-                      <button
-                        type="button"
-                        className="secondary-btn"
-                        disabled={isSubmitting}
-                        onClick={() =>
-                          void handleQuickStatus(
-                            'under_review',
-                            'Request moved to Under Review by Integrated Admin.',
-                          )
-                        }
-                      >
-                        Mark Under Review
-                      </button>
-                    ) : null}
-                    {request.status !== 'approved' ? (
-                      <button
-                        type="button"
-                        className="secondary-btn"
-                        disabled={isSubmitting}
-                        onClick={() =>
-                          void handleQuickStatus(
-                            'approved',
-                            'Approved for fulfillment by Integrated Admin.',
-                          )
-                        }
-                      >
-                        Approve
-                      </button>
-                    ) : null}
+                <div className="ia-scc-action-row">
+                  {onRequestDelete ? (
                     <button
                       type="button"
                       className="secondary-btn ia-scc-btn--danger"
                       disabled={isSubmitting}
                       onClick={() => {
-                        setReviewerRemarks('');
-                        setActiveMode('reject');
+                        const target = request;
+                        onClose();
+                        onRequestDelete(target);
                       }}
                     >
-                      Reject
+                      Delete Record
                     </button>
+                  ) : null}
+                  {request.status === 'provisioned' ? (
                     <button
                       type="button"
                       className="primary-btn"
-                      disabled={isSubmitting}
-                      onClick={() => {
-                        setReviewerRemarks('Approved and provisioned via Integrated Admin SCC Desk.');
-                        setActiveMode('provision');
-                      }}
+                      disabled={isSubmitting || notify.isLoading}
+                      onClick={() => void handleResendProvisioningEmail()}
                     >
-                      Provision Service
+                      {isSubmitting ? 'Resending...' : 'Resend Provisioning Email'}
                     </button>
-                  </div>
-                ) : null}
+                  ) : null}
+                  {request.status !== 'provisioned' && request.status !== 'rejected' ? (
+                    <>
+                      {request.status === 'pending' ? (
+                        <button
+                          type="button"
+                          className="secondary-btn"
+                          disabled={isSubmitting}
+                          onClick={() =>
+                            void handleQuickStatus(
+                              'under_review',
+                              'Request moved to Under Review by Integrated Admin.',
+                            )
+                          }
+                        >
+                          Mark Under Review
+                        </button>
+                      ) : null}
+                      {request.status !== 'approved' ? (
+                        <button
+                          type="button"
+                          className="secondary-btn"
+                          disabled={isSubmitting}
+                          onClick={() =>
+                            void handleQuickStatus(
+                              'approved',
+                              'Approved for fulfillment by Integrated Admin.',
+                            )
+                          }
+                        >
+                          Approve
+                        </button>
+                      ) : null}
+                      <button
+                        type="button"
+                        className="secondary-btn ia-scc-btn--danger"
+                        disabled={isSubmitting}
+                        onClick={() => {
+                          setReviewerRemarks('');
+                          setActiveMode('reject');
+                        }}
+                      >
+                        Reject
+                      </button>
+                      <button
+                        type="button"
+                        className="primary-btn"
+                        disabled={isSubmitting}
+                        onClick={() => {
+                          setReviewerRemarks('Approved and provisioned via Integrated Admin SCC Desk.');
+                          setActiveMode('provision');
+                        }}
+                      >
+                        Provision Service
+                      </button>
+                    </>
+                  ) : null}
+                </div>
               </>
             ) : (
               <>

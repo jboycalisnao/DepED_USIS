@@ -64,8 +64,17 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
+  gap: 16px;
   flex-wrap: wrap;
+}
+
+.ia-scc-panel__header > :first-child {
+  flex: 1 1 360px;
+  min-width: 0;
+}
+
+.ia-scc-panel__header > :last-child:not(:first-child) {
+  flex: 0 0 auto;
 }
 
 .ia-scc-panel__header h3 {
@@ -418,6 +427,7 @@
 /* Modals */
 .ia-scc-modal__body {
   display: grid;
+  align-content: start;
   gap: 14px;
 }
 

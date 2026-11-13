@@ -74,9 +74,7 @@ export function SccServicesCatalogPage({ session }: SccServicesCatalogPageProps)
           session={session}
           initialServiceKey={selectedService}
           onClose={() => setSelectedService(null)}
-          onCreated={() => {
-            setSelectedService(null);
-          }}
+          onCreated={() => {}}
         />
       ) : null}
     </div>

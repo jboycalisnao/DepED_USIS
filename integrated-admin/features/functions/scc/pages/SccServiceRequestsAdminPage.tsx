@@ -9,6 +9,7 @@ import type {
   IaSccServiceRequest,
 } from '../types';
 import { SccRequestActionModal, type SccRequestModalMode } from '../modals/SccRequestActionModal';
+import { SccDeleteRequestModal } from '../modals/SccDeleteRequestModal';
 import {
   SccGoogleAccountSuccessModal,
   type SccGoogleAccountSuccessInfo,
@@ -44,6 +45,7 @@ export function SccServiceRequestsAdminPage({ coordinatorName }: SccServiceReque
   const [searchQuery, setSearchQuery] = useState('');
   const [modalRequest, setModalRequest] = useState<IaSccServiceRequest | null>(null);
   const [modalMode, setModalMode] = useState<SccRequestModalMode>('view');
+  const [deleteTarget, setDeleteTarget] = useState<IaSccServiceRequest | null>(null);
   const [googleSuccessInfo, setGoogleSuccessInfo] = useState<SccGoogleAccountSuccessInfo | null>(null);
   const [notifyAlert, setNotifyAlert] = useState<{
     open: boolean;
@@ -222,6 +224,13 @@ export function SccServiceRequestsAdminPage({ coordinatorName }: SccServiceReque
                               Provision
                             </button>
                           ) : null}
+                          <button
+                            type="button"
+                            className="secondary-btn ia-scc-btn--danger"
+                            onClick={() => setDeleteTarget(req)}
+                          >
+                            Delete
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -242,6 +251,7 @@ export function SccServiceRequestsAdminPage({ coordinatorName }: SccServiceReque
         onUpdated={(updated) => {
           setRequests((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
         }}
+        onRequestDelete={(target) => setDeleteTarget(target)}
         onGoogleSuccess={(info) => setGoogleSuccessInfo(info)}
         onNotifyOutcome={(outcome) => {
           setNotifyAlert({
@@ -250,13 +260,34 @@ export function SccServiceRequestsAdminPage({ coordinatorName }: SccServiceReque
               ? `Request ${outcome.trackingNumber} Updated (Email Warning)`
               : `Officer Notification Sent (${outcome.trackingNumber})`,
             message: outcome.error
-              ? `Request updated to ${outcome.statusLabel}, but Google SMTP delivery reported: ${outcome.error}`
-              : `Email notification for ${outcome.statusLabel} status was sent via Google SMTP to: ${outcome.sentTo.join(', ')}${
+              ? `Request updated to ${outcome.statusLabel}, but email delivery reported: ${outcome.error}`
+              : `Email notification for ${outcome.statusLabel} status was sent to: ${outcome.sentTo.join(', ')}${
                   outcome.ccSent && outcome.ccSent.length > 0
                     ? ` (CC: ${outcome.ccSent.join(', ')})`
                     : ''
                 }.`,
             tone: outcome.error ? 'warning' : 'success',
+          });
+        }}
+      />
+
+      <SccDeleteRequestModal
+        request={deleteTarget}
+        coordinatorName={coordinatorName}
+        onClose={() => setDeleteTarget(null)}
+        onDeleted={({ request: deletedReq, deletedEmail, removedFromGoogleAdmin }) => {
+          setRequests((prev) => prev.filter((item) => item.id !== deletedReq.id));
+          setNotifyAlert({
+            open: true,
+            title: `Request ${deletedReq.trackingNumber} Deleted`,
+            message: deletedEmail
+              ? `Service request ${deletedReq.trackingNumber} was permanently deleted${
+                  removedFromGoogleAdmin
+                    ? `, and associated Google Workspace account ${deletedEmail} was removed from Google Admin and organization records.`
+                    : `, and associated mailbox ${deletedEmail} was cleared from system organization records.`
+                }`
+              : `Service request ${deletedReq.trackingNumber} was permanently deleted from system records.`,
+            tone: 'success',
           });
         }}
       />

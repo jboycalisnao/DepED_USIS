@@ -223,7 +223,8 @@ export function SccOrganizationFormModal({
           </button>
         </div>
 
-        <form className="modal-dialog__body ia-scc-modal__body" onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit}>
+          <div className="modal-dialog__body ia-scc-modal__body">
           {errorMsg ? (
             <div className="ia-scc-alert ia-scc-alert--danger" role="alert">
               <span className="material-symbols-outlined" aria-hidden="true">error</span>
@@ -352,6 +353,7 @@ export function SccOrganizationFormModal({
             />
             <span>Mandate & Organization Description</span>
           </label>
+          </div>
 
           <div className="modal-dialog__actions ia-scc-modal__actions">
             <button type="button" className="secondary-btn" onClick={onClose} disabled={isSaving}>

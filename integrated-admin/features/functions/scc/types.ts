@@ -82,6 +82,7 @@ export interface IaSccServiceRequest {
   updatedAt: string;
   details: {
     requestedMailboxAlias?: string;
+    notificationEmail?: string;
     targetUsernames?: string[];
     storageCapacity?: string;
     eventTitle?: string;

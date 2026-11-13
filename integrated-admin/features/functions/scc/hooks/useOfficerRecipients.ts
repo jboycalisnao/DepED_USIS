@@ -28,6 +28,7 @@ export function useOfficerRecipients(params: {
   organizationAcronym?: string;
   organizationName?: string;
   adviserEmail?: string;
+  preferredEmail?: string;
   enabled: boolean;
   defaultChecked?: boolean;
 }) {
@@ -36,6 +37,7 @@ export function useOfficerRecipients(params: {
     organizationAcronym,
     organizationName,
     adviserEmail,
+    preferredEmail,
     enabled,
     defaultChecked = true,
   } = params;
@@ -73,6 +75,26 @@ export function useOfficerRecipients(params: {
         setSmtpStatus(smtp);
         setRecipients(roster.recipients);
         setAllOfficersCount(roster.allOfficersCount);
+
+        const cleanPreferred = (preferredEmail || '').trim().toLowerCase();
+        const hasValidPreferred = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanPreferred);
+
+        if (hasValidPreferred) {
+          const matchedRec = roster.recipients.find(
+            (rec) => rec.email.toLowerCase() === cleanPreferred,
+          );
+          if (matchedRec) {
+            setSelectedEmails([matchedRec.email]);
+            setPresetMode(matchedRec.isPresident ? 'president' : 'custom');
+          } else {
+            setSelectedEmails([]);
+            setPresetMode('custom');
+            setManualEmail(cleanPreferred);
+          }
+          setNotifyEnabled(defaultChecked && smtp.configured);
+          return;
+        }
+
         const picked = pickDefaultEmails(roster.recipients);
         setSelectedEmails(picked.emails);
         setPresetMode(picked.mode);
@@ -82,8 +104,13 @@ export function useOfficerRecipients(params: {
       })
       .catch(() => {
         if (cancelled) return;
+        const cleanPreferred = (preferredEmail || '').trim().toLowerCase();
+        const hasValidPreferred = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanPreferred);
         setRecipients([]);
         setSelectedEmails([]);
+        if (hasValidPreferred) {
+          setManualEmail(cleanPreferred);
+        }
         setNotifyEnabled(false);
       })
       .finally(() => {
@@ -98,6 +125,7 @@ export function useOfficerRecipients(params: {
     organizationId,
     organizationAcronym,
     organizationName,
+    preferredEmail,
     defaultChecked,
   ]);
 

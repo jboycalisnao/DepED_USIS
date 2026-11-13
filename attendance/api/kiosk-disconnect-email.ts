@@ -58,9 +58,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const occurredAt = normalize(body.occurredAt) || new Date().toISOString();
     const details = normalize(body.details) || 'The kiosk serial device link was lost.';
 
-    const subject = `[DepED USIS Attendance] ${stationName} serial device disconnected`;
+    const subject = `[Leon NHS USIS Attendance] ${stationName} serial device disconnected`;
     const text = [
-      'DepED USIS Attendance Kiosk Alert',
+      'Leon NHS USIS Attendance Kiosk Alert',
       '',
       `Station: ${stationName}`,
       `Status: ${status}`,

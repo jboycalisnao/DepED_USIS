@@ -4,6 +4,7 @@ import type { IaSccOrganization } from '../types';
 import { useOfficerRecipients } from '../hooks/useOfficerRecipients';
 import { OfficerNotificationBox } from '../components/OfficerNotificationBox';
 import { sendOfficerEmailNotification } from '../services/iaSccService';
+import { buildCustomOfficerAnnouncementEmail } from '../utils/sccNotificationTemplates';
 
 type SccNotifyOfficersModalProps = {
   organization: IaSccOrganization | null;
@@ -19,6 +20,7 @@ export function SccNotifyOfficersModal({
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const [sendProgress, setSendProgress] = useState<{ sent: number; total: number } | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const notify = useOfficerRecipients({
@@ -33,7 +35,7 @@ export function SccNotifyOfficersModal({
   useEffect(() => {
     if (!organization) return;
     setErrorMsg(null);
-    setSubject(`[DepED USIS SCC • ${organization.acronym}] Official Officer Notification`);
+    setSubject(`[Leon NHS USIS SCC • ${organization.acronym}] Official Officer Notification`);
     setMessage(
       [
         `Good day, ${organization.name} (${organization.acronym}) Officers,`,
@@ -41,7 +43,7 @@ export function SccNotifyOfficersModal({
         '',
         '',
         'Respectfully,',
-        'DepED USIS — Integrated Admin (SCC)',
+        'Leon NHS USIS — Integrated Admin (SCC)',
         'Leon National High School',
       ].join('\n'),
     );
@@ -54,7 +56,7 @@ export function SccNotifyOfficersModal({
     setErrorMsg(null);
 
     if (!notify.smtpStatus?.configured) {
-      setErrorMsg('Google SMTP server is not configured.');
+      setErrorMsg('Email notification service is not configured.');
       return;
     }
     if (notify.effectiveTo.length === 0) {
@@ -70,19 +72,33 @@ export function SccNotifyOfficersModal({
 
     try {
       setIsSending(true);
+      setSendProgress(
+        notify.effectiveTo.length > 1 ? { sent: 0, total: notify.effectiveTo.length } : null,
+      );
+      const mail = buildCustomOfficerAnnouncementEmail({
+        organizationName: organization.name,
+        organizationAcronym: organization.acronym,
+        subject: subject.trim(),
+        message: message.trim(),
+      });
       const res = await sendOfficerEmailNotification({
         to: notify.effectiveTo,
         cc: notify.effectiveCc,
         replyTo: organization.adviserEmail || undefined,
-        subject: subject.trim(),
-        text: message.trim(),
+        subject: mail.subject,
+        text: mail.text,
+        html: mail.html,
+        onProgress: ({ sent, total }) => {
+          setSendProgress({ sent, total });
+        },
       });
       onSent?.(res.sentTo, res.ccSent);
       onClose();
     } catch (err: any) {
-      setErrorMsg(err?.message || 'Unable to send notification via Google SMTP.');
+      setErrorMsg(err?.message || 'Unable to send email notification.');
     } finally {
       setIsSending(false);
+      setSendProgress(null);
     }
   };
 
@@ -98,7 +114,7 @@ export function SccNotifyOfficersModal({
         <div className="modal-dialog__header">
           <div className="modal-dialog__title-group">
             <p className="modal-dialog__eyebrow">
-              {organization.name} ({organization.acronym}) • Google SMTP
+              {organization.name} ({organization.acronym}) • Officer Notification
             </p>
             <h3>Notify Registered Officers</h3>
           </div>
@@ -107,7 +123,8 @@ export function SccNotifyOfficersModal({
           </button>
         </div>
 
-        <form className="modal-dialog__body ia-scc-modal__body" onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit}>
+          <div className="modal-dialog__body ia-scc-modal__body">
           {errorMsg ? (
             <div className="ia-scc-alert ia-scc-alert--danger" role="alert">
               <span className="material-symbols-outlined" aria-hidden="true">error</span>
@@ -117,7 +134,7 @@ export function SccNotifyOfficersModal({
 
           <div className="ia-scc-form-stack">
             <OfficerNotificationBox
-              title="Send via Google SMTP to selected officer recipients"
+              title="Send email notification to selected officer recipients"
               smtpStatus={notify.smtpStatus}
               recipients={notify.recipients}
               allOfficersCount={notify.allOfficersCount}
@@ -157,6 +174,7 @@ export function SccNotifyOfficersModal({
               <span>Notification Message *</span>
             </label>
           </div>
+          </div>
 
           <div className="modal-dialog__actions ia-scc-modal__actions">
             <button type="button" className="secondary-btn" onClick={onClose} disabled={isSending}>
@@ -168,7 +186,9 @@ export function SccNotifyOfficersModal({
               disabled={isSending || !notify.smtpStatus?.configured || notify.effectiveTo.length === 0}
             >
               {isSending
-                ? 'Sending via Google SMTP...'
+                ? sendProgress && sendProgress.total > 1
+                  ? `Sending Queued (${sendProgress.sent}/${sendProgress.total})...`
+                  : 'Sending Email Notification...'
                 : `Send Notification (${notify.effectiveTo.length})`}
             </button>
           </div>

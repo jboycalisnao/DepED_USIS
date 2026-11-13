@@ -23,6 +23,7 @@ fs.writeFileSync(versionJsonPath, `${JSON.stringify(manifest, null, 2)}\n`);
 const distSrc = path.join(rootDir, '..', 'attendance', 'dist');
 const distDest = path.join(rootDir, 'dist');
 if (fs.existsSync(distSrc)) {
+  fs.rmSync(distDest, { recursive: true, force: true });
   fs.cpSync(distSrc, distDest, { recursive: true });
   console.log(`Synced attendance web build to kiosk shell dist folder.`);
 }

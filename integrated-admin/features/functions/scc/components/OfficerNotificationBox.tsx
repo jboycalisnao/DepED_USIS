@@ -21,7 +21,7 @@ type OfficerNotificationBoxProps = {
 };
 
 export function OfficerNotificationBox({
-  title = 'Notify registered officers via Google SMTP',
+  title = 'Notify registered officers via email',
   smtpStatus,
   recipients,
   allOfficersCount,
@@ -56,18 +56,18 @@ export function OfficerNotificationBox({
 
       {isLoading ? (
         <p className="ia-scc-notify-box__hint">
-          Checking Google SMTP status and registered officer emails...
+          Checking email notification availability and registered officer emails...
         </p>
       ) : !smtpReady ? (
         <p className="ia-scc-notify-box__hint ia-scc-notify-box__hint--warn">
-          Google SMTP is not configured on the server
+          Email notification service is not configured on the server
           {smtpStatus?.missing?.length
             ? ` (missing: ${smtpStatus.missing.join(', ')})`
             : '.'}
         </p>
       ) : (
         <p className="ia-scc-notify-box__hint">
-          Sender: <code>{smtpStatus?.from}</code> via <code>{smtpStatus?.host}:{smtpStatus?.port}</code>
+          Sender: <code>{smtpStatus?.from}</code>
         </p>
       )}
 

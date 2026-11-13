@@ -14,6 +14,10 @@ import {
   getGoogleSmtpConfigStatus,
   sendSmtpEmailNotification,
 } from './lib/server/googleSmtpMailer';
+import {
+  buildEmailTermsAgreementPdf,
+  type EmailTermsAgreementPdfInput,
+} from './lib/server/emailTermsPdfGenerator';
 
 const readJsonBody = async (req: any): Promise<Record<string, unknown>> => {
   const chunks: Buffer[] = [];
@@ -31,12 +35,13 @@ const sendJson = (res: any, statusCode: number, payload: unknown) => {
 };
 
 export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, '..', '');
+  const getEnv = () => loadEnv(mode, '..', '');
 
   const sccGoogleProvisionApiPlugin = {
     name: 'ia-scc-google-provision-api',
     configureServer(server: any) {
       server.middlewares.use('/api/scc-provision-google-user', async (req: any, res: any) => {
+        const env = getEnv();
         if (req.method === 'GET') {
           try {
             const rawUrl = String(req.url || '');
@@ -153,12 +158,13 @@ export default defineConfig(({ mode }) => {
       });
 
       server.middlewares.use('/api/scc-send-notification', async (req: any, res: any) => {
+        const env = getEnv();
         if (req.method === 'GET') {
           try {
             sendJson(res, 200, getGoogleSmtpConfigStatus(env));
           } catch (err: any) {
             sendJson(res, 500, {
-              error: err?.message || 'Unable to inspect Google SMTP configuration.',
+              error: err?.message || 'Unable to inspect email notification configuration.',
             });
           }
           return;
@@ -187,6 +193,33 @@ export default defineConfig(({ mode }) => {
                 ? [body.cc]
                 : [];
 
+            const attachments =
+              body.termsAgreement && typeof body.termsAgreement === 'object'
+                ? (() => {
+                    const ta = body.termsAgreement as EmailTermsAgreementPdfInput;
+                    const pdf = buildEmailTermsAgreementPdf({
+                      trackingNumber: ta.trackingNumber != null ? String(ta.trackingNumber) : undefined,
+                      organizationName: String(ta.organizationName || ''),
+                      organizationAcronym: ta.organizationAcronym != null ? String(ta.organizationAcronym) : undefined,
+                      emailAddress: String(ta.emailAddress || ''),
+                      requesterName: String(ta.requesterName || ''),
+                      requesterPosition: ta.requesterPosition != null ? String(ta.requesterPosition) : undefined,
+                      adviserName: ta.adviserName != null ? String(ta.adviserName) : undefined,
+                      adviserEndorsed: typeof ta.adviserEndorsed === 'boolean' ? ta.adviserEndorsed : undefined,
+                      approvedBy: ta.approvedBy != null ? String(ta.approvedBy) : undefined,
+                      statusLabel: ta.statusLabel != null ? String(ta.statusLabel) : undefined,
+                      issuedDate: ta.issuedDate != null ? String(ta.issuedDate) : undefined,
+                    });
+                    return [
+                      {
+                        filename: pdf.filename,
+                        contentType: 'application/pdf',
+                        content: pdf.buffer,
+                      },
+                    ];
+                  })()
+                : undefined;
+
             const result = await sendSmtpEmailNotification(
               {
                 to,
@@ -194,13 +227,33 @@ export default defineConfig(({ mode }) => {
                 replyTo: body.replyTo != null ? String(body.replyTo) : undefined,
                 subject: String(body.subject || ''),
                 text: String(body.text || body.message || ''),
+                html: body.html != null ? String(body.html) : undefined,
+                attachments,
+                relayTest:
+                  body.relayTest && typeof body.relayTest === 'object'
+                    ? {
+                        host:
+                          (body.relayTest as { host?: unknown }).host != null
+                            ? String((body.relayTest as { host?: unknown }).host)
+                            : undefined,
+                        port:
+                          (body.relayTest as { port?: unknown }).port != null
+                            ? Number((body.relayTest as { port?: unknown }).port)
+                            : undefined,
+                        requireAuth:
+                          typeof (body.relayTest as { requireAuth?: unknown }).requireAuth ===
+                          'boolean'
+                            ? Boolean((body.relayTest as { requireAuth?: unknown }).requireAuth)
+                            : undefined,
+                      }
+                    : undefined,
               },
               env,
             );
             sendJson(res, 200, result);
           } catch (err: any) {
             sendJson(res, 400, {
-              error: err?.message || 'Unable to send email notification via Google SMTP.',
+              error: err?.message || 'Unable to send email notification.',
             });
           }
           return;

@@ -3,12 +3,22 @@ import { createPortal } from 'react-dom';
 import { UsisSearchableSelect } from '../../../../common/components/ui/UsisSearchableSelect';
 import type { SccSession, SccServiceKey, SccPriority, SccServiceRequest } from '../../../types';
 import { SCC_DIGITAL_SERVICES } from '../../services/constants';
+import { SccEmailRequestDocument } from '../components/SccEmailRequestDocument';
+import {
+  LEON_NHS_PRIVACY_CLAUSES,
+  LEON_NHS_PRIVACY_CONTRACT_INTRO,
+} from '../constants/dataPrivacyTerms';
+import { downloadSccEmailRequestPdf } from '../utils/sccEmailRequestPdf';
 import {
   checkSccMailboxAvailability,
   createSccRequest,
+  fetchSccOfficers,
   fetchSccOrganizations,
   formatEmailAlreadyRegisteredMessage,
+  isValidSccEmail,
   normalizeMailboxAlias,
+  resolvePresidentNotificationEmail,
+  sanitizeEmail,
   type MailboxAvailabilityResult,
 } from '../../../services/sccSupabase';
 
@@ -37,6 +47,10 @@ export function CreateServiceRequestModal({
   const [requestedAlias, setRequestedAlias] = useState(
     session.organizationAcronym.toLowerCase().replace(/[^a-z0-9]/g, ''),
   );
+  const [notificationEmail, setNotificationEmail] = useState('');
+  const [defaultPresidentEmail, setDefaultPresidentEmail] = useState('');
+  const [defaultPresidentName, setDefaultPresidentName] = useState('');
+  const [isLoadingPresidentEmail, setIsLoadingPresidentEmail] = useState(false);
   const [storageCapacity, setStorageCapacity] = useState('50GB');
   const [eventTitle, setEventTitle] = useState('');
   const [eventDate, setEventDate] = useState('');
@@ -55,30 +69,60 @@ export function CreateServiceRequestModal({
   const [isCheckingAlias, setIsCheckingAlias] = useState(false);
   const [aliasAvailability, setAliasAvailability] = useState<MailboxAvailabilityResult | null>(null);
   const [liveAdviserName, setLiveAdviserName] = useState(session.adviserName);
+  const [submittedEmailRequest, setSubmittedEmailRequest] = useState<SccServiceRequest | null>(null);
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+  const [pdfError, setPdfError] = useState<string | null>(null);
+  const [dataPrivacyAccepted, setDataPrivacyAccepted] = useState(false);
+  const [dataPrivacySignatory, setDataPrivacySignatory] = useState(session.fullName);
 
   useEffect(() => {
     if (!isOpen) return;
     let cancelled = false;
+    setErrorMessage(null);
+    setSubmittedEmailRequest(null);
+    setIsDownloadingPdf(false);
+    setPdfError(null);
+    setDataPrivacyAccepted(false);
+    setDataPrivacySignatory(session.fullName);
+    setSelectedServiceKey(initialServiceKey);
     setLiveAdviserName(session.adviserName);
-    void fetchSccOrganizations()
-      .then((orgs) => {
+    setNotificationEmail('');
+    setDefaultPresidentEmail('');
+    setDefaultPresidentName('');
+    setIsLoadingPresidentEmail(true);
+
+    void Promise.allSettled([
+      fetchSccOrganizations(),
+      fetchSccOfficers(session.organizationId, session.organizationAcronym, session.organizationName),
+    ])
+      .then(([orgsRes, officersRes]) => {
         if (cancelled) return;
-        const matched = orgs.find(
-          (o) =>
-            o.id === session.organizationId ||
-            o.acronym.toLowerCase() === session.organizationAcronym.toLowerCase(),
-        );
-        if (matched?.adviserName) {
-          setLiveAdviserName(matched.adviserName);
+        if (orgsRes.status === 'fulfilled') {
+          const matched = orgsRes.value.find(
+            (o) =>
+              o.id === session.organizationId ||
+              o.acronym.toLowerCase() === session.organizationAcronym.toLowerCase(),
+          );
+          if (matched?.adviserName) {
+            setLiveAdviserName(matched.adviserName);
+          }
+        }
+        if (officersRes.status === 'fulfilled') {
+          const pres = resolvePresidentNotificationEmail(officersRes.value);
+          setDefaultPresidentEmail(pres.email);
+          setDefaultPresidentName(pres.presidentName);
+          if (pres.email) {
+            setNotificationEmail((prev) => (prev.trim() ? prev : pres.email));
+          }
         }
       })
-      .catch(() => {
-        // keep session.adviserName fallback
+      .finally(() => {
+        if (!cancelled) setIsLoadingPresidentEmail(false);
       });
     return () => {
       cancelled = true;
     };
-  }, [isOpen, session.organizationId, session.organizationAcronym, session.adviserName]);
+  }, [isOpen, session.organizationId, session.organizationAcronym, session.organizationName, session.adviserName]);
 
   const normalizedAlias = normalizeMailboxAlias(requestedAlias);
 
@@ -113,7 +157,126 @@ export function CreateServiceRequestModal({
     };
   }, [isOpen, normalizedAlias, selectedServiceKey]);
 
+  const handleDownloadPdf = async (targetRequest: SccServiceRequest) => {
+    try {
+      setIsDownloadingPdf(true);
+      setPdfError(null);
+      await downloadSccEmailRequestPdf(targetRequest, {
+        adviserName: liveAdviserName || session.adviserName,
+        schoolId: session.schoolId,
+        schoolName: session.schoolName,
+      });
+    } catch (err: any) {
+      setPdfError(err?.message || 'Unable to generate PDF. Please try again.');
+    } finally {
+      setIsDownloadingPdf(false);
+    }
+  };
+
   if (!isOpen) return null;
+
+  const resolvedAdviserName = liveAdviserName || session.adviserName;
+
+  if (submittedEmailRequest) {
+    const requestedAddress = `${submittedEmailRequest.details?.requestedMailboxAlias || normalizedAlias}@leonnhs.edu.ph`;
+
+    return createPortal(
+      <div className="modal-overlay modal-overlay--high scc-usis-modal-wrap" role="presentation">
+        <div className="modal-backdrop" onClick={onClose} />
+        <div
+          className="modal-dialog modal-dialog--wide"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="scc-submitted-req-title"
+        >
+          <div className="modal-dialog__header">
+            <div className="modal-dialog__title-group">
+              <p className="modal-dialog__eyebrow">
+                {session.organizationName} ({session.organizationAcronym}) •{' '}
+                {submittedEmailRequest.trackingNumber}
+              </p>
+              <h3 id="scc-submitted-req-title">Email Creation Request Submitted</h3>
+            </div>
+            <button
+              type="button"
+              className="modal-dialog__close"
+              onClick={onClose}
+              aria-label="Close dialog"
+            >
+              <span className="material-symbols-outlined" aria-hidden="true">
+                close
+              </span>
+            </button>
+          </div>
+
+          <div className="modal-dialog__body">
+            <div className="scc-request-confirm">
+              {pdfError ? (
+                <div className="scc-alert scc-alert--danger" role="alert">
+                  <span className="material-symbols-outlined" aria-hidden="true">error</span>
+                  <span>{pdfError}</span>
+                </div>
+              ) : null}
+
+              <div className="scc-request-confirm__banner">
+                <div className="scc-request-confirm__info">
+                  <span
+                    className="material-symbols-outlined scc-request-confirm__icon"
+                    aria-hidden="true"
+                  >
+                    check_circle
+                  </span>
+                  <div>
+                    <h4 className="scc-request-confirm__title">
+                      Tracking No. {submittedEmailRequest.trackingNumber} Recorded
+                    </h4>
+                    <p className="scc-request-confirm__desc">
+                      Your request for <strong>{requestedAddress}</strong> is now queued for Coordinator review. Download the auto-filled USIS letterhead request form below for signatures and filing.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="scc-btn scc-btn--primary"
+                  disabled={isDownloadingPdf}
+                  onClick={() => handleDownloadPdf(submittedEmailRequest)}
+                >
+                  <span className="material-symbols-outlined" aria-hidden="true">
+                    picture_as_pdf
+                  </span>
+                  {isDownloadingPdf ? 'Generating PDF...' : 'Download Request Form (PDF)'}
+                </button>
+              </div>
+
+              <div className="scc-letterhead-preview-wrap">
+                <SccEmailRequestDocument
+                  request={submittedEmailRequest}
+                  adviserName={resolvedAdviserName}
+                  schoolId={session.schoolId}
+                  schoolName={session.schoolName}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="modal-dialog__actions">
+            <button type="button" onClick={onClose} disabled={isDownloadingPdf}>
+              Done
+            </button>
+            <button
+              type="button"
+              className="modal-dialog__blue"
+              disabled={isDownloadingPdf}
+              onClick={() => handleDownloadPdf(submittedEmailRequest)}
+            >
+              {isDownloadingPdf ? 'Generating PDF...' : 'Download PDF Form'}
+            </button>
+          </div>
+        </div>
+      </div>,
+      document.body,
+    );
+  }
 
   const currentService =
     SCC_DIGITAL_SERVICES.find((s) => s.key === selectedServiceKey) || SCC_DIGITAL_SERVICES[0];
@@ -138,9 +301,26 @@ export function CreateServiceRequestModal({
       setErrorMessage('Club requests must be endorsed by the designated Teacher Adviser.');
       return;
     }
+    const cleanNotificationEmail = sanitizeEmail(notificationEmail).trim().toLowerCase();
     if (selectedServiceKey === 'email_account') {
       if (!normalizedAlias) {
         setErrorMessage('Please enter a valid desired email prefix / mailbox alias.');
+        return;
+      }
+      if (!isValidSccEmail(cleanNotificationEmail)) {
+        setErrorMessage('Please enter a valid notification email address.');
+        return;
+      }
+      if (!dataPrivacySignatory.trim()) {
+        setErrorMessage(
+          'Please enter the Requesting Party full name to sign the Leon NHS Data Privacy Terms.',
+        );
+        return;
+      }
+      if (!dataPrivacyAccepted) {
+        setErrorMessage(
+          'You must accept the Data Privacy Contract and Leon NHS Data Privacy Terms before submitting.',
+        );
         return;
       }
       const check = await checkSccMailboxAvailability(normalizedAlias);
@@ -150,6 +330,8 @@ export function CreateServiceRequestModal({
         return;
       }
     }
+
+    const signedAtIso = new Date().toISOString();
 
     try {
       setIsSubmitting(true);
@@ -170,7 +352,13 @@ export function CreateServiceRequestModal({
         adviserEndorsement,
         details: {
           ...(selectedServiceKey === 'email_account'
-            ? { requestedMailboxAlias: requestedAlias.trim() }
+            ? {
+                requestedMailboxAlias: requestedAlias.trim(),
+                notificationEmail: cleanNotificationEmail,
+                dataPrivacyAccepted: true,
+                dataPrivacySignatory: dataPrivacySignatory.trim(),
+                dataPrivacySignedAt: signedAtIso,
+              }
             : {}),
           ...(selectedServiceKey === 'cloud_storage' ? { storageCapacity } : {}),
           ...(selectedServiceKey === 'digital_id_pass'
@@ -197,7 +385,11 @@ export function CreateServiceRequestModal({
       });
 
       onCreated(request);
-      onClose();
+      if (selectedServiceKey === 'email_account') {
+        setSubmittedEmailRequest(request);
+      } else {
+        onClose();
+      }
     } catch (err: any) {
       setErrorMessage(err?.message || 'Failed to submit service request. Please try again.');
     } finally {
@@ -328,6 +520,61 @@ export function CreateServiceRequestModal({
                   ) : aliasAvailability?.available ? (
                     <span className="scc-helper scc-helper--success">
                       <strong>{aliasAvailability.email}</strong> is available.
+                    </span>
+                  ) : null}
+                </div>
+
+                <div className="scc-form-group">
+                  <label className="scc-label" htmlFor="scc-notification-email">
+                    Notification Email *
+                  </label>
+                  <input
+                    id="scc-notification-email"
+                    type="email"
+                    className="scc-input"
+                    required={selectedServiceKey === 'email_account'}
+                    placeholder="president@example.com"
+                    value={notificationEmail}
+                    onChange={(e) => setNotificationEmail(e.target.value)}
+                  />
+                  {isLoadingPresidentEmail ? (
+                    <span className="scc-helper scc-helper--checking">
+                      Loading President&apos;s email address...
+                    </span>
+                  ) : defaultPresidentEmail ? (
+                    <span className="scc-helper">
+                      Defaulted to {defaultPresidentName ? `${defaultPresidentName}'s` : "President's"} email (
+                      <strong>{defaultPresidentEmail}</strong>). Status updates and account credentials will be sent here.
+                      {notificationEmail.trim().toLowerCase() !== defaultPresidentEmail.toLowerCase() ? (
+                        <>
+                          {' '}
+                          <button
+                            type="button"
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              padding: 0,
+                              color: '#0b4d91',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                              textDecoration: 'underline',
+                              fontSize: 'inherit',
+                            }}
+                            onClick={() => setNotificationEmail(defaultPresidentEmail)}
+                          >
+                            Use President&apos;s Email
+                          </button>
+                        </>
+                      ) : null}
+                    </span>
+                  ) : (
+                    <span className="scc-helper">
+                      Required. No President email is on file in the officer roster — enter the active email where updates and credentials will be sent.
+                    </span>
+                  )}
+                  {notificationEmail.trim() && !isValidSccEmail(notificationEmail) ? (
+                    <span className="scc-helper scc-helper--danger" role="alert">
+                      Please enter a valid notification email address.
                     </span>
                   ) : null}
                 </div>
@@ -516,6 +763,56 @@ export function CreateServiceRequestModal({
               </label>
             </div>
             </div>
+
+          {selectedServiceKey === 'email_account' ? (
+            <div className="scc-privacy-contract">
+              <div className="scc-privacy-contract__header">
+                <h4 className="scc-privacy-contract__title">
+                  Data Privacy Contract &amp; Leon NHS Data Privacy Terms
+                </h4>
+                <span className="scc-privacy-contract__badge">Required Signature</span>
+              </div>
+
+              <div className="scc-privacy-contract__terms">
+                <p>{LEON_NHS_PRIVACY_CONTRACT_INTRO}</p>
+                <ol>
+                  {LEON_NHS_PRIVACY_CLAUSES.map((clause) => (
+                    <li key={clause.title}>
+                      <strong>{clause.title}:</strong> {clause.body}
+                    </li>
+                  ))}
+                </ol>
+              </div>
+
+              <div className="scc-form-group">
+                <label className="scc-label" htmlFor="scc-privacy-signatory">
+                  Requesting Party Full Name (Signatory) *
+                </label>
+                <input
+                  id="scc-privacy-signatory"
+                  type="text"
+                  className="scc-input"
+                  required
+                  placeholder="Enter full printed name of Requesting Party"
+                  value={dataPrivacySignatory}
+                  onChange={(e) => setDataPrivacySignatory(e.target.value)}
+                />
+              </div>
+
+              <label className="scc-checkbox-label scc-endorsement-box">
+                <input
+                  type="checkbox"
+                  checked={dataPrivacyAccepted}
+                  onChange={(e) => setDataPrivacyAccepted(e.target.checked)}
+                />
+                <span>
+                  I, <strong>{dataPrivacySignatory.trim() || session.fullName}</strong>, agree to
+                  the Data Privacy Contract and Leon National High School Data Privacy Terms and
+                  understand that my printed signature block will appear on the generated request form.
+                </span>
+              </label>
+            </div>
+          ) : null}
           </div>
 
           <div className="modal-dialog__actions">
@@ -528,7 +825,12 @@ export function CreateServiceRequestModal({
               disabled={
                 isSubmitting ||
                 (selectedServiceKey === 'email_account' &&
-                  (isCheckingAlias || !normalizedAlias || aliasAvailability?.available === false))
+                  (isCheckingAlias ||
+                    !normalizedAlias ||
+                    !isValidSccEmail(notificationEmail) ||
+                    !dataPrivacyAccepted ||
+                    !dataPrivacySignatory.trim() ||
+                    aliasAvailability?.available === false))
               }
             >
               {isSubmitting ? 'Submitting Request...' : 'Submit Service Request'}

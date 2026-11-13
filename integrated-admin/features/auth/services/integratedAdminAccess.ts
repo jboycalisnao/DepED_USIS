@@ -181,3 +181,63 @@ export const resolveIntegratedAdminAccess = async (username: string, password: s
     record,
   };
 };
+
+export const verifyAuthenticatedCoordinatorPassword = async (
+  passwordInput: string,
+): Promise<{ ok: true; coordinatorId: string; coordinatorName: string } | { ok: false; error: string }> => {
+  if (!passwordInput) {
+    return {
+      ok: false,
+      error: 'Please enter the password for your authenticated USIS Coordinator account.',
+    };
+  }
+
+  const access = getStoredIntegratedAdminAccess();
+  if (!access?.userId) {
+    return {
+      ok: false,
+      error: 'No authenticated USIS Coordinator session is active. Please sign in again.',
+    };
+  }
+
+  const { data, error } = await supabase
+    .from('usis_core_coordinators')
+    .select('*')
+    .eq('id', access.userId)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    return {
+      ok: false,
+      error: `Unable to verify coordinator credentials (${error.message}).`,
+    };
+  }
+
+  const record = data as Record<string, unknown> | null;
+  if (!record || record.is_active === false) {
+    return {
+      ok: false,
+      error: 'The authenticated USIS Coordinator account is inactive or unavailable.',
+    };
+  }
+
+  const passwordHash = typeof record.password_hash === 'string' ? record.password_hash : '';
+  const passwordPlain = typeof record.password_plain === 'string' ? record.password_plain : '';
+  const matches =
+    (Boolean(passwordHash) && passwordInput === passwordHash) ||
+    (Boolean(passwordPlain) && passwordInput === passwordPlain);
+
+  if (!matches) {
+    return {
+      ok: false,
+      error: 'Incorrect password for the authenticated USIS Coordinator account.',
+    };
+  }
+
+  return {
+    ok: true,
+    coordinatorId: String(record.id),
+    coordinatorName: access.coordinatorName,
+  };
+};

@@ -11,17 +11,33 @@ export type GoogleSmtpConfigStatus = {
   missing: string[];
 };
 
+export type EmailAttachmentInput = {
+  filename: string;
+  contentType: string;
+  content: Buffer;
+};
+
+export type RelayTestOverride = {
+  host?: string;
+  port?: number;
+  requireAuth?: boolean;
+};
+
 export type SendGoogleSmtpEmailInput = {
   to: string[];
   cc?: string[];
   replyTo?: string;
   subject: string;
   text: string;
+  html?: string;
+  attachments?: EmailAttachmentInput[];
+  relayTest?: RelayTestOverride;
 };
 
 export type SendGoogleSmtpEmailResult = {
   ok: true;
   host: string;
+  port?: number;
   from: string;
   sentTo: string[];
   ccSent: string[];
@@ -87,7 +103,7 @@ const resolveEnvConfig = (
 ): ResolvedSmtpConfig => {
   const host =
     normalize(env.IA_SMTP_HOST || env.SMTP_HOST || env.ATTENDANCE_SMTP_HOST) ||
-    'smtp.gmail.com';
+    'smtp-relay.gmail.com';
   const port = Number(
     normalize(env.IA_SMTP_PORT || env.SMTP_PORT || env.ATTENDANCE_SMTP_PORT) || 587,
   );
@@ -111,7 +127,7 @@ const resolveEnvConfig = (
     username;
   const fromName =
     normalize(env.IA_SMTP_FROM_NAME || env.SMTP_FROM_NAME) ||
-    'DepED USIS Integrated Admin (SCC)';
+    'Leon NHS USIS Integrated Admin (SCC)';
 
   const missing = [
     !host ? 'IA_SMTP_HOST' : '',
@@ -185,7 +201,7 @@ class SmtpConnection {
         this.buffer = '';
         const code = Number(lastLine.slice(0, 3));
         if (!expectedCodes.includes(code)) {
-          throw new Error(`Google SMTP returned ${code}: ${lastLine}`);
+          throw new Error(`Email delivery server returned ${code}: ${lastLine}`);
         }
         return lines.join('\n');
       }
@@ -193,7 +209,7 @@ class SmtpConnection {
       await new Promise((resolve) => setTimeout(resolve, 40));
     }
 
-    throw new Error('Google SMTP server timed out waiting for a response.');
+    throw new Error('Email delivery server timed out waiting for a response.');
   }
 
   async command(command: string, expectedCodes: number[]): Promise<string> {
@@ -243,6 +259,46 @@ const isImplicitTlsModeMismatch = (error: unknown) => {
   );
 };
 
+const encodeBase64Lines = (value: string): string =>
+  Buffer.from(value, 'utf8')
+    .toString('base64')
+    .replace(/.{1,76}/g, `$&${CRLF}`)
+    .trimEnd();
+
+const encodeBase64BufferLines = (value: Buffer): string =>
+  value
+    .toString('base64')
+    .replace(/.{1,76}/g, `$&${CRLF}`)
+    .trimEnd();
+
+const createAlternativeSection = (text: string, html?: string): { header: string; body: string } => {
+  const cleanHtml = normalize(html);
+  if (cleanHtml) {
+    const altBoundary = `usis-alt-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+    return {
+      header: `Content-Type: multipart/alternative; boundary="${altBoundary}"`,
+      body: [
+        `--${altBoundary}`,
+        'Content-Type: text/plain; charset=UTF-8',
+        'Content-Transfer-Encoding: base64',
+        '',
+        encodeBase64Lines(text.replace(/\r?\n/g, CRLF)),
+        `--${altBoundary}`,
+        'Content-Type: text/html; charset=UTF-8',
+        'Content-Transfer-Encoding: base64',
+        '',
+        encodeBase64Lines(cleanHtml.replace(/\r?\n/g, CRLF)),
+        `--${altBoundary}--`,
+      ].join(CRLF),
+    };
+  }
+
+  return {
+    header: `Content-Type: text/plain; charset=UTF-8${CRLF}Content-Transfer-Encoding: base64`,
+    body: encodeBase64Lines(text.replace(/\r?\n/g, CRLF)),
+  };
+};
+
 const createMimeMessage = (params: {
   from: string;
   fromName: string;
@@ -251,12 +307,14 @@ const createMimeMessage = (params: {
   replyTo?: string;
   subject: string;
   text: string;
+  html?: string;
+  attachments?: EmailAttachmentInput[];
 }): string => {
   const safeFromHeader = params.fromName
     ? `"${encodeHeaderValue(params.fromName.replace(/"/g, ''))}" <${sanitizeHeader(params.from)}>`
     : sanitizeHeader(params.from);
 
-  const headers = [
+  const baseHeaders = [
     `From: ${safeFromHeader}`,
     `To: ${params.to.map(sanitizeHeader).join(', ')}`,
     params.cc.length > 0 ? `Cc: ${params.cc.map(sanitizeHeader).join(', ')}` : '',
@@ -266,28 +324,83 @@ const createMimeMessage = (params: {
     `Subject: ${encodeHeaderValue(params.subject)}`,
     `Date: ${new Date().toUTCString()}`,
     'MIME-Version: 1.0',
-    'Content-Type: text/plain; charset=UTF-8',
-    'Content-Transfer-Encoding: 8bit',
   ].filter(Boolean);
 
-  // Dot-stuff lines beginning with '.' per RFC 5321
-  const stuffedBody = params.text
-    .replace(/\r?\n/g, CRLF)
-    .split(CRLF)
-    .map((line) => (line.startsWith('.') ? `.${line}` : line))
-    .join(CRLF);
+  const alt = createAlternativeSection(params.text, params.html);
+  const attachments = (params.attachments || []).filter((att) => att?.content?.length > 0);
 
-  return `${headers.join(CRLF)}${CRLF}${CRLF}${stuffedBody}${CRLF}.`;
+  if (attachments.length > 0) {
+    const mixedBoundary = `usis-mix-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+    const headers = [
+      ...baseHeaders,
+      `Content-Type: multipart/mixed; boundary="${mixedBoundary}"`,
+    ];
+
+    const parts: string[] = [
+      `--${mixedBoundary}`,
+      alt.header,
+      '',
+      alt.body,
+    ];
+
+    for (const att of attachments) {
+      const safeName = sanitizeHeader(att.filename || 'attachment.pdf').replace(/"/g, '');
+      const safeType = sanitizeHeader(att.contentType || 'application/octet-stream');
+      parts.push(
+        `--${mixedBoundary}`,
+        `Content-Type: ${safeType}; name="${safeName}"`,
+        `Content-Disposition: attachment; filename="${safeName}"`,
+        'Content-Transfer-Encoding: base64',
+        '',
+        encodeBase64BufferLines(att.content),
+      );
+    }
+    parts.push(`--${mixedBoundary}--`);
+
+    return `${headers.join(CRLF)}${CRLF}${CRLF}${parts.join(CRLF)}${CRLF}.`;
+  }
+
+  return `${[...baseHeaders, alt.header].join(CRLF)}${CRLF}${CRLF}${alt.body}${CRLF}.`;
 };
 
+const ALLOWED_TEST_HOSTS = new Set(['smtp.gmail.com', 'smtp-relay.gmail.com']);
+const ALLOWED_TEST_PORTS = new Set([25, 465, 587]);
+const SMTP_QUEUE_INTERVAL_MS = 1000;
+
+let smtpQueueTail: Promise<void> = Promise.resolve();
+let lastSmtpSentAt = 0;
+
+const sleepMs = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+function enqueueSmtpSend<T>(task: () => Promise<T>): Promise<T> {
+  const run = smtpQueueTail.then(async () => {
+    const elapsed = Date.now() - lastSmtpSentAt;
+    if (lastSmtpSentAt > 0 && elapsed < SMTP_QUEUE_INTERVAL_MS) {
+      await sleepMs(SMTP_QUEUE_INTERVAL_MS - elapsed);
+    }
+    try {
+      return await task();
+    } finally {
+      lastSmtpSentAt = Date.now();
+    }
+  });
+  smtpQueueTail = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
+
 const transmitViaSmtp = async (
-  cfg: ResolvedSmtpConfig,
+  cfg: ResolvedSmtpConfig & { skipAuth?: boolean },
   payload: {
     to: string[];
     cc: string[];
     replyTo?: string;
     subject: string;
     text: string;
+    html?: string;
+    attachments?: EmailAttachmentInput[];
   },
 ) => {
   const connection = await connectSocket(cfg.host, cfg.port, cfg.secure);
@@ -304,10 +417,22 @@ const transmitViaSmtp = async (
       await connection.command(`EHLO ${heloName}`, [250]);
     }
 
-    await connection.command(
-      `AUTH PLAIN ${encodeBase64(`\u0000${cfg.username}\u0000${cfg.password}`)}`,
-      [235],
-    );
+    if (!cfg.skipAuth) {
+      try {
+        await connection.command(
+          `AUTH PLAIN ${encodeBase64(`\u0000${cfg.username}\u0000${cfg.password}`)}`,
+          [235],
+        );
+      } catch (authError) {
+        const detail = authError instanceof Error ? authError.message : String(authError);
+        if (detail.includes('535')) {
+          throw new Error(
+            `Email server rejected authentication for ${cfg.username} (${detail}). Verify that 2-Step Verification is active on ${cfg.username}, initial sign-in is completed, and the notification app password is valid for ${cfg.username}.`,
+          );
+        }
+        throw authError;
+      }
+    }
     await connection.command(`MAIL FROM:<${cfg.from}>`, [250]);
 
     for (const rcpt of allRecipients) {
@@ -324,6 +449,8 @@ const transmitViaSmtp = async (
         replyTo: payload.replyTo,
         subject: payload.subject,
         text: payload.text,
+        html: payload.html,
+        attachments: payload.attachments,
       }),
       [250],
     );
@@ -337,12 +464,47 @@ export const sendSmtpEmailNotification = async (
   input: SendGoogleSmtpEmailInput,
   env: Record<string, string | undefined> = process.env,
 ): Promise<SendGoogleSmtpEmailResult> => {
-  const cfg = resolveEnvConfig(env);
-  if (cfg.missing.length > 0) {
+  const baseCfg = resolveEnvConfig(env);
+  let effectiveHost = baseCfg.host;
+  let effectivePort = baseCfg.port;
+  let effectiveSecure = baseCfg.secure;
+  const skipAuth = input.relayTest?.requireAuth === false;
+
+  if (input.relayTest) {
+    const reqHost = normalize(input.relayTest.host).toLowerCase();
+    if (reqHost) {
+      if (!ALLOWED_TEST_HOSTS.has(reqHost)) {
+        throw new Error(`Test host "${reqHost}" is not allowed.`);
+      }
+      effectiveHost = reqHost;
+    }
+    if (input.relayTest.port != null) {
+      const reqPort = Number(input.relayTest.port);
+      if (!ALLOWED_TEST_PORTS.has(reqPort)) {
+        throw new Error(`Test port ${reqPort} is not supported (use 25, 465, or 587).`);
+      }
+      effectivePort = reqPort;
+      effectiveSecure = reqPort === 465;
+    }
+  }
+
+  const effectiveMissing = skipAuth
+    ? baseCfg.missing.filter((key) => key !== 'IA_SMTP_USER' && key !== 'IA_SMTP_APP_PASSWORD')
+    : baseCfg.missing;
+
+  if (effectiveMissing.length > 0) {
     throw new Error(
-      `Google SMTP is not configured. Missing environment variables: ${cfg.missing.join(', ')}.`,
+      `Email notification service is not configured. Missing environment variables: ${effectiveMissing.join(', ')}.`,
     );
   }
+
+  const cfg: ResolvedSmtpConfig & { skipAuth?: boolean } = {
+    ...baseCfg,
+    host: effectiveHost,
+    port: effectivePort,
+    secure: effectiveSecure,
+    skipAuth,
+  };
 
   const to = normalizeEmailList(input.to);
   const toSet = new Set(to);
@@ -366,21 +528,26 @@ export const sendSmtpEmailNotification = async (
     replyTo: normalize(input.replyTo),
     subject,
     text,
+    html: normalize(input.html) || undefined,
+    attachments: input.attachments,
   };
 
-  try {
-    await transmitViaSmtp(cfg, payload);
-  } catch (err) {
-    if (cfg.secure && isImplicitTlsModeMismatch(err)) {
-      await transmitViaSmtp({ ...cfg, secure: false }, payload);
-    } else {
-      throw err;
+  await enqueueSmtpSend(async () => {
+    try {
+      await transmitViaSmtp(cfg, payload);
+    } catch (err) {
+      if (cfg.secure && isImplicitTlsModeMismatch(err)) {
+        await transmitViaSmtp({ ...cfg, secure: false }, payload);
+      } else {
+        throw err;
+      }
     }
-  }
+  });
 
   return {
     ok: true,
     host: cfg.host,
+    port: cfg.port,
     from: cfg.from,
     sentTo: to,
     ccSent: cc,
